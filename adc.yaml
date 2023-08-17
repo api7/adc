@@ -1,0 +1,21 @@
+services:
+- name: svc1
+  hosts:
+  - foo.com
+  - bar.com
+  upstreams:
+  - name: upstream1
+    targets:
+    - host: 10.10.16.12
+      port: 8080
+      weight: 50
+    - host: 10.10.16.13
+      port: 8080
+      weight: 50
+  - name: upstream2
+  plugins:
+    foo: bar
+- name: svc2
+routes:
+- name: route1
+  service_name: svc1
