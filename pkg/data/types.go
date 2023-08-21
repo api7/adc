@@ -12,6 +12,7 @@ type Plugins map[string]interface{}
 
 // Service is the abstraction of a backend service on API gateway.
 type Service struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	// Labels are used for resource classification and indexing
@@ -217,5 +218,25 @@ type TCPUnhealthyPredicatesForPassive struct {
 
 // ServiceConfig is the configuration of services
 type Configuration struct {
-	Services []Service `yaml:"services" json:"services"`
+	Services []*Service `yaml:"services" json:"services"`
+}
+
+type ResourceType string
+
+var (
+	// ResourceTypeService is the resource type of service
+	ServiceResourceType ResourceType = "service"
+)
+
+const (
+	CreateOption = iota
+	DeleteOption
+	UpdateOption
+)
+
+// Event is the event of adc
+type Event struct {
+	ResourceType ResourceType `json:"resource_type"`
+	Option       int          `json:"option"`
+	Value        interface{}  `json:"value"`
 }
