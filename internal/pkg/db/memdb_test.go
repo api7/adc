@@ -1,9 +1,11 @@
 package db
 
 import (
-	"github.com/api7/adc/pkg/data"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/api7/adc/pkg/data"
 )
 
 var (

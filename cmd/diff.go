@@ -51,5 +51,6 @@ func diffAPI7(cmd *cobra.Command) error {
 		return err
 	}
 
-	return d.Diff()
+	d.Diff()
+	return nil
 }
