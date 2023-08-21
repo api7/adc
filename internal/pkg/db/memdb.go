@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+
 	"github.com/api7/adc/pkg/data"
 	"github.com/hashicorp/go-memdb"
 )

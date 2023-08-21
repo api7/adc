@@ -1,8 +1,9 @@
 package differ
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/api7/adc/pkg/data"
 )

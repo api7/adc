@@ -4,11 +4,11 @@ Copyright © 2023 API7.ai
 package cmd
 
 import (
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+
 	"github.com/api7/adc/internal/pkg/differ"
 	"github.com/api7/adc/pkg/common"
-	"github.com/fatih/color"
-
-	"github.com/spf13/cobra"
 )
 
 // newDiffCmd represents the diff command
