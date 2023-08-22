@@ -10,10 +10,34 @@ import (
 	"github.com/api7/adc/pkg/data"
 )
 
+// Route apisix route object
+// +k8s:deepcopy-gen=true
+type Route struct {
+	ID string `json:"id" yaml:"id"`
+
+	Labels data.StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	Host            string           `json:"host,omitempty" yaml:"host,omitempty"`
+	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
+	Uri             string           `json:"uri,omitempty" yaml:"uri,omitempty"`
+	Priority        int              `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Timeout         *UpstreamTimeout `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Vars            data.Vars        `json:"vars,omitempty" yaml:"vars,omitempty"`
+	Uris            []string         `json:"uris,omitempty" yaml:"uris,omitempty"`
+	Methods         []string         `json:"methods,omitempty" yaml:"methods,omitempty"`
+	EnableWebsocket bool             `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
+	RemoteAddrs     []string         `json:"remote_addrs,omitempty" yaml:"remote_addrs,omitempty"`
+	UpstreamId      string           `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
+	Plugins         data.Plugins     `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	PluginConfigId  string           `json:"plugin_config_id,omitempty" yaml:"plugin_config_id,omitempty"`
+	FilterFunc      string           `json:"filter_func,omitempty" yaml:"filter_func,omitempty"`
+}
+
 // Service is the abstraction of a backend service on API gateway.
 type Service struct {
-	Name        string `json:"id"`
-	Description string `json:"desc"`
+	ID string `json:"id"`
+
+	Description string `json:"desc,omitempty"`
 	// Labels are used for resource classification and indexing
 	Labels data.StringArray `json:"labels,omitempty"`
 	// HTTP hosts for this service.
@@ -30,9 +54,9 @@ type Service struct {
 
 // Upstream is the definition of the upstream on Service.
 type Upstream struct {
-	// Name is the upstream name. It should be unique among all upstreams
+	// ID is the upstream name. It should be unique among all upstreams
 	// in the same service.
-	Name string `json:"id"`
+	ID string `json:"id"`
 
 	Type    string               `json:"type,omitempty" yaml:"type,omitempty"`
 	HashOn  string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`

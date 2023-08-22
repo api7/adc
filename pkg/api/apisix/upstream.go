@@ -2,6 +2,7 @@ package apisix
 
 import (
 	"context"
+
 	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
@@ -17,9 +18,9 @@ func newUpstream(c *Client) Upstream {
 }
 
 func (u *upstreamClient) Create(ctx context.Context, obj *types.Upstream) (*types.Upstream, error) {
-	return u.resourceClient.Create(ctx, obj.Name, obj)
+	return u.resourceClient.Create(ctx, obj.ID, obj)
 }
 
 func (u *upstreamClient) Update(ctx context.Context, obj *types.Upstream) (*types.Upstream, error) {
-	return u.resourceClient.Update(ctx, obj.Name, obj)
+	return u.resourceClient.Update(ctx, obj.ID, obj)
 }
