@@ -10,6 +10,7 @@ import (
 	"github.com/hexops/gotextdiff/span"
 )
 
+// ResourceType is the type of resource
 type ResourceType string
 
 var (
@@ -20,8 +21,11 @@ var (
 )
 
 const (
+	// CreateOption is the option of create
 	CreateOption = iota
+	// DeleteOption is the option of delete
 	DeleteOption
+	// UpdateOption is the option of update
 	UpdateOption
 )
 
@@ -41,6 +45,10 @@ func getName(field string, value interface{}) string {
 	return v.FieldByName(field).String()
 }
 
+// Output returns the output of event,
+// if the event is create, it will return the message of creating resource.
+// if the event is update, it will return the diff of old value and new value.
+// if the event is delete, it will return the message of deleting resource.
 func (e *Event) Output() (string, error) {
 	var output string
 	switch e.Option {
