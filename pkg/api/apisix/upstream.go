@@ -8,20 +8,20 @@ import (
 )
 
 type upstreamClient struct {
-	url     string
-	cluster *Client
+	url    string
+	client *Client
 }
 
 func newUpstream(c *Client) Upstream {
 	return &upstreamClient{
-		url:     c.baseURL + "/upstreams",
-		cluster: c,
+		url:    c.baseURL + "/upstreams",
+		client: c,
 	}
 }
 
 func (u *upstreamClient) Get(ctx context.Context, name string) (*types.Upstream, error) {
 	url := u.url + "/" + name
-	resp, err := u.cluster.getResource(ctx, url)
+	resp, err := u.client.getResource(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -33,10 +33,8 @@ func (u *upstreamClient) Get(ctx context.Context, name string) (*types.Upstream,
 	return ups, nil
 }
 
-// List is only used in cache warming up. So here just pass through
-// to APISIX.
 func (u *upstreamClient) List(ctx context.Context) ([]*types.Upstream, error) {
-	upsItems, err := u.cluster.listResource(ctx, u.url)
+	upsItems, err := u.client.listResource(ctx, u.url)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +57,7 @@ func (u *upstreamClient) Create(ctx context.Context, obj *types.Upstream) (*type
 	}
 	url := u.url + "/" + obj.Name
 
-	resp, err := u.cluster.createResource(ctx, url, body)
+	resp, err := u.client.createResource(ctx, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +70,7 @@ func (u *upstreamClient) Create(ctx context.Context, obj *types.Upstream) (*type
 
 func (u *upstreamClient) Delete(ctx context.Context, name string) error {
 	url := u.url + "/" + name
-	if err := u.cluster.deleteResource(ctx, url); err != nil {
+	if err := u.client.deleteResource(ctx, url); err != nil {
 		return err
 	}
 	return nil
@@ -85,7 +83,7 @@ func (u *upstreamClient) Update(ctx context.Context, obj *types.Upstream) (*type
 	}
 
 	url := u.url + "/" + obj.Name
-	resp, err := u.cluster.updateResource(ctx, url, body)
+	resp, err := u.client.updateResource(ctx, url, body)
 	if err != nil {
 		return nil, err
 	}
