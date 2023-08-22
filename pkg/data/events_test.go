@@ -67,7 +67,7 @@ func TestEventOutput(t *testing.T) {
 	assert.Nil(t, err, "should not return error")
 	assert.Equal(t, "creating service: \"svc\"", output)
 
-	// Test case3: update events
+	// Test case 3: update events
 	route1 := *route
 	route1.Description = "route1"
 	event = &Event{
