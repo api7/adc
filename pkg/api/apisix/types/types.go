@@ -16,17 +16,15 @@ type Service struct {
 	Description string `json:"desc"`
 	// Labels are used for resource classification and indexing
 	Labels data.StringArray `json:"labels,omitempty"`
-	// Protocols indicates the protocols that the service supports
-	Protocols []string `json:"protocols,omitempty"`
-	// The listening path prefix for this service.
-	PathPrefix string `json:"path_prefix,omitempty"`
 	// HTTP hosts for this service.
 	Hosts []string `json:"hosts"`
 	// Plugin settings on Service level
 	Plugins data.Plugins `json:"plugins,omitempty"`
 	// Upstream settings for the Service.
 	Upstream Upstream `json:"upstream"`
-	// doesn't support upstream_id
+	// UpstreamId settings for the Service.
+	UpstreamId string `json:"upstream_id"`
+	// Enables a websocket. Set to false by default.
 	EnableWebsocket bool `json:"enable_websocket,omitempty"`
 }
 
