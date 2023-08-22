@@ -37,3 +37,9 @@ func GetContentFromFile(filename string) (*api7types.Configuration, error) {
 
 	return &content, nil
 }
+
+func GetContentFromRemote() (*data.Configuration, error) {
+	return &data.Configuration{
+		Services: []*data.Service{},
+	}, nil
+}

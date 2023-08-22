@@ -12,6 +12,7 @@ type Plugins map[string]interface{}
 
 // Service is the abstraction of a backend service on API gateway.
 type Service struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	// Labels are used for resource classification and indexing
@@ -53,6 +54,26 @@ type Upstream struct {
 	UpstreamHost string `json:"upstream_host,omitempty"`
 	//Checks the data of health check
 	Checks *Checks `json:"checks,omitempty"`
+}
+
+// Route is the API endpoint which is exposed to the outside world by its service.
+type Route struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Labels are used for resource classification and indexing
+	Labels  StringArray `json:"labels,omitempty"`
+	Methods []string    `json:"methods"`
+	// Paths is the route paths to match this route.
+	Paths []string `json:"paths"`
+	// StripePathPrefix indicates whether to strip the path prefix defined on service.
+	StripPathPrefix bool `json:"strip_path_prefix"`
+	// Plugin settings on Service level
+	Plugins Plugins `json:"plugins,omitempty"`
+	// ServiceID is id of service that current route belong with.
+	ServiceID string `json:"service_id"`
+	// EnableWebSocket indicates whether this route should support websocket upgrade.
+	EnableWebSocket bool `json:"enable_websocket"`
 }
 
 // UpstreamTarget is the definition for an upstream endpoint.
@@ -215,7 +236,32 @@ type TCPUnhealthyPredicatesForPassive struct {
 	Timeouts    int64 `json:"timeouts,omitempty"`
 }
 
-// ServiceConfig is the configuration of services
+// Configuration is the configuration of services
 type Configuration struct {
-	Services []Service `yaml:"services" json:"services"`
+	Name     string     `yaml:"name" json:"name"`
+	Version  string     `yaml:"version" json:"version"`
+	Services []*Service `yaml:"services" json:"services"`
+	Routes   []*Route   `yaml:"routes" json:"routes"`
+}
+
+type ResourceType string
+
+var (
+	// ServiceResourceType is the resource type of service
+	ServiceResourceType ResourceType = "service"
+	// RouteResourceType is the resource type of route
+	RouteResourceType ResourceType = "route"
+)
+
+const (
+	CreateOption = iota
+	DeleteOption
+	UpdateOption
+)
+
+// Event is the event of adc
+type Event struct {
+	ResourceType ResourceType `json:"resource_type"`
+	Option       int          `json:"option"`
+	Value        interface{}  `json:"value"`
 }

@@ -19,6 +19,5 @@
 
 # Go workspace file
 go.work
-
-bin/
-.idea/
+.idea
+bin
