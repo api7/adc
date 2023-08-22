@@ -17,10 +17,15 @@ var schema = &memdb.DBSchema{
 					Unique:  true,
 					Indexer: &memdb.StringFieldIndex{Field: "ID"},
 				},
-				"name": {
-					Name:    "name",
+			},
+		},
+		"routes": {
+			Name: "routes",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
 					Unique:  true,
-					Indexer: &memdb.StringFieldIndex{Field: "Name"},
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
 				},
 			},
 		},
@@ -47,8 +52,17 @@ func NewMemDB(configure *data.Configuration) (*DB, error) {
 		if service.ID == "" {
 			service.ID = service.Name
 		}
+		err = txn.Insert("services", service)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-		err := txn.Insert("services", service)
+	for _, routes := range configure.Routes {
+		if routes.ID == "" {
+			routes.ID = routes.Name
+		}
+		err = txn.Insert("routes", routes)
 		if err != nil {
 			return nil, err
 		}
@@ -69,4 +83,17 @@ func (db *DB) GetServiceByID(id string) (*data.Service, error) {
 	}
 
 	return obj.(*data.Service), err
+}
+
+func (db *DB) GetRouteByID(id string) (*data.Route, error) {
+	obj, err := db.memDB.Txn(false).First("routes", "id", id)
+	if err != nil {
+		return nil, err
+	}
+
+	if obj == nil {
+		return nil, NotFound
+	}
+
+	return obj.(*data.Route), err
 }

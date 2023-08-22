@@ -35,19 +35,23 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 	var events []*data.Event
 	var err error
 
-	serviceEvents, err := d.diffService()
+	serviceEvents, err := d.diffServices()
+	if err != nil {
+		return nil, err
+	}
+
+	routeEvents, err := d.diffRoutes()
 	if err != nil {
 		return nil, err
 	}
 	events = append(events, serviceEvents...)
-
-	// TODO: diff routes
+	events = append(events, routeEvents...)
 
 	return events, nil
 }
 
 // diffService compares the services between local and remote.
-func (d *Differ) diffService() ([]*data.Event, error) {
+func (d *Differ) diffServices() ([]*data.Event, error) {
 	var events []*data.Event
 	var mark = make(map[string]bool)
 
@@ -93,6 +97,59 @@ func (d *Differ) diffService() ([]*data.Event, error) {
 			ResourceType: data.ServiceResourceType,
 			Option:       data.CreateOption,
 			Value:        service,
+		})
+	}
+
+	return events, nil
+}
+
+// diffRoutes compares the routes between local and remote.
+func (d *Differ) diffRoutes() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteRoute := range d.remoteConfig.Routes {
+		localRoute, err := d.localDB.GetRouteByID(remoteRoute.ID)
+		if err != nil {
+			// If we can't find the route in local, it means the route should be deleted.
+			// So we add a delete event and the value is the route from remote.
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.RouteResourceType,
+					Option:       data.DeleteOption,
+					Value:        remoteRoute,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localRoute.ID] = true
+		// If the route is equal, we don't need to add an event.
+		// Else, we use the local routes to update the remote routes.
+		if equal := reflect.DeepEqual(localRoute, remoteRoute); equal {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.RouteResourceType,
+			Option:       data.UpdateOption,
+			Value:        localRoute,
+		})
+	}
+
+	// If the route is not in the remote configuration, it means the route should be created.
+	for _, route := range d.localConfig.Routes {
+		if mark[route.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+			Value:        route,
 		})
 	}
 

@@ -1,6 +1,7 @@
 package differ
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,9 +37,55 @@ var (
 		},
 		UpstreamInUse: "upstream1",
 	}
+
+	route = &data.Route{
+		ID:        "route",
+		Name:      "route",
+		Labels:    []string{"lable1", "label2"},
+		Methods:   []string{http.MethodGet},
+		Paths:     []string{"/get"},
+		ServiceID: "svc",
+	}
 )
 
 func TestDiff(t *testing.T) {
+	// Test case 1: delete events
+	localConfig := &data.Configuration{
+		Services: []*data.Service{},
+		Routes:   []*data.Route{route},
+	}
+
+	route1 := *route
+	route1.ID = "route1"
+	route1.Name = "route1"
+	remoteConfig := &data.Configuration{
+		Services: []*data.Service{svc},
+		Routes:   []*data.Route{&route1},
+	}
+
+	differ, _ := NewDiffer(localConfig, remoteConfig)
+	events, _ := differ.Diff()
+	assert.Equal(t, 3, len(events), "check the number of delete events")
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.DeleteOption,
+			Value:        svc,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.DeleteOption,
+			Value:        &route1,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+			Value:        route,
+		},
+	}, events, "check the content of delete events")
+}
+
+func TestDiffServices(t *testing.T) {
 	// Test case 1: delete events
 	localConfig := &data.Configuration{
 		Services: []*data.Service{},
@@ -48,7 +95,7 @@ func TestDiff(t *testing.T) {
 	}
 
 	differ, _ := NewDiffer(localConfig, remoteConfig)
-	events, _ := differ.Diff()
+	events, _ := differ.diffServices()
 	assert.Equal(t, 1, len(events), "check the number of delete events")
 	assert.Equal(t, []*data.Event{
 		{
@@ -70,7 +117,7 @@ func TestDiff(t *testing.T) {
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
-	events, _ = differ.Diff()
+	events, _ = differ.diffServices()
 	assert.Equal(t, 1, len(events), "check the number of update events")
 	assert.Equal(t, []*data.Event{
 		{
@@ -89,7 +136,7 @@ func TestDiff(t *testing.T) {
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
-	events, _ = differ.Diff()
+	events, _ = differ.diffServices()
 	assert.Equal(t, 1, len(events), "check the number of create events")
 	assert.Equal(t, []*data.Event{
 		{
@@ -109,7 +156,7 @@ func TestDiff(t *testing.T) {
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
-	events, _ = differ.Diff()
+	events, _ = differ.diffServices()
 	assert.Equal(t, 0, len(events), "check the number of no events")
 
 	// Test case 5: delete and create events
@@ -125,7 +172,7 @@ func TestDiff(t *testing.T) {
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
-	events, _ = differ.Diff()
+	events, _ = differ.diffServices()
 	assert.Equal(t, 2, len(events), "check the number of delete and create events")
 	assert.Equal(t, []*data.Event{
 		{
@@ -137,6 +184,107 @@ func TestDiff(t *testing.T) {
 			ResourceType: data.ServiceResourceType,
 			Option:       data.CreateOption,
 			Value:        svc,
+		},
+	}, events, "check the content of delete and create events")
+}
+
+func TestDifferRoutes(t *testing.T) {
+	// Test case 1: delete events
+	localConfig := &data.Configuration{
+		Routes: []*data.Route{},
+	}
+	remoteConfig := &data.Configuration{
+		Routes: []*data.Route{route},
+	}
+
+	differ, _ := NewDiffer(localConfig, remoteConfig)
+	events, _ := differ.diffRoutes()
+	assert.Equal(t, 1, len(events), "check the number of delete events")
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.DeleteOption,
+			Value:        route,
+		},
+	}, events, "check the content of delete events")
+
+	// Test case 2: update events
+	localConfig = &data.Configuration{
+		Routes: []*data.Route{route},
+	}
+	route1 := *route
+	route1.Name = "route1"
+	remoteConfig = &data.Configuration{
+		Routes: []*data.Route{&route1},
+	}
+
+	differ, _ = NewDiffer(localConfig, remoteConfig)
+	events, _ = differ.diffRoutes()
+	assert.Equal(t, 1, len(events), "check the number of update events")
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.UpdateOption,
+			Value:        route,
+		},
+	}, events, "check the content of update events")
+
+	// Test case 3: create events
+	localConfig = &data.Configuration{
+		Routes: []*data.Route{route},
+	}
+	remoteConfig = &data.Configuration{
+		Routes: []*data.Route{},
+	}
+
+	differ, _ = NewDiffer(localConfig, remoteConfig)
+	events, _ = differ.diffRoutes()
+	assert.Equal(t, 1, len(events), "check the number of create events")
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+			Value:        route,
+		},
+	}, events, "check the content of create events")
+
+	// Test case 4: no events
+	localConfig = &data.Configuration{
+		Routes: []*data.Route{},
+	}
+
+	remoteConfig = &data.Configuration{
+		Routes: []*data.Route{},
+	}
+
+	differ, _ = NewDiffer(localConfig, remoteConfig)
+	events, _ = differ.diffRoutes()
+	assert.Equal(t, 0, len(events), "check the number of no events")
+
+	// Test case 5: delete and create events
+	localConfig = &data.Configuration{
+		Routes: []*data.Route{route},
+	}
+	route1 = *route
+	route1.ID = "route1"
+	route1.Name = "route1"
+	remoteConfig = &data.Configuration{
+		Routes: []*data.Route{&route1},
+	}
+
+	differ, _ = NewDiffer(localConfig, remoteConfig)
+	events, _ = differ.diffRoutes()
+	assert.Equal(t, 2, len(events), "check the number of delete and create events")
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.DeleteOption,
+			Value:        &route1,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+			Value:        route,
 		},
 	}, events, "check the content of delete and create events")
 }
