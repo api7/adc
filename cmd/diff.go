@@ -83,9 +83,9 @@ func diffAPI7(cmd *cobra.Command) error {
 		}
 
 		for _, line := range strings.Split(str, "\n") {
-			if strings.HasPrefix(line, "+") {
+			if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "creating") {
 				color.Green(line)
-			} else if strings.HasPrefix(line, "-") {
+			} else if strings.HasPrefix(line, "-") || strings.HasPrefix(line, "deleting") {
 				color.Red(line)
 			} else {
 				fmt.Println(line)
