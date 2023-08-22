@@ -10,8 +10,8 @@ type cluster struct {
 
 	cli *Client
 
-	upstream Upstream
-	service  Service
+	route   Route
+	service Service
 }
 
 func NewCluster(ctx context.Context, url, adminKey string) Cluster {
@@ -23,15 +23,15 @@ func NewCluster(ctx context.Context, url, adminKey string) Cluster {
 	cli := newClient(url, adminKey)
 	c.cli = cli
 
-	c.upstream = newUpstream(cli)
+	c.route = newRoute(cli)
 	c.service = newService(cli)
 
 	return c
 }
 
-// Upstream implements Cluster.Upstream method.
-func (c *cluster) Upstream() Upstream {
-	return c.upstream
+// Route implements Cluster.Route method.
+func (c *cluster) Route() Route {
+	return c.route
 }
 
 // Service implements Cluster.Service method.
