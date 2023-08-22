@@ -56,6 +56,6 @@ func saveConfiguration() error {
 		return err
 	}
 
-	color.Green("Scucessfully configure ADC")
+	color.Green("Successfully configure ADC")
 	return nil
 }

@@ -12,3 +12,7 @@ build: ## Build adc
 test:
 	@go test -v ./...
 .PHONY: test
+
+.PHONY: fmt
+fmt: ## Format all go codes
+	./utils/goimports-reviser.sh

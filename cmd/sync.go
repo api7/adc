@@ -30,7 +30,7 @@ func newSyncCmd() *cobra.Command {
 			}
 
 			color.Green("Get file content success: %v", d)
-			color.Green("Scucessfully sync configurations")
+			color.Green("Successfully sync configurations")
 			return nil
 		},
 	}
