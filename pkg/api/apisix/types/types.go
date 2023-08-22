@@ -1,0 +1,202 @@
+package types
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/api7/adc/pkg/data"
+)
+
+// Service is the abstraction of a backend service on API gateway.
+type Service struct {
+	Name        string `json:"id"`
+	Description string `json:"desc"`
+	// Labels are used for resource classification and indexing
+	Labels data.StringArray `json:"labels,omitempty"`
+	// Protocols indicates the protocols that the service supports
+	Protocols []string `json:"protocols,omitempty"`
+	// The listening path prefix for this service.
+	PathPrefix string `json:"path_prefix,omitempty"`
+	// HTTP hosts for this service.
+	Hosts []string `json:"hosts"`
+	// Plugin settings on Service level
+	Plugins data.Plugins `json:"plugins,omitempty"`
+	// Upstream settings for the Service.
+	Upstream Upstream `json:"upstream"`
+	// doesn't support upstream_id
+	EnableWebsocket bool `json:"enable_websocket,omitempty"`
+}
+
+// Upstream is the definition of the upstream on Service.
+type Upstream struct {
+	// Name is the upstream name. It should be unique among all upstreams
+	// in the same service.
+	Name string `json:"id"`
+
+	Type    string               `json:"type,omitempty" yaml:"type,omitempty"`
+	HashOn  string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
+	Key     string               `json:"key,omitempty" yaml:"key,omitempty"`
+	Checks  *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Nodes   UpstreamNodes        `json:"nodes" yaml:"nodes"`
+	Scheme  string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	Retries *int                 `json:"retries,omitempty" yaml:"retries,omitempty"`
+	Timeout *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	TLS     *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
+
+	// for Service Discovery
+	ServiceName   string            `json:"service_name,omitempty" yaml:"service_name,omitempty"`
+	DiscoveryType string            `json:"discovery_type,omitempty" yaml:"discovery_type,omitempty"`
+	DiscoveryArgs map[string]string `json:"discovery_args,omitempty" yaml:"discovery_args,omitempty"`
+}
+
+// UpstreamNode is the node in upstream
+// +k8s:deepcopy-gen=true
+type UpstreamNode struct {
+	Host   string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port   int    `json:"port,omitempty" yaml:"port,omitempty"`
+	Weight int    `json:"weight,omitempty" yaml:"weight,omitempty"`
+}
+
+// UpstreamNodes is the upstream node list.
+type UpstreamNodes []UpstreamNode
+
+// UnmarshalJSON implements json.Unmarshaler interface.
+// lua-cjson doesn't distinguish empty array and table,
+// and by default empty array will be encoded as '{}'.
+// We have to maintain the compatibility.
+func (n *UpstreamNodes) UnmarshalJSON(p []byte) error {
+	var data []UpstreamNode
+	if p[0] == '{' {
+		value := map[string]float64{}
+		if err := json.Unmarshal(p, &value); err != nil {
+			return err
+		}
+		for k, v := range value {
+			node, err := mapKV2Node(k, v)
+			if err != nil {
+				return err
+			}
+			data = append(data, *node)
+		}
+		*n = data
+		return nil
+	}
+	if err := json.Unmarshal(p, &data); err != nil {
+		return err
+	}
+	*n = data
+	return nil
+}
+
+// UpstreamHealthCheck defines the active and/or passive health check for an Upstream,
+// with the upstream health check feature, pods can be kicked out or joined in quickly,
+// if the feedback of Kubernetes liveness/readiness probe is long.
+// +k8s:deepcopy-gen=true
+type UpstreamHealthCheck struct {
+	Active  *UpstreamActiveHealthCheck  `json:"active" yaml:"active"`
+	Passive *UpstreamPassiveHealthCheck `json:"passive,omitempty" yaml:"passive,omitempty"`
+}
+
+// UpstreamActiveHealthCheck defines the active kind of upstream health check.
+// +k8s:deepcopy-gen=true
+type UpstreamActiveHealthCheck struct {
+	Type               string                             `json:"type,omitempty" yaml:"type,omitempty"`
+	Timeout            int                                `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Concurrency        int                                `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+	Host               string                             `json:"host,omitempty" yaml:"host,omitempty"`
+	Port               int32                              `json:"port,omitempty" yaml:"port,omitempty"`
+	HTTPPath           string                             `json:"http_path,omitempty" yaml:"http_path,omitempty"`
+	HTTPSVerifyCert    bool                               `json:"https_verify_certificate,omitempty" yaml:"https_verify_certificate,omitempty"`
+	HTTPRequestHeaders []string                           `json:"req_headers,omitempty" yaml:"req_headers,omitempty"`
+	Healthy            UpstreamActiveHealthCheckHealthy   `json:"healthy,omitempty" yaml:"healthy,omitempty"`
+	Unhealthy          UpstreamActiveHealthCheckUnhealthy `json:"unhealthy,omitempty" yaml:"unhealthy,omitempty"`
+}
+
+// UpstreamPassiveHealthCheck defines the passive kind of upstream health check.
+// +k8s:deepcopy-gen=true
+type UpstreamPassiveHealthCheck struct {
+	Type      string                              `json:"type,omitempty" yaml:"type,omitempty"`
+	Healthy   UpstreamPassiveHealthCheckHealthy   `json:"healthy,omitempty" yaml:"healthy,omitempty"`
+	Unhealthy UpstreamPassiveHealthCheckUnhealthy `json:"unhealthy,omitempty" yaml:"unhealthy,omitempty"`
+}
+
+// UpstreamActiveHealthCheckHealthy defines the conditions to judge whether
+// an upstream node is healthy with the active manner.
+// +k8s:deepcopy-gen=true
+type UpstreamActiveHealthCheckHealthy struct {
+	UpstreamPassiveHealthCheckHealthy `json:",inline" yaml:",inline"`
+
+	Interval int `json:"interval,omitempty" yaml:"interval,omitempty"`
+}
+
+// UpstreamPassiveHealthCheckHealthy defines the conditions to judge whether
+// an upstream node is healthy with the passive manner.
+// +k8s:deepcopy-gen=true
+type UpstreamPassiveHealthCheckHealthy struct {
+	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
+	Successes    int   `json:"successes,omitempty" yaml:"successes,omitempty"`
+}
+
+// UpstreamActiveHealthCheckUnhealthy defines the conditions to judge whether
+// an upstream node is unhealthy with the active manager.
+// +k8s:deepcopy-gen=true
+type UpstreamActiveHealthCheckUnhealthy struct {
+	UpstreamPassiveHealthCheckUnhealthy `json:",inline" yaml:",inline"`
+
+	Interval int `json:"interval,omitempty" yaml:"interval,omitempty"`
+}
+
+// UpstreamPassiveHealthCheckUnhealthy defines the conditions to judge whether
+// an upstream node is unhealthy with the passive manager.
+// +k8s:deepcopy-gen=true
+type UpstreamPassiveHealthCheckUnhealthy struct {
+	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
+	HTTPFailures int   `json:"http_failures,omitempty" yaml:"http_failures,omitempty"`
+	TCPFailures  int   `json:"tcp_failures,omitempty" yaml:"tcp_failures,omitempty"`
+	Timeouts     int   `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
+}
+
+// ClientTLS is tls cert and key use in mTLS
+type ClientTLS struct {
+	Cert string `json:"client_cert,omitempty" yaml:"client_cert,omitempty"`
+	Key  string `json:"client_key,omitempty" yaml:"client_key,omitempty"`
+}
+
+// UpstreamTimeout represents the timeout settings on Upstream.
+type UpstreamTimeout struct {
+	// Connect is the connect timeout
+	Connect int `json:"connect" yaml:"connect"`
+	// Send is the send timeout
+	Send int `json:"send" yaml:"send"`
+	// Read is the read timeout
+	Read int `json:"read" yaml:"read"`
+}
+
+func mapKV2Node(key string, val float64) (*UpstreamNode, error) {
+	hp := strings.Split(key, ":")
+	host := hp[0]
+	//  according to APISIX upstream nodes policy, port is required
+	port := "80"
+
+	if len(hp) > 2 {
+		return nil, errors.New("invalid upstream node")
+	} else if len(hp) == 2 {
+		port = hp[1]
+	}
+
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, fmt.Errorf("parse port to int fail: %s", err.Error())
+	}
+
+	node := &UpstreamNode{
+		Host:   host,
+		Port:   portInt,
+		Weight: int(val),
+	}
+
+	return node, nil
+}

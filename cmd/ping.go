@@ -44,7 +44,7 @@ func pingAPI7() error {
 		return err
 	}
 	if resp.StatusCode == http.StatusOK {
-		color.Green("Scucessfully connected to the API7")
+		color.Green("Successfully connected to the API7")
 	} else {
 		color.Red("Failed to connect to the API7")
 	}

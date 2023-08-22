@@ -30,7 +30,7 @@ func newDiffCmd() *cobra.Command {
 			}
 
 			color.Green("Get file content success: %v", d)
-			color.Green("Scucessfully run diff")
+			color.Green("Successfully run diff")
 			return nil
 		},
 	}
