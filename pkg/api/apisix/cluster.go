@@ -5,9 +5,8 @@ import (
 )
 
 type cluster struct {
-	baseURL      string
-	adminKey     string
-	adminVersion string
+	baseURL  string
+	adminKey string
 
 	cli *Client
 
@@ -21,7 +20,7 @@ func NewCluster(ctx context.Context, url, adminKey string) Cluster {
 		adminKey: adminKey,
 	}
 
-	cli := newClient(url, adminKey, "v3")
+	cli := newClient(url, adminKey)
 	c.cli = cli
 
 	c.upstream = newUpstream(cli)

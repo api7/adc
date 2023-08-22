@@ -10,18 +10,14 @@ import (
 	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
-type getResponse struct {
-	Item item `json:"node"`
-}
+type getResponse = item
 
-// listResponse is the unified LIST response mapping of APISIX.
+type createResponse = item
+
+type updateResponse = item
+
+// listResponse is the v3 version unified LIST response mapping of APISIX.
 type listResponse struct {
-	Count IntOrString `json:"count"`
-	Node  node        `json:"node"`
-}
-
-// listResponseV3 is the v3 version unified LIST response mapping of APISIX.
-type listResponseV3 struct {
 	Total IntOrString `json:"total"`
 	List  items       `json:"list"`
 }
@@ -39,24 +35,6 @@ func (ios *IntOrString) UnmarshalJSON(p []byte) error {
 	}
 	ios.IntValue = count
 	return nil
-}
-
-type createResponse struct {
-	Action string `json:"action"`
-	Item   item   `json:"node"`
-}
-
-type createResponseV3 struct {
-	item
-}
-
-type updateResponse = createResponse
-
-type updateResponseV3 = createResponseV3
-
-type node struct {
-	Key   string `json:"key"`
-	Items items  `json:"nodes"`
 }
 
 type items []item

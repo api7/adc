@@ -24,15 +24,13 @@ type Client struct {
 	baseURL  string
 	adminKey string
 
-	adminVersion string
-	cli          *http.Client
+	cli *http.Client
 }
 
-func newClient(baseURL, adminKey, version string) *Client {
+func newClient(baseURL, adminKey string) *Client {
 	return &Client{
-		baseURL:      baseURL,
-		adminKey:     adminKey,
-		adminVersion: version,
+		baseURL:  baseURL,
+		adminKey: adminKey,
 		cli: &http.Client{
 			Timeout: 5 * time.Second,
 		},
@@ -55,76 +53,41 @@ func (c *Client) isFunctionDisabled(body string) bool {
 }
 
 func (c *Client) getResource(ctx context.Context, url string) (*item, error) {
-	if c.adminVersion == "v3" {
-		var res item
-		err := makeGetRequest(c, ctx, url, &res)
-		if err != nil {
-			return nil, err
-		}
-		return &res, nil
-	}
-
 	var res getResponse
 	err := makeGetRequest(c, ctx, url, &res)
 	if err != nil {
 		return nil, err
 	}
-	return &res.Item, nil
+	return &res, nil
 }
 
 func (c *Client) listResource(ctx context.Context, url string) (items, error) {
-	if c.adminVersion == "v3" {
-		var res listResponseV3
-
-		err := makeGetRequest(c, ctx, url, &res)
-		if err != nil {
-			return nil, err
-		}
-		return res.List, nil
-	}
-
 	var res listResponse
+
 	err := makeGetRequest(c, ctx, url, &res)
 	if err != nil {
 		return nil, err
 	}
-	return res.Node.Items, nil
+	return res.List, nil
 }
 
 func (c *Client) createResource(ctx context.Context, url string, body []byte) (*item, error) {
-	if c.adminVersion == "v3" {
-		var cr createResponseV3
-		err := makePutRequest(c, ctx, url, body, &cr)
-		if err != nil {
-			return nil, err
-		}
-		return &cr.item, nil
-	}
-
 	var cr createResponse
 	err := makePutRequest(c, ctx, url, body, &cr)
 	if err != nil {
 		return nil, err
 	}
-	return &cr.Item, nil
+	return &cr, nil
 }
 
 func (c *Client) updateResource(ctx context.Context, url string, body []byte) (*item, error) {
-	if c.adminVersion == "v3" {
-		var ur updateResponseV3
-
-		err := makePutRequest(c, ctx, url, body, &ur)
-		if err != nil {
-			return nil, err
-		}
-		return &ur.item, nil
-	}
 	var ur updateResponse
+
 	err := makePutRequest(c, ctx, url, body, &ur)
 	if err != nil {
 		return nil, err
 	}
-	return &ur.Item, nil
+	return &ur, nil
 }
 
 func (c *Client) deleteResource(ctx context.Context, url string) error {
