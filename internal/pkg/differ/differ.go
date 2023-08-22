@@ -64,7 +64,7 @@ func (d *Differ) diffServices() ([]*data.Event, error) {
 				e := data.Event{
 					ResourceType: data.ServiceResourceType,
 					Option:       data.DeleteOption,
-					Value:        remoteSvc,
+					OldValue:     remoteSvc,
 				}
 				events = append(events, &e)
 				continue
@@ -83,6 +83,7 @@ func (d *Differ) diffServices() ([]*data.Event, error) {
 		events = append(events, &data.Event{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     remoteSvc,
 			Value:        localSvc,
 		})
 	}
@@ -117,7 +118,7 @@ func (d *Differ) diffRoutes() ([]*data.Event, error) {
 				e := data.Event{
 					ResourceType: data.RouteResourceType,
 					Option:       data.DeleteOption,
-					Value:        remoteRoute,
+					OldValue:     remoteRoute,
 				}
 				events = append(events, &e)
 				continue
@@ -136,6 +137,7 @@ func (d *Differ) diffRoutes() ([]*data.Event, error) {
 		events = append(events, &data.Event{
 			ResourceType: data.RouteResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     remoteRoute,
 			Value:        localRoute,
 		})
 	}

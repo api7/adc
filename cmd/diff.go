@@ -4,11 +4,15 @@ Copyright © 2023 API7.ai
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/api7/adc/internal/pkg/differ"
 	"github.com/api7/adc/pkg/common"
+	"github.com/api7/adc/pkg/data"
 )
 
 // newDiffCmd represents the diff command
@@ -51,6 +55,45 @@ func diffAPI7(cmd *cobra.Command) error {
 		return err
 	}
 
-	d.Diff()
+	events, err := d.Diff()
+	if err != nil {
+		color.Red("Failed to diff: %v", err)
+		return err
+	}
+
+	var summary struct {
+		created int
+		updated int
+		deleted int
+	}
+
+	for _, event := range events {
+		if event.Option == data.CreateOption {
+			summary.created++
+		} else if event.Option == data.UpdateOption {
+			summary.updated++
+		} else if event.Option == data.DeleteOption {
+			summary.deleted++
+		}
+
+		str, err := event.Output()
+		if err != nil {
+			color.Red("Failed to get output: %v", err)
+			return err
+		}
+
+		for _, line := range strings.Split(str, "\n") {
+			if strings.HasPrefix(line, "+") {
+				color.Green(line)
+			} else if strings.HasPrefix(line, "-") {
+				color.Red(line)
+			} else {
+				fmt.Println(line)
+			}
+		}
+	}
+
+	color.Green("Summary: created %d, updated %d, deleted %d", summary.created, summary.updated, summary.deleted)
+
 	return nil
 }

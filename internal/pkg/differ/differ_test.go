@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/api7/adc/pkg/data"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -70,12 +69,12 @@ func TestDiff(t *testing.T) {
 		{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.DeleteOption,
-			Value:        svc,
+			OldValue:     svc,
 		},
 		{
 			ResourceType: data.RouteResourceType,
 			Option:       data.DeleteOption,
-			Value:        &route1,
+			OldValue:     &route1,
 		},
 		{
 			ResourceType: data.RouteResourceType,
@@ -101,7 +100,7 @@ func TestDiffServices(t *testing.T) {
 		{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.DeleteOption,
-			Value:        svc,
+			OldValue:     svc,
 		},
 	}, events, "check the content of delete events")
 
@@ -123,6 +122,7 @@ func TestDiffServices(t *testing.T) {
 		{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     &svc1,
 			Value:        svc,
 		},
 	}, events, "check the content of update events")
@@ -178,7 +178,7 @@ func TestDiffServices(t *testing.T) {
 		{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.DeleteOption,
-			Value:        &svc1,
+			OldValue:     &svc1,
 		},
 		{
 			ResourceType: data.ServiceResourceType,
@@ -204,7 +204,7 @@ func TestDifferRoutes(t *testing.T) {
 		{
 			ResourceType: data.RouteResourceType,
 			Option:       data.DeleteOption,
-			Value:        route,
+			OldValue:     route,
 		},
 	}, events, "check the content of delete events")
 
@@ -225,6 +225,7 @@ func TestDifferRoutes(t *testing.T) {
 		{
 			ResourceType: data.RouteResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     &route1,
 			Value:        route,
 		},
 	}, events, "check the content of update events")
@@ -279,7 +280,7 @@ func TestDifferRoutes(t *testing.T) {
 		{
 			ResourceType: data.RouteResourceType,
 			Option:       data.DeleteOption,
-			Value:        &route1,
+			OldValue:     &route1,
 		},
 		{
 			ResourceType: data.RouteResourceType,

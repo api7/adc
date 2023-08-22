@@ -243,25 +243,3 @@ type Configuration struct {
 	Services []*Service `yaml:"services" json:"services"`
 	Routes   []*Route   `yaml:"routes" json:"routes"`
 }
-
-type ResourceType string
-
-var (
-	// ServiceResourceType is the resource type of service
-	ServiceResourceType ResourceType = "service"
-	// RouteResourceType is the resource type of route
-	RouteResourceType ResourceType = "route"
-)
-
-const (
-	CreateOption = iota
-	DeleteOption
-	UpdateOption
-)
-
-// Event is the event of adc
-type Event struct {
-	ResourceType ResourceType `json:"resource_type"`
-	Option       int          `json:"option"`
-	Value        interface{}  `json:"value"`
-}
