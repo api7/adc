@@ -2,13 +2,13 @@ package common
 
 import (
 	"bufio"
-	"github.com/api7/adc/pkg/api/apisix/types"
 	"io"
 	"os"
 
 	"github.com/fatih/color"
 	"sigs.k8s.io/yaml"
 
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/data"
 )
 

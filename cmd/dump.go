@@ -5,12 +5,13 @@ package cmd
 
 import (
 	"context"
-	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/pkg/common"
+
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/api7/adc/pkg/api/apisix"
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 // newDumpCmd represents the dump command

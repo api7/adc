@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/api7/adc/pkg/data"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/api7/adc/pkg/data"
 )
 
 var (
