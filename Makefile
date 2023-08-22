@@ -8,3 +8,7 @@ help:  ## Display this help
 build: ## Build adc
 	@go build -o bin/adc main.go
 .PHONY: build
+
+test:
+	@go test -v ./...
+.PHONY: test

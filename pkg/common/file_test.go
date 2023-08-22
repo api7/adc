@@ -17,7 +17,9 @@ func TestGetContentFromFile(t *testing.T) {
 	defer os.Remove(tmpfile.Name()) // clean up
 
 	// write some content to the file
-	expectedContent := `services:
+	expectedContent := `name: test
+version: "1.0.0"
+services:
 - name: svc1
   hosts:
   - svc1.example.com
