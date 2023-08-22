@@ -8,11 +8,11 @@ import (
 	"github.com/fatih/color"
 	"sigs.k8s.io/yaml"
 
-	api7types "github.com/api7/adc/pkg/api/api7/types"
+	"github.com/api7/adc/pkg/data"
 )
 
-func GetContentFromFile(filename string) (*api7types.Configuration, error) {
-	var content api7types.Configuration
+func GetContentFromFile(filename string) (*data.Configuration, error) {
+	var content data.Configuration
 
 	f, err := os.Open(filename)
 	if err != nil {
