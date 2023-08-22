@@ -11,3 +11,4 @@ build: ## Build adc
 
 test:
 	@go test -v ./...
+.PHONY: test
