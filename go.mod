@@ -5,6 +5,8 @@ go 1.20
 require (
 	github.com/fatih/color v1.15.0
 	github.com/hashicorp/go-memdb v1.3.4
+	github.com/hexops/gotextdiff v1.0.3
+	github.com/sergi/go-diff v1.3.1
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
