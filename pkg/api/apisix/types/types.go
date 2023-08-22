@@ -10,13 +10,18 @@ import (
 	"github.com/api7/adc/pkg/data"
 )
 
+// Configuration is the configuration of services
+type Configuration struct {
+	Services []*Service `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes   []*Route   `yaml:"routes,omitempty" json:"routes,omitempty"`
+}
+
 // Route apisix route object
 // +k8s:deepcopy-gen=true
 type Route struct {
 	ID string `json:"id" yaml:"id"`
 
-	Labels data.StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
-
+	Labels          data.StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Host            string           `json:"host,omitempty" yaml:"host,omitempty"`
 	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	Uri             string           `json:"uri,omitempty" yaml:"uri,omitempty"`
@@ -41,13 +46,13 @@ type Service struct {
 	// Labels are used for resource classification and indexing
 	Labels data.StringArray `json:"labels,omitempty"`
 	// HTTP hosts for this service.
-	Hosts []string `json:"hosts"`
+	Hosts []string `json:"hosts,omitempty"`
 	// Plugin settings on Service level
 	Plugins data.Plugins `json:"plugins,omitempty"`
 	// Upstream settings for the Service.
-	Upstream Upstream `json:"upstream"`
+	Upstream Upstream `json:"upstream,omitempty"`
 	// UpstreamId settings for the Service.
-	UpstreamId string `json:"upstream_id"`
+	UpstreamId string `json:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
 	EnableWebsocket bool `json:"enable_websocket,omitempty"`
 }
