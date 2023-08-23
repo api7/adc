@@ -54,6 +54,7 @@ func validateContent(c *types.Configuration) error {
 	v, err := validator.NewValidator(c)
 	if err != nil {
 		color.Red("Failed to create validator: %v", err)
+		return err
 	}
 	v.Validate()
 	return nil

@@ -49,26 +49,29 @@ func getResourceNameOrID(resource interface{}) string {
 	return nameOrID.String()
 }
 
-func (v *Validator) validateResource(resourceType string, resource interface{}) (bool, error) {
+func (v *Validator) validateResource(resourceType string, resource interface{}) error {
 	nameOrID := getResourceNameOrID(resource)
 	errWrap := "validate resource '%s (%s)': %s"
 	endpoint := fmt.Sprintf("/apisix/admin/schema/validate/%s", resourceType)
 	httpClient := &http.Client{}
 	jsonData, err := json.Marshal(resource)
 	if err != nil {
-		return false, fmt.Errorf(errWrap, resourceType, nameOrID, err)
+		return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return false, fmt.Errorf(errWrap, resourceType, nameOrID, err)
+		return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return false, fmt.Errorf(errWrap, resourceType, nameOrID, err)
+		return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK, nil
+	if resp.StatusCode == http.StatusOK {
+		return fmt.Errorf(errWrap, resourceType, nameOrID, "invalid")
+	}
+	return nil
 }
 
 func (v *Validator) Validate() []error {
@@ -76,13 +79,9 @@ func (v *Validator) Validate() []error {
 
 	for _, service := range v.localConfig.Services {
 		service := service
-		valid, err := v.validateResource("service", service)
+		err := v.validateResource("service", service)
 		if err != nil {
 			allErr = append(allErr, err)
-		}
-
-		if !valid {
-			// we can use event to record it or just log it
 		}
 	}
 
