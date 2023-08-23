@@ -20,5 +20,3 @@ unit-test: ## Run unit test
 .PHONY: fmt
 fmt: ## Format all go codes
 	./utils/goimports-reviser.sh
-
-

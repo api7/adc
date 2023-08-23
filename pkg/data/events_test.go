@@ -1,11 +1,12 @@
 package data
 
 import (
-	"github.com/api7/adc/pkg/api/apisix/types"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 var (

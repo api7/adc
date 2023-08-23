@@ -1,12 +1,13 @@
 package differ
 
 import (
-	"github.com/api7/adc/pkg/api/apisix/types"
 	"net/http"
 	"testing"
 
-	"github.com/api7/adc/pkg/data"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/data"
 )
 
 var (
