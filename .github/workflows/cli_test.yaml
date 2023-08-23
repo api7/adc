@@ -1,4 +1,4 @@
-name: Run Unit Test Suites
+name: Run CLI Test Suites
 
 on:
   push:
@@ -55,7 +55,20 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: '1.20.3'
+
+      - name: Install ginkgo
+        run: |
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+          sudo cp ~/go/bin/ginkgo /usr/local/bin
+
+      - name: Deploy Apache APISIX
+        run: |
+          curl -sL https://run.api7.ai/apisix/quickstart | sh
+          docker run --name httpbin --network apisix-quickstart-net --hostname httpbin -d kennethreitz/httpbin
+
       - name: Run Unit Test Suites
         working-directory: ./
         run: |
-          make unit-test
+          export PATH=$PWD/bin:$PATH
+          make build
+          make test

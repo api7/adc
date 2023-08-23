@@ -2,18 +2,19 @@ package common
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"os"
 
 	"github.com/fatih/color"
 	"sigs.k8s.io/yaml"
 
+	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/pkg/data"
 )
 
-func GetContentFromFile(filename string) (*data.Configuration, error) {
-	var content data.Configuration
+func GetContentFromFile(filename string) (*types.Configuration, error) {
+	var content types.Configuration
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -39,9 +40,20 @@ func GetContentFromFile(filename string) (*data.Configuration, error) {
 	return &content, nil
 }
 
-func GetContentFromRemote() (*data.Configuration, error) {
-	return &data.Configuration{
-		Services: []*data.Service{},
+func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) {
+	svcs, err := cluster.Service().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	routes, err := cluster.Route().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Configuration{
+		Routes:   routes,
+		Services: svcs,
 	}, nil
 }
 

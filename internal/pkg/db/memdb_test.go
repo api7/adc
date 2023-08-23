@@ -6,52 +6,41 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/api7/adc/pkg/data"
+	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 var (
-	svc = &data.Service{
+	svc = &types.Service{
 		ID:   "svc",
 		Name: "svc",
 		Hosts: []string{
 			"svc.example.com",
 		},
 		Labels: []string{"label1", "label2"},
-		Upstreams: []data.Upstream{
-			{
-				Name: "upstream1",
-				Targets: []data.UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
-				},
-			},
-			{
-				Name: "upstream2",
-				Targets: []data.UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
+		Upstream: types.Upstream{
+			Name: "upstream1",
+			Nodes: []types.UpstreamNode{
+				{
+					Host: "httpbin.org",
 				},
 			},
 		},
-		UpstreamInUse: "upstream1",
 	}
 
-	route = &data.Route{
+	route = &types.Route{
 		ID:        "route",
 		Name:      "route",
 		Labels:    []string{"lable1", "label2"},
 		Methods:   []string{http.MethodGet},
-		Paths:     []string{"/get"},
+		Uris:      []string{"/get"},
 		ServiceID: "svc",
 	}
 )
 
 func TestGetServiceByID(t *testing.T) {
 	// Test Case 1: get service by id
-	config := data.Configuration{
-		Services: []*data.Service{svc},
+	config := types.Configuration{
+		Services: []*types.Service{svc},
 	}
 
 	db, _ := NewMemDB(&config)
@@ -66,8 +55,8 @@ func TestGetServiceByID(t *testing.T) {
 	// Test Case 3: Service don't have id
 	svc1 := *svc
 	svc1.ID = ""
-	config = data.Configuration{
-		Services: []*data.Service{&svc1},
+	config = types.Configuration{
+		Services: []*types.Service{&svc1},
 	}
 
 	db, _ = NewMemDB(&config)
@@ -78,8 +67,8 @@ func TestGetServiceByID(t *testing.T) {
 
 func TestGetRouteByID(t *testing.T) {
 	// Test Case 1: get route by id
-	config := data.Configuration{
-		Routes: []*data.Route{route},
+	config := types.Configuration{
+		Routes: []*types.Route{route},
 	}
 
 	db, _ := NewMemDB(&config)
@@ -93,8 +82,8 @@ func TestGetRouteByID(t *testing.T) {
 
 	// Test Case 3: Route don't have id
 	route.ID = ""
-	config = data.Configuration{
-		Routes: []*data.Route{route},
+	config = types.Configuration{
+		Routes: []*types.Route{route},
 	}
 
 	db, _ = NewMemDB(&config)
