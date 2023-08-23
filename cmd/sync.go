@@ -5,13 +5,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/api7/adc/internal/pkg/differ"
-	"github.com/api7/adc/pkg/data"
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 	"strings"
 
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+
+	"github.com/api7/adc/internal/pkg/differ"
 	"github.com/api7/adc/pkg/common"
+	"github.com/api7/adc/pkg/data"
 )
 
 // newSyncCmd represents the configure command
