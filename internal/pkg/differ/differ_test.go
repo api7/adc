@@ -4,62 +4,53 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/api7/adc/pkg/data"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/data"
 )
 
 var (
-	svc = &data.Service{
+	svc = &types.Service{
 		ID:   "svc",
 		Name: "svc",
 		Hosts: []string{
 			"svc.example.com",
 		},
 		Labels: []string{"label1", "label2"},
-		Upstreams: []data.Upstream{
-			{
-				Name: "upstream1",
-				Targets: []data.UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
-				},
-			},
-			{
-				Name: "upstream2",
-				Targets: []data.UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
+		Upstream: types.Upstream{
+			Name: "upstream1",
+			Nodes: []types.UpstreamNode{
+				{
+					Host: "httpbin.org",
 				},
 			},
 		},
-		UpstreamInUse: "upstream1",
 	}
 
-	route = &data.Route{
+	route = &types.Route{
 		ID:        "route",
 		Name:      "route",
 		Labels:    []string{"lable1", "label2"},
 		Methods:   []string{http.MethodGet},
-		Paths:     []string{"/get"},
+		Uris:      []string{"/get"},
 		ServiceID: "svc",
 	}
 )
 
 func TestDiff(t *testing.T) {
 	// Test case 1: delete events
-	localConfig := &data.Configuration{
-		Services: []*data.Service{},
-		Routes:   []*data.Route{route},
+	localConfig := &types.Configuration{
+		Services: []*types.Service{},
+		Routes:   []*types.Route{route},
 	}
 
 	route1 := *route
 	route1.ID = "route1"
 	route1.Name = "route1"
-	remoteConfig := &data.Configuration{
-		Services: []*data.Service{svc},
-		Routes:   []*data.Route{&route1},
+	remoteConfig := &types.Configuration{
+		Services: []*types.Service{svc},
+		Routes:   []*types.Route{&route1},
 	}
 
 	differ, _ := NewDiffer(localConfig, remoteConfig)
@@ -86,11 +77,11 @@ func TestDiff(t *testing.T) {
 
 func TestDiffServices(t *testing.T) {
 	// Test case 1: delete events
-	localConfig := &data.Configuration{
-		Services: []*data.Service{},
+	localConfig := &types.Configuration{
+		Services: []*types.Service{},
 	}
-	remoteConfig := &data.Configuration{
-		Services: []*data.Service{svc},
+	remoteConfig := &types.Configuration{
+		Services: []*types.Service{svc},
 	}
 
 	differ, _ := NewDiffer(localConfig, remoteConfig)
@@ -105,14 +96,14 @@ func TestDiffServices(t *testing.T) {
 	}, events, "check the content of delete events")
 
 	// Test case 2: update events
-	localConfig = &data.Configuration{
-		Services: []*data.Service{svc},
+	localConfig = &types.Configuration{
+		Services: []*types.Service{svc},
 	}
 	svc1 := *svc
 	svc1.Name = "svc1"
 	svc1.Hosts[0] = "svc1.example.com"
-	remoteConfig = &data.Configuration{
-		Services: []*data.Service{&svc1},
+	remoteConfig = &types.Configuration{
+		Services: []*types.Service{&svc1},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -128,11 +119,11 @@ func TestDiffServices(t *testing.T) {
 	}, events, "check the content of update events")
 
 	// Test case 3: create events
-	localConfig = &data.Configuration{
-		Services: []*data.Service{svc},
+	localConfig = &types.Configuration{
+		Services: []*types.Service{svc},
 	}
-	remoteConfig = &data.Configuration{
-		Services: []*data.Service{},
+	remoteConfig = &types.Configuration{
+		Services: []*types.Service{},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -147,12 +138,12 @@ func TestDiffServices(t *testing.T) {
 	}, events, "check the content of create events")
 
 	// Test case 4: no events
-	localConfig = &data.Configuration{
-		Services: []*data.Service{svc},
+	localConfig = &types.Configuration{
+		Services: []*types.Service{svc},
 	}
 
-	remoteConfig = &data.Configuration{
-		Services: []*data.Service{svc},
+	remoteConfig = &types.Configuration{
+		Services: []*types.Service{svc},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -160,15 +151,15 @@ func TestDiffServices(t *testing.T) {
 	assert.Equal(t, 0, len(events), "check the number of no events")
 
 	// Test case 5: delete and create events
-	localConfig = &data.Configuration{
-		Services: []*data.Service{svc},
+	localConfig = &types.Configuration{
+		Services: []*types.Service{svc},
 	}
 	svc1 = *svc
 	svc1.ID = "svc1"
 	svc1.Name = "svc1"
 	svc1.Hosts[0] = "svc1.example.com"
-	remoteConfig = &data.Configuration{
-		Services: []*data.Service{&svc1},
+	remoteConfig = &types.Configuration{
+		Services: []*types.Service{&svc1},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -190,11 +181,11 @@ func TestDiffServices(t *testing.T) {
 
 func TestDifferRoutes(t *testing.T) {
 	// Test case 1: delete events
-	localConfig := &data.Configuration{
-		Routes: []*data.Route{},
+	localConfig := &types.Configuration{
+		Routes: []*types.Route{},
 	}
-	remoteConfig := &data.Configuration{
-		Routes: []*data.Route{route},
+	remoteConfig := &types.Configuration{
+		Routes: []*types.Route{route},
 	}
 
 	differ, _ := NewDiffer(localConfig, remoteConfig)
@@ -209,13 +200,13 @@ func TestDifferRoutes(t *testing.T) {
 	}, events, "check the content of delete events")
 
 	// Test case 2: update events
-	localConfig = &data.Configuration{
-		Routes: []*data.Route{route},
+	localConfig = &types.Configuration{
+		Routes: []*types.Route{route},
 	}
 	route1 := *route
 	route1.Name = "route1"
-	remoteConfig = &data.Configuration{
-		Routes: []*data.Route{&route1},
+	remoteConfig = &types.Configuration{
+		Routes: []*types.Route{&route1},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -231,11 +222,11 @@ func TestDifferRoutes(t *testing.T) {
 	}, events, "check the content of update events")
 
 	// Test case 3: create events
-	localConfig = &data.Configuration{
-		Routes: []*data.Route{route},
+	localConfig = &types.Configuration{
+		Routes: []*types.Route{route},
 	}
-	remoteConfig = &data.Configuration{
-		Routes: []*data.Route{},
+	remoteConfig = &types.Configuration{
+		Routes: []*types.Route{},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -250,12 +241,12 @@ func TestDifferRoutes(t *testing.T) {
 	}, events, "check the content of create events")
 
 	// Test case 4: no events
-	localConfig = &data.Configuration{
-		Routes: []*data.Route{},
+	localConfig = &types.Configuration{
+		Routes: []*types.Route{},
 	}
 
-	remoteConfig = &data.Configuration{
-		Routes: []*data.Route{},
+	remoteConfig = &types.Configuration{
+		Routes: []*types.Route{},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)
@@ -263,14 +254,14 @@ func TestDifferRoutes(t *testing.T) {
 	assert.Equal(t, 0, len(events), "check the number of no events")
 
 	// Test case 5: delete and create events
-	localConfig = &data.Configuration{
-		Routes: []*data.Route{route},
+	localConfig = &types.Configuration{
+		Routes: []*types.Route{route},
 	}
 	route1 = *route
 	route1.ID = "route1"
 	route1.Name = "route1"
-	remoteConfig = &data.Configuration{
-		Routes: []*data.Route{&route1},
+	remoteConfig = &types.Configuration{
+		Routes: []*types.Route{&route1},
 	}
 
 	differ, _ = NewDiffer(localConfig, remoteConfig)

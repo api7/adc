@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/go-memdb"
 
-	"github.com/api7/adc/pkg/data"
+	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 var schema = &memdb.DBSchema{
@@ -41,7 +41,7 @@ var (
 	NotFound = errors.New("data not found")
 )
 
-func NewMemDB(configure *data.Configuration) (*DB, error) {
+func NewMemDB(configure *types.Configuration) (*DB, error) {
 	db, err := memdb.NewMemDB(schema)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func NewMemDB(configure *data.Configuration) (*DB, error) {
 	return &DB{memDB: db}, nil
 }
 
-func (db *DB) GetServiceByID(id string) (*data.Service, error) {
+func (db *DB) GetServiceByID(id string) (*types.Service, error) {
 	obj, err := db.memDB.Txn(false).First("services", "id", id)
 	if err != nil {
 		return nil, err
@@ -83,10 +83,10 @@ func (db *DB) GetServiceByID(id string) (*data.Service, error) {
 		return nil, NotFound
 	}
 
-	return obj.(*data.Service), err
+	return obj.(*types.Service), err
 }
 
-func (db *DB) GetRouteByID(id string) (*data.Route, error) {
+func (db *DB) GetRouteByID(id string) (*types.Route, error) {
 	obj, err := db.memDB.Txn(false).First("routes", "id", id)
 	if err != nil {
 		return nil, err
@@ -96,5 +96,5 @@ func (db *DB) GetRouteByID(id string) (*data.Route, error) {
 		return nil, NotFound
 	}
 
-	return obj.(*data.Route), err
+	return obj.(*types.Route), err
 }

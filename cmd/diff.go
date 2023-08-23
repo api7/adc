@@ -22,7 +22,8 @@ func newDiffCmd() *cobra.Command {
 		Short: "Diff the configurations between local and API7",
 		Long:  `The diff command can be used to diff the configurations between local and API7.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return diffAPI7(cmd)
+			_ = diffAPI7(cmd)
+			return nil
 		},
 	}
 
@@ -43,7 +44,7 @@ func diffAPI7(cmd *cobra.Command) error {
 		return err
 	}
 
-	remoteConifg, err := common.GetContentFromRemote()
+	remoteConifg, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
 		color.Red("Failed to get remote config: %v", err)
 		return err

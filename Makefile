@@ -9,9 +9,13 @@ build: ## Build adc
 	@go build -o bin/adc main.go
 .PHONY: build
 
-test:
-	@go test -v ./...
+test: ## Run cli test
+	@cd test/cli && ginkgo -r
 .PHONY: test
+
+unit-test: ## Run unit test
+	@go test -v $$(go list ./... | grep -v /test/)
+.PHONY: unit-test
 
 .PHONY: fmt
 fmt: ## Format all go codes

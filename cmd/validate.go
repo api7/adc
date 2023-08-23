@@ -7,8 +7,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/common"
-	"github.com/api7/adc/pkg/data"
 )
 
 // newValidateCmd represents the configure command
@@ -49,6 +49,6 @@ func newValidateCmd() *cobra.Command {
 }
 
 // validateContent validates the content of the configuration file
-func validateContent(c *data.Configuration) error {
+func validateContent(c *types.Configuration) error {
 	return nil
 }
