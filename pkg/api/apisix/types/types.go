@@ -63,7 +63,7 @@ type Service struct {
 	// Upstream settings for the Service.
 	Upstream Upstream `json:"upstream"`
 	// UpstreamId settings for the Service.
-	UpstreamId string `json:"upstream_id"`
+	UpstreamId string `json:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
 	EnableWebsocket bool `json:"enable_websocket,omitempty"`
 }
