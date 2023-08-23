@@ -74,17 +74,17 @@ func (v *Validator) validateResource(resourceType string, resource interface{}) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		resp := &RespData{}
+		respData := &RespData{}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 		}
-		err = json.Unmarlshal(body, resp)
+		err = json.Unmarshal(body, respData)
 		if err != nil {
 			return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 		}
 		if resp != nil {
-			return fmt.Errorf(errWrap, resourceType, nameOrID, resp.ErrMsg)
+			return fmt.Errorf(errWrap, resourceType, nameOrID, respData.ErrMsg)
 		}
 		return fmt.Errorf(errWrap, resourceType, nameOrID, "invalid")
 	}
