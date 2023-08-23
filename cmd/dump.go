@@ -5,13 +5,13 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/api7/adc/pkg/api/apisix"
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 // newDumpCmd represents the dump command
@@ -21,10 +21,11 @@ func newDumpCmd() *cobra.Command {
 		Short: "Dump the configurations of API7",
 		Long:  `The dump command can be used to dump the configurations to the API7.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			testClient()
-
-			color.Green("Successfully dump configurations")
-			return nil
+			err := dumpConfiguration(cmd)
+			if err != nil {
+				color.Red(err.Error())
+			}
+			return err
 		},
 	}
 
@@ -33,20 +34,39 @@ func newDumpCmd() *cobra.Command {
 	return cmd
 }
 
-func testClient() {
+func dumpConfiguration(cmd *cobra.Command) error {
+	path, err := cmd.Flags().GetString("output")
+	if err != nil {
+		color.Red("Get file path failed: %v", err)
+		return err
+	}
+	if path == "" {
+		color.Red("Output path is empty. Example: adc dump -o config.yaml")
+		return nil
+	}
+
 	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
 
-	ups, err := cluster.Service().List(context.Background())
+	svcs, err := cluster.Service().List(context.Background())
 	if err != nil {
-		color.Red(err.Error())
-		return
+		return err
 	}
 
-	data, err := json.MarshalIndent(ups, "", "  ")
+	routes, err := cluster.Route().List(context.Background())
 	if err != nil {
-		color.Red(err.Error())
-		return
+		return err
 	}
 
-	fmt.Println(string(data))
+	conf := &types.Configuration{
+		Routes:   routes,
+		Services: svcs,
+	}
+
+	err = common.SaveAPISIXConfiguration(path, conf)
+	if err != nil {
+		return err
+	}
+
+	color.Green("Successfully dump configurations to " + path)
+	return nil
 }

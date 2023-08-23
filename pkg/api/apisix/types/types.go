@@ -10,8 +10,8 @@ import (
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name     string     `yaml:"name",json:"name"`
-	Version  string     `yaml:"version",json:"version"`
+	Name     string     `yaml:"name" json:"name"`
+	Version  string     `yaml:"version" json:"version"`
 	Services []*Service `yaml:"services,omitempty" json:"services,omitempty"`
 	Routes   []*Route   `yaml:"routes,omitempty" json:"routes,omitempty"`
 }
@@ -57,11 +57,11 @@ type Service struct {
 	// Labels are used for resource classification and indexing
 	Labels StringArray `json:"labels,omitempty"`
 	// HTTP hosts for this service.
-	Hosts []string `json:"hosts"`
+	Hosts []string `json:"hosts,omitempty"`
 	// Plugin settings on Service level
 	Plugins Plugins `json:"plugins,omitempty"`
 	// Upstream settings for the Service.
-	Upstream Upstream `json:"upstream"`
+	Upstream Upstream `json:"upstream,omitempty"`
 	// UpstreamId settings for the Service.
 	UpstreamId string `json:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
