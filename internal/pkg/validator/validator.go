@@ -8,16 +8,17 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/data"
 )
 
 type Validator struct {
-	localConfig *data.Configuration
+	localConfig *types.Configuration
 
 	evenChan *data.Event
 }
 
-func NewValidator(local *data.Configuration) (*Validator, error) {
+func NewValidator(local *types.Configuration) (*Validator, error) {
 	return &Validator{
 		localConfig: local,
 	}, nil
