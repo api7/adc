@@ -6,29 +6,44 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/api7/adc/pkg/data"
 )
+
+// Configuration is the configuration of services
+type Configuration struct {
+	Name     string     `yaml:"name",json:"name"`
+	Version  string     `yaml:"version",json:"version"`
+	Services []*Service `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes   []*Route   `yaml:"routes,omitempty" json:"routes,omitempty"`
+}
+
+// StringArray is enhanced version of pq.StringArray that can be handled nil value automatically.
+type StringArray []string
+
+// Vars represents the route match expressions of APISIX.
+type Vars [][]StringOrSlice
 
 // Route apisix route object
 // +k8s:deepcopy-gen=true
 type Route struct {
 	ID string `json:"id" yaml:"id"`
 
-	Labels data.StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name        string      `json:"name" yaml:"name"`
+	Labels      StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Description string      `json:"desc,omitempty" yaml:"desc,omitempty"`
 
 	Host            string           `json:"host,omitempty" yaml:"host,omitempty"`
 	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	Uri             string           `json:"uri,omitempty" yaml:"uri,omitempty"`
 	Priority        int              `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Timeout         *UpstreamTimeout `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	Vars            data.Vars        `json:"vars,omitempty" yaml:"vars,omitempty"`
+	Vars            Vars             `json:"vars,omitempty" yaml:"vars,omitempty"`
 	Uris            []string         `json:"uris,omitempty" yaml:"uris,omitempty"`
 	Methods         []string         `json:"methods,omitempty" yaml:"methods,omitempty"`
 	EnableWebsocket bool             `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
 	RemoteAddrs     []string         `json:"remote_addrs,omitempty" yaml:"remote_addrs,omitempty"`
 	UpstreamId      string           `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
-	Plugins         data.Plugins     `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	ServiceID       string           `json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Plugins         Plugins          `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	PluginConfigId  string           `json:"plugin_config_id,omitempty" yaml:"plugin_config_id,omitempty"`
 	FilterFunc      string           `json:"filter_func,omitempty" yaml:"filter_func,omitempty"`
 }
@@ -37,13 +52,14 @@ type Route struct {
 type Service struct {
 	ID string `json:"id"`
 
+	Name        string `json:"name"`
 	Description string `json:"desc,omitempty"`
 	// Labels are used for resource classification and indexing
-	Labels data.StringArray `json:"labels,omitempty"`
+	Labels StringArray `json:"labels,omitempty"`
 	// HTTP hosts for this service.
 	Hosts []string `json:"hosts"`
 	// Plugin settings on Service level
-	Plugins data.Plugins `json:"plugins,omitempty"`
+	Plugins Plugins `json:"plugins,omitempty"`
 	// Upstream settings for the Service.
 	Upstream Upstream `json:"upstream"`
 	// UpstreamId settings for the Service.
@@ -58,6 +74,7 @@ type Upstream struct {
 	// in the same service.
 	ID string `json:"id"`
 
+	Name    string               `json:"name"`
 	Type    string               `json:"type,omitempty" yaml:"type,omitempty"`
 	HashOn  string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
 	Key     string               `json:"key,omitempty" yaml:"key,omitempty"`
@@ -221,4 +238,55 @@ func mapKV2Node(key string, val float64) (*UpstreamNode, error) {
 	}
 
 	return node, nil
+}
+
+type Plugins map[string]interface{}
+
+func (p *Plugins) DeepCopyInto(out *Plugins) {
+	b, _ := json.Marshal(&p)
+	_ = json.Unmarshal(b, out)
+}
+
+func (p *Plugins) DeepCopy() *Plugins {
+	if p == nil {
+		return nil
+	}
+	out := new(Plugins)
+	p.DeepCopyInto(out)
+	return out
+}
+
+// StringOrSlice represents a string or a string slice.
+// TODO Do not use interface{} to avoid the reflection overheads.
+// +k8s:deepcopy-gen=true
+type StringOrSlice struct {
+	StrVal   string   `json:"-"`
+	SliceVal []string `json:"-"`
+}
+
+func (s *StringOrSlice) MarshalJSON() ([]byte, error) {
+	var (
+		p   []byte
+		err error
+	)
+	if s.SliceVal != nil {
+		p, err = json.Marshal(s.SliceVal)
+	} else {
+		p, err = json.Marshal(s.StrVal)
+	}
+	return p, err
+}
+
+func (s *StringOrSlice) UnmarshalJSON(p []byte) error {
+	var err error
+
+	if len(p) == 0 {
+		return errors.New("empty object")
+	}
+	if p[0] == '[' {
+		err = json.Unmarshal(p, &s.SliceVal)
+	} else {
+		err = json.Unmarshal(p, &s.StrVal)
+	}
+	return err
 }

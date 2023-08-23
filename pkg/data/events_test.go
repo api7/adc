@@ -1,6 +1,7 @@
 package data
 
 import (
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"net/http"
 	"testing"
 
@@ -8,40 +9,29 @@ import (
 )
 
 var (
-	svc = &Service{
+	svc = &types.Service{
 		ID:   "svc",
 		Name: "svc",
 		Hosts: []string{
 			"svc.example.com",
 		},
 		Labels: []string{"label1", "label2"},
-		Upstreams: []Upstream{
-			{
-				Name: "upstream1",
-				Targets: []UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
-				},
-			},
-			{
-				Name: "upstream2",
-				Targets: []UpstreamTarget{
-					{
-						Host: "httpbin.org",
-					},
+		Upstream: types.Upstream{
+			Name: "upstream1",
+			Nodes: []types.UpstreamNode{
+				{
+					Host: "httpbin.org",
 				},
 			},
 		},
-		UpstreamInUse: "upstream1",
 	}
 
-	route = &Route{
+	route = &types.Route{
 		ID:        "route",
 		Name:      "route",
 		Labels:    []string{"lable1", "label2"},
 		Methods:   []string{http.MethodGet},
-		Paths:     []string{"/get"},
+		Uris:      []string{"/get"},
 		ServiceID: "svc",
 	}
 )
@@ -79,6 +69,5 @@ func TestEventOutput(t *testing.T) {
 	output, err = event.Output()
 	assert.Nil(t, err, "should not return error")
 	assert.Contains(t, output, "updating route: \"route\"", "should contain the route name")
-	assert.Contains(t, output, "-\t\"description\": \"\"", "should contain the changes")
-	assert.Contains(t, output, "+\t\"description\": \"route1\"", "should contain the changes")
+	assert.Contains(t, output, "+\t\"desc\": \"route1\"", "should contain the changes")
 }

@@ -43,7 +43,7 @@ func diffAPI7(cmd *cobra.Command) error {
 		return err
 	}
 
-	remoteConifg, err := common.GetContentFromRemote()
+	remoteConifg, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
 		color.Red("Failed to get remote config: %v", err)
 		return err

@@ -4,20 +4,21 @@ import (
 	"reflect"
 
 	"github.com/api7/adc/internal/pkg/db"
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/data"
 )
 
 // Differ is the object of comparing two configurations.
 type Differ struct {
 	localDB      *db.DB
-	localConfig  *data.Configuration
-	remoteConfig *data.Configuration
+	localConfig  *types.Configuration
+	remoteConfig *types.Configuration
 
 	evenChan *data.Event
 }
 
 // NewDiffer creates a new Differ object.
-func NewDiffer(local, remote *data.Configuration) (*Differ, error) {
+func NewDiffer(local, remote *types.Configuration) (*Differ, error) {
 	db, err := db.NewMemDB(local)
 	if err != nil {
 		return nil, err

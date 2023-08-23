@@ -4,12 +4,14 @@ Copyright © 2023 API7.ai
 package cmd
 
 import (
+	"context"
 	"os"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/config"
 )
 
@@ -63,8 +65,15 @@ func initConfig() {
 	err := viper.ReadInConfig()
 	if err != nil {
 		color.Red("Fatal to read config file, please run `adc configure` to configure the client first.")
+		return
 	}
 
 	rootConfig.Server = viper.GetString("server")
 	rootConfig.Token = viper.GetString("token")
+	cluser := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
+	if err != nil {
+		color.RedString("Fatal to create cluster: %v", err)
+		return
+	}
+	rootConfig.APISIXCluster = cluser
 }
