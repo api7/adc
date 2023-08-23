@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 
@@ -49,6 +50,10 @@ func getResourceNameOrID(resource interface{}) string {
 	return nameOrID.String()
 }
 
+type RespData struct {
+	ErrMsg string `json: "error_msg"`
+}
+
 func (v *Validator) validateResource(resourceType string, resource interface{}) error {
 	nameOrID := getResourceNameOrID(resource)
 	errWrap := "validate resource '%s (%s)': %s"
@@ -68,7 +73,19 @@ func (v *Validator) validateResource(resourceType string, resource interface{}) 
 		return fmt.Errorf(errWrap, resourceType, nameOrID, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode != http.StatusOK {
+		resp := &RespData{}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf(errWrap, resourceType, nameOrID, err)
+		}
+		err = json.Unmarlshal(body, resp)
+		if err != nil {
+			return fmt.Errorf(errWrap, resourceType, nameOrID, err)
+		}
+		if resp != nil {
+			return fmt.Errorf(errWrap, resourceType, nameOrID, resp.ErrMsg)
+		}
 		return fmt.Errorf(errWrap, resourceType, nameOrID, "invalid")
 	}
 	return nil
