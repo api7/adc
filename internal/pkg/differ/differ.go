@@ -4,20 +4,21 @@ import (
 	"reflect"
 
 	"github.com/api7/adc/internal/pkg/db"
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/data"
 )
 
 // Differ is the object of comparing two configurations.
 type Differ struct {
 	localDB      *db.DB
-	localConfig  *data.Configuration
-	remoteConfig *data.Configuration
+	localConfig  *types.Configuration
+	remoteConfig *types.Configuration
 
 	evenChan *data.Event
 }
 
 // NewDiffer creates a new Differ object.
-func NewDiffer(local, remote *data.Configuration) (*Differ, error) {
+func NewDiffer(local, remote *types.Configuration) (*Differ, error) {
 	db, err := db.NewMemDB(local)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (d *Differ) diffServices() ([]*data.Event, error) {
 				e := data.Event{
 					ResourceType: data.ServiceResourceType,
 					Option:       data.DeleteOption,
-					Value:        remoteSvc,
+					OldValue:     remoteSvc,
 				}
 				events = append(events, &e)
 				continue
@@ -83,6 +84,7 @@ func (d *Differ) diffServices() ([]*data.Event, error) {
 		events = append(events, &data.Event{
 			ResourceType: data.ServiceResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     remoteSvc,
 			Value:        localSvc,
 		})
 	}
@@ -117,7 +119,7 @@ func (d *Differ) diffRoutes() ([]*data.Event, error) {
 				e := data.Event{
 					ResourceType: data.RouteResourceType,
 					Option:       data.DeleteOption,
-					Value:        remoteRoute,
+					OldValue:     remoteRoute,
 				}
 				events = append(events, &e)
 				continue
@@ -136,6 +138,7 @@ func (d *Differ) diffRoutes() ([]*data.Event, error) {
 		events = append(events, &data.Event{
 			ResourceType: data.RouteResourceType,
 			Option:       data.UpdateOption,
+			OldValue:     remoteRoute,
 			Value:        localRoute,
 		})
 	}
