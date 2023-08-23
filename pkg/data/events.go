@@ -1,8 +1,12 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/api7/adc/pkg/api/apisix"
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/pkg/errors"
 	"reflect"
 
 	"github.com/hexops/gotextdiff"
@@ -75,4 +79,44 @@ func (e *Event) Output() (string, error) {
 	}
 
 	return output, nil
+}
+
+func applyService(cluster apisix.Cluster, option int, value interface{}) error {
+	var err error
+	switch option {
+	case CreateOption:
+		_, err = cluster.Service().Create(context.Background(), value.(*types.Service))
+	case DeleteOption:
+		err = cluster.Service().Delete(context.Background(), getName("Name", value))
+	case UpdateOption:
+		_, err = cluster.Service().Update(context.Background(), value.(*types.Service))
+		return err
+	}
+
+	return errors.Wrap(err, "failed to apply service")
+}
+
+func applyRoute(cluster apisix.Cluster, option int, value interface{}) error {
+	var err error
+	switch option {
+	case CreateOption:
+		_, err = cluster.Route().Create(context.Background(), value.(*types.Route))
+	case DeleteOption:
+		err = cluster.Route().Delete(context.Background(), getName("Name", value))
+	case UpdateOption:
+		_, err = cluster.Route().Update(context.Background(), value.(*types.Route))
+	}
+
+	return errors.Wrap(err, "failed to apply route")
+}
+
+func (e *Event) Apply(cluster apisix.Cluster) error {
+	switch e.ResourceType {
+	case ServiceResourceType:
+		return applyService(cluster, e.Option, e.Value)
+	case RouteResourceType:
+		return applyRoute(cluster, e.Option, e.Value)
+	}
+
+	return nil
 }

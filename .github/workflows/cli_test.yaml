@@ -64,6 +64,7 @@ jobs:
       - name: Deploy Apache APISIX
         run: |
           curl -sL https://run.api7.ai/apisix/quickstart | sh
+          docker run --name httpbin --network apisix-quickstart-net --hostname httpbin -d kennethreitz/httpbin
 
       - name: Run Unit Test Suites
         working-directory: ./

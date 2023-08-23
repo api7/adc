@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"net/http"
 	"os/exec"
 	"strings"
 	"testing"
 
+	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -29,10 +31,17 @@ var _ = ginkgo.Describe("ADC CLI test", func() {
 			err = cmd.Run()
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(out.String()).To(gomega.Equal(`creating service: "svc1"
-creating service: "svc2"
 creating route: "route1"
-Summary: created 3, updated 0, deleted 0
+Summary: created 2, updated 0, deleted 0
 `))
+
+			var syncOutput bytes.Buffer
+			cmd = exec.Command("adc", "sync", "-f", "testdata/test.yaml")
+			cmd.Stdout = &syncOutput
+			err = cmd.Run()
+			gomega.Expect(err).To(gomega.BeNil())
+			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
+			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "foo.com"`)
 		})
 	})
 })
