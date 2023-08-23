@@ -7,6 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
+	"github.com/api7/adc/internal/pkg/validator"
 	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/common"
 )
@@ -50,5 +51,11 @@ func newValidateCmd() *cobra.Command {
 
 // validateContent validates the content of the configuration file
 func validateContent(c *types.Configuration) error {
+	v, err := validator.NewValidator(c)
+	if err != nil {
+		color.Red("Failed to create validator: %v", err)
+		return err
+	}
+	v.Validate()
 	return nil
 }
