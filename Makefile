@@ -14,7 +14,7 @@ test: ## Run cli test
 .PHONY: test
 
 unit-test: ## Run unit test
-	@go test -v ./...
+	@go test -v $$(go list ./... | grep -v /test/)
 .PHONY: unit-test
 
 .PHONY: fmt
