@@ -21,6 +21,8 @@ func newDumpCmd() *cobra.Command {
 		Short: "Dump the configurations of API7",
 		Long:  `The dump command can be used to dump the configurations to the API7.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			checkConfig()
+
 			err := dumpConfiguration(cmd)
 			if err != nil {
 				color.Red(err.Error())

@@ -57,5 +57,6 @@ func saveConfiguration() error {
 	}
 
 	color.Green("Successfully configure ADC")
-	return nil
+
+	return pingAPISIX()
 }

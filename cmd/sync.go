@@ -22,6 +22,8 @@ func newSyncCmd() *cobra.Command {
 		Short: "Sync the configurations from local to API7",
 		Long:  `The sync command can be used to sync the configurations from local to API7.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			checkConfig()
+
 			// TODO: add validate before sync
 			_ = sync(cmd, false)
 			return nil

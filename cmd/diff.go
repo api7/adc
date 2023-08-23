@@ -14,6 +14,8 @@ func newDiffCmd() *cobra.Command {
 		Short: "Diff the configurations between local and API7",
 		Long:  `The diff command can be used to diff the configurations between local and API7.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			checkConfig()
+
 			_ = sync(cmd, true)
 			return nil
 		},
