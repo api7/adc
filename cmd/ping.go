@@ -34,6 +34,8 @@ func pingAPISIX() error {
 	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
 
 	err := cluster.Route().Validate(context.Background(), &types.Route{
+		ID:         "test",
+		Name:       "test",
 		Uri:        "*",
 		UpstreamId: "abcd",
 	})
