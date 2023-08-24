@@ -18,8 +18,10 @@ var _ = ginkgo.Describe("`adc diff` tests", func() {
 			err := cmd.Run()
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(out.String()).To(gomega.Equal(`creating service: "svc1"
+creating service: "svc2"
 creating route: "route1"
-Summary: created 2, updated 0, deleted 0
+creating route: "route2"
+Summary: created 4, updated 0, deleted 0
 `))
 		})
 	})

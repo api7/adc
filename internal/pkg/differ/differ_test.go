@@ -38,6 +38,64 @@ var (
 	}
 )
 
+func TestSortEvents(t *testing.T) {
+	events := []*data.Event{
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+		},
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.CreateOption,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.DeleteOption,
+		},
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.DeleteOption,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.UpdateOption,
+		},
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.UpdateOption,
+		},
+	}
+
+	sortEvents(events)
+	assert.Equal(t, []*data.Event{
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.CreateOption,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+		},
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.UpdateOption,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.UpdateOption,
+		},
+		{
+			ResourceType: data.RouteResourceType,
+			Option:       data.DeleteOption,
+		},
+		{
+			ResourceType: data.ServiceResourceType,
+			Option:       data.DeleteOption,
+		},
+	}, events, "check the content of sorted events")
+
+}
+
 func TestDiff(t *testing.T) {
 	// Test case 1: delete events
 	localConfig := &types.Configuration{
@@ -58,9 +116,9 @@ func TestDiff(t *testing.T) {
 	assert.Equal(t, 3, len(events), "check the number of delete events")
 	assert.Equal(t, []*data.Event{
 		{
-			ResourceType: data.ServiceResourceType,
-			Option:       data.DeleteOption,
-			OldValue:     svc,
+			ResourceType: data.RouteResourceType,
+			Option:       data.CreateOption,
+			Value:        route,
 		},
 		{
 			ResourceType: data.RouteResourceType,
@@ -68,9 +126,9 @@ func TestDiff(t *testing.T) {
 			OldValue:     &route1,
 		},
 		{
-			ResourceType: data.RouteResourceType,
-			Option:       data.CreateOption,
-			Value:        route,
+			ResourceType: data.ServiceResourceType,
+			Option:       data.DeleteOption,
+			OldValue:     svc,
 		},
 	}, events, "check the content of delete events")
 }

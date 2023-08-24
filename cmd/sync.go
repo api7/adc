@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -93,6 +94,7 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 				color.Red("Failed to apply: %v", err)
 				return err
 			}
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		for _, line := range strings.Split(str, "\n") {

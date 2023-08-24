@@ -10,7 +10,7 @@ import (
 
 var _ = ginkgo.Describe("`adc dump` tests", func() {
 	ginkgo.Context("Test the dump command", func() {
-		_ = NewScaffold()
+		s := NewScaffold()
 		ginkgo.It("should dump APISIX resources", func() {
 			var syncOutput bytes.Buffer
 			cmd := exec.Command("adc", "sync", "-f", "testdata/test.yaml")
@@ -28,12 +28,19 @@ routes:
 - id: route1
   methods:
   - GET
+  - PUT
   name: route1
   service_id: svc1
   uri: /get
+- id: route2
+  methods:
+  - GET
+  name: route2
+  service_id: svc2
+  uri: /get
 services:
 - hosts:
-  - foo.com
+  - foo1.com
   id: svc1
   name: svc1
   upstream:
@@ -46,8 +53,30 @@ services:
       weight: 1
     scheme: http
     type: roundrobin
+- hosts:
+  - svc.com
+  id: svc2
+  name: svc2
+  upstream:
+    hash_on: vars
+    id: httpbin
+    name: httpbin
+    nodes:
+    - host: httpbin
+      port: 80
+      weight: 1
+    scheme: http
+    type: roundrobin
 version: ""
 `))
+
+			err = s.DeleteRoute("route1")
+			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
+			err = s.DeleteRoute("route2")
+			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
+			err = s.DeleteService("svc1")
+			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
+			err = s.DeleteService("svc2")
 		})
 	})
 })

@@ -12,13 +12,13 @@ var _ = ginkgo.Describe("`adc validate` tests", func() {
 	ginkgo.Context("Basic functions", func() {
 		_ = NewScaffold()
 		ginkgo.It("should validate schema", func() {
-			var pingOutput bytes.Buffer
+			var validateOutput bytes.Buffer
 			cmd := exec.Command("adc", "validate", "-f", "testdata/test.yaml")
-			cmd.Stdout = &pingOutput
+			cmd.Stdout = &validateOutput
 			err := cmd.Run()
 			gomega.Expect(err).To(gomega.BeNil())
 
-			gomega.Expect(pingOutput.String()).To(gomega.Equal("Get file content success: config name: test, version: test, routes: 1, services: 1.\nValidate file content success\n"))
+			gomega.Expect(validateOutput.String()).To(gomega.Equal("Get file content success: config name: test, version: test, routes: 2, services: 2.\nValidate file content success\n"))
 		})
 	})
 })
