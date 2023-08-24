@@ -35,10 +35,6 @@ func newSyncCmd() *cobra.Command {
 	return cmd
 }
 
-func sort(events *data.Event) {
-
-}
-
 func sync(cmd *cobra.Command, dryRun bool) error {
 	file, err := cmd.Flags().GetString("file")
 	if err != nil {

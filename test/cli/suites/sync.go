@@ -2,13 +2,14 @@ package suites
 
 import (
 	"bytes"
-	"github.com/api7/adc/pkg/api/apisix/types"
 	"net/http"
 	"os/exec"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 var (
@@ -91,12 +92,12 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "foo.com"`)
 
 			/*
-					service is deleted
-					service1 is updated
-					service2 is created
-				    route is deleted
-					route1 is updated
-				    route2 is created
+				service is deleted
+				service1 is updated
+				service2 is created
+				route is deleted
+				route1 is updated
+				route2 is created
 			*/
 			var syncOutput bytes.Buffer
 			cmd := exec.Command("adc", "sync", "-f", "testdata/test.yaml")
