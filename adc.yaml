@@ -5,9 +5,9 @@ services:
   hosts:
   - foo.com
   - bar.com
-  upstreams:
-  - name: upstream1
-    targets:
+  upstream:
+    name: upstream1
+    nodes:
     - host: 10.10.16.12
       port: 8080
       weight: 50
