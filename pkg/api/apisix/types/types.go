@@ -50,31 +50,31 @@ type Route struct {
 
 // Service is the abstraction of a backend service on API gateway.
 type Service struct {
-	ID string `json:"id"`
+	ID string `json:"id" yaml:"id"`
 
-	Name        string `json:"name"`
-	Description string `json:"desc,omitempty"`
+	Name        string `json:"name" yaml:"name"`
+	Description string `json:"desc,omitempty" yaml:"desc,omitempty"`
 	// Labels are used for resource classification and indexing
-	Labels StringArray `json:"labels,omitempty"`
+	Labels StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
 	// HTTP hosts for this service.
-	Hosts []string `json:"hosts,omitempty"`
+	Hosts []string `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	// Plugin settings on Service level
-	Plugins Plugins `json:"plugins,omitempty"`
+	Plugins Plugins `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	// Upstream settings for the Service.
-	Upstream Upstream `json:"upstream,omitempty"`
+	Upstream Upstream `json:"upstream,omitempty" yaml:"upstream,omitempty"`
 	// UpstreamId settings for the Service.
-	UpstreamId string `json:"upstream_id,omitempty"`
+	UpstreamId string `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
-	EnableWebsocket bool `json:"enable_websocket,omitempty"`
+	EnableWebsocket bool `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
 }
 
 // Upstream is the definition of the upstream on Service.
 type Upstream struct {
 	// ID is the upstream name. It should be unique among all upstreams
 	// in the same service.
-	ID string `json:"id"`
+	ID string `json:"id" yaml:"id"`
 
-	Name    string               `json:"name"`
+	Name    string               `json:"name" yaml:"name"`
 	Type    string               `json:"type,omitempty" yaml:"type,omitempty"`
 	HashOn  string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
 	Key     string               `json:"key,omitempty" yaml:"key,omitempty"`
