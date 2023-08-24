@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/fatih/color"
-	"sigs.k8s.io/yaml"
-
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/data"
@@ -54,8 +51,6 @@ func (v *Validator) Validate() []error {
 		}
 		err := v.cluster.Service().Validate(context.Background(), service)
 		if err != nil {
-			b, _ := yaml.Marshal(service)
-			color.Red(string(b))
 			allErr = append(allErr, err)
 		}
 	}
