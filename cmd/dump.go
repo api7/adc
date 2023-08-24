@@ -6,10 +6,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/yaml"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"

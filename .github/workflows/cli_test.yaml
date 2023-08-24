@@ -63,7 +63,7 @@ jobs:
 
       - name: Deploy Apache APISIX
         run: |
-          curl -sL https://run.api7.ai/apisix/quickstart | DEFAULT_APISIX_IMAGE_TAG=dev sh
+          curl -sL https://run.api7.ai/apisix/quickstart | sed 's/3.4.0-debian/dev/g' | sh
           docker run --name httpbin --network apisix-quickstart-net --hostname httpbin -d kennethreitz/httpbin
 
       - name: Run Unit Test Suites

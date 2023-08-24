@@ -2,11 +2,13 @@ package suites
 
 import (
 	"context"
-	"github.com/api7/adc/pkg/api/apisix"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	"os/exec"
 	"strings"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
+	"github.com/api7/adc/pkg/api/apisix"
 )
 
 type Scaffold struct {
