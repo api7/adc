@@ -43,6 +43,9 @@ func (v *Validator) Validate() []error {
 
 	for _, service := range v.localConfig.Services {
 		service := service
+		if service.ID == "" {
+			service.ID = "placeholder"
+		}
 		err := v.cluster.Service().Validate(context.Background(), service)
 		if err != nil {
 			allErr = append(allErr, err)
@@ -51,6 +54,9 @@ func (v *Validator) Validate() []error {
 
 	for _, route := range v.localConfig.Routes {
 		route := route
+		if route.ID == "" {
+			route.ID = "placeholder"
+		}
 		err := v.cluster.Route().Validate(context.Background(), route)
 		if err != nil {
 			allErr = append(allErr, err)
