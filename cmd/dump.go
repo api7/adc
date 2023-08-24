@@ -5,9 +5,11 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
@@ -47,6 +49,11 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return nil
 	}
 
+	save := true
+	if path == "/dev/stdout" {
+		save = false
+	}
+
 	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
 
 	svcs, err := cluster.Service().List(context.Background())
@@ -64,11 +71,24 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		Services: svcs,
 	}
 
-	err = common.SaveAPISIXConfiguration(path, conf)
-	if err != nil {
-		return err
+	if save {
+		err = common.SaveAPISIXConfiguration(path, conf)
+		if err != nil {
+			return err
+		}
+		color.Green("Successfully dump configurations to " + path)
+	} else {
+		data, err := yaml.Marshal(conf)
+		if err != nil {
+			color.Red(err.Error())
+			return err
+		}
+
+		_, err = fmt.Printf(string(data))
+		if err != nil {
+			return err
+		}
 	}
 
-	color.Green("Successfully dump configurations to " + path)
 	return nil
 }

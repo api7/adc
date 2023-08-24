@@ -1,4 +1,6 @@
 #/bin/bash
+PWD ?= $(shell pwd)
+export PATH := $(PWD)/bin:$(PATH)
 
 default: help
 help:  ## Display this help
