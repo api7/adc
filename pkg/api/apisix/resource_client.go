@@ -109,7 +109,7 @@ func (u *resourceClient[T]) Update(ctx context.Context, id string, obj *T) (*T, 
 	return svc, err
 }
 
-func getResourceNameOrID(resource interface{}) string {
+func GetResourceNameOrID(resource interface{}) string {
 	value := reflect.ValueOf(resource)
 	value = reflect.Indirect(value)
 	nameOrID := value.FieldByName("Name")
@@ -122,7 +122,7 @@ func getResourceNameOrID(resource interface{}) string {
 func (u *resourceClient[T]) Validate(ctx context.Context, resource *T) error {
 	err := u.client.validate(ctx, u.validateURL, resource)
 	if err != nil {
-		return fmt.Errorf("failed to validate resource '%s (%s)': %s", u.resourceName, getResourceNameOrID(resource), err.Error())
+		return fmt.Errorf("failed to validate resource '%s (%s)': %s", u.resourceName, GetResourceNameOrID(resource), err.Error())
 	}
 	return nil
 }

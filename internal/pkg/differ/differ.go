@@ -1,7 +1,9 @@
 package differ
 
 import (
+	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/api7/adc/internal/pkg/db"
 	"github.com/api7/adc/pkg/api/apisix/types"
@@ -31,6 +33,31 @@ func NewDiffer(local, remote *types.Configuration) (*Differ, error) {
 	}, nil
 }
 
+func sortEvents(events []*data.Event) {
+	// Since the routes is related to the services, we need to sort the events.
+	// The order is:
+	// 1. Routes Delete
+	// 2. Services Delete
+	// 3. Routes Update
+	// 4. Services Update
+	// 5. Services Create
+	// 6. Routes Create
+	_key := func(typ data.ResourceType, option int) string {
+		return fmt.Sprintf("%s:%d", typ, option)
+	}
+	var order = map[string]int{
+		_key(data.RouteResourceType, data.DeleteOption):   6,
+		_key(data.ServiceResourceType, data.DeleteOption): 5,
+		_key(data.RouteResourceType, data.UpdateOption):   4,
+		_key(data.ServiceResourceType, data.UpdateOption): 3,
+		_key(data.ServiceResourceType, data.CreateOption): 2,
+		_key(data.RouteResourceType, data.CreateOption):   1,
+	}
+	sort.Slice(events, func(i, j int) bool {
+		return order[_key(events[i].ResourceType, events[i].Option)] > order[_key(events[j].ResourceType, events[j].Option)]
+	})
+}
+
 // Diff compares the local configuration and remote configuration, and returns the events.
 func (d *Differ) Diff() ([]*data.Event, error) {
 	var events []*data.Event
@@ -47,6 +74,8 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 	}
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
+
+	sortEvents(events)
 
 	return events, nil
 }

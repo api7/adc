@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
-
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
@@ -42,14 +40,6 @@ type Event struct {
 	Value        interface{}  `json:"value"`
 }
 
-func getName(field string, value interface{}) string {
-	v := reflect.ValueOf(value)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	return v.FieldByName(field).String()
-}
-
 // Output returns the output of event,
 // if the event is create, it will return the message of creating resource.
 // if the event is update, it will return the diff of old value and new value.
@@ -58,9 +48,9 @@ func (e *Event) Output() (string, error) {
 	var output string
 	switch e.Option {
 	case CreateOption:
-		output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, getName("Name", e.Value))
+		output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceNameOrID(e.Value))
 	case DeleteOption:
-		output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, getName("Name", e.OldValue))
+		output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceNameOrID(e.OldValue))
 	case UpdateOption:
 		remote, err := json.MarshalIndent(e.OldValue, "", "\t")
 		if err != nil {
@@ -76,36 +66,36 @@ func (e *Event) Output() (string, error) {
 
 		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
 		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
-		output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, getName("Name", e.Value), diff)
+		output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceNameOrID(e.Value), diff)
 	}
 
 	return output, nil
 }
 
-func applyService(cluster apisix.Cluster, option int, value interface{}) error {
+func applyService(cluster apisix.Cluster, event *Event) error {
 	var err error
-	switch option {
+	switch event.Option {
 	case CreateOption:
-		_, err = cluster.Service().Create(context.Background(), value.(*types.Service))
+		_, err = cluster.Service().Create(context.Background(), event.Value.(*types.Service))
 	case DeleteOption:
-		err = cluster.Service().Delete(context.Background(), getName("Name", value))
+		err = cluster.Service().Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
 	case UpdateOption:
-		_, err = cluster.Service().Update(context.Background(), value.(*types.Service))
+		_, err = cluster.Service().Update(context.Background(), event.Value.(*types.Service))
 		return err
 	}
 
 	return errors.Wrap(err, "failed to apply service")
 }
 
-func applyRoute(cluster apisix.Cluster, option int, value interface{}) error {
+func applyRoute(cluster apisix.Cluster, event *Event) error {
 	var err error
-	switch option {
+	switch event.Option {
 	case CreateOption:
-		_, err = cluster.Route().Create(context.Background(), value.(*types.Route))
+		_, err = cluster.Route().Create(context.Background(), event.Value.(*types.Route))
 	case DeleteOption:
-		err = cluster.Route().Delete(context.Background(), getName("Name", value))
+		err = cluster.Route().Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
 	case UpdateOption:
-		_, err = cluster.Route().Update(context.Background(), value.(*types.Route))
+		_, err = cluster.Route().Update(context.Background(), event.Value.(*types.Route))
 	}
 
 	return errors.Wrap(err, "failed to apply route")
@@ -114,9 +104,9 @@ func applyRoute(cluster apisix.Cluster, option int, value interface{}) error {
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
-		return applyService(cluster, e.Option, e.Value)
+		return applyService(cluster, e)
 	case RouteResourceType:
-		return applyRoute(cluster, e.Option, e.Value)
+		return applyRoute(cluster, e)
 	}
 
 	return nil

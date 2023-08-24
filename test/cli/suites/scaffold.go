@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix"
+	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 type Scaffold struct {
@@ -30,6 +31,22 @@ func NewScaffold() *Scaffold {
 	return &Scaffold{
 		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
 	}
+}
+
+func (s *Scaffold) CreateRoute(route *types.Route) (*types.Route, error) {
+	return s.cluster.Route().Create(context.Background(), route)
+}
+
+func (s *Scaffold) UpdateRoute(route *types.Route) (*types.Route, error) {
+	return s.cluster.Route().Update(context.Background(), route)
+}
+
+func (s *Scaffold) CreateService(service *types.Service) (*types.Service, error) {
+	return s.cluster.Service().Create(context.Background(), service)
+}
+
+func (s *Scaffold) UpdateService(service *types.Service) (*types.Service, error) {
+	return s.cluster.Service().Update(context.Background(), service)
 }
 
 func (s *Scaffold) DeleteService(id string) error {
