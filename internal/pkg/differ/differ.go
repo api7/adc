@@ -10,6 +10,27 @@ import (
 	"github.com/api7/adc/pkg/data"
 )
 
+func _key(typ data.ResourceType, option int) string {
+	return fmt.Sprintf("%s:%d", typ, option)
+}
+
+// Since the routes is related to the services, we need to sort the events.
+// The order is:
+// 1. Services Create
+// 2. Routes Create
+// 3. Services Update
+// 4. Routes Update
+// 5. Routes Delete
+// 6. Services Delete
+var order = map[string]int{
+	_key(data.ServiceResourceType, data.CreateOption): 6,
+	_key(data.RouteResourceType, data.CreateOption):   5,
+	_key(data.ServiceResourceType, data.UpdateOption): 4,
+	_key(data.RouteResourceType, data.UpdateOption):   3,
+	_key(data.RouteResourceType, data.DeleteOption):   2,
+	_key(data.ServiceResourceType, data.DeleteOption): 1,
+}
+
 // Differ is the object of comparing two configurations.
 type Differ struct {
 	localDB      *db.DB
@@ -34,25 +55,6 @@ func NewDiffer(local, remote *types.Configuration) (*Differ, error) {
 }
 
 func sortEvents(events []*data.Event) {
-	// Since the routes is related to the services, we need to sort the events.
-	// The order is:
-	// 1. Routes Delete
-	// 2. Services Delete
-	// 3. Routes Update
-	// 4. Services Update
-	// 5. Services Create
-	// 6. Routes Create
-	_key := func(typ data.ResourceType, option int) string {
-		return fmt.Sprintf("%s:%d", typ, option)
-	}
-	var order = map[string]int{
-		_key(data.ServiceResourceType, data.CreateOption): 6,
-		_key(data.RouteResourceType, data.CreateOption):   5,
-		_key(data.ServiceResourceType, data.UpdateOption): 4,
-		_key(data.RouteResourceType, data.UpdateOption):   3,
-		_key(data.RouteResourceType, data.DeleteOption):   2,
-		_key(data.ServiceResourceType, data.DeleteOption): 1,
-	}
 	sort.Slice(events, func(i, j int) bool {
 		return order[_key(events[i].ResourceType, events[i].Option)] > order[_key(events[j].ResourceType, events[j].Option)]
 	})
