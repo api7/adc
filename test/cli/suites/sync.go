@@ -122,4 +122,39 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			expect.GET("/get").WithHost("svc.com").Expect().Status(http.StatusNotFound)
 		})
 	})
+
+	ginkgo.Context("Test the sync command order", func() {
+		s := NewScaffold()
+		ginkgo.It("should sync data to APISIX", func() {
+			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
+
+			_, err := s.UpdateService(service)
+			gomega.Expect(err).To(gomega.BeNil(), "check service update")
+			_, err = s.UpdateRoute(route)
+			gomega.Expect(err).To(gomega.BeNil(), "check route update")
+			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "foo.com"`)
+			_, err = s.UpdateService(service1)
+			gomega.Expect(err).To(gomega.BeNil(), "check service update")
+			expect.GET("/get").WithHost("bar.com").Expect().Status(http.StatusNotFound)
+
+			// Now we have two services and one route in APISIX
+			// route => svc, and svc1
+			// we delete svc1 and update the route to reference svc1
+			var syncOutput bytes.Buffer
+			cmd := exec.Command("adc", "sync", "-f", "testdata/test2.yaml")
+			cmd.Stdout = &syncOutput
+			err = cmd.Run()
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
+			gomega.Expect(syncOutput.String()).To(gomega.ContainSubstring("Summary: created 0, updated 2, deleted 1"))
+
+			expect.GET("/get").WithHost("svc.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "svc.com"`)
+			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusNotFound)
+			expect.GET("/get").WithHost("bar.com").Expect().Status(http.StatusNotFound)
+
+			err = s.DeleteRoute("route")
+			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
+			err = s.DeleteService("svc1")
+			gomega.Expect(err).To(gomega.BeNil(), "check svc delete")
+		})
+	})
 })

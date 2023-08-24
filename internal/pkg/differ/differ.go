@@ -46,12 +46,12 @@ func sortEvents(events []*data.Event) {
 		return fmt.Sprintf("%s:%d", typ, option)
 	}
 	var order = map[string]int{
-		_key(data.RouteResourceType, data.DeleteOption):   6,
-		_key(data.ServiceResourceType, data.DeleteOption): 5,
-		_key(data.RouteResourceType, data.UpdateOption):   4,
-		_key(data.ServiceResourceType, data.UpdateOption): 3,
-		_key(data.ServiceResourceType, data.CreateOption): 2,
-		_key(data.RouteResourceType, data.CreateOption):   1,
+		_key(data.ServiceResourceType, data.CreateOption): 6,
+		_key(data.RouteResourceType, data.CreateOption):   5,
+		_key(data.ServiceResourceType, data.UpdateOption): 4,
+		_key(data.RouteResourceType, data.UpdateOption):   3,
+		_key(data.RouteResourceType, data.DeleteOption):   2,
+		_key(data.ServiceResourceType, data.DeleteOption): 1,
 	}
 	sort.Slice(events, func(i, j int) bool {
 		return order[_key(events[i].ResourceType, events[i].Option)] > order[_key(events[j].ResourceType, events[j].Option)]
