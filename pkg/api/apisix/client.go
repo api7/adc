@@ -103,7 +103,11 @@ func (c *Client) deleteResource(ctx context.Context, url string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		message := readBody(resp.Body)
+		message, err := readBody(resp.Body)
+		if err != nil {
+			err = multierr.Append(err, fmt.Errorf("read body failed"))
+			return err
+		}
 		if c.isFunctionDisabled(message) {
 			return ErrFunctionDisabled
 		}
@@ -117,14 +121,14 @@ func (c *Client) deleteResource(ctx context.Context, url string) error {
 	return nil
 }
 
-func readBody(r io.ReadCloser) string {
+func readBody(r io.ReadCloser) (string, error) {
 	defer r.Close()
 
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return string(data)
+	return string(data), nil
 }
 
 // getSchema returns the schema of APISIX object.
@@ -139,17 +143,23 @@ func (c *Client) getSchema(ctx context.Context, url string) (string, error) {
 	}
 
 	defer resp.Body.Close()
+	body, err := readBody(resp.Body)
+	if err != nil {
+		err = multierr.Append(err, fmt.Errorf("read body failed"))
+		return "", err
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
 			return "", ErrNotFound
 		} else {
 			err = multierr.Append(err, fmt.Errorf("unexpected status code %d", resp.StatusCode))
-			err = multierr.Append(err, fmt.Errorf("error message: %s", readBody(resp.Body)))
+			err = multierr.Append(err, fmt.Errorf("error message: %s", body))
 		}
 		return "", err
 	}
 
-	return readBody(resp.Body), nil
+	return body, nil
 }
 
 // getList returns a list of string.
@@ -167,6 +177,43 @@ func (c *Client) getList(ctx context.Context, url string) ([]string, error) {
 	return res, nil
 }
 
+func (c *Client) validate(ctx context.Context, url string, resource interface{}) error {
+	jsonData, err := json.Marshal(resource)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respData := &struct {
+			ErrMsg string `json:"error_msg"`
+		}{}
+
+		body, err := readBody(resp.Body)
+		if err != nil {
+			err = multierr.Append(err, fmt.Errorf("read body failed"))
+			return err
+		}
+		err = json.Unmarshal([]byte(body), respData)
+		if err != nil {
+			return err
+		}
+		if resp != nil {
+			return errors.New(respData.ErrMsg)
+		}
+		return err
+	}
+	return nil
+}
+
 func makeGetRequest[T any](c *Client, ctx context.Context, url string, result *T) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -179,7 +226,11 @@ func makeGetRequest[T any](c *Client, ctx context.Context, url string, result *T
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body := readBody(resp.Body)
+		body, err := readBody(resp.Body)
+		if err != nil {
+			err = multierr.Append(err, fmt.Errorf("read body failed"))
+			return err
+		}
 		if c.isFunctionDisabled(body) {
 			return ErrFunctionDisabled
 		}
@@ -209,7 +260,11 @@ func makePutRequest[T any](c *Client, ctx context.Context, url string, body []by
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body := readBody(resp.Body)
+		body, err := readBody(resp.Body)
+		if err != nil {
+			err = multierr.Append(err, fmt.Errorf("read body failed"))
+			return err
+		}
 		if c.isFunctionDisabled(body) {
 			return ErrFunctionDisabled
 		}

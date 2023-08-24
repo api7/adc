@@ -11,7 +11,7 @@ type serviceClient struct {
 }
 
 func newService(c *Client) Service {
-	cli := newResourceClient[types.Service](c, "apisix/admin/services")
+	cli := newResourceClient[types.Service](c, "services")
 	return &serviceClient{
 		resourceClient: cli,
 	}

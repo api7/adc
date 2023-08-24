@@ -17,6 +17,7 @@ type Route interface {
 	Create(ctx context.Context, ups *types.Route) (*types.Route, error)
 	Delete(ctx context.Context, name string) error
 	Update(ctx context.Context, ups *types.Route) (*types.Route, error)
+	Validate(ctx context.Context, resource *types.Route) error
 }
 
 type Service interface {
@@ -25,4 +26,5 @@ type Service interface {
 	Create(ctx context.Context, ups *types.Service) (*types.Service, error)
 	Delete(ctx context.Context, name string) error
 	Update(ctx context.Context, ups *types.Service) (*types.Service, error)
+	Validate(ctx context.Context, resource *types.Service) error
 }

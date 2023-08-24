@@ -11,7 +11,7 @@ type routeClient struct {
 }
 
 func newRoute(c *Client) Route {
-	cli := newResourceClient[types.Route](c, "apisix/admin/routes")
+	cli := newResourceClient[types.Route](c, "routes")
 	return &routeClient{
 		resourceClient: cli,
 	}
