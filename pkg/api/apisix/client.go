@@ -48,10 +48,6 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	return c.cli.Do(req)
 }
 
-func (c *Client) isFunctionDisabled(body string) bool {
-	return strings.Contains(body, "is disabled")
-}
-
 func (c *Client) getResource(ctx context.Context, url string) (*item, error) {
 	var res getResponse
 	err := makeGetRequest(c, ctx, url, &res)
@@ -103,20 +99,7 @@ func (c *Client) deleteResource(ctx context.Context, url string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		message, err := readBody(resp.Body)
-		if err != nil {
-			err = multierr.Append(err, fmt.Errorf("read body failed"))
-			return err
-		}
-		if c.isFunctionDisabled(message) {
-			return ErrFunctionDisabled
-		}
-		err = multierr.Append(err, fmt.Errorf("unexpected status code %d", resp.StatusCode))
-		err = multierr.Append(err, fmt.Errorf("error message: %s", message))
-		if strings.Contains(message, "still using") {
-			return ErrStillInUse
-		}
-		return err
+		return handleErrorResponse(resp)
 	}
 	return nil
 }
@@ -193,25 +176,13 @@ func (c *Client) validate(ctx context.Context, url string, resource interface{})
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		respData := &struct {
-			ErrMsg string `json:"error_msg"`
-		}{}
-
-		body, err := readBody(resp.Body)
-		if err != nil {
-			err = multierr.Append(err, fmt.Errorf("read body failed"))
-			return err
-		}
-		err = json.Unmarshal([]byte(body), respData)
-		if err != nil {
-			return err
-		}
-		if resp != nil {
-			return errors.New(respData.ErrMsg)
-		}
-		return err
+		return handleErrorResponse(resp)
 	}
 	return nil
+}
+
+func isFunctionDisabled(msg string) bool {
+	return strings.Contains(msg, "is disabled")
 }
 
 func makeGetRequest[T any](c *Client, ctx context.Context, url string, result *T) error {
@@ -226,17 +197,10 @@ func makeGetRequest[T any](c *Client, ctx context.Context, url string, result *T
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, err := readBody(resp.Body)
-		if err != nil {
-			err = multierr.Append(err, fmt.Errorf("read body failed"))
-			return err
+		if resp.StatusCode == http.StatusNotFound {
+			return ErrNotFound
 		}
-		if c.isFunctionDisabled(body) {
-			return ErrFunctionDisabled
-		}
-		err = multierr.Append(err, fmt.Errorf("unexpected status code %d", resp.StatusCode))
-		err = multierr.Append(err, fmt.Errorf("error message: %s", body))
-		return err
+		return handleErrorResponse(resp)
 	}
 
 	dec := json.NewDecoder(resp.Body)
@@ -260,17 +224,7 @@ func makePutRequest[T any](c *Client, ctx context.Context, url string, body []by
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, err := readBody(resp.Body)
-		if err != nil {
-			err = multierr.Append(err, fmt.Errorf("read body failed"))
-			return err
-		}
-		if c.isFunctionDisabled(body) {
-			return ErrFunctionDisabled
-		}
-		err = multierr.Append(err, fmt.Errorf("unexpected status code %d", resp.StatusCode))
-		err = multierr.Append(err, fmt.Errorf("error message: %s", body))
-		return err
+		return handleErrorResponse(resp)
 	}
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(result); err != nil {
@@ -278,4 +232,26 @@ func makePutRequest[T any](c *Client, ctx context.Context, url string, body []by
 	}
 
 	return nil
+}
+
+func handleErrorResponse(resp *http.Response) error {
+	respData := &struct {
+		ErrMsg string `json:"error_msg"`
+	}{}
+
+	body, err := readBody(resp.Body)
+	if err != nil {
+		err = multierr.Append(err, fmt.Errorf("read body failed"))
+		return err
+	}
+	err = json.Unmarshal([]byte(body), respData)
+	if err != nil {
+		return err
+	}
+
+	errMsg := errors.New(respData.ErrMsg)
+	if isFunctionDisabled(errMsg.Error()) {
+		return errMsg
+	}
+	return multierr.Append(fmt.Errorf("unexpected status code %d", resp.StatusCode), errMsg)
 }
