@@ -2,6 +2,25 @@
 
 The ADC CLI tool is a command-line interface for interacting with the APISIX's API. It is built using the Golang Cobra library and provides several sub-commands for managing your APISIX instance.
 
+## Installation
+
+The ADC CLI tool can be installed using the `go install` command:
+
+```
+go install github.com/api7/adc@latest
+```
+
+This will install the `adc` binary to your `$GOPATH/bin` directory. Make sure that this directory is in your `$PATH` environment variable.
+
+You can also download the binary from the [releases page](https://github.com/api7/adc/releases) and place it in your `$PATH` directory.
+
+```bash
+# Download the binary
+wget https://github.com/api7/adc/releases/download/v0.1.0/adc_0.1.0_linux_amd64.tar.gz
+tar -zxvf adc_0.1.0_linux_amd64.tar.gz
+mv adc /usr/local/bin/adc
+```
+
 ## Usage
 
 To use the ADC CLI tool, run the `adc` command followed by the sub-command you wish to use. For example, to check the connection to APISIX API, run the following command:
