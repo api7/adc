@@ -39,6 +39,7 @@ It can be used to dump, diff, sync configurations to API7 server.
 	rootCmd.AddCommand(newDiffCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newValidateCmd())
+	rootCmd.AddCommand(newVersionCmd())
 	return rootCmd
 }
 
