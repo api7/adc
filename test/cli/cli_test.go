@@ -7,6 +7,7 @@ import (
 	"github.com/onsi/gomega"
 
 	_ "github.com/api7/adc/test/cli/suites"
+	_ "github.com/api7/adc/test/cli/suites-consumer"
 )
 
 func TestADC(t *testing.T) {

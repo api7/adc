@@ -10,71 +10,72 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
-)
-
-var (
-	service = &types.Service{
-		ID:   "svc",
-		Name: "svc",
-		Hosts: []string{
-			"foo.com",
-		},
-		Upstream: types.Upstream{
-			ID:   "httpbin",
-			Name: "httpbin",
-			Nodes: []types.UpstreamNode{
-				{
-					Host:   "httpbin",
-					Port:   80,
-					Weight: 1,
-				},
-			},
-		},
-	}
-
-	service1 = &types.Service{
-		ID:   "svc1",
-		Name: "svc1",
-		Hosts: []string{
-			"bar.com",
-		},
-		Upstream: types.Upstream{
-			ID:   "httpbin",
-			Name: "httpbin",
-			Nodes: []types.UpstreamNode{
-				{
-					Host:   "httpbin",
-					Port:   80,
-					Weight: 1,
-				},
-			},
-		},
-	}
-
-	route = &types.Route{
-		ID:   "route",
-		Name: "route",
-		Uri:  "/get",
-		Methods: []string{
-			"GET",
-		},
-		ServiceID: "svc",
-	}
-
-	route1 = &types.Route{
-		ID:   "route1",
-		Name: "route1",
-		Uri:  "/get",
-		Methods: []string{
-			"GET",
-		},
-		ServiceID: "svc1",
-	}
+	"github.com/api7/adc/test/cli/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc sync` tests", func() {
+	var (
+		service = &types.Service{
+			ID:   "svc",
+			Name: "svc",
+			Hosts: []string{
+				"foo.com",
+			},
+			Upstream: types.Upstream{
+				ID:   "httpbin",
+				Name: "httpbin",
+				Nodes: []types.UpstreamNode{
+					{
+						Host:   "httpbin",
+						Port:   80,
+						Weight: 1,
+					},
+				},
+			},
+		}
+
+		service1 = &types.Service{
+			ID:   "svc1",
+			Name: "svc1",
+			Hosts: []string{
+				"bar.com",
+			},
+			Upstream: types.Upstream{
+				ID:   "httpbin",
+				Name: "httpbin",
+				Nodes: []types.UpstreamNode{
+					{
+						Host:   "httpbin",
+						Port:   80,
+						Weight: 1,
+					},
+				},
+			},
+		}
+
+		route = &types.Route{
+			ID:   "route",
+			Name: "route",
+			Uri:  "/get",
+			Methods: []string{
+				"GET",
+			},
+			ServiceID: "svc",
+		}
+
+		route1 = &types.Route{
+			ID:   "route1",
+			Name: "route1",
+			Uri:  "/get",
+			Methods: []string{
+				"GET",
+			},
+			ServiceID: "svc1",
+		}
+	)
+
 	ginkgo.Context("Basic functions", func() {
-		s := NewScaffold()
+		s := scaffold.NewScaffold()
 		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 
@@ -124,7 +125,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 	})
 
 	ginkgo.Context("Test the sync command order", func() {
-		s := NewScaffold()
+		s := scaffold.NewScaffold()
 		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 

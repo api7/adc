@@ -22,6 +22,8 @@ var (
 	ServiceResourceType ResourceType = "service"
 	// RouteResourceType is the resource type of route
 	RouteResourceType ResourceType = "route"
+	// ConsumerResourceType is the resource type of consumer
+	ConsumerResourceType ResourceType = "consumer"
 )
 
 const (
@@ -73,33 +75,30 @@ func (e *Event) Output() (string, error) {
 	return output, nil
 }
 
-func applyService(cluster apisix.Cluster, event *Event) error {
+func apply[T any](client apisix.ResourceClient[T], event *Event) error {
 	var err error
 	switch event.Option {
 	case CreateOption:
-		_, err = cluster.Service().Create(context.Background(), event.Value.(*types.Service))
+		_, err = client.Create(context.Background(), event.Value.(*T))
 	case DeleteOption:
-		err = cluster.Service().Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
+		err = client.Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
 	case UpdateOption:
-		_, err = cluster.Service().Update(context.Background(), event.Value.(*types.Service))
-		return err
+		_, err = client.Update(context.Background(), event.Value.(*T))
 	}
 
-	return errors.Wrap(err, "failed to apply service")
+	return errors.Wrap(err, "failed to apply "+string(event.ResourceType))
+}
+
+func applyService(cluster apisix.Cluster, event *Event) error {
+	return apply[types.Service](cluster.Service(), event)
 }
 
 func applyRoute(cluster apisix.Cluster, event *Event) error {
-	var err error
-	switch event.Option {
-	case CreateOption:
-		_, err = cluster.Route().Create(context.Background(), event.Value.(*types.Route))
-	case DeleteOption:
-		err = cluster.Route().Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
-	case UpdateOption:
-		_, err = cluster.Route().Update(context.Background(), event.Value.(*types.Route))
-	}
+	return apply[types.Route](cluster.Route(), event)
+}
 
-	return errors.Wrap(err, "failed to apply route")
+func applyConsumer(cluster apisix.Cluster, event *Event) error {
+	return apply[types.Consumer](cluster.Consumer(), event)
 }
 
 func (e *Event) Apply(cluster apisix.Cluster) error {
@@ -108,6 +107,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyService(cluster, e)
 	case RouteResourceType:
 		return applyRoute(cluster, e)
+	case ConsumerResourceType:
+		return applyConsumer(cluster, e)
 	}
 
 	return nil

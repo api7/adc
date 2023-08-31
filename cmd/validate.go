@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -40,7 +41,18 @@ func newValidateCmd() *cobra.Command {
 				return err
 			}
 
-			color.Green("Get file content success: config name: %v, version: %v, routes: %v, services: %v.", d.Name, d.Name, len(d.Routes), len(d.Services))
+			msg := fmt.Sprintf("Get file content success: config name: %v, version: %v", d.Name, d.Name)
+			if len(d.Routes) > 0 {
+				msg += fmt.Sprintf(", routes: %v", len(d.Routes))
+			}
+			if len(d.Services) > 0 {
+				msg += fmt.Sprintf(", services: %v", len(d.Services))
+			}
+			if len(d.Consumers) > 0 {
+				msg += fmt.Sprintf(", consumers: %v", len(d.Consumers))
+			}
+			msg += "."
+			color.Green(msg)
 
 			err = validateContent(d)
 			if err != nil {

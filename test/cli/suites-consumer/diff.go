@@ -1,4 +1,4 @@
-package suites
+package consumer
 
 import (
 	"bytes"
@@ -10,20 +10,17 @@ import (
 	"github.com/api7/adc/test/cli/scaffold"
 )
 
-var _ = ginkgo.Describe("`adc diff` tests", func() {
+var _ = ginkgo.Describe("`adc diff` consumer tests", func() {
 	ginkgo.Context("Basic functions", func() {
 		_ = scaffold.NewScaffold()
 		ginkgo.It("should return the diff result", func() {
 			var out bytes.Buffer
-			cmd := exec.Command("adc", "diff", "-f", "testdata/test.yaml")
+			cmd := exec.Command("adc", "diff", "-f", "suites-consumer/testdata/test.yaml")
 			cmd.Stdout = &out
 			err := cmd.Run()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out.String()).To(gomega.Equal(`creating service: "svc1"
-creating service: "svc2"
-creating route: "route1"
-creating route: "route2"
-Summary: created 4, updated 0, deleted 0
+			gomega.Expect(out.String()).To(gomega.Equal(`creating consumer: "jack"
+Summary: created 1, updated 0, deleted 0
 `))
 		})
 	})

@@ -30,6 +30,16 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"consumers": {
+			Name: "consumers",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "Username"},
+				},
+			},
+		},
 	},
 }
 
@@ -68,13 +78,21 @@ func NewMemDB(configure *types.Configuration) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	for _, consumers := range configure.Consumers {
+		err = txn.Insert("consumers", consumers)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txn.Commit()
 
 	return &DB{memDB: db}, nil
 }
 
-func (db *DB) GetServiceByID(id string) (*types.Service, error) {
-	obj, err := db.memDB.Txn(false).First("services", "id", id)
+func getByID[T any](db *DB, table, id string) (*T, error) {
+	obj, err := db.memDB.Txn(false).First(table, "id", id)
 	if err != nil {
 		return nil, err
 	}
@@ -83,18 +101,17 @@ func (db *DB) GetServiceByID(id string) (*types.Service, error) {
 		return nil, NotFound
 	}
 
-	return obj.(*types.Service), err
+	return obj.(*T), err
+}
+
+func (db *DB) GetServiceByID(id string) (*types.Service, error) {
+	return getByID[types.Service](db, "services", id)
 }
 
 func (db *DB) GetRouteByID(id string) (*types.Route, error) {
-	obj, err := db.memDB.Txn(false).First("routes", "id", id)
-	if err != nil {
-		return nil, err
-	}
+	return getByID[types.Route](db, "routes", id)
+}
 
-	if obj == nil {
-		return nil, NotFound
-	}
-
-	return obj.(*types.Route), err
+func (db *DB) GetConsumerByID(username string) (*types.Consumer, error) {
+	return getByID[types.Consumer](db, "consumers", username)
 }

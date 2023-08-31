@@ -66,9 +66,15 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	consumers, err := cluster.Consumer().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	conf := &types.Configuration{
-		Routes:   routes,
-		Services: svcs,
+		Routes:    routes,
+		Services:  svcs,
+		Consumers: consumers,
 	}
 
 	if save {

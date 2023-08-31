@@ -112,9 +112,12 @@ func (u *resourceClient[T]) Update(ctx context.Context, id string, obj *T) (*T, 
 func GetResourceNameOrID(resource interface{}) string {
 	value := reflect.ValueOf(resource)
 	value = reflect.Indirect(value)
-	nameOrID := value.FieldByName("Name")
+	nameOrID := value.FieldByName("ID")
 	if !nameOrID.IsValid() {
-		nameOrID = value.FieldByName("ID")
+		nameOrID = value.FieldByName("Name")
+	}
+	if !nameOrID.IsValid() {
+		nameOrID = value.FieldByName("Username")
 	}
 	return nameOrID.String()
 }

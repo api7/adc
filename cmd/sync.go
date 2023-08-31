@@ -49,13 +49,13 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		return err
 	}
 
-	remoteConifg, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
+	remoteConfig, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
 		color.Red("Failed to get remote config: %v", err)
 		return err
 	}
 
-	d, err := differ.NewDiffer(config, remoteConifg)
+	d, err := differ.NewDiffer(config, remoteConfig)
 	if err != nil {
 		color.Red("Failed to create differ: %v", err)
 		return err

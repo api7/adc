@@ -6,11 +6,13 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/api7/adc/test/cli/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc dump` tests", func() {
 	ginkgo.Context("Test the dump command", func() {
-		s := NewScaffold()
+		s := scaffold.NewScaffold()
 		ginkgo.It("should dump APISIX resources", func() {
 			var syncOutput bytes.Buffer
 			cmd := exec.Command("adc", "sync", "-f", "testdata/test.yaml")

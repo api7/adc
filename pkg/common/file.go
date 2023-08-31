@@ -51,9 +51,15 @@ func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) 
 		return nil, err
 	}
 
+	consumers, err := cluster.Consumer().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Configuration{
-		Routes:   routes,
-		Services: svcs,
+		Routes:    routes,
+		Services:  svcs,
+		Consumers: consumers,
 	}, nil
 }
 
