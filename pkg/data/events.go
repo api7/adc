@@ -51,9 +51,9 @@ func (e *Event) Output() (string, error) {
 	var output string
 	switch e.Option {
 	case CreateOption:
-		output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceNameOrID(e.Value))
+		output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
 	case DeleteOption:
-		output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceNameOrID(e.OldValue))
+		output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
 	case UpdateOption:
 		remote, err := json.MarshalIndent(e.OldValue, "", "\t")
 		if err != nil {
@@ -69,7 +69,7 @@ func (e *Event) Output() (string, error) {
 
 		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
 		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
-		output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceNameOrID(e.Value), diff)
+		output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
 	}
 
 	return output, nil
@@ -81,7 +81,7 @@ func apply[T any](client apisix.ResourceClient[T], event *Event) error {
 	case CreateOption:
 		_, err = client.Create(context.Background(), event.Value.(*T))
 	case DeleteOption:
-		err = client.Delete(context.Background(), apisix.GetResourceNameOrID(event.OldValue))
+		err = client.Delete(context.Background(), apisix.GetResourceUniqueKey(event.OldValue))
 	case UpdateOption:
 		_, err = client.Update(context.Background(), event.Value.(*T))
 	}
