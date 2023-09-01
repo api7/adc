@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/onsi/ginkgo/v2"
@@ -76,6 +77,8 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			gomega.Expect(err).To(gomega.BeNil(), "check service update")
 			_, err = s.UpdateRoute(route)
 			gomega.Expect(err).To(gomega.BeNil(), "check route update")
+
+			time.Sleep(time.Second * 1)
 
 			resp := expect.GET("/get").WithHeader("apikey", authKey).
 				WithHost("foo.com").Expect()
