@@ -10,10 +10,11 @@ import (
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name     string     `yaml:"name" json:"name"`
-	Version  string     `yaml:"version" json:"version"`
-	Services []*Service `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes   []*Route   `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Name      string      `yaml:"name" json:"name"`
+	Version   string      `yaml:"version" json:"version"`
+	Services  []*Service  `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes    []*Route    `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers []*Consumer `yaml:"consumers,omitempty" json:"consumers,omitempty"`
 }
 
 // StringArray is enhanced version of pq.StringArray that can be handled nil value automatically.
@@ -289,4 +290,13 @@ func (s *StringOrSlice) UnmarshalJSON(p []byte) error {
 		err = json.Unmarshal(p, &s.StrVal)
 	}
 	return err
+}
+
+// Consumer represents the consumer object in APISIX.
+// +k8s:deepcopy-gen=true
+type Consumer struct {
+	Username string            `json:"username" yaml:"username"`
+	Desc     string            `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Plugins  Plugins           `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }

@@ -1,29 +1,22 @@
 package suites
 
 import (
-	"bytes"
-	"os/exec"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/api7/adc/test/cli/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc dump` tests", func() {
 	ginkgo.Context("Test the dump command", func() {
-		s := NewScaffold()
+		s := scaffold.NewScaffold()
 		ginkgo.It("should dump APISIX resources", func() {
-			var syncOutput bytes.Buffer
-			cmd := exec.Command("adc", "sync", "-f", "testdata/test.yaml")
-			cmd.Stdout = &syncOutput
-			err := cmd.Run()
-			gomega.Expect(err).To(gomega.BeNil())
+			_, err := s.Sync("testdata/test.yaml")
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
 
-			var out bytes.Buffer
-			cmd = exec.Command("adc", "dump", "-o", "/dev/stdout")
-			cmd.Stdout = &out
-			err = cmd.Run()
+			out, err := s.Dump()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out.String()).To(gomega.Equal(`name: ""
+			gomega.Expect(out).To(gomega.Equal(`name: ""
 routes:
 - id: route1
   methods:

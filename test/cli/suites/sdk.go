@@ -1,29 +1,25 @@
 package suites
 
 import (
-	"context"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/test/cli/scaffold"
 )
 
 var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 	ginkgo.Context("Basic functions", func() {
-		s := NewScaffold()
+		s := scaffold.NewScaffold()
 		ginkgo.It("Route resource", func() {
-			cluster := s.cluster
-			ctx := context.Background()
-
 			var (
 				err   error
 				route *types.Route
 			)
 
 			// create service
-			_, err = cluster.Service().Create(ctx, &types.Service{
+			_, err = s.CreateService(&types.Service{
 				ID:   "svc1",
 				Name: "svc1",
 				Hosts: []string{
@@ -58,10 +54,10 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				Uri:       "/route1",
 				ServiceID: "svc1",
 			}
-			_, err = cluster.Route().Create(ctx, baseRoute1)
+			_, err = s.CreateRoute(baseRoute1)
 
 			// get route 1
-			route, err = cluster.Route().Get(ctx, "route1")
+			route, err = s.GetRoute("route1")
 			gomega.Expect(err).To(gomega.BeNil())
 			assertRouteEqual(route, baseRoute1)
 
@@ -72,12 +68,12 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				Uri:       "/route2",
 				ServiceID: "svc1",
 			}
-			route, err = cluster.Route().Create(ctx, baseRoute2)
+			route, err = s.CreateRoute(baseRoute2)
 			gomega.Expect(err).To(gomega.BeNil())
 			assertRouteEqual(route, baseRoute2)
 
 			// test list
-			routes, err := cluster.Route().List(ctx)
+			routes, err := s.ListRoute()
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(len(routes)).To(gomega.Equal(2))
 			var route1, route2 *types.Route
@@ -101,34 +97,34 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				Uri:       "/route1-updated",
 				ServiceID: "svc1",
 			}
-			_, err = cluster.Route().Update(ctx, baseRoute1)
+			_, err = s.UpdateRoute(baseRoute1)
 			gomega.Expect(err).To(gomega.BeNil())
 
-			route, err = cluster.Route().Get(ctx, "route1")
+			route, err = s.GetRoute("route1")
 			gomega.Expect(err).To(gomega.BeNil())
 			assertRouteEqual(route, baseRoute1)
 
 			// delete route 2
-			err = cluster.Route().Delete(ctx, "route2")
+			err = s.DeleteRoute("route2")
 			gomega.Expect(err).To(gomega.BeNil())
 
-			_, err = cluster.Route().Get(ctx, "route2")
+			_, err = s.GetRoute("route2")
 			gomega.Expect(err).To(gomega.Equal(apisix.ErrNotFound))
 
 			// delete route 1
-			err = cluster.Route().Delete(ctx, "route1")
+			err = s.DeleteRoute("route1")
 			gomega.Expect(err).To(gomega.BeNil())
 
-			_, err = cluster.Route().Get(ctx, "route1")
+			_, err = s.GetRoute("route1")
 			gomega.Expect(err).To(gomega.Equal(apisix.ErrNotFound))
 
 			// final list
-			routes, err = cluster.Route().List(ctx)
+			routes, err = s.ListRoute()
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(len(routes)).To(gomega.Equal(0))
 
 			// delete service
-			err = cluster.Service().Delete(ctx, "svc1")
+			err = s.DeleteService("svc1")
 			gomega.Expect(err).To(gomega.BeNil())
 		})
 	})

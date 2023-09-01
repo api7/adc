@@ -23,12 +23,15 @@ func _key(typ data.ResourceType, option int) string {
 // 5. Routes Delete
 // 6. Services Delete
 var order = map[string]int{
-	_key(data.ServiceResourceType, data.CreateOption): 6,
-	_key(data.RouteResourceType, data.CreateOption):   5,
-	_key(data.ServiceResourceType, data.UpdateOption): 4,
-	_key(data.RouteResourceType, data.UpdateOption):   3,
-	_key(data.RouteResourceType, data.DeleteOption):   2,
-	_key(data.ServiceResourceType, data.DeleteOption): 1,
+	_key(data.ConsumerResourceType, data.UpdateOption): 8,
+	_key(data.ConsumerResourceType, data.CreateOption): 7,
+	_key(data.ServiceResourceType, data.CreateOption):  6,
+	_key(data.RouteResourceType, data.CreateOption):    5,
+	_key(data.ServiceResourceType, data.UpdateOption):  4,
+	_key(data.RouteResourceType, data.UpdateOption):    3,
+	_key(data.RouteResourceType, data.DeleteOption):    2,
+	_key(data.ServiceResourceType, data.DeleteOption):  1,
+	_key(data.ConsumerResourceType, data.DeleteOption): 0,
 }
 
 // Differ is the object of comparing two configurations.
@@ -74,8 +77,15 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	consumerEvents, err := d.diffConsumers()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
+	events = append(events, consumerEvents...)
 
 	sortEvents(events)
 
@@ -184,6 +194,59 @@ func (d *Differ) diffRoutes() ([]*data.Event, error) {
 			ResourceType: data.RouteResourceType,
 			Option:       data.CreateOption,
 			Value:        route,
+		})
+	}
+
+	return events, nil
+}
+
+// diffConsumers compares the consumers between local and remote.
+func (d *Differ) diffConsumers() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteConsumers := range d.remoteConfig.Consumers {
+		localConsumer, err := d.localDB.GetConsumerByID(remoteConsumers.Username)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.ConsumerResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteConsumers,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localConsumer.Username] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localConsumer, remoteConsumers); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.ConsumerResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteConsumers,
+			Value:        localConsumer,
+		})
+	}
+
+	// only in local, create
+	for _, consumer := range d.localConfig.Consumers {
+		if mark[consumer.Username] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.ConsumerResourceType,
+			Option:       data.CreateOption,
+			Value:        consumer,
 		})
 	}
 
