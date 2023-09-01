@@ -19,7 +19,7 @@ build: ## Build adc
 
 .PHONY: test
 test: ## Run cli test
-	@cd test/cli && ginkgo -r --node=1
+	@cd test/cli && ginkgo -r --nodes=1
 
 .PHONY: unit-test
 unit-test: ## Run unit test
