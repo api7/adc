@@ -38,6 +38,7 @@ The following sub-commands are available:
 - `sync`: Sync your local configuration to APISIX instance.
 - `diff`: Show the differences between your local configuration and the APISIX instance.
 - `dump`: Dump your APISIX configurations to a local file.
+- `version`: Print the version of ADC CLI.
 
 Use the `--help` flag with any sub-command to see its usage information.
 
@@ -46,6 +47,43 @@ Use the `--help` flag with any sub-command to see its usage information.
 The ADC CLI tool can be configured using the `configure` sub-command. This sub-command will prompt you for your APISIX server address and API token, and save them to a configuration file.
 
 The configuration file is located at `$HOME/.adc.yaml` and can be edited manually if necessary.
+
+## Dump
+
+The ADC CLI tool can dump your APISIX configurations to a local file. This file can then be used to sync your APISIX configurations to APISIX instance.
+
+To dump your APISIX configurations, run the following command:
+
+```bash
+adc dump -o <file>
+```
+
+This will dump your APISIX configurations to the specified file.
+
+## Sync
+
+The ADC CLI tool can sync your local configuration to APISIX instance. This will update your APISIX instance with the configurations in your local file.
+
+To sync your local configuration to APISIX instance, run the following command:
+
+```bash
+adc sync -f <file>
+```
+
+This will sync your local configuration to APISIX instance.
+
+## Diff
+
+The ADC CLI tool can show the differences between your local configuration and the APISIX instance. This will show you what changes will be made to your APISIX instance when you sync your local configuration.
+
+To show the differences between your local configuration and the APISIX instance, run the following command:
+
+```bash
+adc diff -f <file>
+```
+
+This will show the differences between your local configuration and the APISIX instance.
+
 
 ## License
 
