@@ -37,6 +37,21 @@ func GetContentFromFile(filename string) (*types.Configuration, error) {
 		return nil, err
 	}
 
+	for _, route := range content.Routes {
+		if route.ID == "" {
+			route.ID = route.Name
+		}
+	}
+
+	for _, service := range content.Services {
+		if service.ID == "" {
+			service.ID = service.Name
+		}
+		if service.Upstream.ID == "" {
+			service.Upstream.ID = service.Upstream.Name
+		}
+	}
+
 	return &content, nil
 }
 

@@ -1,9 +1,7 @@
 package suites
 
 import (
-	"bytes"
 	"net/http"
-	"os/exec"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/onsi/ginkgo/v2"
@@ -26,7 +24,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				Name: "httpbin",
 				Nodes: []types.UpstreamNode{
 					{
-						Host:   "httpbin",
+						Host:   "httpbin.org",
 						Port:   80,
 						Weight: 1,
 					},
@@ -45,7 +43,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				Name: "httpbin",
 				Nodes: []types.UpstreamNode{
 					{
-						Host:   "httpbin",
+						Host:   "httpbin.org",
 						Port:   80,
 						Weight: 1,
 					},
@@ -100,12 +98,10 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				route1 is updated
 				route2 is created
 			*/
-			var syncOutput bytes.Buffer
-			cmd := exec.Command("adc", "sync", "-f", "testdata/test.yaml")
-			cmd.Stdout = &syncOutput
-			err = cmd.Run()
+			output, err := s.Sync("testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
-			gomega.Expect(syncOutput.String()).To(gomega.ContainSubstring("Summary: created 2, updated 2, deleted 2"))
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 2, updated 2, deleted 2"))
+
 			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusNotFound)
 			expect.GET("/get").WithHost("bar.com").Expect().Status(http.StatusNotFound)
 			expect.GET("/get").WithHost("foo1.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "foo1.com"`)
@@ -141,12 +137,9 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			// Now we have two services and one route in APISIX
 			// route => svc, and svc1
 			// we delete svc1 and update the route to reference svc1
-			var syncOutput bytes.Buffer
-			cmd := exec.Command("adc", "sync", "-f", "testdata/test2.yaml")
-			cmd.Stdout = &syncOutput
-			err = cmd.Run()
+			output, err := s.Sync("testdata/test2.yaml")
 			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
-			gomega.Expect(syncOutput.String()).To(gomega.ContainSubstring("Summary: created 0, updated 2, deleted 1"))
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 0, updated 2, deleted 1"))
 
 			expect.GET("/get").WithHost("svc.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "svc.com"`)
 			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusNotFound)

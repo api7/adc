@@ -63,6 +63,9 @@ func NewMemDB(configure *types.Configuration) (*DB, error) {
 		if service.ID == "" {
 			service.ID = service.Name
 		}
+		if service.Upstream.ID == "" {
+			service.Upstream.ID = service.Upstream.Name
+		}
 		err = txn.Insert("services", service)
 		if err != nil {
 			return nil, err
