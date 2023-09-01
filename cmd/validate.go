@@ -41,7 +41,7 @@ func newValidateCmd() *cobra.Command {
 				return err
 			}
 
-			msg := fmt.Sprintf("Get file content success: config name: %v, version: %v", d.Name, d.Name)
+			msg := fmt.Sprintf("Get file content success: config name: %v, version: %v", d.Name, d.Version)
 			if len(d.Routes) > 0 {
 				msg += fmt.Sprintf(", routes: %v", len(d.Routes))
 			}
