@@ -71,10 +71,16 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	ssls, err := cluster.SSL().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	conf := &types.Configuration{
 		Routes:    routes,
 		Services:  svcs,
 		Consumers: consumers,
+		SSLs:      ssls,
 	}
 
 	if save {

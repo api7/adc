@@ -10,6 +10,7 @@ type Cluster interface {
 	Route() Route
 	Service() Service
 	Consumer() Consumer
+	SSL() SSL
 }
 
 type ResourceClient[T any] interface {

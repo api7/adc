@@ -13,6 +13,7 @@ type cluster struct {
 	route    Route
 	service  Service
 	consumer Consumer
+	ssl      SSL
 }
 
 func NewCluster(ctx context.Context, url, adminKey string) Cluster {
@@ -27,6 +28,7 @@ func NewCluster(ctx context.Context, url, adminKey string) Cluster {
 	c.route = newRoute(cli)
 	c.service = newService(cli)
 	c.consumer = newConsumer(cli)
+	c.ssl = newSSL(cli)
 
 	return c
 }
@@ -44,4 +46,9 @@ func (c *cluster) Service() Service {
 // Consumer implements Cluster.Consumer method.
 func (c *cluster) Consumer() Consumer {
 	return c.consumer
+}
+
+// SSL implements ClusterSSL method.
+func (c *cluster) SSL() SSL {
+	return c.ssl
 }

@@ -16,13 +16,22 @@ func _key(typ data.ResourceType, option int) string {
 
 // Since the routes is related to the services, we need to sort the events.
 // The order is:
+// 0. Consumers Delete
 // 1. Services Create
 // 2. Routes Create
 // 3. Services Update
 // 4. Routes Update
 // 5. Routes Delete
 // 6. Services Delete
+// 7. Consumers Create
+// 8. Consumers Update
+// 9. SSLs Delete
+// 10. SSLs Create
+// 11. SSLs Update
 var order = map[string]int{
+	_key(data.SSLResourceType, data.UpdateOption):      11,
+	_key(data.SSLResourceType, data.CreateOption):      10,
+	_key(data.SSLResourceType, data.DeleteOption):      9,
 	_key(data.ConsumerResourceType, data.UpdateOption): 8,
 	_key(data.ConsumerResourceType, data.CreateOption): 7,
 	_key(data.ServiceResourceType, data.CreateOption):  6,
@@ -83,9 +92,15 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
+	sslEvents, err := d.diffSSLs()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
 	events = append(events, consumerEvents...)
+	events = append(events, sslEvents...)
 
 	sortEvents(events)
 
@@ -247,6 +262,58 @@ func (d *Differ) diffConsumers() ([]*data.Event, error) {
 			ResourceType: data.ConsumerResourceType,
 			Option:       data.CreateOption,
 			Value:        consumer,
+		})
+	}
+
+	return events, nil
+}
+
+// diffSSLs compares the routes between local and remote.
+func (d *Differ) diffSSLs() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteSSL := range d.remoteConfig.SSLs {
+		localSSL, err := d.localDB.GetSSLByID(remoteSSL.ID)
+		if err != nil {
+			// we can't find the route in local, it means the route should be deleted.
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.SSLResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteSSL,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localSSL.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localSSL, remoteSSL); equal {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.SSLResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteSSL,
+			Value:        localSSL,
+		})
+	}
+
+	// only in local, create
+	for _, ssl := range d.localConfig.SSLs {
+		if mark[ssl.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.SSLResourceType,
+			Option:       data.CreateOption,
+			Value:        ssl,
 		})
 	}
 
