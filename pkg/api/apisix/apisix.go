@@ -32,3 +32,7 @@ type Service interface {
 type Consumer interface {
 	ResourceClient[types.Consumer]
 }
+
+type SSL interface {
+	ResourceClient[types.SSL]
+}
