@@ -41,6 +41,16 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"ssls": {
+			Name: "ssls",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
 		"global_rules": {
 			Name: "global_rules",
 			Indexes: map[string]*memdb.IndexSchema{
@@ -93,6 +103,13 @@ func NewMemDB(config *types.Configuration) (*DB, error) {
 		}
 	}
 
+	for _, ssls := range config.SSLs {
+		err = txn.Insert("ssls", ssls)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for _, globalRule := range config.GlobalRules {
 		err = txn.Insert("global_rules", globalRule)
 		if err != nil {
@@ -128,6 +145,10 @@ func (db *DB) GetRouteByID(id string) (*types.Route, error) {
 
 func (db *DB) GetConsumerByID(username string) (*types.Consumer, error) {
 	return getByID[types.Consumer](db, "consumers", username)
+}
+
+func (db *DB) GetSSLByID(id string) (*types.SSL, error) {
+	return getByID[types.SSL](db, "ssls", id)
 }
 
 func (db *DB) GetGlobalRuleByID(username string) (*types.GlobalRule, error) {

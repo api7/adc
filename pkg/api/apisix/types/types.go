@@ -15,6 +15,7 @@ type Configuration struct {
 	Services    []*Service    `yaml:"services,omitempty" json:"services,omitempty"`
 	Routes      []*Route      `yaml:"routes,omitempty" json:"routes,omitempty"`
 	Consumers   []*Consumer   `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs        []*SSL        `yaml:"ssls,omitempty" json:"ssls,omitempty"`
 	GlobalRules []*GlobalRule `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
 }
 
@@ -300,6 +301,17 @@ type Consumer struct {
 	Desc     string            `json:"desc,omitempty" yaml:"desc,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Plugins  Plugins           `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+}
+
+// SSL represents the ssl object in APISIX.
+// +k8s:deepcopy-gen=true
+type SSL struct {
+	ID string `json:"id" yaml:"id"`
+
+	SNIs   []string          `json:"snis" yaml:"snis"`
+	Cert   string            `json:"cert,omitempty" yaml:"cert,omitempty"`
+	Key    string            `json:"key,omitempty" yaml:"key,omitempty"`
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // GlobalRule represents the global_rule object in APISIX.

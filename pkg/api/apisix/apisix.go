@@ -10,6 +10,7 @@ type Cluster interface {
 	Route() Route
 	Service() Service
 	Consumer() Consumer
+	SSL() SSL
 	GlobalRule() GlobalRule
 }
 
@@ -32,6 +33,10 @@ type Service interface {
 
 type Consumer interface {
 	ResourceClient[types.Consumer]
+}
+
+type SSL interface {
+	ResourceClient[types.SSL]
 }
 
 type GlobalRule interface {

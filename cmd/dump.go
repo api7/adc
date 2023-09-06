@@ -71,6 +71,11 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	ssls, err := cluster.SSL().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	globalRules, err := cluster.GlobalRule().List(context.Background())
 	if err != nil {
 		return err
@@ -80,6 +85,7 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		Routes:      routes,
 		Services:    svcs,
 		Consumers:   consumers,
+		SSLs:        ssls,
 		GlobalRules: globalRules,
 	}
 
