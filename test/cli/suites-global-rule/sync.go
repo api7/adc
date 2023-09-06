@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 
 	ginkgo.Context("Basic functions", func() {
 		s := scaffold.NewScaffold()
-		ginkgo.FIt("should sync data to APISIX", func() {
+		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 
 			_, err := s.UpdateGlobalRule(globalRule)
