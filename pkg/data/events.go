@@ -24,6 +24,8 @@ var (
 	RouteResourceType ResourceType = "route"
 	// ConsumerResourceType is the resource type of consumer
 	ConsumerResourceType ResourceType = "consumer"
+	// SSLResourceType is the resource type of SSL
+	SSLResourceType ResourceType = "ssl"
 )
 
 const (
@@ -101,6 +103,10 @@ func applyConsumer(cluster apisix.Cluster, event *Event) error {
 	return apply[types.Consumer](cluster.Consumer(), event)
 }
 
+func applySSL(cluster apisix.Cluster, event *Event) error {
+	return apply[types.SSL](cluster.SSL(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -109,6 +115,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyRoute(cluster, e)
 	case ConsumerResourceType:
 		return applyConsumer(cluster, e)
+	case SSLResourceType:
+		return applySSL(cluster, e)
 	}
 
 	return nil

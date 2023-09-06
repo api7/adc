@@ -40,6 +40,16 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"ssls": {
+			Name: "ssls",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
 	},
 }
 
@@ -89,6 +99,13 @@ func NewMemDB(configure *types.Configuration) (*DB, error) {
 		}
 	}
 
+	for _, ssls := range configure.SSLs {
+		err = txn.Insert("ssls", ssls)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txn.Commit()
 
 	return &DB{memDB: db}, nil
@@ -117,4 +134,8 @@ func (db *DB) GetRouteByID(id string) (*types.Route, error) {
 
 func (db *DB) GetConsumerByID(username string) (*types.Consumer, error) {
 	return getByID[types.Consumer](db, "consumers", username)
+}
+
+func (db *DB) GetSSLByID(id string) (*types.SSL, error) {
+	return getByID[types.SSL](db, "ssls", id)
 }
