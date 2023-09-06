@@ -10,9 +10,9 @@ type cluster struct {
 
 	cli *Client
 
-	route    Route
-	service  Service
-	consumer Consumer
+	route      Route
+	service    Service
+	consumer   Consumer
 	globalRule GlobalRule
 }
 

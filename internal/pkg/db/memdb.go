@@ -2,11 +2,11 @@ package db
 
 import (
 	"errors"
-	"github.com/api7/adc/pkg/common"
 
 	"github.com/hashicorp/go-memdb"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 var schema = &memdb.DBSchema{

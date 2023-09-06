@@ -77,9 +77,9 @@ func dumpConfiguration(cmd *cobra.Command) error {
 	}
 
 	conf := &types.Configuration{
-		Routes:    routes,
-		Services:  svcs,
-		Consumers: consumers,
+		Routes:      routes,
+		Services:    svcs,
+		Consumers:   consumers,
 		GlobalRules: globalRules,
 	}
 

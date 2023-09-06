@@ -3,10 +3,10 @@ package validator
 import (
 	"context"
 	"errors"
-	"github.com/api7/adc/pkg/common"
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 	"github.com/api7/adc/pkg/data"
 )
 
