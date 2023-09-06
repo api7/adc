@@ -10,12 +10,13 @@ import (
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name      string      `yaml:"name" json:"name"`
-	Version   string      `yaml:"version" json:"version"`
-	Services  []*Service  `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes    []*Route    `yaml:"routes,omitempty" json:"routes,omitempty"`
-	Consumers []*Consumer `yaml:"consumers,omitempty" json:"consumers,omitempty"`
-	SSLs      []*SSL      `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	Name        string        `yaml:"name" json:"name"`
+	Version     string        `yaml:"version" json:"version"`
+	Services    []*Service    `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes      []*Route      `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers   []*Consumer   `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs        []*SSL        `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	GlobalRules []*GlobalRule `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
 }
 
 // StringArray is enhanced version of pq.StringArray that can be handled nil value automatically.
@@ -311,4 +312,11 @@ type SSL struct {
 	Cert   string            `json:"cert,omitempty" yaml:"cert,omitempty"`
 	Key    string            `json:"key,omitempty" yaml:"key,omitempty"`
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+}
+
+// GlobalRule represents the global_rule object in APISIX.
+// +k8s:deepcopy-gen=true
+type GlobalRule struct {
+	ID      string  `json:"id" yaml:"id"`
+	Plugins Plugins `json:"plugins" yaml:"plugins"`
 }

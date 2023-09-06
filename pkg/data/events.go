@@ -26,6 +26,8 @@ var (
 	ConsumerResourceType ResourceType = "consumer"
 	// SSLResourceType is the resource type of SSL
 	SSLResourceType ResourceType = "ssl"
+	// GlobalRuleResourceType is the resource type of global rule
+	GlobalRuleResourceType ResourceType = "global_rule"
 )
 
 const (
@@ -107,6 +109,10 @@ func applySSL(cluster apisix.Cluster, event *Event) error {
 	return apply[types.SSL](cluster.SSL(), event)
 }
 
+func applyGlobalRule(cluster apisix.Cluster, event *Event) error {
+	return apply[types.GlobalRule](cluster.GlobalRule(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -117,6 +123,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyConsumer(cluster, e)
 	case SSLResourceType:
 		return applySSL(cluster, e)
+	case GlobalRuleResourceType:
+		return applyGlobalRule(cluster, e)
 	}
 
 	return nil

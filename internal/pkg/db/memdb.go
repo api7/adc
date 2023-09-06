@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/go-memdb"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 var schema = &memdb.DBSchema{
@@ -50,6 +51,16 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"global_rules": {
+			Name: "global_rules",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
 	},
 }
 
@@ -61,7 +72,7 @@ var (
 	NotFound = errors.New("data not found")
 )
 
-func NewMemDB(configure *types.Configuration) (*DB, error) {
+func NewMemDB(config *types.Configuration) (*DB, error) {
 	db, err := memdb.NewMemDB(schema)
 	if err != nil {
 		return nil, err
@@ -69,38 +80,38 @@ func NewMemDB(configure *types.Configuration) (*DB, error) {
 
 	txn := db.Txn(true)
 
-	for _, service := range configure.Services {
-		if service.ID == "" {
-			service.ID = service.Name
-		}
-		if service.Upstream.ID == "" {
-			service.Upstream.ID = service.Upstream.Name
-		}
+	common.NormalizeConfiguration(config)
+
+	for _, service := range config.Services {
 		err = txn.Insert("services", service)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for _, routes := range configure.Routes {
-		if routes.ID == "" {
-			routes.ID = routes.Name
-		}
+	for _, routes := range config.Routes {
 		err = txn.Insert("routes", routes)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for _, consumers := range configure.Consumers {
+	for _, consumers := range config.Consumers {
 		err = txn.Insert("consumers", consumers)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for _, ssls := range configure.SSLs {
+	for _, ssls := range config.SSLs {
 		err = txn.Insert("ssls", ssls)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, globalRule := range config.GlobalRules {
+		err = txn.Insert("global_rules", globalRule)
 		if err != nil {
 			return nil, err
 		}
@@ -138,4 +149,8 @@ func (db *DB) GetConsumerByID(username string) (*types.Consumer, error) {
 
 func (db *DB) GetSSLByID(id string) (*types.SSL, error) {
 	return getByID[types.SSL](db, "ssls", id)
+}
+
+func (db *DB) GetGlobalRuleByID(username string) (*types.GlobalRule, error) {
+	return getByID[types.GlobalRule](db, "global_rules", username)
 }

@@ -1,0 +1,100 @@
+package global_rule
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/gavv/httpexpect/v2"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
+	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/test/cli/scaffold"
+)
+
+var _ = ginkgo.Describe("`adc sync` tests", func() {
+	var (
+		id       = "globalRule1"
+		upstream = "httpbin"
+
+		globalRule = &types.GlobalRule{
+			ID: id,
+			Plugins: map[string]interface{}{
+				"limit-count": map[string]interface{}{
+					"count":         2,
+					"time_window":   60,
+					"rejected_code": 503,
+					"key":           "remote_addr",
+				},
+			},
+		}
+
+		service = &types.Service{
+			ID:   "svc",
+			Name: "svc",
+			Hosts: []string{
+				"foo.com",
+			},
+			Upstream: types.Upstream{
+				ID:   "httpbin",
+				Name: "httpbin",
+				Nodes: []types.UpstreamNode{
+					{
+						Host:   upstream,
+						Port:   80,
+						Weight: 1,
+					},
+				},
+			},
+		}
+
+		route = &types.Route{
+			ID:   "route",
+			Name: "route",
+			Uri:  "/get",
+			Methods: []string{
+				"GET",
+			},
+			ServiceID: "svc",
+		}
+	)
+
+	ginkgo.Context("Basic functions", func() {
+		s := scaffold.NewScaffold()
+		ginkgo.It("should sync data to APISIX", func() {
+			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
+
+			_, err := s.UpdateGlobalRule(globalRule)
+			gomega.Expect(err).To(gomega.BeNil(), "check globalRule update")
+			_, err = s.UpdateService(service)
+			gomega.Expect(err).To(gomega.BeNil(), "check service update")
+			_, err = s.UpdateRoute(route)
+			gomega.Expect(err).To(gomega.BeNil(), "check route update")
+
+			time.Sleep(time.Second * 1)
+
+			resp := expect.GET("/get").
+				WithHost("foo.com").Expect()
+			resp.Status(http.StatusOK)
+			resp.Header("X-Ratelimit-Remaining").IsEqual("1")
+
+			resp = expect.GET("/get").
+				WithHost("foo.com").Expect().Status(http.StatusOK)
+			resp.Status(http.StatusOK)
+			resp.Header("X-Ratelimit-Remaining").IsEqual("0")
+
+			resp = expect.GET("/get").
+				WithHost("foo.com").Expect()
+			resp.Status(http.StatusServiceUnavailable)
+			resp.Header("X-Ratelimit-Remaining").IsEqual("0")
+
+			err = s.DeleteRoute("route")
+			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
+			err = s.DeleteService("svc")
+			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
+			err = s.DeleteGlobalRule(id)
+			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
+			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusNotFound)
+		})
+	})
+})

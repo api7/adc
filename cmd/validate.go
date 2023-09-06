@@ -42,17 +42,29 @@ func newValidateCmd() *cobra.Command {
 			}
 
 			msg := fmt.Sprintf("Get file content success: config name: %v, version: %v", d.Name, d.Version)
+			changed := false
 			if len(d.Routes) > 0 {
 				msg += fmt.Sprintf(", routes: %v", len(d.Routes))
+				changed = true
 			}
 			if len(d.Services) > 0 {
 				msg += fmt.Sprintf(", services: %v", len(d.Services))
+				changed = true
 			}
 			if len(d.Consumers) > 0 {
 				msg += fmt.Sprintf(", consumers: %v", len(d.Consumers))
+				changed = true
 			}
 			if len(d.SSLs) > 0 {
 				msg += fmt.Sprintf(", ssls: %v", len(d.SSLs))
+				changed = true
+			}
+			if len(d.GlobalRules) > 0 {
+				msg += fmt.Sprintf(", global_rules: %v", len(d.GlobalRules))
+				changed = true
+			}
+			if !changed {
+				msg += "nothing changed"
 			}
 			msg += "."
 			color.Green(msg)
