@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/api7/adc/test/cli/suites"
 	_ "github.com/api7/adc/test/cli/suites-consumer"
+	_ "github.com/api7/adc/test/cli/suites-global-rule"
 )
 
 func TestADC(t *testing.T) {

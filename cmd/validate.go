@@ -51,6 +51,9 @@ func newValidateCmd() *cobra.Command {
 			if len(d.Consumers) > 0 {
 				msg += fmt.Sprintf(", consumers: %v", len(d.Consumers))
 			}
+			if len(d.GlobalRules) > 0 {
+				msg += fmt.Sprintf(", global_rules: %v", len(d.GlobalRules))
+			}
 			msg += "."
 			color.Green(msg)
 

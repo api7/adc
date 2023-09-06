@@ -17,18 +17,20 @@ import (
 type Scaffold struct {
 	cluster apisix.Cluster
 
-	routes    map[string]struct{}
-	services  map[string]struct{}
-	consumers map[string]struct{}
+	routes      map[string]struct{}
+	services    map[string]struct{}
+	consumers   map[string]struct{}
+	globalRules map[string]struct{}
 }
 
 func NewScaffold() *Scaffold {
 	s := &Scaffold{
 		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
 
-		routes:    map[string]struct{}{},
-		services:  map[string]struct{}{},
-		consumers: map[string]struct{}{},
+		routes:      map[string]struct{}{},
+		services:    map[string]struct{}{},
+		consumers:   map[string]struct{}{},
+		globalRules: map[string]struct{}{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -45,6 +47,9 @@ func NewScaffold() *Scaffold {
 		}
 		for consumer, _ := range s.consumers {
 			s.DeleteConsumer(consumer)
+		}
+		for globalRule, _ := range s.globalRules {
+			s.DeleteGlobalRule(globalRule)
 		}
 	})
 
@@ -66,6 +71,12 @@ func (s *Scaffold) AddServicesFinalizer(services ...string) {
 func (s *Scaffold) AddConsumersFinalizer(consumers ...string) {
 	for _, consumer := range consumers {
 		s.consumers[consumer] = struct{}{}
+	}
+}
+
+func (s *Scaffold) AddGlobalRulesFinalizer(globalRules ...string) {
+	for _, globalRule := range globalRules {
+		s.globalRules[globalRule] = struct{}{}
 	}
 }
 
@@ -111,6 +122,10 @@ func (s *Scaffold) Sync(path string) (string, error) {
 
 	for _, consumer := range conf.Consumers {
 		s.AddConsumersFinalizer(consumer.Username)
+	}
+
+	for _, globalRule := range conf.GlobalRules {
+		s.AddGlobalRulesFinalizer(globalRule.ID)
 	}
 
 	return s.Exec("sync", "-f", path)
@@ -204,4 +219,30 @@ func (s *Scaffold) DeleteConsumer(id string) error {
 	delete(s.consumers, id)
 
 	return s.cluster.Consumer().Delete(context.Background(), id)
+}
+
+func (s *Scaffold) GetGlobalRule(id string) (*types.GlobalRule, error) {
+	return s.cluster.GlobalRule().Get(context.Background(), id)
+}
+
+func (s *Scaffold) ListGlobalRule() ([]*types.GlobalRule, error) {
+	return s.cluster.GlobalRule().List(context.Background())
+}
+
+func (s *Scaffold) CreateGlobalRule(globalRule *types.GlobalRule) (*types.GlobalRule, error) {
+	s.globalRules[globalRule.ID] = struct{}{}
+
+	return s.cluster.GlobalRule().Create(context.Background(), globalRule)
+}
+
+func (s *Scaffold) UpdateGlobalRule(globalRule *types.GlobalRule) (*types.GlobalRule, error) {
+	s.globalRules[globalRule.ID] = struct{}{}
+
+	return s.cluster.GlobalRule().Update(context.Background(), globalRule)
+}
+
+func (s *Scaffold) DeleteGlobalRule(id string) error {
+	delete(s.globalRules, id)
+
+	return s.cluster.GlobalRule().Delete(context.Background(), id)
 }

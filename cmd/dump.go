@@ -71,10 +71,16 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	globalRules, err := cluster.GlobalRule().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	conf := &types.Configuration{
 		Routes:    routes,
 		Services:  svcs,
 		Consumers: consumers,
+		GlobalRules: globalRules,
 	}
 
 	if save {

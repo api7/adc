@@ -13,6 +13,23 @@ import (
 	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
+func NormalizeConfiguration(content *types.Configuration) {
+	for _, route := range content.Routes {
+		if route.ID == "" {
+			route.ID = route.Name
+		}
+	}
+
+	for _, service := range content.Services {
+		if service.ID == "" {
+			service.ID = service.Name
+		}
+		if service.Upstream.ID == "" {
+			service.Upstream.ID = service.Upstream.Name
+		}
+	}
+}
+
 func GetContentFromFile(filename string) (*types.Configuration, error) {
 	var content types.Configuration
 
@@ -37,20 +54,7 @@ func GetContentFromFile(filename string) (*types.Configuration, error) {
 		return nil, err
 	}
 
-	for _, route := range content.Routes {
-		if route.ID == "" {
-			route.ID = route.Name
-		}
-	}
-
-	for _, service := range content.Services {
-		if service.ID == "" {
-			service.ID = service.Name
-		}
-		if service.Upstream.ID == "" {
-			service.Upstream.ID = service.Upstream.Name
-		}
-	}
+	NormalizeConfiguration(&content)
 
 	return &content, nil
 }

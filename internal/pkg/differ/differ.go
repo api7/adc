@@ -23,6 +23,9 @@ func _key(typ data.ResourceType, option int) string {
 // 5. Routes Delete
 // 6. Services Delete
 var order = map[string]int{
+	_key(data.GlobalRuleResourceType, data.UpdateOption): 11,
+	_key(data.GlobalRuleResourceType, data.CreateOption): 10,
+	_key(data.GlobalRuleResourceType, data.DeleteOption): 9,
 	_key(data.ConsumerResourceType, data.UpdateOption): 8,
 	_key(data.ConsumerResourceType, data.CreateOption): 7,
 	_key(data.ServiceResourceType, data.CreateOption):  6,
@@ -83,9 +86,15 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
+	globalRuleEvents, err := d.diffGlobalRule()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
 	events = append(events, consumerEvents...)
+	events = append(events, globalRuleEvents...)
 
 	sortEvents(events)
 
@@ -247,6 +256,59 @@ func (d *Differ) diffConsumers() ([]*data.Event, error) {
 			ResourceType: data.ConsumerResourceType,
 			Option:       data.CreateOption,
 			Value:        consumer,
+		})
+	}
+
+	return events, nil
+}
+
+// diffGlobalRule compares the global_rules between local and remote.
+func (d *Differ) diffGlobalRule() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteGlobalRule := range d.remoteConfig.GlobalRules {
+		localGlobalRule, err := d.localDB.GetGlobalRuleByID(remoteGlobalRule.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.GlobalRuleResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteGlobalRule,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localGlobalRule.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localGlobalRule, remoteGlobalRule); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.GlobalRuleResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteGlobalRule,
+			Value:        localGlobalRule,
+		})
+	}
+
+	// only in local, create
+	for _, globalRule := range d.localConfig.GlobalRules {
+		if mark[globalRule.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.GlobalRuleResourceType,
+			Option:       data.CreateOption,
+			Value:        globalRule,
 		})
 	}
 

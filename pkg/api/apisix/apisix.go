@@ -10,6 +10,7 @@ type Cluster interface {
 	Route() Route
 	Service() Service
 	Consumer() Consumer
+	GlobalRule() GlobalRule
 }
 
 type ResourceClient[T any] interface {
@@ -31,4 +32,8 @@ type Service interface {
 
 type Consumer interface {
 	ResourceClient[types.Consumer]
+}
+
+type GlobalRule interface {
+	ResourceClient[types.GlobalRule]
 }
