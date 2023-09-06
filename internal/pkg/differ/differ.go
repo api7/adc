@@ -28,7 +28,7 @@ func _key(typ data.ResourceType, option int) string {
 // 9. SSLs Delete
 // 10. SSLs Create
 // 11. SSLs Update
-// 9. GlobalRules Delete
+// 12. GlobalRules Delete
 // 10. GlobalRules Create
 // 11. GlobalRules Update
 var order = map[string]int{
