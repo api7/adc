@@ -60,5 +60,29 @@ func (v *Validator) Validate() []error {
 		}
 	}
 
+	for _, consumer := range v.localConfig.Consumers {
+		consumer := consumer
+		err := v.cluster.Consumer().Validate(context.Background(), consumer)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
+	for _, ssl := range v.localConfig.SSLs {
+		ssl := ssl
+		err := v.cluster.SSL().Validate(context.Background(), ssl)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
+	for _, globalRule := range v.localConfig.GlobalRules {
+		globalRule := globalRule
+		err := v.cluster.GlobalRule().Validate(context.Background(), globalRule)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
 	return allErr
 }

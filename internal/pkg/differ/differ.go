@@ -316,6 +316,7 @@ func (d *Differ) diffSSLs() ([]*data.Event, error) {
 		})
 	}
 
+	// only in local, create
 	for _, ssl := range d.localConfig.SSLs {
 		if mark[ssl.ID] {
 			continue
