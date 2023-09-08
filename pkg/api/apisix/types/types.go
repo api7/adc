@@ -10,17 +10,18 @@ import (
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name        string        `yaml:"name" json:"name"`
-	Version     string        `yaml:"version" json:"version"`
-	Services    []*Service    `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes      []*Route      `yaml:"routes,omitempty" json:"routes,omitempty"`
-	Consumers   []*Consumer   `yaml:"consumers,omitempty" json:"consumers,omitempty"`
-	SSLs        []*SSL        `yaml:"ssls,omitempty" json:"ssls,omitempty"`
-	GlobalRules []*GlobalRule `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
+	Name          string          `yaml:"name" json:"name"`
+	Version       string          `yaml:"version" json:"version"`
+	Services      []*Service      `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes        []*Route        `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers     []*Consumer     `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs          []*SSL          `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	GlobalRules   []*GlobalRule   `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
+	PluginConfigs []*PluginConfig `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
 }
 
-// StringArray is enhanced version of pq.StringArray that can be handled nil value automatically.
-type StringArray []string
+// Labels is the APISIX resource labels
+type Labels map[string]string
 
 // Vars represents the route match expressions of APISIX.
 type Vars [][]StringOrSlice
@@ -30,9 +31,9 @@ type Vars [][]StringOrSlice
 type Route struct {
 	ID string `json:"id" yaml:"id"`
 
-	Name        string      `json:"name" yaml:"name"`
-	Labels      StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Description string      `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Name        string `json:"name" yaml:"name"`
+	Labels      Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Description string `json:"desc,omitempty" yaml:"desc,omitempty"`
 
 	Host            string           `json:"host,omitempty" yaml:"host,omitempty"`
 	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
@@ -58,7 +59,7 @@ type Service struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"desc,omitempty" yaml:"desc,omitempty"`
 	// Labels are used for resource classification and indexing
-	Labels StringArray `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 	// HTTP hosts for this service.
 	Hosts []string `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	// Plugin settings on Service level
@@ -297,26 +298,38 @@ func (s *StringOrSlice) UnmarshalJSON(p []byte) error {
 // Consumer represents the consumer object in APISIX.
 // +k8s:deepcopy-gen=true
 type Consumer struct {
-	Username string            `json:"username" yaml:"username"`
-	Desc     string            `json:"desc,omitempty" yaml:"desc,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Plugins  Plugins           `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	Username string `json:"username" yaml:"username"`
+	Desc     string `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels   Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	Plugins Plugins `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }
 
 // SSL represents the ssl object in APISIX.
 // +k8s:deepcopy-gen=true
 type SSL struct {
-	ID string `json:"id" yaml:"id"`
+	ID     string `json:"id" yaml:"id"`
+	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 
-	SNIs   []string          `json:"snis" yaml:"snis"`
-	Cert   string            `json:"cert,omitempty" yaml:"cert,omitempty"`
-	Key    string            `json:"key,omitempty" yaml:"key,omitempty"`
-	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	SNIs []string `json:"snis" yaml:"snis"`
+	Cert string   `json:"cert,omitempty" yaml:"cert,omitempty"`
+	Key  string   `json:"key,omitempty" yaml:"key,omitempty"`
 }
 
 // GlobalRule represents the global_rule object in APISIX.
 // +k8s:deepcopy-gen=true
 type GlobalRule struct {
 	ID      string  `json:"id" yaml:"id"`
+	Plugins Plugins `json:"plugins" yaml:"plugins"`
+}
+
+// PluginConfig apisix plugin object
+// +k8s:deepcopy-gen=true
+type PluginConfig struct {
+	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
+	Name   string `json:"name,omitempty" yaml:"name,omitempty"`
+	Desc   string `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
+
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
 }

@@ -84,5 +84,13 @@ func (v *Validator) Validate() []error {
 		}
 	}
 
+	for _, pluginConfig := range v.localConfig.PluginConfigs {
+		pluginConfig := pluginConfig
+		err := v.cluster.PluginConfig().Validate(context.Background(), pluginConfig)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
 	return allErr
 }

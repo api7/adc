@@ -28,6 +28,12 @@ func NormalizeConfiguration(content *types.Configuration) {
 			service.Upstream.ID = service.Upstream.Name
 		}
 	}
+
+	for _, pluginConfig := range content.PluginConfigs {
+		if pluginConfig.ID == "" {
+			pluginConfig.ID = pluginConfig.Name
+		}
+	}
 }
 
 func GetContentFromFile(filename string) (*types.Configuration, error) {

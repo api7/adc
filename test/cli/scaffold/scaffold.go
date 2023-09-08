@@ -17,20 +17,22 @@ import (
 type Scaffold struct {
 	cluster apisix.Cluster
 
-	routes      map[string]struct{}
-	services    map[string]struct{}
-	consumers   map[string]struct{}
-	globalRules map[string]struct{}
+	routes        map[string]struct{}
+	services      map[string]struct{}
+	consumers     map[string]struct{}
+	globalRules   map[string]struct{}
+	pluginConfigs map[string]struct{}
 }
 
 func NewScaffold() *Scaffold {
 	s := &Scaffold{
 		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
 
-		routes:      map[string]struct{}{},
-		services:    map[string]struct{}{},
-		consumers:   map[string]struct{}{},
-		globalRules: map[string]struct{}{},
+		routes:        map[string]struct{}{},
+		services:      map[string]struct{}{},
+		consumers:     map[string]struct{}{},
+		globalRules:   map[string]struct{}{},
+		pluginConfigs: map[string]struct{}{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -50,6 +52,9 @@ func NewScaffold() *Scaffold {
 		}
 		for globalRule, _ := range s.globalRules {
 			s.DeleteGlobalRule(globalRule)
+		}
+		for pluginConfig, _ := range s.pluginConfigs {
+			s.DeletePluginConfig(pluginConfig)
 		}
 	})
 
@@ -77,6 +82,12 @@ func (s *Scaffold) AddConsumersFinalizer(consumers ...string) {
 func (s *Scaffold) AddGlobalRulesFinalizer(globalRules ...string) {
 	for _, globalRule := range globalRules {
 		s.globalRules[globalRule] = struct{}{}
+	}
+}
+
+func (s *Scaffold) AddPluginConfigsFinalizer(pluginConfigs ...string) {
+	for _, pluginConfig := range pluginConfigs {
+		s.pluginConfigs[pluginConfig] = struct{}{}
 	}
 }
 
@@ -126,6 +137,10 @@ func (s *Scaffold) Sync(path string) (string, error) {
 
 	for _, globalRule := range conf.GlobalRules {
 		s.AddGlobalRulesFinalizer(globalRule.ID)
+	}
+
+	for _, pluginConfig := range conf.PluginConfigs {
+		s.AddPluginConfigsFinalizer(pluginConfig.ID)
 	}
 
 	return s.Exec("sync", "-f", path)
@@ -245,4 +260,30 @@ func (s *Scaffold) DeleteGlobalRule(id string) error {
 	delete(s.globalRules, id)
 
 	return s.cluster.GlobalRule().Delete(context.Background(), id)
+}
+
+func (s *Scaffold) GetPluginConfig(id string) (*types.PluginConfig, error) {
+	return s.cluster.PluginConfig().Get(context.Background(), id)
+}
+
+func (s *Scaffold) ListPluginConfig() ([]*types.PluginConfig, error) {
+	return s.cluster.PluginConfig().List(context.Background())
+}
+
+func (s *Scaffold) CreatePluginConfig(pluginConfig *types.PluginConfig) (*types.PluginConfig, error) {
+	s.pluginConfigs[pluginConfig.ID] = struct{}{}
+
+	return s.cluster.PluginConfig().Create(context.Background(), pluginConfig)
+}
+
+func (s *Scaffold) UpdatePluginConfig(pluginConfig *types.PluginConfig) (*types.PluginConfig, error) {
+	s.pluginConfigs[pluginConfig.ID] = struct{}{}
+
+	return s.cluster.PluginConfig().Update(context.Background(), pluginConfig)
+}
+
+func (s *Scaffold) DeletePluginConfig(id string) error {
+	delete(s.pluginConfigs, id)
+
+	return s.cluster.PluginConfig().Delete(context.Background(), id)
 }

@@ -10,43 +10,37 @@ import (
 	"github.com/api7/adc/pkg/data"
 )
 
+var _orderIndex = -1
+
+func _order() int {
+	_orderIndex += 1
+	return _orderIndex
+}
+
 func _key(typ data.ResourceType, option int) string {
 	return fmt.Sprintf("%s:%d", typ, option)
 }
 
-// Since the routes is related to the services, we need to sort the events.
-// The order is:
-// 0. Consumers Delete
-// 1. Services Create
-// 2. Routes Create
-// 3. Services Update
-// 4. Routes Update
-// 5. Routes Delete
-// 6. Services Delete
-// 7. Consumers Create
-// 8. Consumers Update
-// 9. SSLs Delete
-// 10. SSLs Create
-// 11. SSLs Update
-// 12. GlobalRules Delete
-// 13. GlobalRules Create
-// 14. GlobalRules Update
+// order is the events order to ensure the data dependency
 var order = map[string]int{
-	_key(data.GlobalRuleResourceType, data.UpdateOption): 14,
-	_key(data.GlobalRuleResourceType, data.CreateOption): 13,
-	_key(data.GlobalRuleResourceType, data.DeleteOption): 12,
-	_key(data.SSLResourceType, data.UpdateOption):        11,
-	_key(data.SSLResourceType, data.CreateOption):        10,
-	_key(data.SSLResourceType, data.DeleteOption):        9,
-	_key(data.ConsumerResourceType, data.UpdateOption):   8,
-	_key(data.ConsumerResourceType, data.CreateOption):   7,
-	_key(data.ServiceResourceType, data.CreateOption):    6,
-	_key(data.RouteResourceType, data.CreateOption):      5,
-	_key(data.ServiceResourceType, data.UpdateOption):    4,
-	_key(data.RouteResourceType, data.UpdateOption):      3,
-	_key(data.RouteResourceType, data.DeleteOption):      2,
-	_key(data.ServiceResourceType, data.DeleteOption):    1,
-	_key(data.ConsumerResourceType, data.DeleteOption):   0,
+	_key(data.ConsumerResourceType, data.DeleteOption):     _order(),
+	_key(data.ServiceResourceType, data.DeleteOption):      _order(),
+	_key(data.PluginConfigResourceType, data.DeleteOption): _order(),
+	_key(data.RouteResourceType, data.DeleteOption):        _order(),
+	_key(data.RouteResourceType, data.UpdateOption):        _order(),
+	_key(data.ServiceResourceType, data.UpdateOption):      _order(),
+	_key(data.PluginConfigResourceType, data.UpdateOption): _order(),
+	_key(data.RouteResourceType, data.CreateOption):        _order(),
+	_key(data.ServiceResourceType, data.CreateOption):      _order(),
+	_key(data.PluginConfigResourceType, data.CreateOption): _order(),
+	_key(data.ConsumerResourceType, data.CreateOption):     _order(),
+	_key(data.ConsumerResourceType, data.UpdateOption):     _order(),
+	_key(data.SSLResourceType, data.DeleteOption):          _order(),
+	_key(data.SSLResourceType, data.CreateOption):          _order(),
+	_key(data.SSLResourceType, data.UpdateOption):          _order(),
+	_key(data.GlobalRuleResourceType, data.DeleteOption):   _order(),
+	_key(data.GlobalRuleResourceType, data.CreateOption):   _order(),
+	_key(data.GlobalRuleResourceType, data.UpdateOption):   _order(),
 }
 
 // Differ is the object of comparing two configurations.
@@ -108,11 +102,17 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
+	pluginConfigEvents, err := d.diffPluginConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
 	events = append(events, consumerEvents...)
 	events = append(events, sslEvents...)
 	events = append(events, globalRuleEvents...)
+	events = append(events, pluginConfigEvents...)
 
 	sortEvents(events)
 
@@ -379,6 +379,59 @@ func (d *Differ) diffGlobalRule() ([]*data.Event, error) {
 			ResourceType: data.GlobalRuleResourceType,
 			Option:       data.CreateOption,
 			Value:        globalRule,
+		})
+	}
+
+	return events, nil
+}
+
+// diffPluginConfig compares the global_rules between local and remote.
+func (d *Differ) diffPluginConfig() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remotePluginConfig := range d.remoteConfig.PluginConfigs {
+		localPluginConfig, err := d.localDB.GetPluginConfigByID(remotePluginConfig.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.PluginConfigResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remotePluginConfig,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localPluginConfig.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localPluginConfig, remotePluginConfig); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.PluginConfigResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remotePluginConfig,
+			Value:        localPluginConfig,
+		})
+	}
+
+	// only in local, create
+	for _, pluginConfig := range d.localConfig.PluginConfigs {
+		if mark[pluginConfig.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.PluginConfigResourceType,
+			Option:       data.CreateOption,
+			Value:        pluginConfig,
 		})
 	}
 

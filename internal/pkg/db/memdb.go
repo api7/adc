@@ -61,6 +61,22 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"plugin_configs": {
+			Name: "plugin_configs",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+				"name": {
+					Name:         "name",
+					Unique:       true,
+					Indexer:      &memdb.StringFieldIndex{Field: "Name"},
+					AllowMissing: true,
+				},
+			},
+		},
 	},
 }
 
@@ -117,6 +133,13 @@ func NewMemDB(config *types.Configuration) (*DB, error) {
 		}
 	}
 
+	for _, pluginConfig := range config.PluginConfigs {
+		err = txn.Insert("plugin_configs", pluginConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txn.Commit()
 
 	return &DB{memDB: db}, nil
@@ -151,6 +174,10 @@ func (db *DB) GetSSLByID(id string) (*types.SSL, error) {
 	return getByID[types.SSL](db, "ssls", id)
 }
 
-func (db *DB) GetGlobalRuleByID(username string) (*types.GlobalRule, error) {
-	return getByID[types.GlobalRule](db, "global_rules", username)
+func (db *DB) GetGlobalRuleByID(id string) (*types.GlobalRule, error) {
+	return getByID[types.GlobalRule](db, "global_rules", id)
+}
+
+func (db *DB) GetPluginConfigByID(id string) (*types.PluginConfig, error) {
+	return getByID[types.PluginConfig](db, "plugin_configs", id)
 }
