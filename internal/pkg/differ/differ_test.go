@@ -17,7 +17,10 @@ var (
 		Hosts: []string{
 			"svc.example.com",
 		},
-		Labels: []string{"label1", "label2"},
+		Labels: map[string]string{
+			"label1": "v1",
+			"label2": "v2",
+		},
 		Upstream: types.Upstream{
 			Name: "upstream1",
 			Nodes: []types.UpstreamNode{
@@ -29,9 +32,12 @@ var (
 	}
 
 	route = &types.Route{
-		ID:        "route",
-		Name:      "route",
-		Labels:    []string{"lable1", "label2"},
+		ID:   "route",
+		Name: "route",
+		Labels: map[string]string{
+			"label1": "v1",
+			"label2": "v2",
+		},
 		Methods:   []string{http.MethodGet},
 		Uris:      []string{"/get"},
 		ServiceID: "svc",

@@ -28,6 +28,8 @@ var (
 	SSLResourceType ResourceType = "ssl"
 	// GlobalRuleResourceType is the resource type of global rule
 	GlobalRuleResourceType ResourceType = "global_rule"
+	// PluginConfigResourceType is the resource type of plugin config
+	PluginConfigResourceType ResourceType = "plugin_config"
 )
 
 const (
@@ -113,6 +115,10 @@ func applyGlobalRule(cluster apisix.Cluster, event *Event) error {
 	return apply[types.GlobalRule](cluster.GlobalRule(), event)
 }
 
+func applyPluginConfig(cluster apisix.Cluster, event *Event) error {
+	return apply[types.PluginConfig](cluster.PluginConfig(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -125,6 +131,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applySSL(cluster, e)
 	case GlobalRuleResourceType:
 		return applyGlobalRule(cluster, e)
+	case PluginConfigResourceType:
+		return applyPluginConfig(cluster, e)
 	}
 
 	return nil

@@ -1,0 +1,13 @@
+plugin_configs:
+  - desc: enable limit-count plugin
+    id: "1"
+    plugins:
+      limit-count:
+        allow_degradation: false
+        count: 2
+        key: remote_addr
+        key_type: var
+        policy: local
+        rejected_code: 503
+        show_limit_quota_header: true
+        time_window: 60
