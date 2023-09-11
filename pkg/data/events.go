@@ -30,6 +30,8 @@ var (
 	GlobalRuleResourceType ResourceType = "global_rule"
 	// PluginConfigResourceType is the resource type of plugin config
 	PluginConfigResourceType ResourceType = "plugin_config"
+	// ConsumerGroupResourceType is the resource type of consumer group
+	ConsumerGroupResourceType ResourceType = "consumer_group"
 )
 
 const (
@@ -119,6 +121,10 @@ func applyPluginConfig(cluster apisix.Cluster, event *Event) error {
 	return apply[types.PluginConfig](cluster.PluginConfig(), event)
 }
 
+func applyConsumerGroup(cluster apisix.Cluster, event *Event) error {
+	return apply[types.ConsumerGroup](cluster.ConsumerGroup(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -133,6 +139,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyGlobalRule(cluster, e)
 	case PluginConfigResourceType:
 		return applyPluginConfig(cluster, e)
+	case ConsumerGroupResourceType:
+		return applyConsumerGroup(cluster, e)
 	}
 
 	return nil

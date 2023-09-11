@@ -92,5 +92,13 @@ func (v *Validator) Validate() []error {
 		}
 	}
 
+	for _, consumerGroup := range v.localConfig.ConsumerGroups {
+		consumerGroup := consumerGroup
+		err := v.cluster.ConsumerGroup().Validate(context.Background(), consumerGroup)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
 	return allErr
 }

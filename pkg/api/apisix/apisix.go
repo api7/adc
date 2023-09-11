@@ -13,6 +13,7 @@ type Cluster interface {
 	SSL() SSL
 	GlobalRule() GlobalRule
 	PluginConfig() PluginConfig
+	ConsumerGroup() ConsumerGroup
 }
 
 type ResourceClient[T any] interface {
@@ -46,4 +47,8 @@ type GlobalRule interface {
 
 type PluginConfig interface {
 	ResourceClient[types.PluginConfig]
+}
+
+type ConsumerGroup interface {
+	ResourceClient[types.ConsumerGroup]
 }

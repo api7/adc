@@ -17,22 +17,24 @@ import (
 type Scaffold struct {
 	cluster apisix.Cluster
 
-	routes        map[string]struct{}
-	services      map[string]struct{}
-	consumers     map[string]struct{}
-	globalRules   map[string]struct{}
-	pluginConfigs map[string]struct{}
+	routes         map[string]struct{}
+	services       map[string]struct{}
+	consumers      map[string]struct{}
+	globalRules    map[string]struct{}
+	pluginConfigs  map[string]struct{}
+	consumerGroups map[string]struct{}
 }
 
 func NewScaffold() *Scaffold {
 	s := &Scaffold{
 		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
 
-		routes:        map[string]struct{}{},
-		services:      map[string]struct{}{},
-		consumers:     map[string]struct{}{},
-		globalRules:   map[string]struct{}{},
-		pluginConfigs: map[string]struct{}{},
+		routes:         map[string]struct{}{},
+		services:       map[string]struct{}{},
+		consumers:      map[string]struct{}{},
+		globalRules:    map[string]struct{}{},
+		pluginConfigs:  map[string]struct{}{},
+		consumerGroups: map[string]struct{}{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -55,6 +57,9 @@ func NewScaffold() *Scaffold {
 		}
 		for pluginConfig, _ := range s.pluginConfigs {
 			s.DeletePluginConfig(pluginConfig)
+		}
+		for consumerGroup, _ := range s.consumerGroups {
+			s.DeleteConsumerGroup(consumerGroup)
 		}
 	})
 
@@ -88,6 +93,12 @@ func (s *Scaffold) AddGlobalRulesFinalizer(globalRules ...string) {
 func (s *Scaffold) AddPluginConfigsFinalizer(pluginConfigs ...string) {
 	for _, pluginConfig := range pluginConfigs {
 		s.pluginConfigs[pluginConfig] = struct{}{}
+	}
+}
+
+func (s *Scaffold) AddConsumerGroupsFinalizer(consumerGroups ...string) {
+	for _, consumerGroup := range consumerGroups {
+		s.consumerGroups[consumerGroup] = struct{}{}
 	}
 }
 
@@ -141,6 +152,10 @@ func (s *Scaffold) Sync(path string) (string, error) {
 
 	for _, pluginConfig := range conf.PluginConfigs {
 		s.AddPluginConfigsFinalizer(pluginConfig.ID)
+	}
+
+	for _, consumerGroup := range conf.ConsumerGroups {
+		s.AddConsumerGroupsFinalizer(consumerGroup.ID)
 	}
 
 	return s.Exec("sync", "-f", path)
@@ -286,4 +301,30 @@ func (s *Scaffold) DeletePluginConfig(id string) error {
 	delete(s.pluginConfigs, id)
 
 	return s.cluster.PluginConfig().Delete(context.Background(), id)
+}
+
+func (s *Scaffold) GetConsumerGroup(id string) (*types.ConsumerGroup, error) {
+	return s.cluster.ConsumerGroup().Get(context.Background(), id)
+}
+
+func (s *Scaffold) ListConsumerGroup() ([]*types.ConsumerGroup, error) {
+	return s.cluster.ConsumerGroup().List(context.Background())
+}
+
+func (s *Scaffold) CreateConsumerGroup(consumerGroup *types.ConsumerGroup) (*types.ConsumerGroup, error) {
+	s.consumerGroups[consumerGroup.ID] = struct{}{}
+
+	return s.cluster.ConsumerGroup().Create(context.Background(), consumerGroup)
+}
+
+func (s *Scaffold) UpdateConsumerGroup(consumerGroup *types.ConsumerGroup) (*types.ConsumerGroup, error) {
+	s.consumerGroups[consumerGroup.ID] = struct{}{}
+
+	return s.cluster.ConsumerGroup().Update(context.Background(), consumerGroup)
+}
+
+func (s *Scaffold) DeleteConsumerGroup(id string) error {
+	delete(s.consumerGroups, id)
+
+	return s.cluster.ConsumerGroup().Delete(context.Background(), id)
 }

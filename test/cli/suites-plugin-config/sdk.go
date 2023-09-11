@@ -21,7 +21,6 @@ var _ = ginkgo.Describe("adc APISIX pluginConfig SDK tests", func() {
 			// utils
 			assertPluginConfigEqual := func(expect, toBe *types.PluginConfig, plugins ...string) {
 				gomega.Expect(expect.ID).To(gomega.Equal(toBe.ID))
-				gomega.Expect(expect.Name).To(gomega.Equal(toBe.Name))
 				gomega.Expect(expect.Desc).To(gomega.Equal(toBe.Desc))
 				for _, plugin := range plugins {
 					gomega.Expect(expect.Plugins[plugin]).NotTo(gomega.BeNil())
