@@ -10,14 +10,15 @@ import (
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name          string          `yaml:"name" json:"name"`
-	Version       string          `yaml:"version" json:"version"`
-	Services      []*Service      `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes        []*Route        `yaml:"routes,omitempty" json:"routes,omitempty"`
-	Consumers     []*Consumer     `yaml:"consumers,omitempty" json:"consumers,omitempty"`
-	SSLs          []*SSL          `yaml:"ssls,omitempty" json:"ssls,omitempty"`
-	GlobalRules   []*GlobalRule   `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
-	PluginConfigs []*PluginConfig `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
+	Name           string           `yaml:"name" json:"name"`
+	Version        string           `yaml:"version" json:"version"`
+	Services       []*Service       `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes         []*Route         `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers      []*Consumer      `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs           []*SSL           `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	GlobalRules    []*GlobalRule    `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
+	PluginConfigs  []*PluginConfig  `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
+	ConsumerGroups []*ConsumerGroup `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
 }
 
 // Labels is the APISIX resource labels
@@ -303,6 +304,7 @@ type Consumer struct {
 	Labels   Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	Plugins Plugins `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	GroupID string  `json:"group_id,omitempty" yaml:"group_id,omitempty"`
 }
 
 // SSL represents the ssl object in APISIX.
@@ -327,7 +329,16 @@ type GlobalRule struct {
 // +k8s:deepcopy-gen=true
 type PluginConfig struct {
 	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
-	Name   string `json:"name,omitempty" yaml:"name,omitempty"`
+	Desc   string `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	Plugins Plugins `json:"plugins" yaml:"plugins"`
+}
+
+// ConsumerGroup apisix consumer group object
+// +k8s:deepcopy-gen=true
+type ConsumerGroup struct {
+	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
 	Desc   string `json:"desc,omitempty" yaml:"desc,omitempty"`
 	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 

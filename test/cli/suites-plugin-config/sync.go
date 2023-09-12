@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			err = s.DeleteService("svc")
 			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
 			err = s.DeletePluginConfig(id)
-			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
+			gomega.Expect(err).To(gomega.BeNil(), "check pluginConfig delete")
 			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusNotFound)
 		})
 	})

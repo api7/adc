@@ -67,6 +67,10 @@ func newValidateCmd() *cobra.Command {
 				msg += fmt.Sprintf(", plugin_configs: %v", len(d.PluginConfigs))
 				changed = true
 			}
+			if len(d.ConsumerGroups) > 0 {
+				msg += fmt.Sprintf(", consumer_groups: %v", len(d.ConsumerGroups))
+				changed = true
+			}
 			if !changed {
 				msg += "nothing changed"
 			}

@@ -28,12 +28,6 @@ func NormalizeConfiguration(content *types.Configuration) {
 			service.Upstream.ID = service.Upstream.Name
 		}
 	}
-
-	for _, pluginConfig := range content.PluginConfigs {
-		if pluginConfig.ID == "" {
-			pluginConfig.ID = pluginConfig.Name
-		}
-	}
 }
 
 func GetContentFromFile(filename string) (*types.Configuration, error) {
@@ -86,11 +80,29 @@ func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) 
 		return nil, err
 	}
 
+	globalRules, err := cluster.GlobalRule().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	pluginConfigs, err := cluster.PluginConfig().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	consumerGroups, err := cluster.ConsumerGroup().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Configuration{
-		Routes:    routes,
-		Services:  svcs,
-		Consumers: consumers,
-		SSLs:      ssls,
+		Routes:         routes,
+		Services:       svcs,
+		Consumers:      consumers,
+		SSLs:           ssls,
+		GlobalRules:    globalRules,
+		PluginConfigs:  pluginConfigs,
+		ConsumerGroups: consumerGroups,
 	}, nil
 }
 

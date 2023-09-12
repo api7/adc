@@ -21,26 +21,36 @@ func _key(typ data.ResourceType, option int) string {
 	return fmt.Sprintf("%s:%d", typ, option)
 }
 
-// order is the events order to ensure the data dependency
+// order is the events order to ensure the data dependency. Higher takes priority
+// route requires: service, plugin config, consumer (soft require)
+// consumer requires: consumer group
+// The dependent resources should be created/updated first but deleted later
 var order = map[string]int{
-	_key(data.ConsumerResourceType, data.DeleteOption):     _order(),
-	_key(data.ServiceResourceType, data.DeleteOption):      _order(),
-	_key(data.PluginConfigResourceType, data.DeleteOption): _order(),
-	_key(data.RouteResourceType, data.DeleteOption):        _order(),
-	_key(data.RouteResourceType, data.UpdateOption):        _order(),
-	_key(data.ServiceResourceType, data.UpdateOption):      _order(),
-	_key(data.PluginConfigResourceType, data.UpdateOption): _order(),
-	_key(data.RouteResourceType, data.CreateOption):        _order(),
-	_key(data.ServiceResourceType, data.CreateOption):      _order(),
-	_key(data.PluginConfigResourceType, data.CreateOption): _order(),
-	_key(data.ConsumerResourceType, data.CreateOption):     _order(),
-	_key(data.ConsumerResourceType, data.UpdateOption):     _order(),
-	_key(data.SSLResourceType, data.DeleteOption):          _order(),
-	_key(data.SSLResourceType, data.CreateOption):          _order(),
-	_key(data.SSLResourceType, data.UpdateOption):          _order(),
-	_key(data.GlobalRuleResourceType, data.DeleteOption):   _order(),
-	_key(data.GlobalRuleResourceType, data.CreateOption):   _order(),
-	_key(data.GlobalRuleResourceType, data.UpdateOption):   _order(),
+	_key(data.ServiceResourceType, data.DeleteOption):       _order(),
+	_key(data.PluginConfigResourceType, data.DeleteOption):  _order(),
+	_key(data.ConsumerGroupResourceType, data.DeleteOption): _order(),
+	_key(data.ConsumerResourceType, data.DeleteOption):      _order(),
+	_key(data.RouteResourceType, data.DeleteOption):         _order(),
+
+	_key(data.RouteResourceType, data.UpdateOption):         _order(),
+	_key(data.ServiceResourceType, data.UpdateOption):       _order(),
+	_key(data.PluginConfigResourceType, data.UpdateOption):  _order(),
+	_key(data.ConsumerResourceType, data.UpdateOption):      _order(),
+	_key(data.ConsumerGroupResourceType, data.UpdateOption): _order(),
+
+	_key(data.RouteResourceType, data.CreateOption):         _order(),
+	_key(data.ServiceResourceType, data.CreateOption):       _order(),
+	_key(data.PluginConfigResourceType, data.CreateOption):  _order(),
+	_key(data.ConsumerResourceType, data.CreateOption):      _order(),
+	_key(data.ConsumerGroupResourceType, data.CreateOption): _order(),
+
+	// no dependency
+	_key(data.SSLResourceType, data.DeleteOption):        _order(),
+	_key(data.SSLResourceType, data.CreateOption):        _order(),
+	_key(data.SSLResourceType, data.UpdateOption):        _order(),
+	_key(data.GlobalRuleResourceType, data.DeleteOption): _order(),
+	_key(data.GlobalRuleResourceType, data.CreateOption): _order(),
+	_key(data.GlobalRuleResourceType, data.UpdateOption): _order(),
 }
 
 // Differ is the object of comparing two configurations.
@@ -66,6 +76,7 @@ func NewDiffer(local, remote *types.Configuration) (*Differ, error) {
 	}, nil
 }
 
+// sortEvents sorts events descending, higher priority events will be executed first
 func sortEvents(events []*data.Event) {
 	sort.Slice(events, func(i, j int) bool {
 		return order[_key(events[i].ResourceType, events[i].Option)] > order[_key(events[j].ResourceType, events[j].Option)]
@@ -107,12 +118,18 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
+	consumerGroupEvents, err := d.diffConsumerGroup()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
 	events = append(events, consumerEvents...)
 	events = append(events, sslEvents...)
 	events = append(events, globalRuleEvents...)
 	events = append(events, pluginConfigEvents...)
+	events = append(events, consumerGroupEvents...)
 
 	sortEvents(events)
 
@@ -432,6 +449,59 @@ func (d *Differ) diffPluginConfig() ([]*data.Event, error) {
 			ResourceType: data.PluginConfigResourceType,
 			Option:       data.CreateOption,
 			Value:        pluginConfig,
+		})
+	}
+
+	return events, nil
+}
+
+// diffConsumerGroup compares the global_rules between local and remote.
+func (d *Differ) diffConsumerGroup() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteConsumerGroup := range d.remoteConfig.ConsumerGroups {
+		localConsumerGroup, err := d.localDB.GetConsumerGroupByID(remoteConsumerGroup.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.ConsumerGroupResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteConsumerGroup,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localConsumerGroup.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localConsumerGroup, remoteConsumerGroup); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.ConsumerGroupResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteConsumerGroup,
+			Value:        localConsumerGroup,
+		})
+	}
+
+	// only in local, create
+	for _, consumerGroup := range d.localConfig.ConsumerGroups {
+		if mark[consumerGroup.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.ConsumerGroupResourceType,
+			Option:       data.CreateOption,
+			Value:        consumerGroup,
 		})
 	}
 

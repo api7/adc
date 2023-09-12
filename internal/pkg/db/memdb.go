@@ -69,11 +69,15 @@ var schema = &memdb.DBSchema{
 					Unique:  true,
 					Indexer: &memdb.StringFieldIndex{Field: "ID"},
 				},
-				"name": {
-					Name:         "name",
-					Unique:       true,
-					Indexer:      &memdb.StringFieldIndex{Field: "Name"},
-					AllowMissing: true,
+			},
+		},
+		"consumer_groups": {
+			Name: "consumer_groups",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
 				},
 			},
 		},
@@ -140,6 +144,13 @@ func NewMemDB(config *types.Configuration) (*DB, error) {
 		}
 	}
 
+	for _, consumerGroup := range config.ConsumerGroups {
+		err = txn.Insert("consumer_groups", consumerGroup)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txn.Commit()
 
 	return &DB{memDB: db}, nil
@@ -180,4 +191,8 @@ func (db *DB) GetGlobalRuleByID(id string) (*types.GlobalRule, error) {
 
 func (db *DB) GetPluginConfigByID(id string) (*types.PluginConfig, error) {
 	return getByID[types.PluginConfig](db, "plugin_configs", id)
+}
+
+func (db *DB) GetConsumerGroupByID(id string) (*types.ConsumerGroup, error) {
+	return getByID[types.ConsumerGroup](db, "consumer_groups", id)
 }

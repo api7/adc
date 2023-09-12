@@ -86,13 +86,19 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	consumerGroups, err := cluster.ConsumerGroup().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	conf := &types.Configuration{
-		Routes:        routes,
-		Services:      svcs,
-		Consumers:     consumers,
-		SSLs:          ssls,
-		GlobalRules:   globalRules,
-		PluginConfigs: pluginConfigs,
+		Routes:         routes,
+		Services:       svcs,
+		Consumers:      consumers,
+		SSLs:           ssls,
+		GlobalRules:    globalRules,
+		PluginConfigs:  pluginConfigs,
+		ConsumerGroups: consumerGroups,
 	}
 
 	if save {
