@@ -79,16 +79,17 @@ type Upstream struct {
 	// in the same service.
 	ID string `json:"id" yaml:"id"`
 
-	Name    string               `json:"name" yaml:"name"`
-	Type    string               `json:"type,omitempty" yaml:"type,omitempty"`
-	HashOn  string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
-	Key     string               `json:"key,omitempty" yaml:"key,omitempty"`
-	Checks  *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
-	Nodes   UpstreamNodes        `json:"nodes" yaml:"nodes"`
-	Scheme  string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
-	Retries *int                 `json:"retries,omitempty" yaml:"retries,omitempty"`
-	Timeout *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	TLS     *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
+	Name     string               `json:"name" yaml:"name"`
+	Type     string               `json:"type,omitempty" yaml:"type,omitempty"`
+	HashOn   string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
+	Key      string               `json:"key,omitempty" yaml:"key,omitempty"`
+	Checks   *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Nodes    UpstreamNodes        `json:"nodes" yaml:"nodes"`
+	Scheme   string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	Retries  *int                 `json:"retries,omitempty" yaml:"retries,omitempty"`
+	Timeout  *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	TLS      *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
+	PassHost string               `json:"passhost,omitempty" yaml:"passhostomitempty"`
 
 	// for Service Discovery
 	ServiceName   string            `json:"service_name,omitempty" yaml:"service_name,omitempty"`
@@ -344,3 +345,7 @@ type ConsumerGroup struct {
 
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
 }
+
+const (
+	UpstreamPassHost = "host"
+)
