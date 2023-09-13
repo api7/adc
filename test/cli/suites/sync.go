@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/test/cli/config"
 	"github.com/api7/adc/test/cli/scaffold"
 )
 
@@ -24,7 +25,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				Name: "httpbin",
 				Nodes: []types.UpstreamNode{
 					{
-						Host:   "httpbin.org",
+						Host:   config.TestUpstream,
 						Port:   80,
 						Weight: 1,
 					},
@@ -43,7 +44,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				Name: "httpbin",
 				Nodes: []types.UpstreamNode{
 					{
-						Host:   "httpbin.org",
+						Host:   config.TestUpstream,
 						Port:   80,
 						Weight: 1,
 					},

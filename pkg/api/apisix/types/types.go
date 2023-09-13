@@ -4,21 +4,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
 
 // Configuration is the configuration of services
 type Configuration struct {
-	Name           string           `yaml:"name" json:"name"`
-	Version        string           `yaml:"version" json:"version"`
-	Services       []*Service       `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes         []*Route         `yaml:"routes,omitempty" json:"routes,omitempty"`
-	Consumers      []*Consumer      `yaml:"consumers,omitempty" json:"consumers,omitempty"`
-	SSLs           []*SSL           `yaml:"ssls,omitempty" json:"ssls,omitempty"`
-	GlobalRules    []*GlobalRule    `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
-	PluginConfigs  []*PluginConfig  `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
-	ConsumerGroups []*ConsumerGroup `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
+	Name            string            `yaml:"name" json:"name"`
+	Version         string            `yaml:"version" json:"version"`
+	Services        []*Service        `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes          []*Route          `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers       []*Consumer       `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs            []*SSL            `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	GlobalRules     []*GlobalRule     `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
+	PluginConfigs   []*PluginConfig   `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
+	ConsumerGroups  []*ConsumerGroup  `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
+	PluginMetadatas []*PluginMetadata `yaml:"plugin_metadatas,omitempty" json:"plugin_metadatas,omitempty"`
 }
 
 // Labels is the APISIX resource labels
@@ -28,7 +30,6 @@ type Labels map[string]string
 type Vars [][]StringOrSlice
 
 // Route apisix route object
-// +k8s:deepcopy-gen=true
 type Route struct {
 	ID string `json:"id" yaml:"id"`
 
@@ -97,7 +98,6 @@ type Upstream struct {
 }
 
 // UpstreamNode is the node in upstream
-// +k8s:deepcopy-gen=true
 type UpstreamNode struct {
 	Host   string `json:"host,omitempty" yaml:"host,omitempty"`
 	Port   int    `json:"port,omitempty" yaml:"port,omitempty"`
@@ -138,14 +138,12 @@ func (n *UpstreamNodes) UnmarshalJSON(p []byte) error {
 // UpstreamHealthCheck defines the active and/or passive health check for an Upstream,
 // with the upstream health check feature, pods can be kicked out or joined in quickly,
 // if the feedback of Kubernetes liveness/readiness probe is long.
-// +k8s:deepcopy-gen=true
 type UpstreamHealthCheck struct {
 	Active  *UpstreamActiveHealthCheck  `json:"active" yaml:"active"`
 	Passive *UpstreamPassiveHealthCheck `json:"passive,omitempty" yaml:"passive,omitempty"`
 }
 
 // UpstreamActiveHealthCheck defines the active kind of upstream health check.
-// +k8s:deepcopy-gen=true
 type UpstreamActiveHealthCheck struct {
 	Type               string                             `json:"type,omitempty" yaml:"type,omitempty"`
 	Timeout            int                                `json:"timeout,omitempty" yaml:"timeout,omitempty"`
@@ -160,7 +158,6 @@ type UpstreamActiveHealthCheck struct {
 }
 
 // UpstreamPassiveHealthCheck defines the passive kind of upstream health check.
-// +k8s:deepcopy-gen=true
 type UpstreamPassiveHealthCheck struct {
 	Type      string                              `json:"type,omitempty" yaml:"type,omitempty"`
 	Healthy   UpstreamPassiveHealthCheckHealthy   `json:"healthy,omitempty" yaml:"healthy,omitempty"`
@@ -169,7 +166,6 @@ type UpstreamPassiveHealthCheck struct {
 
 // UpstreamActiveHealthCheckHealthy defines the conditions to judge whether
 // an upstream node is healthy with the active manner.
-// +k8s:deepcopy-gen=true
 type UpstreamActiveHealthCheckHealthy struct {
 	UpstreamPassiveHealthCheckHealthy `json:",inline" yaml:",inline"`
 
@@ -178,7 +174,6 @@ type UpstreamActiveHealthCheckHealthy struct {
 
 // UpstreamPassiveHealthCheckHealthy defines the conditions to judge whether
 // an upstream node is healthy with the passive manner.
-// +k8s:deepcopy-gen=true
 type UpstreamPassiveHealthCheckHealthy struct {
 	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
 	Successes    int   `json:"successes,omitempty" yaml:"successes,omitempty"`
@@ -186,7 +181,6 @@ type UpstreamPassiveHealthCheckHealthy struct {
 
 // UpstreamActiveHealthCheckUnhealthy defines the conditions to judge whether
 // an upstream node is unhealthy with the active manager.
-// +k8s:deepcopy-gen=true
 type UpstreamActiveHealthCheckUnhealthy struct {
 	UpstreamPassiveHealthCheckUnhealthy `json:",inline" yaml:",inline"`
 
@@ -195,7 +189,6 @@ type UpstreamActiveHealthCheckUnhealthy struct {
 
 // UpstreamPassiveHealthCheckUnhealthy defines the conditions to judge whether
 // an upstream node is unhealthy with the passive manager.
-// +k8s:deepcopy-gen=true
 type UpstreamPassiveHealthCheckUnhealthy struct {
 	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
 	HTTPFailures int   `json:"http_failures,omitempty" yaml:"http_failures,omitempty"`
@@ -263,7 +256,6 @@ func (p *Plugins) DeepCopy() *Plugins {
 
 // StringOrSlice represents a string or a string slice.
 // TODO Do not use interface{} to avoid the reflection overheads.
-// +k8s:deepcopy-gen=true
 type StringOrSlice struct {
 	StrVal   string   `json:"-"`
 	SliceVal []string `json:"-"`
@@ -297,7 +289,6 @@ func (s *StringOrSlice) UnmarshalJSON(p []byte) error {
 }
 
 // Consumer represents the consumer object in APISIX.
-// +k8s:deepcopy-gen=true
 type Consumer struct {
 	Username string `json:"username" yaml:"username"`
 	Desc     string `json:"desc,omitempty" yaml:"desc,omitempty"`
@@ -308,7 +299,6 @@ type Consumer struct {
 }
 
 // SSL represents the ssl object in APISIX.
-// +k8s:deepcopy-gen=true
 type SSL struct {
 	ID     string `json:"id" yaml:"id"`
 	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -319,14 +309,12 @@ type SSL struct {
 }
 
 // GlobalRule represents the global_rule object in APISIX.
-// +k8s:deepcopy-gen=true
 type GlobalRule struct {
 	ID      string  `json:"id" yaml:"id"`
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
 }
 
 // PluginConfig apisix plugin object
-// +k8s:deepcopy-gen=true
 type PluginConfig struct {
 	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
 	Desc   string `json:"desc,omitempty" yaml:"desc,omitempty"`
@@ -336,11 +324,54 @@ type PluginConfig struct {
 }
 
 // ConsumerGroup apisix consumer group object
-// +k8s:deepcopy-gen=true
 type ConsumerGroup struct {
 	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
 	Desc   string `json:"desc,omitempty" yaml:"desc,omitempty"`
 	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
+}
+
+type PluginMetadata struct {
+	ID     string                 `json:"id,omitempty" yaml:"id,omitempty"`
+	Config map[string]interface{} `json:",inline" yaml:",inline"`
+}
+
+func (s *PluginMetadata) MarshalJSON() ([]byte, error) {
+	if s.Config == nil {
+		s.Config = make(map[string]interface{})
+	}
+
+	s.Config["id"] = s.ID
+
+	p, err := json.Marshal(s.Config)
+
+	delete(s.Config, "id")
+
+	return p, err
+}
+
+func (s *PluginMetadata) UnmarshalJSON(p []byte) error {
+	var (
+		config map[string]interface{}
+		err    error
+	)
+
+	err = json.Unmarshal(p, &config)
+	if err != nil {
+		return err
+	}
+
+	id, ok := config["id"]
+	if ok {
+		if reflect.TypeOf(id).Kind() != reflect.String {
+			return errors.New("plugin metadata id is not a string, input: " + string(p))
+		}
+		s.ID = fmt.Sprintf("%v", id)
+		delete(config, "id")
+	}
+
+	s.Config = config
+
+	return nil
 }

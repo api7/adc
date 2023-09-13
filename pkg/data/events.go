@@ -32,6 +32,8 @@ var (
 	PluginConfigResourceType ResourceType = "plugin_config"
 	// ConsumerGroupResourceType is the resource type of consumer group
 	ConsumerGroupResourceType ResourceType = "consumer_group"
+	// PluginMetadataResourceType is the resource type of consumer group
+	PluginMetadataResourceType ResourceType = "plugin_metadata"
 )
 
 const (
@@ -125,6 +127,10 @@ func applyConsumerGroup(cluster apisix.Cluster, event *Event) error {
 	return apply[types.ConsumerGroup](cluster.ConsumerGroup(), event)
 }
 
+func applyPluginMetadata(cluster apisix.Cluster, event *Event) error {
+	return apply[types.PluginMetadata](cluster.PluginMetadata(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -141,6 +147,8 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyPluginConfig(cluster, e)
 	case ConsumerGroupResourceType:
 		return applyConsumerGroup(cluster, e)
+	case PluginMetadataResourceType:
+		return applyPluginMetadata(cluster, e)
 	}
 
 	return nil

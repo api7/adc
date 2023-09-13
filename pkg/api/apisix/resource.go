@@ -69,19 +69,20 @@ func unmarshalItem[T any](i *item) (*T, error) {
 		return nil, fmt.Errorf("bad upstream config key: %s", i.Key)
 	}
 
-	var ups T
-	if err := json.Unmarshal(i.Value, &ups); err != nil {
+	var obj T
+	if err := json.Unmarshal(i.Value, &obj); err != nil {
 		return nil, err
 	}
-	return &ups, nil
-}
 
-// upstream decodes item.Value and converts it to types.Upstream.
-func (i *item) upstream() (*types.Upstream, error) {
-	return unmarshalItem[types.Upstream](i)
-}
+	// patch PluginMetadata since the response doesn't contain ID
+	switch any(obj).(type) {
+	case *types.PluginMetadata:
+		any(obj).(*types.PluginMetadata).ID = list[len(list)-1]
+		break
+	case types.PluginMetadata:
+		any(&obj).(*types.PluginMetadata).ID = list[len(list)-1]
+		break
+	}
 
-// service decodes item.Value and converts it to types.Service.
-func (i *item) service() (*types.Service, error) {
-	return unmarshalItem[types.Service](i)
+	return &obj, nil
 }
