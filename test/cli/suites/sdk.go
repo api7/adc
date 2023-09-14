@@ -54,7 +54,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				Uri:       "/route1",
 				ServiceID: "svc1",
 			}
-			_, err = s.CreateRoute(baseRoute1)
+			_, _ = s.CreateRoute(baseRoute1)
 
 			// get route 1
 			route, err = s.GetRoute("route1")
