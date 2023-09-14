@@ -55,7 +55,7 @@ func TestGetServiceByID(t *testing.T) {
 	assert.Equal(t, svc, service, "check the service")
 
 	// Test Case 2: get service by id (not found)
-	service, err = db.GetServiceByID("not-found")
+	_, err = db.GetServiceByID("not-found")
 	assert.Equal(t, NotFound, err, "check the error")
 
 	// Test Case 3: Service don't have id
@@ -83,7 +83,7 @@ func TestGetRouteByID(t *testing.T) {
 	assert.Equal(t, route, route1, "check the route")
 
 	// Test Case 2: get route by id (not found)
-	route1, err = db.GetRouteByID("not-found")
+	_, err = db.GetRouteByID("not-found")
 	assert.Equal(t, NotFound, err, "check the error")
 
 	// Test Case 3: Route don't have id
