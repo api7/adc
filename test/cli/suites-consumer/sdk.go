@@ -30,7 +30,7 @@ var _ = ginkgo.Describe("adc APISIX consumer SDK tests", func() {
 			baseConsumer1 := &types.Consumer{
 				Username: "consumer1",
 			}
-			_, err = s.CreateConsumer(baseConsumer1)
+			_, _ = s.CreateConsumer(baseConsumer1)
 
 			// get consumer 1
 			consumer, err = s.GetConsumer("consumer1")
