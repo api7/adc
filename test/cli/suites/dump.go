@@ -70,7 +70,7 @@ version: ""
 			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
 			err = s.DeleteService("svc1")
 			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
-			err = s.DeleteService("svc2")
+			_ = s.DeleteService("svc2")
 		})
 	})
 })
