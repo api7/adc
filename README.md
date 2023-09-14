@@ -97,6 +97,14 @@ adc version
 
 Prints the version of ADC. See [Installation](#installation) for details on installing the latest version.
 
+### adc completion
+
+```shell
+adc completion <bash|zsh|fish|powershell>
+```
+
+Generates autocompletion scripts for the specified shell.
+
 ## License
 
 This project is licensed under the [Apache 2.0 License](LICENSE).
