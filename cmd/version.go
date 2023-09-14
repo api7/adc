@@ -14,10 +14,10 @@ var (
 func newVersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the version of adc",
-		Long:  `The version command can be used to print the version of adc.`,
+		Short: "Print the version of ADC",
+		Long:  `Prints the version of ADC. See https://github.com/api7/adc for details on how to update.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			color.Green("adc version: %s - %s\n", VERSION, GitRevision)
+			color.Green("ADC version: %s - %s\n", VERSION, GitRevision)
 		},
 	}
 

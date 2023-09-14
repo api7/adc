@@ -20,8 +20,8 @@ import (
 func newDumpCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dump",
-		Short: "Dump the configurations of API7",
-		Long:  `The dump command can be used to dump the configurations to the API7.`,
+		Short: "Dump the APISIX configuration",
+		Long:  `Dumps the configuration of the connected APISIX instance to a local file.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
@@ -41,11 +41,11 @@ func newDumpCmd() *cobra.Command {
 func dumpConfiguration(cmd *cobra.Command) error {
 	path, err := cmd.Flags().GetString("output")
 	if err != nil {
-		color.Red("Get file path failed: %v", err)
+		color.Red("Failed to get output file path: %v", err)
 		return err
 	}
 	if path == "" {
-		color.Red("Output path is empty. Example: adc dump -o config.yaml")
+		color.Red("Output file path is empty. Please specify a file path: adc dump -o config.yaml")
 		return nil
 	}
 
