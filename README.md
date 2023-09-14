@@ -1,90 +1,102 @@
-# ADC
+# APISIX Declarative CLI (ADC)
 
-The ADC CLI tool is a command-line interface for interacting with the APISIX's API. It is built using the Golang Cobra library and provides several sub-commands for managing your APISIX instance.
+ADC is a command line utility to interface with APISIX's API.
+
+It is built using the [Cobra](https://github.com/spf13/cobra) library.
 
 ## Installation
 
-The ADC CLI tool can be installed using the `go install` command:
+ADC can be installed using the `go install` command:
 
 ```
 go install github.com/api7/adc@latest
 ```
 
-This will install the `adc` binary to your `$GOPATH/bin` directory. Make sure that this directory is in your `$PATH` environment variable.
+This will install the `adc` binary to your `$GOPATH/bin` directory.
 
-You can also download the binary from the [releases page](https://github.com/api7/adc/releases) and place it in your `$PATH` directory.
+You can also download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
 
 ```bash
-# Download the binary
 wget https://github.com/api7/adc/releases/download/v0.1.0/adc_0.1.0_linux_amd64.tar.gz
 tar -zxvf adc_0.1.0_linux_amd64.tar.gz
 mv adc /usr/local/bin/adc
 ```
 
+> [!IMPORTANT]
+> Make sure that these directories are in your `$PATH` environment variable.
+
 ## Usage
 
-To use the ADC CLI tool, run the `adc` command followed by the sub-command you wish to use. For example, to check the connection to APISIX API, run the following command:
+To view a list of all available commands, run:
 
+```shell
+adc --help
 ```
+
+To learn how to use a particular subcommand, for example, `ping` run:
+
+```shell
+adc ping --help
+```
+
+### adc configure
+
+```shell
+adc configure
+```
+
+Configures ADC with APISIX's server address and token. Running this command will prompt you for an APISIX server address and API token and saves them to a configuration file.
+
+By default, ADC creates a configuration file at `$HOME/adc.yaml` and this can be changed manually.
+
+### adc ping
+
+```shell
 adc ping
 ```
 
-This will verify the connection to the APISIX API and print a success message.
+Pings the configured APISIX instance to verify connectivity.
 
-The following sub-commands are available:
+### adc validate
 
-- `configure`: Configure the ADC CLI tool with the APISIX's server address and token.
-- `ping`: Verify the connection to the APISIX API.
-- `sync`: Sync your local configuration to APISIX instance.
-- `diff`: Show the differences between your local configuration and the APISIX instance.
-- `dump`: Dump your APISIX configurations to a local file.
-- `version`: Print the version of ADC CLI.
-
-Use the `--help` flag with any sub-command to see its usage information.
-
-## Configuration
-
-The ADC CLI tool can be configured using the `configure` sub-command. This sub-command will prompt you for your APISIX server address and API token, and save them to a configuration file.
-
-The configuration file is located at `$HOME/.adc.yaml` and can be edited manually if necessary.
-
-## Dump
-
-The ADC CLI tool can dump your APISIX configurations to a local file. This file can then be used to sync your APISIX configurations to APISIX instance.
-
-To dump your APISIX configurations, run the following command:
-
-```bash
-adc dump -o <file>
+```shell
+adc validate -f config.yaml
 ```
 
-This will dump your APISIX configurations to the specified file.
+Validates the provided APISIX configuration file.
 
-## Sync
+### adc sync
 
-The ADC CLI tool can sync your local configuration to APISIX instance. This will update your APISIX instance with the configurations in your local file.
-
-To sync your local configuration to APISIX instance, run the following command:
-
-```bash
-adc sync -f <file>
+```shell
+adc sync
 ```
 
-This will sync your local configuration to APISIX instance.
+Syncs the local configuration present in the `adc.yaml` file (or specified configuration file) to the connected APISIX instance.
 
-## Diff
+### adc dump
 
-The ADC CLI tool can show the differences between your local configuration and the APISIX instance. This will show you what changes will be made to your APISIX instance when you sync your local configuration.
-
-To show the differences between your local configuration and the APISIX instance, run the following command:
-
-```bash
-adc diff -f <file>
+```shell
+adc dump --output config.yaml
 ```
 
-This will show the differences between your local configuration and the APISIX instance.
+Dumps the configuration of the connected APISIX instance to the specified configuration file.
 
+### adc diff
+
+```shell
+adc diff
+```
+
+Shows the differences in configuration between the connected APISIX instance and the local configuration file.
+
+### adc version
+
+```shell
+adc version
+```
+
+Prints the version of ADC. See [Installation](#installation) for details on installing the latest version.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the [Apache 2.0 License](LICENSE).
