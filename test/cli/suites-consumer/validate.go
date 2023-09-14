@@ -13,7 +13,7 @@ var _ = ginkgo.Describe("`adc validate` consumer tests", func() {
 		ginkgo.It("should validate consumer schema", func() {
 			validateOutput, err := s.Validate("suites-consumer/testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(validateOutput).To(gomega.Equal("Get file content success: config name: , version: , consumers: 1.\nValidate file content success\n"))
+			gomega.Expect(validateOutput).To(gomega.Equal("Read configuration file successfully: config name: , version: , consumers: 1.\nValidate file content success\n"))
 		})
 	})
 })
