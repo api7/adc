@@ -61,8 +61,6 @@ type Differ struct {
 	localDB      *db.DB
 	localConfig  *types.Configuration
 	remoteConfig *types.Configuration
-
-	evenChan *data.Event
 }
 
 // NewDiffer creates a new Differ object.
