@@ -105,7 +105,7 @@ func validateContent(c *types.Configuration) error {
 		return err
 	}
 	errs := v.Validate()
-	if errs != nil && len(errs) > 0 {
+	if len(errs) > 0 {
 		color.Red("Some validation failed:")
 		for _, err := range errs {
 			color.Red(err.Error())
