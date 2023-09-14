@@ -114,21 +114,6 @@ func readBody(r io.ReadCloser) (string, error) {
 	return string(data), nil
 }
 
-// getList returns a list of string.
-func (c *Client) getList(ctx context.Context, url string) ([]string, error) {
-	var listResp map[string]interface{}
-	err := makeGetRequest(c, ctx, url, &listResp)
-	if err != nil {
-		return nil, err
-	}
-	res := make([]string, 0, len(listResp))
-
-	for name := range listResp {
-		res = append(res, name)
-	}
-	return res, nil
-}
-
 func (c *Client) validate(ctx context.Context, url string, resource interface{}) error {
 	jsonData, err := json.Marshal(resource)
 	if err != nil {
