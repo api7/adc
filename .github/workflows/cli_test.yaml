@@ -58,7 +58,7 @@ jobs:
 
       - name: Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+          go install github.com/onsi/ginkgo/v2/ginkgo
           sudo cp ~/go/bin/ginkgo /usr/local/bin
 
       - name: Deploy Apache APISIX
