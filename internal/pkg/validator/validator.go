@@ -100,5 +100,14 @@ func (v *Validator) Validate() []error {
 		}
 	}
 
+	// TODO: enable this when APISIX supports
+	//for _, pluginMetadata := range v.localConfig.PluginMetadatas {
+	//	pluginMetadata := pluginMetadata
+	//	err := v.cluster.PluginMetadata().Validate(context.Background(), pluginMetadata)
+	//	if err != nil {
+	//		allErr = append(allErr, err)
+	//	}
+	//}
+
 	return allErr
 }

@@ -95,14 +95,20 @@ func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) 
 		return nil, err
 	}
 
+	pluginMetadatas, err := cluster.PluginMetadata().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Configuration{
-		Routes:         routes,
-		Services:       svcs,
-		Consumers:      consumers,
-		SSLs:           ssls,
-		GlobalRules:    globalRules,
-		PluginConfigs:  pluginConfigs,
-		ConsumerGroups: consumerGroups,
+		Routes:          routes,
+		Services:        svcs,
+		Consumers:       consumers,
+		SSLs:            ssls,
+		GlobalRules:     globalRules,
+		PluginConfigs:   pluginConfigs,
+		ConsumerGroups:  consumerGroups,
+		PluginMetadatas: pluginMetadatas,
 	}, nil
 }
 

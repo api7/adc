@@ -3,6 +3,7 @@ package scaffold
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -12,29 +13,32 @@ import (
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/common"
+	"github.com/api7/adc/test/cli/config"
 )
 
 type Scaffold struct {
 	cluster apisix.Cluster
 
-	routes         map[string]struct{}
-	services       map[string]struct{}
-	consumers      map[string]struct{}
-	globalRules    map[string]struct{}
-	pluginConfigs  map[string]struct{}
-	consumerGroups map[string]struct{}
+	routes          map[string]struct{}
+	services        map[string]struct{}
+	consumers       map[string]struct{}
+	globalRules     map[string]struct{}
+	pluginConfigs   map[string]struct{}
+	consumerGroups  map[string]struct{}
+	pluginMetadatas map[string]struct{}
 }
 
 func NewScaffold() *Scaffold {
 	s := &Scaffold{
 		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
 
-		routes:         map[string]struct{}{},
-		services:       map[string]struct{}{},
-		consumers:      map[string]struct{}{},
-		globalRules:    map[string]struct{}{},
-		pluginConfigs:  map[string]struct{}{},
-		consumerGroups: map[string]struct{}{},
+		routes:          map[string]struct{}{},
+		services:        map[string]struct{}{},
+		consumers:       map[string]struct{}{},
+		globalRules:     map[string]struct{}{},
+		pluginConfigs:   map[string]struct{}{},
+		consumerGroups:  map[string]struct{}{},
+		pluginMetadatas: map[string]struct{}{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -60,6 +64,9 @@ func NewScaffold() *Scaffold {
 		}
 		for consumerGroup, _ := range s.consumerGroups {
 			s.DeleteConsumerGroup(consumerGroup)
+		}
+		for pluginMetadata, _ := range s.pluginMetadatas {
+			s.DeletePluginMetadata(pluginMetadata)
 		}
 	})
 
@@ -102,6 +109,12 @@ func (s *Scaffold) AddConsumerGroupsFinalizer(consumerGroups ...string) {
 	}
 }
 
+func (s *Scaffold) AddPluginMetadatasFinalizer(pluginsMetadatas ...string) {
+	for _, pluginsMetadata := range pluginsMetadatas {
+		s.pluginMetadatas[pluginsMetadata] = struct{}{}
+	}
+}
+
 func (s *Scaffold) Configure(host, key string) error {
 	input := host + "\n" + key + "\n"
 	_, err := s.ExecWithInput(input, "configure")
@@ -133,6 +146,15 @@ func (s *Scaffold) Ping() (string, error) {
 
 func (s *Scaffold) Sync(path string) (string, error) {
 	conf, err := common.GetContentFromFile(path)
+
+	for _, service := range conf.Services {
+		for j, node := range service.Upstream.Nodes {
+			if node.Host == "HTTPBIN_PLACEHOLDER" {
+				service.Upstream.Nodes[j].Host = config.TestUpstream
+			}
+		}
+	}
+
 	gomega.Expect(err).To(gomega.BeNil(), "load config from file "+path)
 	for _, route := range conf.Routes {
 		s.AddRoutesFinalizer(route.ID)
@@ -158,7 +180,19 @@ func (s *Scaffold) Sync(path string) (string, error) {
 		s.AddConsumerGroupsFinalizer(consumerGroup.ID)
 	}
 
-	return s.Exec("sync", "-f", path)
+	for _, pluginMetadata := range conf.PluginMetadatas {
+		s.AddPluginMetadatasFinalizer(pluginMetadata.ID)
+	}
+
+	tmpFile := path + ".tmp"
+	defer func() {
+		err = os.Remove(tmpFile)
+		gomega.Expect(err).To(gomega.BeNil(), "delete temp file at "+tmpFile)
+	}()
+	err = common.SaveAPISIXConfiguration(tmpFile, conf)
+	gomega.Expect(err).To(gomega.BeNil(), "save temp file to "+tmpFile)
+
+	return s.Exec("sync", "-f", tmpFile)
 }
 
 func (s *Scaffold) Dump() (string, error) {
@@ -327,4 +361,30 @@ func (s *Scaffold) DeleteConsumerGroup(id string) error {
 	delete(s.consumerGroups, id)
 
 	return s.cluster.ConsumerGroup().Delete(context.Background(), id)
+}
+
+func (s *Scaffold) GetPluginMetadata(id string) (*types.PluginMetadata, error) {
+	return s.cluster.PluginMetadata().Get(context.Background(), id)
+}
+
+func (s *Scaffold) ListPluginMetadata() ([]*types.PluginMetadata, error) {
+	return s.cluster.PluginMetadata().List(context.Background())
+}
+
+func (s *Scaffold) CreatePluginMetadata(pluginMetadata *types.PluginMetadata) (*types.PluginMetadata, error) {
+	s.pluginMetadatas[pluginMetadata.ID] = struct{}{}
+
+	return s.cluster.PluginMetadata().Create(context.Background(), pluginMetadata)
+}
+
+func (s *Scaffold) UpdatePluginMetadata(pluginMetadata *types.PluginMetadata) (*types.PluginMetadata, error) {
+	s.pluginMetadatas[pluginMetadata.ID] = struct{}{}
+
+	return s.cluster.PluginMetadata().Update(context.Background(), pluginMetadata)
+}
+
+func (s *Scaffold) DeletePluginMetadata(id string) error {
+	delete(s.pluginMetadatas, id)
+
+	return s.cluster.PluginMetadata().Delete(context.Background(), id)
 }

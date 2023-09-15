@@ -1,0 +1,6 @@
+plugin_metadatas:
+  - id: http-logger
+    log_format:
+      '@timestamp': $time_iso8601
+      client_ip: $remote_addr
+      host: $host

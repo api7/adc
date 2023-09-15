@@ -45,12 +45,15 @@ var order = map[string]int{
 	_key(data.ConsumerGroupResourceType, data.CreateOption): _order(),
 
 	// no dependency
-	_key(data.SSLResourceType, data.DeleteOption):        _order(),
-	_key(data.SSLResourceType, data.CreateOption):        _order(),
-	_key(data.SSLResourceType, data.UpdateOption):        _order(),
-	_key(data.GlobalRuleResourceType, data.DeleteOption): _order(),
-	_key(data.GlobalRuleResourceType, data.CreateOption): _order(),
-	_key(data.GlobalRuleResourceType, data.UpdateOption): _order(),
+	_key(data.SSLResourceType, data.DeleteOption):            _order(),
+	_key(data.SSLResourceType, data.CreateOption):            _order(),
+	_key(data.SSLResourceType, data.UpdateOption):            _order(),
+	_key(data.GlobalRuleResourceType, data.DeleteOption):     _order(),
+	_key(data.GlobalRuleResourceType, data.CreateOption):     _order(),
+	_key(data.GlobalRuleResourceType, data.UpdateOption):     _order(),
+	_key(data.PluginMetadataResourceType, data.DeleteOption): _order(),
+	_key(data.PluginMetadataResourceType, data.CreateOption): _order(),
+	_key(data.PluginMetadataResourceType, data.UpdateOption): _order(),
 }
 
 // Differ is the object of comparing two configurations.
@@ -123,12 +126,18 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
+	pluginMetadataEvents, err := d.diffPluginMetadata()
+	if err != nil {
+		return nil, err
+	}
+
 	events = append(events, serviceEvents...)
 	events = append(events, routeEvents...)
 	events = append(events, consumerEvents...)
 	events = append(events, sslEvents...)
 	events = append(events, globalRuleEvents...)
 	events = append(events, pluginConfigEvents...)
+	events = append(events, pluginMetadataEvents...)
 	events = append(events, consumerGroupEvents...)
 
 	sortEvents(events)
@@ -502,6 +511,59 @@ func (d *Differ) diffConsumerGroup() ([]*data.Event, error) {
 			ResourceType: data.ConsumerGroupResourceType,
 			Option:       data.CreateOption,
 			Value:        consumerGroup,
+		})
+	}
+
+	return events, nil
+}
+
+// diffPluginMetadata compares the global_rules between local and remote.
+func (d *Differ) diffPluginMetadata() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remotePluginMetadata := range d.remoteConfig.PluginMetadatas {
+		localPluginMetadata, err := d.localDB.GetPluginMetadataByID(remotePluginMetadata.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.PluginMetadataResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remotePluginMetadata,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localPluginMetadata.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localPluginMetadata, remotePluginMetadata); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.PluginMetadataResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remotePluginMetadata,
+			Value:        localPluginMetadata,
+		})
+	}
+
+	// only in local, create
+	for _, pluginMetadata := range d.localConfig.PluginMetadatas {
+		if mark[pluginMetadata.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.PluginMetadataResourceType,
+			Option:       data.CreateOption,
+			Value:        pluginMetadata,
 		})
 	}
 

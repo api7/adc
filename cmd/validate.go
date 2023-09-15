@@ -71,6 +71,11 @@ func newValidateCmd() *cobra.Command {
 				msg += fmt.Sprintf(", consumer_groups: %v", len(d.ConsumerGroups))
 				changed = true
 			}
+			// TODO: enable this when APISIX supports
+			//if len(d.PluginMetadatas) > 0 {
+			//	msg += fmt.Sprintf(", plugin_metadatas: %v", len(d.PluginMetadatas))
+			//	changed = true
+			//}
 			if !changed {
 				msg += "nothing changed"
 			}

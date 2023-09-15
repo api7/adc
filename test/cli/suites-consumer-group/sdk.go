@@ -14,7 +14,7 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 		s := scaffold.NewScaffold()
 		ginkgo.It("ConsumerGroup resource", func() {
 			var (
-				err          error
+				err           error
 				consumerGroup *types.ConsumerGroup
 			)
 

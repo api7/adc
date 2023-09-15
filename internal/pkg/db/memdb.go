@@ -81,6 +81,16 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"plugin_metadatas": {
+			Name: "plugin_metadatas",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
 	},
 }
 
@@ -151,6 +161,13 @@ func NewMemDB(config *types.Configuration) (*DB, error) {
 		}
 	}
 
+	for _, consumerGroup := range config.PluginMetadatas {
+		err = txn.Insert("plugin_metadatas", consumerGroup)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txn.Commit()
 
 	return &DB{memDB: db}, nil
@@ -195,4 +212,8 @@ func (db *DB) GetPluginConfigByID(id string) (*types.PluginConfig, error) {
 
 func (db *DB) GetConsumerGroupByID(id string) (*types.ConsumerGroup, error) {
 	return getByID[types.ConsumerGroup](db, "consumer_groups", id)
+}
+
+func (db *DB) GetPluginMetadataByID(id string) (*types.PluginMetadata, error) {
+	return getByID[types.PluginMetadata](db, "plugin_metadatas", id)
 }
