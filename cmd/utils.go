@@ -8,7 +8,7 @@ import (
 
 func checkConfig() {
 	if rootConfig.Server == "" || rootConfig.Token == "" {
-		color.Yellow("adc hasn't been configured, you can use `adc configure` to configure adc")
+		color.Yellow("ADC isn't configured, run `adc configure` to configure ADC.")
 		os.Exit(0)
 	}
 }

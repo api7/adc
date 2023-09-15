@@ -11,8 +11,8 @@ import (
 func newDiffCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff",
-		Short: "Diff the configurations between local and API7",
-		Long:  `The diff command can be used to diff the configurations between local and API7.`,
+		Short: "Show the differences between the local and existing APISIX configuration",
+		Long:  `Shows the differences in the configuration between the local confguration file and the connected APISIX instance.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 

@@ -24,10 +24,10 @@ var (
 func newRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "adc",
-		Short: "API7 Declarative CLI",
-		Long: `A CLI tool for API7 Declarative configurations.
+		Short: "APISIX Declarative CLI",
+		Long: `A command line interface for configuring APISIX declaratively.
 
-It can be used to dump, diff, sync configurations to API7 server.
+It can be used to validate, dump, diff, and sync configurations with an APISIX instance.
 		`,
 	}
 	cobra.OnInitialize(initConfig)
@@ -66,7 +66,7 @@ func initConfig() {
 	viper.AddConfigPath("$HOME/")
 	err := viper.ReadInConfig()
 	if err != nil {
-		color.Red("Fatal to read config file, please run `adc configure` to configure the client first.")
+		color.Red("Failed to read configuration file, please run `adc configure` first to configure ADC.")
 		return
 	}
 
@@ -74,7 +74,7 @@ func initConfig() {
 	rootConfig.Token = viper.GetString("token")
 	cluser := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
 	if err != nil {
-		color.RedString("Fatal to create cluster: %v", err)
+		color.RedString("Failed to create a new cluster: %v", err)
 		return
 	}
 	rootConfig.APISIXCluster = cluser

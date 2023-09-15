@@ -20,8 +20,8 @@ import (
 func newSyncCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Sync the configurations from local to API7",
-		Long:  `The sync command can be used to sync the configurations from local to API7.`,
+		Short: "Sync local configuration to APISIX",
+		Long:  `Syncs the configuration in adc.yaml (or other provided file) to APISIX.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
@@ -39,31 +39,31 @@ func newSyncCmd() *cobra.Command {
 func sync(cmd *cobra.Command, dryRun bool) error {
 	file, err := cmd.Flags().GetString("file")
 	if err != nil {
-		color.Red("Get file path failed: %v", err)
+		color.Red("Failed to get the configuration file: %v", err)
 		return err
 	}
 
 	config, err := common.GetContentFromFile(file)
 	if err != nil {
-		color.Red("Get file content failed: %v", err)
+		color.Red("Failed to read configuration file: %v", err)
 		return err
 	}
 
 	remoteConfig, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
-		color.Red("Failed to get remote config: %v", err)
+		color.Red("Failed to get remote configuration: %v", err)
 		return err
 	}
 
 	d, err := differ.NewDiffer(config, remoteConfig)
 	if err != nil {
-		color.Red("Failed to create differ: %v", err)
+		color.Red("Failed to create a Differ object: %v", err)
 		return err
 	}
 
 	events, err := d.Diff()
 	if err != nil {
-		color.Red("Failed to diff: %v", err)
+		color.Red("Failed to compare local and remote configuration: %v", err)
 		return err
 	}
 
@@ -84,14 +84,14 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 
 		str, err := event.Output()
 		if err != nil {
-			color.Red("Failed to get output: %v", err)
+			color.Red("Failed to get output of the event: %v", err)
 			return err
 		}
 
 		if !dryRun {
 			err = event.Apply(rootConfig.APISIXCluster)
 			if err != nil {
-				color.Red("Failed to apply: %v", err)
+				color.Red("Failed to apply configuration: %v", err)
 				return err
 			}
 			time.Sleep(100 * time.Millisecond)

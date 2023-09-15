@@ -13,7 +13,7 @@ var _ = ginkgo.Describe("`adc validate` global rule tests", func() {
 		ginkgo.It("should validate global rule schema", func() {
 			validateOutput, err := s.Validate("suites-global-rule/testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(validateOutput).To(gomega.Equal("Get file content success: config name: , version: , global_rules: 1.\nValidate file content success\n"))
+			gomega.Expect(validateOutput).To(gomega.Equal("Read configuration file successfully: config name: , version: , global_rules: 1.\nSuccessfully validated configuration file!\n"))
 		})
 	})
 })

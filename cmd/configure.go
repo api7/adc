@@ -18,8 +18,8 @@ import (
 func newConfigureCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "Configure the connection of API7",
-		Long:  `The ping command can be used to configure the connection to the API7.`,
+		Short: "Configure ADC with APISIX instance",
+		Long:  `Configures ADC with APISIX's server address and token.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return saveConfiguration()
 		},
@@ -30,20 +30,20 @@ func newConfigureCmd() *cobra.Command {
 
 func saveConfiguration() error {
 	if rootConfig.Server != "" && rootConfig.Token != "" {
-		color.Yellow("adc has been configured, you can use `adc ping` to test the connection")
+		color.Yellow("ADC configured. Run `adc ping` to test the configuration.")
 		return nil
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 	if rootConfig.Server == "" {
-		fmt.Println("Please input the server address: ")
+		fmt.Println("Please enter the APISIX server address: ")
 		server, _ := reader.ReadString('\n')
 		rootConfig.Server = strings.TrimSpace(server)
 	}
 
 	if rootConfig.Token == "" {
 
-		fmt.Println("Please input the Token: ")
+		fmt.Println("Please enter the token: ")
 		token, _ := reader.ReadString('\n')
 		rootConfig.Token = strings.TrimSpace(token)
 	}
@@ -52,11 +52,11 @@ func saveConfiguration() error {
 	viper.Set("server", rootConfig.Server)
 	viper.Set("token", rootConfig.Token)
 	if err := viper.SafeWriteConfig(); err != nil {
-		color.Red("failed configure ADC")
+		color.Red("Failed to configure ADC")
 		return err
 	}
 
-	color.Green("Successfully configure ADC")
+	color.Green("ADC configured successfully!")
 
 	return pingAPISIX()
 }

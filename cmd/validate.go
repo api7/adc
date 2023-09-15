@@ -20,28 +20,28 @@ import (
 func newValidateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate",
-		Short: "Validate the configurations",
-		Long:  `The validate command can be used to validate the configurations.`,
+		Short: "Validate the provided configuration file",
+		Long:  `Validates the provided configuration file with the connected APISIX instance.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
 			file, err := cmd.Flags().GetString("file")
 			if err != nil {
-				color.Red("Get file path failed: %v", err)
+				color.Red("Failed to get file path: %v", err)
 				return err
 			}
 			if file == "" {
-				color.Red("Input path is empty. Example: adc validate -f config.yaml")
+				color.Red("File path is empty. Please specify a file path: adc validate -f config.yaml")
 				return nil
 			}
 
 			d, err := common.GetContentFromFile(file)
 			if err != nil {
-				color.Red("Get file content failed: %v", err)
+				color.Red("Failed to read configuration file: %v", err)
 				return err
 			}
 
-			msg := fmt.Sprintf("Get file content success: config name: %v, version: %v", d.Name, d.Version)
+			msg := fmt.Sprintf("Read configuration file successfully: config name: %v, version: %v", d.Name, d.Version)
 			changed := false
 			if len(d.Routes) > 0 {
 				msg += fmt.Sprintf(", routes: %v", len(d.Routes))
@@ -84,7 +84,7 @@ func newValidateCmd() *cobra.Command {
 
 			err = validateContent(d)
 			if err != nil {
-				color.Red("Command failed: %v", err)
+				color.Red("Failed to validate configuration file: %v", err)
 				return err
 			}
 			return nil
@@ -111,7 +111,7 @@ func validateContent(c *types.Configuration) error {
 			color.Red(err.Error())
 		}
 	} else {
-		color.Green("Validate file content success")
+		color.Green("Successfully validated configuration file!")
 	}
 	return nil
 }

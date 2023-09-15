@@ -17,8 +17,8 @@ import (
 func newPingCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ping",
-		Short: "Verify the connection to the APISIX",
-		Long:  `The ping command can be used to verify the connection to the APISIX.`,
+		Short: "Verify connectivity with APISIX",
+		Long:  `Pings the configured APISIX instance to verify connectivity.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
@@ -40,9 +40,9 @@ func pingAPISIX() error {
 		UpstreamId: "abcd",
 	})
 	if err != nil {
-		color.Red("failed to ping APISIX: %v", err.Error())
+		color.Red("Failed to ping APISIX: %v", err.Error())
 	} else {
-		color.Green("Successfully connected to APISIX")
+		color.Green("Connected to APISIX successfully!")
 	}
 	return nil
 }
