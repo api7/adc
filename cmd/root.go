@@ -40,6 +40,7 @@ It can be used to dump, diff, sync configurations to API7 server.
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newValidateCmd())
 	rootCmd.AddCommand(newVersionCmd())
+	rootCmd.AddCommand(newOpenAPI2APISIXCmd())
 	return rootCmd
 }
 
