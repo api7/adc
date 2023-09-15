@@ -10,13 +10,14 @@ type cluster struct {
 
 	cli *Client
 
-	route         Route
-	service       Service
-	consumer      Consumer
-	ssl           SSL
-	globalRule    GlobalRule
-	pluginConfig  PluginConfig
-	consumerGroup ConsumerGroup
+	route          Route
+	service        Service
+	consumer       Consumer
+	ssl            SSL
+	globalRule     GlobalRule
+	pluginConfig   PluginConfig
+	consumerGroup  ConsumerGroup
+	pluginMetadata PluginMetadata
 }
 
 func NewCluster(ctx context.Context, url, adminKey string) Cluster {
@@ -35,6 +36,7 @@ func NewCluster(ctx context.Context, url, adminKey string) Cluster {
 	c.globalRule = newGlobalRule(cli)
 	c.pluginConfig = newPluginConfig(cli)
 	c.consumerGroup = newConsumerGroup(cli)
+	c.pluginMetadata = newPluginMetadata(cli)
 
 	return c
 }
@@ -72,4 +74,9 @@ func (c *cluster) PluginConfig() PluginConfig {
 // ConsumerGroup implements Cluster.ConsumerGroup method.
 func (c *cluster) ConsumerGroup() ConsumerGroup {
 	return c.consumerGroup
+}
+
+// PluginMetadata implements Cluster.PluginMetadata method.
+func (c *cluster) PluginMetadata() PluginMetadata {
+	return c.pluginMetadata
 }

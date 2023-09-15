@@ -14,6 +14,7 @@ type Cluster interface {
 	GlobalRule() GlobalRule
 	PluginConfig() PluginConfig
 	ConsumerGroup() ConsumerGroup
+	PluginMetadata() PluginMetadata
 }
 
 type ResourceClient[T any] interface {
@@ -51,4 +52,8 @@ type PluginConfig interface {
 
 type ConsumerGroup interface {
 	ResourceClient[types.ConsumerGroup]
+}
+
+type PluginMetadata interface {
+	ResourceClient[types.PluginMetadata]
 }
