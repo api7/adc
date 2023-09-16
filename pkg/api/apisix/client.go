@@ -114,6 +114,52 @@ func readBody(r io.ReadCloser) (string, error) {
 	return string(data), nil
 }
 
+// getSchema returns the schema of APISIX object.
+func (c *Client) getSchema(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	body, err := readBody(resp.Body)
+	if err != nil {
+		err = multierr.Append(err, fmt.Errorf("read body failed"))
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return "", ErrNotFound
+		} else {
+			err = multierr.Append(err, fmt.Errorf("unexpected status code %d", resp.StatusCode))
+			err = multierr.Append(err, fmt.Errorf("error message: %s", body))
+		}
+		return "", err
+	}
+
+	return body, nil
+}
+
+// getList returns a list of string.
+func (c *Client) getList(ctx context.Context, url string) ([]string, error) {
+	var listResp map[string]interface{}
+	err := makeGetRequest(c, ctx, url, &listResp)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]string, 0, len(listResp))
+
+	for name := range listResp {
+		res = append(res, name)
+	}
+	return res, nil
+}
+
 func (c *Client) validate(ctx context.Context, url string, resource interface{}) error {
 	jsonData, err := json.Marshal(resource)
 	if err != nil {
