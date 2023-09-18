@@ -12,6 +12,7 @@ import (
 	_ "github.com/api7/adc/test/cli/suites-global-rule"
 	_ "github.com/api7/adc/test/cli/suites-plugin-config"
 	_ "github.com/api7/adc/test/cli/suites-plugin-metadata"
+	_ "github.com/api7/adc/test/cli/suites-usecase"
 )
 
 func TestADC(t *testing.T) {

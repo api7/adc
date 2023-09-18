@@ -18,6 +18,9 @@ func NormalizeConfiguration(content *types.Configuration) {
 		if route.ID == "" {
 			route.ID = route.Name
 		}
+		if route.Name == "" {
+			route.Name = route.ID
+		}
 	}
 
 	for _, service := range content.Services {
