@@ -89,6 +89,14 @@ adc diff
 
 Shows the differences in configuration between the connected APISIX instance and the local configuration file.
 
+### adc openapi2apisix
+
+```shell
+adc openapi2apisix -o config.yaml -f openAPI.yaml
+```
+
+Converts the configuration in OpenAPI format (`openAPI.yaml`) to APISIX configuration (`config.yaml`).
+
 ### adc version
 
 ```shell

@@ -17,8 +17,8 @@ import (
 func newOpenAPI2APISIXCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "openapi2apisix",
-		Short: "Convert OpenAPI file to ADC configuration file",
-		Long:  `The openapi2apisix command can be used to convert OpenAPI file to ADC configuration file.`,
+		Short: "Convert OpenAPI configuration to ADC configuration",
+		Long:  `Converts the configuration in OpenAPI format to the ADC configuration format.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			err := openAPI2APISIX(cmd)
@@ -38,17 +38,17 @@ func newOpenAPI2APISIXCmd() *cobra.Command {
 func openAPI2APISIX(cmd *cobra.Command) error {
 	output, err := cmd.Flags().GetString("output")
 	if err != nil {
-		color.Red("Get file path failed: %v", err)
+		color.Red("Failed to get output file path: %v", err)
 		return err
 	}
 	if output == "" {
-		color.Red("Output path is empty.")
+		color.Red("Output file path is empty. Please specify a file path: adc openapi2apisix -o config.yaml")
 		return nil
 	}
 
 	filename, err := cmd.Flags().GetString("file")
 	if err != nil {
-		color.Red("Get file path failed: %v", err)
+		color.Red("Failed to get OpenAPI file path: %v", err)
 		return err
 	}
 	if filename == "" {
@@ -58,7 +58,7 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 
 	f, err := os.Open(filename)
 	if err != nil {
-		color.Red("Open file %s failed: %s", filename, err)
+		color.Red("Failed to open %s: %s", filename, err)
 		return err
 	}
 	defer f.Close()
@@ -66,13 +66,13 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 	reader := bufio.NewReader(f)
 	fileContent, err := io.ReadAll(reader)
 	if err != nil {
-		color.Red("Read file %s failed: %s", filename, err)
+		color.Red("Failed to read file %s: %s", filename, err)
 		return err
 	}
 
 	conf, err := openapi2apisix.Convert(context.Background(), fileContent)
 	if err != nil {
-		color.Red("Convert OpenAPI file %s failed: %s", filename, err)
+		color.Red("Failed to convert OpenAPI file %s: %s", filename, err)
 		return err
 	}
 
@@ -80,6 +80,6 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	color.Green("Successfully convert OpenAPI fileto " + output)
+	color.Green("Converted OpenAPI file to %s successfully ", output)
 	return nil
 }
