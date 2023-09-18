@@ -35,6 +35,24 @@ Then fork and clone the repository, navigate to it in your machine and run:
 make build
 ```
 
+## Connecting to APISIX
+
+ADC works with [Apache APISIX](https://docs.api7.ai/apisix). To deploy APISIX in Docker, run:
+
+```shell
+curl -sL https://run.api7.ai/apisix/quickstart | sh
+```
+
+Once APISIX is deployed and ready, ADC can be configured to connect to it by running:
+
+```shell
+./bin/adc configure
+```
+
+You can add the APISIX endpoint address, which is by default `http://127.0.0.1:9180`, when prompted.
+
+## Testing ADC
+
 Now to test a particular command, for example `ping`, you can run:
 
 ```shell
