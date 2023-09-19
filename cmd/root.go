@@ -55,15 +55,22 @@ func Execute() {
 }
 
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// set default config file $HOME/.adc.yaml
-		viper.SetConfigFile("$HOME/.adc.yaml")
+	if cfgFile == "" {
+		cfgFile = "$HOME/.adc.yaml"
 	}
+	viper.SetConfigFile(cfgFile)
 	viper.SetConfigName(".adc")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/")
+
+	if _, err := os.Stat(os.ExpandEnv(cfgFile)); err != nil {
+		color.Yellow("Config file not found at %s. Creating...", cfgFile)
+		_, err := os.Create(os.ExpandEnv(cfgFile))
+		if err != nil {
+			color.Red("Failed to initialize configuration file: %s", err)
+		}
+	}
+
 	err := viper.ReadInConfig()
 	if err != nil {
 		color.Red("Failed to read configuration file, please run `adc configure` first to configure ADC.")
