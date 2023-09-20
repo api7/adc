@@ -239,7 +239,8 @@ func mapKV2Node(key string, val float64) (*UpstreamNode, error) {
 	return node, nil
 }
 
-type Plugins map[string]interface{}
+type Plugin map[string]interface{}
+type Plugins map[string]Plugin
 
 func (p *Plugins) DeepCopyInto(out *Plugins) {
 	b, _ := json.Marshal(&p)
@@ -253,6 +254,23 @@ func (p *Plugins) DeepCopy() *Plugins {
 	out := new(Plugins)
 	p.DeepCopyInto(out)
 	return out
+}
+
+func (p *Plugins) UnmarshalJSON(cont []byte) error {
+	var plugins map[string]Plugin
+	err := json.Unmarshal(cont, &plugins)
+	if err != nil {
+		return err
+	}
+
+	if p == nil || *p == nil{
+		*p = make(Plugins)
+	}
+	for name, config := range plugins {
+		(*p)[name] = GetPluginDefaultValues(name, config)
+	}
+
+	return nil
 }
 
 // StringOrSlice represents a string or a string slice.

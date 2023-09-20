@@ -29,8 +29,8 @@ var _ = ginkgo.Describe("adc APISIX globalRule SDK tests", func() {
 			// create globalRule 1
 			baseGlobalRule1 := &types.GlobalRule{
 				ID: "globalRule1",
-				Plugins: map[string]interface{}{
-					"limit-count": map[string]interface{}{
+				Plugins: types.Plugins{
+					"limit-count": types.Plugin{
 						"time_window":   60,
 						"policy":        "local",
 						"count":         100,
@@ -49,8 +49,8 @@ var _ = ginkgo.Describe("adc APISIX globalRule SDK tests", func() {
 			// create globalRule 2
 			baseGlobalRule2 := &types.GlobalRule{
 				ID: "globalRule2",
-				Plugins: map[string]interface{}{
-					"limit-count": map[string]interface{}{
+				Plugins: types.Plugins{
+					"limit-count": types.Plugin{
 						"time_window":   60,
 						"policy":        "local",
 						"count":         200,
@@ -84,8 +84,8 @@ var _ = ginkgo.Describe("adc APISIX globalRule SDK tests", func() {
 			// update & get globalRule 1
 			baseGlobalRule1 = &types.GlobalRule{
 				ID: "globalRule1",
-				Plugins: map[string]interface{}{
-					"key-auth": map[string]interface{}{
+				Plugins: types.Plugins{
+					"key-auth": types.Plugin{
 						"key": "auth-one",
 					},
 				},

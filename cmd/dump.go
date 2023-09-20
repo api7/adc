@@ -33,7 +33,7 @@ func newDumpCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "", "output file path")
+	cmd.Flags().StringP("output", "o", "/dev/stdout", "output file path")
 
 	return cmd
 }

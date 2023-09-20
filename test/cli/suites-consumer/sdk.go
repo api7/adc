@@ -67,8 +67,8 @@ var _ = ginkgo.Describe("adc APISIX consumer SDK tests", func() {
 			// update & get consumer 1
 			baseConsumer1 = &types.Consumer{
 				Username: "consumer1",
-				Plugins: map[string]interface{}{
-					"key-auth": map[string]interface{}{
+				Plugins: types.Plugins{
+					"key-auth": types.Plugin{
 						"key": "auth-one",
 					},
 				},

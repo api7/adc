@@ -1,0 +1,713 @@
+{
+"api-breaker": {
+"healthy": {
+  "http_statuses": [
+    200
+  ],
+  "successes": 3
+},
+"max_breaker_sec": 300,
+"unhealthy": {
+  "failures": 3,
+  "http_statuses": [
+    500
+  ]
+}
+},
+"authz-keycloak": {
+  "access_token_expires_in": 300,
+  "access_token_expires_leeway": 0,
+  "cache_ttl_seconds": 86400,
+  "grant_type": "urn:ietf:params:oauth:grant-type:uma-ticket",
+  "http_method_as_scope": false,
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "lazy_load_paths": false,
+  "permissions": {},
+  "policy_enforcement_mode": "ENFORCING",
+  "refresh_token_expires_in": 3600,
+  "refresh_token_expires_leeway": 0,
+  "ssl_verify": true,
+  "timeout": 3000
+},
+"aws-lambda": {
+  "authorization": {
+    "iam": {
+      "aws_region": "us-east-1",
+      "service": "execute-api"
+    }
+  },
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "ssl_verify": true,
+  "timeout": 3000
+},
+"azure-functions": {
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "ssl_verify": true,
+  "timeout": 3000
+},
+"basic-auth": {
+  "hide_credentials": false
+},
+"chaitin-waf": {
+  "append_waf_debug_header": false,
+  "append_waf_resp_header": true
+},
+"clickhouse-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "database": "",
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "logtable": "",
+  "max_retry_count": 0,
+  "name": "clickhouse-logger",
+  "password": "",
+  "retry_delay": 1,
+  "ssl_verify": true,
+  "timeout": 3,
+  "user": ""
+},
+"consumer-restriction": {
+  "rejected_code": 403
+},
+"cors": {
+  "allow_credential": false,
+  "allow_headers": "*",
+  "allow_methods": "*",
+  "allow_origins": "*",
+  "expose_headers": "*",
+  "max_age": 5
+},
+"csrf": {
+  "expires": 7200,
+  "name": "apisix-csrf-token"
+},
+"datadog": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "max_retry_count": 0,
+  "name": "datadog",
+  "prefer_name": true,
+  "retry_delay": 1
+},
+"elasticsearch-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "max_retry_count": 0,
+  "name": "elasticsearch-logger",
+  "retry_delay": 1,
+  "ssl_verify": true,
+  "timeout": 10
+},
+"ext-plugin-post-req": {
+  "allow_degradation": false
+},
+"ext-plugin-post-resp": {
+  "allow_degradation": false
+},
+"ext-plugin-pre-req": {
+  "allow_degradation": false
+},
+"file-logger": {
+  "include_resp_body": false
+},
+"forward-auth": {
+  "allow_degradation": false,
+  "client_headers": {},
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "request_headers": {},
+  "request_method": "GET",
+  "ssl_verify": true,
+  "timeout": 3000,
+  "upstream_headers": {}
+},
+"google-cloud-logging": {
+  "auth_config": {
+    "entries_uri": "https://logging.googleapis.com/v2/entries:write",
+    "scopes": [
+      "https://www.googleapis.com/auth/logging.read",
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/logging.admin",
+      "https://www.googleapis.com/auth/cloud-platform"
+    ],
+    "token_uri": "https://oauth2.googleapis.com/token"
+  },
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "log_id": "apisix.apache.org%2Flogs",
+  "max_retry_count": 0,
+  "name": "google-cloud-logging",
+  "resource": {
+    "type": "global"
+  },
+  "retry_delay": 1,
+  "ssl_verify": true
+},
+"grpc-transcode": {
+  "deadline": 0,
+  "pb_option": [
+    "enum_as_name",
+    "int64_as_number",
+    "auto_default_values",
+    "disable_hooks"
+  ],
+  "show_status_in_body": false
+},
+"gzip": {
+  "buffers": {
+    "number": 32,
+    "size": 4096
+  },
+  "comp_level": 1,
+  "http_version": 1.1,
+  "min_length": 20,
+  "types": [
+    "text/html"
+  ]
+},
+"http-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "concat_method": "json",
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "max_retry_count": 0,
+  "name": "http logger",
+  "retry_delay": 1,
+  "ssl_verify": false,
+  "timeout": 3
+},
+"ip-restriction": {
+  "message": "Your IP address is not allowed"
+},
+"jwt-auth": {
+  "cookie": "jwt",
+  "header": "authorization",
+  "hide_credentials": false,
+  "query": "jwt"
+},
+"kafka-logger": {
+  "batch_max_size": 1000,
+  "brokers": {
+    "items": {
+      "sasl_config": {
+        "mechanism": "PLAIN"
+      }
+    },
+    "type": "array"
+  },
+  "buffer_duration": 60,
+  "cluster_name": 1,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "max_retry_count": 0,
+  "meta_format": "default",
+  "meta_refresh_interval": 30,
+  "name": "kafka logger",
+  "producer_batch_num": 200,
+  "producer_batch_size": 1048576,
+  "producer_max_buffering": 50000,
+  "producer_time_linger": 1,
+  "producer_type": "async",
+  "required_acks": 1,
+  "retry_delay": 1,
+  "timeout": 3
+},
+"key-auth": {
+  "header": "apikey",
+  "hide_credentials": false,
+  "query": "apikey"
+},
+"ldap-auth": {
+  "tls_verify": false,
+  "uid": "cn",
+  "use_tls": false
+},
+"limit-conn": {
+  "allow_degradation": false,
+  "key_type": "var",
+  "only_use_default_delay": false,
+  "rejected_code": 503
+},
+"limit-count": {
+  "allow_degradation": false,
+  "else": {
+    "if": {
+      "properties": {
+        "policy": {
+          "enum": [
+            "redis-cluster"
+          ]
+        }
+      }
+    },
+    "then": {
+      "redis_cluster_ssl": false,
+      "redis_cluster_ssl_verify": false,
+      "redis_timeout": 1000
+    }
+  },
+  "if": {
+    "properties": {
+      "policy": {
+        "enum": [
+          "redis"
+        ]
+      }
+    }
+  },
+  "key": "remote_addr",
+  "key_type": "var",
+  "policy": "local",
+  "rejected_code": 503,
+  "show_limit_quota_header": true,
+  "then": {
+    "redis_database": 0,
+    "redis_port": 6379,
+    "redis_ssl": false,
+    "redis_ssl_verify": false,
+    "redis_timeout": 1000
+  }
+},
+"limit-req": {
+  "allow_degradation": false,
+  "key_type": "var",
+  "nodelay": false,
+  "rejected_code": 503
+},
+"loggly": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "max_retry_count": 0,
+  "name": "loggly",
+  "retry_delay": 1,
+  "severity": "INFO",
+  "ssl_verify": true,
+  "tags": [
+    "apisix"
+  ]
+},
+"loki-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "endpoint_uri": "/loki/api/v1/push",
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "log_labels": {
+    "job": "apisix"
+  },
+  "max_retry_count": 0,
+  "name": "loki logger",
+  "retry_delay": 1,
+  "ssl_verify": false,
+  "tenant_id": "fake",
+  "timeout": 3000
+},
+"mocking": {
+  "content_type": "application/json;charset=utf8",
+  "delay": 0,
+  "response_status": 200,
+  "with_mock_header": true
+},
+"opa": {
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "ssl_verify": true,
+  "timeout": 3000,
+  "with_consumer": false,
+  "with_route": false,
+  "with_service": false
+},
+"openfunction": {
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "ssl_verify": true,
+  "timeout": 3000
+},
+"openid-connect": {
+  "access_token_in_authorization_header": false,
+  "bearer_only": false,
+  "introspection_endpoint_auth_method": "client_secret_basic",
+  "logout_path": "/logout",
+  "realm": "apisix",
+  "scope": "openid",
+  "set_access_token_header": true,
+  "set_id_token_header": true,
+  "set_refresh_token_header": false,
+  "set_userinfo_header": true,
+  "ssl_verify": false,
+  "timeout": 3,
+  "unauth_action": "auth",
+  "use_pkce": false
+},
+"opentelemetry": {
+  "sampler": {
+    "name": "always_off",
+    "options": {
+      "fraction": 0,
+      "root": {
+        "name": "always_off"
+      }
+    }
+  }
+},
+"openwhisk": {
+  "keepalive": true,
+  "keepalive_pool": 5,
+  "keepalive_timeout": 60000,
+  "result": true,
+  "ssl_verify": true,
+  "timeout": 3000
+},
+"prometheus": {
+  "prefer_name": false
+},
+"proxy-control": {
+  "request_buffering": true
+},
+"proxy-mirror": {
+  "path_concat_mode": "replace",
+  "sample_ratio": 1
+},
+"proxy-rewrite": {
+  "use_real_request_uri_unsafe": false
+},
+"real-ip": {
+  "recursive": false
+},
+"redirect": {
+  "append_query_string": false,
+  "encode_uri": false,
+  "ret_code": 302
+},
+"referer-restriction": {
+  "bypass_missing": false,
+  "message": "Your referer host is not allowed"
+},
+"request-id": {
+  "algorithm": "uuid",
+  "header_name": "X-Request-Id",
+  "include_in_response": true,
+  "range_id": {
+    "default": {},
+    "properties": {
+      "char_set": "abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ0123456789",
+      "length": 16
+    }
+  }
+},
+"request-validation": {
+  "rejected_code": 400
+},
+"response-rewrite": {
+  "body_base64": false,
+  "dependencies": {
+    "body": {
+      "not": {
+        "required": [
+          "filters"
+        ]
+      }
+    },
+    "filters": {
+      "not": {
+        "required": [
+          "body"
+        ]
+      }
+    }
+  },
+  "filters": {
+    "items": {
+      "options": "jo",
+      "scope": "once"
+    },
+    "type": "array"
+  }
+},
+"rocketmq-logger": {
+  "access_key": "",
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "max_retry_count": 0,
+  "meta_format": "default",
+  "name": "rocketmq logger",
+  "retry_delay": 1,
+  "secret_key": "",
+  "timeout": 3,
+  "use_tls": false
+},
+"serverless-post-function": {
+  "phase": "access"
+},
+"serverless-pre-function": {
+  "phase": "access"
+},
+"skywalking": {
+  "sample_ratio": 1
+},
+"skywalking-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "max_retry_count": 0,
+  "name": "skywalking logger",
+  "retry_delay": 1,
+  "service_instance_name": "APISIX Instance Name",
+  "service_name": "APISIX",
+  "timeout": 3
+},
+"sls-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "max_retry_count": 0,
+  "name": "sls-logger",
+  "retry_delay": 1,
+  "timeout": 5000
+},
+"splunk-hec-logging": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "endpoint": {
+    "timeout": 10
+  },
+  "inactive_timeout": 5,
+  "max_retry_count": 0,
+  "name": "splunk-hec-logging",
+  "retry_delay": 1,
+  "ssl_verify": true
+},
+"syslog": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "drop_limit": 1048576,
+  "flush_limit": 4096,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "max_retry_count": 0,
+  "name": "sys logger",
+  "pool_size": 5,
+  "retry_delay": 1,
+  "sock_type": "tcp",
+  "timeout": 3000,
+  "tls": false
+},
+"tcp-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "max_retry_count": 0,
+  "name": "tcp logger",
+  "retry_delay": 1,
+  "timeout": 1000,
+  "tls": false
+},
+"tencent-cloud-cls": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "include_resp_body": false,
+  "max_retry_count": 0,
+  "name": "tencent-cloud-cls",
+  "retry_delay": 1,
+  "sample_ratio": 1
+},
+"traffic-split": {
+  "rules": {
+    "items": {
+      "weighted_upstreams": {
+        "default": [
+          {
+            "weight": 1
+          }
+        ],
+        "items": {
+          "upstream": {
+            "checks": {
+              "active": {
+                "concurrency": 10,
+                "healthy": {
+                  "http_statuses": [
+                    200,
+                    302
+                  ],
+                  "interval": 1,
+                  "successes": 2
+                },
+                "http_path": "/",
+                "https_verify_certificate": true,
+                "timeout": 1,
+                "unhealthy": {
+                  "http_failures": 5,
+                  "http_statuses": [
+                    429,
+                    404,
+                    500,
+                    501,
+                    502,
+                    503,
+                    504,
+                    505
+                  ],
+                  "interval": 1,
+                  "tcp_failures": 2,
+                  "timeouts": 3
+                }
+              },
+              "passive": {
+                "healthy": {
+                  "http_statuses": [
+                    200,
+                    201,
+                    202,
+                    203,
+                    204,
+                    205,
+                    206,
+                    207,
+                    208,
+                    226,
+                    300,
+                    301,
+                    302,
+                    303,
+                    304,
+                    305,
+                    306,
+                    307,
+                    308
+                  ],
+                  "successes": 5
+                },
+                "unhealthy": {
+                  "http_failures": 5,
+                  "http_statuses": [
+                    429,
+                    500,
+                    503
+                  ],
+                  "tcp_failures": 2,
+                  "timeouts": 7
+                }
+              }
+            },
+            "hash_on": "vars",
+            "keepalive_pool": {
+              "idle_timeout": 60,
+              "requests": 1000,
+              "size": 320
+            },
+            "nodes": {
+              "anyOf": [
+                null,
+                {
+                  "items": {
+                    "priority": 0
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "pass_host": "pass",
+            "scheme": "http",
+            "tls": {
+              "dependencies": {
+                "client_cert": {
+                  "not": {
+                    "required": [
+                      "client_cert_id"
+                    ]
+                  },
+                  "required": [
+                    "client_key"
+                  ]
+                },
+                "client_cert_id": {
+                  "not": {
+                    "required": [
+                      "client_client",
+                      "client_key"
+                    ]
+                  }
+                },
+                "client_key": {
+                  "not": {
+                    "required": [
+                      "client_cert_id"
+                    ]
+                  },
+                  "required": [
+                    "client_cert"
+                  ]
+                }
+              },
+              "verify": false
+            }
+          },
+          "weight": 1
+        },
+        "type": "array"
+      }
+    },
+    "type": "array"
+  }
+},
+"ua-restriction": {
+  "bypass_missing": false,
+  "message": "Not allowed"
+},
+"udp-logger": {
+  "batch_max_size": 1000,
+  "buffer_duration": 60,
+  "inactive_timeout": 5,
+  "include_req_body": false,
+  "max_retry_count": 0,
+  "name": "udp logger",
+  "retry_delay": 1,
+  "timeout": 3
+},
+"uri-blocker": {
+  "case_insensitive": false,
+  "rejected_code": 403
+},
+"wolf-rbac": {
+  "appid": "unset",
+  "header_prefix": "X-",
+  "server": "http://127.0.0.1:12180"
+},
+"zipkin": {
+  "service_name": "APISIX",
+  "span_version": 2
+}
+}

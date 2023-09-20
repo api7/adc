@@ -19,8 +19,8 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 
 		pluginConfig = &types.PluginConfig{
 			ID: id,
-			Plugins: map[string]interface{}{
-				"limit-count": map[string]interface{}{
+			Plugins: types.Plugins{
+				"limit-count": types.Plugin{
 					"count":         2,
 					"time_window":   60,
 					"rejected_code": 503,

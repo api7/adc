@@ -32,7 +32,10 @@ var _ = ginkgo.Describe("`adc dump` consumer group tests", func() {
 consumers:
 - plugins:
     key-auth:
+      header: apikey
+      hide_credentials: false
       key: auth-one
+      query: apikey
   username: jack
 name: ""
 version: ""
