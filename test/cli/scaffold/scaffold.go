@@ -47,22 +47,22 @@ func NewScaffold() *Scaffold {
 	})
 
 	ginkgo.AfterEach(func() {
-		for route, _ := range s.routes {
+		for route := range s.routes {
 			s.DeleteRoute(route)
 		}
-		for svc, _ := range s.services {
+		for svc := range s.services {
 			s.DeleteService(svc)
 		}
-		for consumer, _ := range s.consumers {
+		for consumer := range s.consumers {
 			s.DeleteConsumer(consumer)
 		}
-		for globalRule, _ := range s.globalRules {
+		for globalRule := range s.globalRules {
 			s.DeleteGlobalRule(globalRule)
 		}
-		for pluginConfig, _ := range s.pluginConfigs {
+		for pluginConfig := range s.pluginConfigs {
 			s.DeletePluginConfig(pluginConfig)
 		}
-		for consumerGroup, _ := range s.consumerGroups {
+		for consumerGroup := range s.consumerGroups {
 			s.DeleteConsumerGroup(consumerGroup)
 		}
 		for pluginMetadata, _ := range s.pluginMetadatas {

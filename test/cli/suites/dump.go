@@ -71,6 +71,7 @@ version: ""
 			err = s.DeleteService("svc1")
 			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
 			err = s.DeleteService("svc2")
+			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
 		})
 	})
 })

@@ -31,6 +31,7 @@ var _ = ginkgo.Describe("adc APISIX consumer SDK tests", func() {
 				Username: "consumer1",
 			}
 			_, err = s.CreateConsumer(baseConsumer1)
+			gomega.Expect(err).To(gomega.BeNil(), "error while creating consumer")
 
 			// get consumer 1
 			consumer, err = s.GetConsumer("consumer1")

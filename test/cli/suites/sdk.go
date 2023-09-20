@@ -55,6 +55,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				ServiceID: "svc1",
 			}
 			_, err = s.CreateRoute(baseRoute1)
+			gomega.Expect(err).To(gomega.BeNil(), "check route creation")
 
 			// get route 1
 			route, err = s.GetRoute("route1")
