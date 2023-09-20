@@ -30,8 +30,8 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 			// create consumerGroup 1
 			baseConsumerGroup1 := &types.ConsumerGroup{
 				ID: "consumerGroup1",
-				Plugins: map[string]interface{}{
-					"limit-count": map[string]interface{}{
+				Plugins: types.Plugins{
+					"limit-count": types.Plugin{
 						"time_window":   60,
 						"policy":        "local",
 						"count":         100,
@@ -50,8 +50,8 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 			// create consumerGroup 2
 			baseConsumerGroup2 := &types.ConsumerGroup{
 				ID: "consumerGroup2",
-				Plugins: map[string]interface{}{
-					"limit-count": map[string]interface{}{
+				Plugins: types.Plugins{
+					"limit-count": types.Plugin{
 						"time_window":   60,
 						"policy":        "local",
 						"count":         200,
@@ -85,8 +85,8 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 			// update & get consumerGroup 1
 			baseConsumerGroup1 = &types.ConsumerGroup{
 				ID: "consumerGroup1",
-				Plugins: map[string]interface{}{
-					"key-auth": map[string]interface{}{
+				Plugins: types.Plugins{
+					"key-auth": types.Plugin{
 						"key": "auth-one",
 					},
 				},

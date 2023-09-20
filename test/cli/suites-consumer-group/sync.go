@@ -21,8 +21,8 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 
 		consumerGroup = &types.ConsumerGroup{
 			ID: id,
-			Plugins: map[string]interface{}{
-				"limit-count": map[string]interface{}{
+			Plugins: types.Plugins{
+				"limit-count": types.Plugin{
 					"count":         2,
 					"time_window":   60,
 					"rejected_code": 503,
@@ -33,8 +33,8 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 
 		consumer = &types.Consumer{
 			Username: user,
-			Plugins: map[string]interface{}{
-				"key-auth": map[string]interface{}{
+			Plugins: types.Plugins{
+				"key-auth": types.Plugin{
 					"key": authKey,
 				},
 			},
@@ -68,9 +68,8 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				"GET",
 			},
 			ServiceID: "svc",
-			Plugins: map[string]interface{}{
-				"key-auth": struct {
-				}{},
+			Plugins: types.Plugins{
+				"key-auth": types.Plugin{},
 			},
 		}
 	)
