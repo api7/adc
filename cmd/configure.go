@@ -51,7 +51,7 @@ func saveConfiguration() error {
 	// use viper to save the configuration
 	viper.Set("server", rootConfig.Server)
 	viper.Set("token", rootConfig.Token)
-	if err := viper.SafeWriteConfig(); err != nil {
+	if err := viper.WriteConfig(); err != nil {
 		color.Red("Failed to configure ADC")
 		return err
 	}
