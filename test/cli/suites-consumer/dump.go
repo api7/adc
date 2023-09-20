@@ -19,7 +19,10 @@ var _ = ginkgo.Describe("`adc dump` consumer tests", func() {
 			gomega.Expect(out).To(gomega.Equal(`consumers:
 - plugins:
     key-auth:
+      header: apikey
+      hide_credentials: false
       key: auth-one
+      query: apikey
     limit-count:
       allow_degradation: false
       count: 2
