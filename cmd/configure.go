@@ -169,10 +169,7 @@ func saveConfiguration(cmd *cobra.Command) error {
 	viper.Set("capath", rootConfig.CAPath)
 	viper.Set("cert", rootConfig.Certificate)
 	viper.Set("cert-key", rootConfig.CertificateKey)
-	if rootConfig.CAPath != "" {
-		// don't save this if no need
-		viper.Set("insecure", rootConfig.Insecure)
-	}
+	viper.Set("insecure", rootConfig.Insecure)
 
 	if overwrite {
 		err = viper.WriteConfig()
