@@ -41,6 +41,7 @@ var _ = ginkgo.Describe("adc APISIX pluginConfig SDK tests", func() {
 				},
 			}
 			_, err = s.CreatePluginConfig(basePluginConfig1)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get pluginConfig 1
 			pluginConfig, err = s.GetPluginConfig("pluginConfig1")

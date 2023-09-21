@@ -41,6 +41,7 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 				},
 			}
 			_, err = s.CreateConsumerGroup(baseConsumerGroup1)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get consumerGroup 1
 			consumerGroup, err = s.GetConsumerGroup("consumerGroup1")

@@ -135,6 +135,7 @@ func readBody(r io.ReadCloser) (string, error) {
 	return string(data), nil
 }
 
+//nolint:unused
 // getSchema returns the schema of APISIX object.
 func (c *Client) getSchema(ctx context.Context, url string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -166,6 +167,7 @@ func (c *Client) getSchema(ctx context.Context, url string) (string, error) {
 	return body, nil
 }
 
+//nolint:unused
 // getList returns a list of string.
 func (c *Client) getList(ctx context.Context, url string) ([]string, error) {
 	var listResp map[string]interface{}

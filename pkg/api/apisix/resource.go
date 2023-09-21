@@ -78,10 +78,8 @@ func unmarshalItem[T any](i *item) (*T, error) {
 	switch any(obj).(type) {
 	case *types.PluginMetadata:
 		any(obj).(*types.PluginMetadata).ID = list[len(list)-1]
-		break
 	case types.PluginMetadata:
 		any(&obj).(*types.PluginMetadata).ID = list[len(list)-1]
-		break
 	}
 
 	return &obj, nil

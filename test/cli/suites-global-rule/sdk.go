@@ -40,6 +40,7 @@ var _ = ginkgo.Describe("adc APISIX globalRule SDK tests", func() {
 				},
 			}
 			_, err = s.CreateGlobalRule(baseGlobalRule1)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get globalRule 1
 			globalRule, err = s.GetGlobalRule("globalRule1")

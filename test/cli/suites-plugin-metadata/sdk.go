@@ -40,6 +40,7 @@ var _ = ginkgo.Describe("adc APISIX pluginMetadata SDK tests", func() {
 				Config: loggerConfig,
 			}
 			_, err = s.CreatePluginMetadata(baseHttpLogger)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get http-logger
 			pluginMetadata, err = s.GetPluginMetadata("http-logger")

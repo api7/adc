@@ -87,7 +87,7 @@ func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
 		for consumerGroup := range s.consumerGroups {
 			s.DeleteConsumerGroup(consumerGroup)
 		}
-		for pluginMetadata, _ := range s.pluginMetadatas {
+		for pluginMetadata := range s.pluginMetadatas {
 			s.DeletePluginMetadata(pluginMetadata)
 		}
 	})

@@ -42,6 +42,7 @@ version: ""
 `))
 
 			err = s.DeleteConsumer("jack")
+			gomega.Expect(err).To(gomega.BeNil())
 			err = s.DeleteConsumerGroup("company_a")
 			gomega.Expect(err).To(gomega.BeNil(), "check consumer group delete")
 		})

@@ -113,6 +113,7 @@ func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
 	return routes
 }
 
+//nolint:unused
 func getLabelsByTags(tags openapi3.Tags) apitypes.Labels {
 	labels := apitypes.Labels{}
 	for i, tag := range tags {
