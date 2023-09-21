@@ -149,7 +149,12 @@ destroy_apisix() {
   docker rm -f $DEFAULT_ETCD_NAME >>/dev/null 2>&1
   docker rm -f $DEFAULT_PROMETHEUS_NAME >>/dev/null 2>&1
   docker network rm $DEFAULT_NET_NAME >>/dev/null 2>&1
-  sleep 5
+  sleep 2
+
+  while docker container inspect $DEFAULT_APP_NAME >/dev/null 2>&1; do sleep 1; done &&
+  while docker container inspect $DEFAULT_ETCD_NAME >/dev/null 2>&1; do sleep 1; done &&
+  while docker container inspect $DEFAULT_PROMETHEUS_NAME >/dev/null 2>&1; do sleep 1; done &&
+  while docker network inspect $DEFAULT_NET_NAME >/dev/null 2>&1; do sleep 1; done
 }
 
 validate_apisix() {
