@@ -4,7 +4,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc dump` consumer group tests", func() {

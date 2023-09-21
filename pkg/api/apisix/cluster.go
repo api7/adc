@@ -2,6 +2,15 @@ package apisix
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"net/url"
+	"os"
+
+	"github.com/fatih/color"
+
+	"github.com/api7/adc/pkg/config"
 )
 
 type cluster struct {
@@ -20,15 +29,54 @@ type cluster struct {
 	pluginMetadata PluginMetadata
 }
 
-func NewCluster(ctx context.Context, url, adminKey string) Cluster {
+func NewCluster(ctx context.Context, conf config.ClientConfig) (Cluster, error) {
 	c := &cluster{
-		baseURL:  url,
-		adminKey: adminKey,
+		baseURL:  conf.Server,
+		adminKey: conf.Token,
 	}
 
-	cli := newClient(url, adminKey)
-	c.cli = cli
+	var cli *Client
+	if conf.CAPath != "" && conf.Certificate != "" && conf.CertificateKey != "" {
+		rootCA, err := os.ReadFile(conf.CAPath)
+		if err != nil {
+			color.Red("Failed to read CA file: %v", err)
+			return nil, err
+		}
 
+		caCertPool := x509.NewCertPool()
+		ok := caCertPool.AppendCertsFromPEM(rootCA)
+		if !ok {
+			color.Red("Failed to parse CA certificate")
+			return nil, errors.New("failed to parse CA certificate")
+		}
+
+		cert, err := os.ReadFile(conf.Certificate)
+		if err != nil {
+			color.Red("Failed to read certificate file: %v", err)
+			return nil, err
+		}
+		key, err := os.ReadFile(conf.CertificateKey)
+		if err != nil {
+			color.Red("Failed to read certificate key file: %v", err)
+			return nil, err
+		}
+		keyPair, err := tls.X509KeyPair(cert, key)
+		if err != nil {
+			color.Red("Failed to parse x509 key pair: %v", err)
+			return nil, err
+		}
+
+		u, err := url.Parse(conf.Server)
+		if err != nil {
+			color.Red("Failed to parse APISIX address: %v", err)
+		}
+
+		cli = newClientWithCertificates(c.baseURL, c.adminKey, u.Hostname(), conf.Insecure, caCertPool, []tls.Certificate{keyPair})
+	} else {
+		cli = newClient(c.baseURL, c.adminKey)
+	}
+
+	c.cli = cli
 	c.route = newRoute(cli)
 	c.service = newService(cli)
 	c.consumer = newConsumer(cli)
@@ -38,7 +86,7 @@ func NewCluster(ctx context.Context, url, adminKey string) Cluster {
 	c.consumerGroup = newConsumerGroup(cli)
 	c.pluginMetadata = newPluginMetadata(cli)
 
-	return c
+	return c, nil
 }
 
 // Route implements Cluster.Route method.

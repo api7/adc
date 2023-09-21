@@ -1,4 +1,4 @@
-package suites
+package basic
 
 import (
 	"net/http"
@@ -8,8 +8,8 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/test/cli/config"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/config"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc sync` tests", func() {
@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 	)
 
 	ginkgo.Context("Basic functions", func() {
-		s := scaffold.NewScaffold()
+		s := scaffold.NewMtlsScaffold()
 		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				route1 is updated
 				route2 is created
 			*/
-			output, err := s.Sync("testdata/test.yaml")
+			output, err := s.Sync("suites-basic/testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
 			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 2, updated 2, deleted 2"))
 
@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 	})
 
 	ginkgo.Context("Test the sync command order", func() {
-		s := scaffold.NewScaffold()
+		s := scaffold.NewMtlsScaffold()
 		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 
@@ -138,7 +138,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			// Now we have two services and one route in APISIX
 			// route => svc, and svc1
 			// we delete svc1 and update the route to reference svc1
-			output, err := s.Sync("testdata/test2.yaml")
+			output, err := s.Sync("suites-basic/testdata/test2.yaml")
 			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
 			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 0, updated 2, deleted 1"))
 

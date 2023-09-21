@@ -6,7 +6,7 @@ import (
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("adc APISIX globalRule SDK tests", func() {

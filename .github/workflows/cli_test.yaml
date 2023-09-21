@@ -61,6 +61,11 @@ jobs:
           go install github.com/onsi/ginkgo/v2/ginkgo
           sudo cp ~/go/bin/ginkgo /usr/local/bin
 
+      - name: Build ADC
+        working-directory: ./
+        run: |
+          make build
+
       - name: Deploy Apache APISIX
         run: |
           curl -sL https://run.api7.ai/apisix/quickstart | sed 's/3.4.0-debian/dev/g' | sh
@@ -70,5 +75,15 @@ jobs:
         working-directory: ./
         run: |
           export PATH=$PWD/bin:$PATH
-          make build
           make test
+
+      - name: Deploy Apache APISIX (MTLS)
+        run: |
+          sh utils/quickstart-mtls.sh
+          docker run --name httpbin --network apisix-quickstart-net --hostname httpbin -d kennethreitz/httpbin
+
+      - name: Run E2E Test Suites
+        working-directory: ./
+        run: |
+          export PATH=$PWD/bin:$PATH
+          make test-mtls

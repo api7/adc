@@ -2,9 +2,10 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Special Schemas to test:
@@ -360,7 +361,6 @@ func TestLimitCount(t *testing.T) {
   "show_limit_quota_header": true
 }`)
 
-
 	plugin = GetPluginDefaultValues("limit-count", Plugin{
 		"policy": "redis",
 	})
@@ -378,7 +378,6 @@ func TestLimitCount(t *testing.T) {
   "rejected_code": 503,
   "show_limit_quota_header": true
 }`)
-
 
 	plugin = GetPluginDefaultValues("limit-count", Plugin{
 		"policy": "redis-cluster",

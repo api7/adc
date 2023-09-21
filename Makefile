@@ -21,6 +21,10 @@ build: ## Build adc
 test: ## Run cli test
 	@cd test/cli && ginkgo -r --nodes=1
 
+.PHONY: test-mtls
+test-mtls: ## Run cli test for mtls
+	@cd test/mtls && ginkgo -r --nodes=1
+
 .PHONY: unit-test
 unit-test: ## Run unit test
 	@go test -v $$(go list ./... | grep -v /test/)

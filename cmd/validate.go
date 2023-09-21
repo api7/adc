@@ -98,7 +98,10 @@ func newValidateCmd() *cobra.Command {
 
 // validateContent validates the content of the configuration file
 func validateContent(c *types.Configuration) error {
-	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
+	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
+	if err != nil {
+		return err
+	}
 	v, err := validator.NewValidator(c, cluster)
 	if err != nil {
 		color.Red("Failed to create validator: %v", err)

@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	_ "github.com/api7/adc/test/cli/suites"
+	_ "github.com/api7/adc/test/cli/suites-basic"
 	_ "github.com/api7/adc/test/cli/suites-consumer"
 	_ "github.com/api7/adc/test/cli/suites-consumer-group"
 	_ "github.com/api7/adc/test/cli/suites-global-rule"

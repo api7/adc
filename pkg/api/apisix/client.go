@@ -3,6 +3,8 @@ package apisix
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"go.uber.org/multierr"
 )
 
@@ -33,6 +36,24 @@ func newClient(baseURL, adminKey string) *Client {
 		adminKey: adminKey,
 		cli: &http.Client{
 			Timeout: 5 * time.Second,
+		},
+	}
+}
+
+func newClientWithCertificates(baseURL, adminKey string, host string, insecure bool, ca *x509.CertPool, certs []tls.Certificate) *Client {
+	return &Client{
+		baseURL:  baseURL,
+		adminKey: adminKey,
+		cli: &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: insecure,
+					ServerName:         host,
+					RootCAs:            ca,
+					Certificates:       certs,
+				},
+			},
 		},
 	}
 }
@@ -246,6 +267,8 @@ func handleErrorResponse(resp *http.Response) error {
 	}
 	err = json.Unmarshal([]byte(body), respData)
 	if err != nil {
+		color.Red("unmarshal response failed:")
+		color.Red(body)
 		return err
 	}
 
