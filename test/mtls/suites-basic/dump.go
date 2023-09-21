@@ -1,23 +1,25 @@
-package suites
+package basic
 
 import (
+	"fmt"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/api7/adc/test/cli/config"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/config"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc dump` tests", func() {
 	ginkgo.Context("Test the dump command", func() {
-		s := scaffold.NewScaffold()
+		s := scaffold.NewMtlsScaffold()
 		ginkgo.It("should dump APISIX resources", func() {
-			_, err := s.Sync("testdata/test.yaml")
+			_, err := s.Sync("suites-basic/testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
 
 			out, err := s.Dump()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out).To(gomega.Equal(config.ReplaceUpstream(`name: ""
+			gomega.Expect(out).To(gomega.Equal(fmt.Sprintf(`name: ""
 routes:
 - id: route1
   methods:
@@ -42,7 +44,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: HTTPBIN_PLACEHOLDER
+    - host: %v
       port: 80
       weight: 1
     scheme: http
@@ -56,13 +58,13 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: HTTPBIN_PLACEHOLDER
+    - host: %v
       port: 80
       weight: 1
     scheme: http
     type: roundrobin
 version: ""
-`)))
+`, config.TestUpstream, config.TestUpstream)))
 
 			err = s.DeleteRoute("route1")
 			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
@@ -71,7 +73,7 @@ version: ""
 			err = s.DeleteService("svc1")
 			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
 			err = s.DeleteService("svc2")
-			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 	})
 })

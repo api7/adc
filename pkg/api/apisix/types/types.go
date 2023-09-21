@@ -263,7 +263,7 @@ func (p *Plugins) UnmarshalJSON(cont []byte) error {
 		return err
 	}
 
-	if p == nil || *p == nil{
+	if p == nil || *p == nil {
 		*p = make(Plugins)
 	}
 	for name, config := range plugins {

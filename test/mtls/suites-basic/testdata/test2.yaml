@@ -1,0 +1,19 @@
+name: "test2"
+version: "1.0.0"
+services:
+  - name: svc1
+    hosts:
+      - svc.com
+    upstream:
+      id: httpbin
+      name: httpbin
+      nodes:
+        - host: HTTPBIN_PLACEHOLDER
+          port: 80
+          weight: 1
+routes:
+  - name: route
+    service_id: svc1
+    uri: "/get"
+    methods:
+      - GET

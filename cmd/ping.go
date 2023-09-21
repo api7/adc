@@ -31,9 +31,12 @@ func newPingCmd() *cobra.Command {
 
 // pingAPISIX check the connection to the APISIX
 func pingAPISIX() error {
-	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
+	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
+	if err != nil {
+		return err
+	}
 
-	err := cluster.Route().Validate(context.Background(), &types.Route{
+	err = cluster.Route().Validate(context.Background(), &types.Route{
 		ID:         "test",
 		Name:       "test",
 		Uri:        "*",

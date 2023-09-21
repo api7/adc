@@ -15,9 +15,14 @@ import (
 	"github.com/api7/adc/pkg/config"
 )
 
+type Config struct {
+	config.ClientConfig
+	APISIXCluster apisix.Cluster
+}
+
 var (
 	cfgFile    string
-	rootConfig config.ClientConfig
+	rootConfig Config
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -79,10 +84,14 @@ func initConfig() {
 
 	rootConfig.Server = viper.GetString("server")
 	rootConfig.Token = viper.GetString("token")
-	cluser := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
+	rootConfig.CAPath = viper.GetString("capath")
+	rootConfig.Certificate = viper.GetString("cert")
+	rootConfig.CertificateKey = viper.GetString("cert-key")
+	rootConfig.Insecure = viper.GetBool("insecure")
+	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
 	if err != nil {
 		color.RedString("Failed to create a new cluster: %v", err)
 		return
 	}
-	rootConfig.APISIXCluster = cluser
+	rootConfig.APISIXCluster = cluster
 }

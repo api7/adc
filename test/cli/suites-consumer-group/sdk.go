@@ -6,7 +6,7 @@ import (
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
@@ -41,6 +41,7 @@ var _ = ginkgo.Describe("adc APISIX consumerGroup SDK tests", func() {
 				},
 			}
 			_, err = s.CreateConsumerGroup(baseConsumerGroup1)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get consumerGroup 1
 			consumerGroup, err = s.GetConsumerGroup("consumerGroup1")

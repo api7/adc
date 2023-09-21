@@ -8,7 +8,7 @@ import (
 
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("adc APISIX pluginMetadata SDK tests", func() {
@@ -40,6 +40,7 @@ var _ = ginkgo.Describe("adc APISIX pluginMetadata SDK tests", func() {
 				Config: loggerConfig,
 			}
 			_, err = s.CreatePluginMetadata(baseHttpLogger)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// get http-logger
 			pluginMetadata, err = s.GetPluginMetadata("http-logger")

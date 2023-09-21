@@ -9,8 +9,8 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/api7/adc/pkg/api/apisix/types"
-	"github.com/api7/adc/test/cli/config"
-	"github.com/api7/adc/test/cli/scaffold"
+	"github.com/api7/adc/test/config"
+	"github.com/api7/adc/test/scaffold"
 )
 
 var _ = ginkgo.Describe("`adc sync` tests", func() {

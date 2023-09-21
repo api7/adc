@@ -13,7 +13,8 @@ import (
 	"github.com/api7/adc/pkg/api/apisix"
 	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/common"
-	"github.com/api7/adc/test/cli/config"
+	cmdconfig "github.com/api7/adc/pkg/config"
+	"github.com/api7/adc/test/config"
 )
 
 type Scaffold struct {
@@ -29,8 +30,28 @@ type Scaffold struct {
 }
 
 func NewScaffold() *Scaffold {
+	return newScaffold(cmdconfig.ClientConfig{
+		Server: "http://127.0.0.1:9180",
+		Token:  "edd1c9f034335f136f87ad84b625c8f1",
+	})
+}
+
+func NewMtlsScaffold() *Scaffold {
+	return newScaffold(cmdconfig.ClientConfig{
+		Server:         "https://127.0.0.1:9180",
+		Token:          "edd1c9f034335f136f87ad84b625c8f1",
+		CAPath:         "../mtls/certs/ca.ca",
+		Certificate:    "../mtls/certs/client.cert",
+		CertificateKey: "../mtls/certs/client.key",
+		Insecure:       true,
+	})
+}
+
+func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
+	cluster, clusterError := apisix.NewCluster(context.Background(), conf)
+
 	s := &Scaffold{
-		cluster: apisix.NewCluster(context.Background(), "http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1"),
+		cluster: cluster,
 
 		routes:          map[string]struct{}{},
 		services:        map[string]struct{}{},
@@ -42,7 +63,8 @@ func NewScaffold() *Scaffold {
 	}
 
 	ginkgo.BeforeEach(func() {
-		err := s.Configure("http://127.0.0.1:9180", "edd1c9f034335f136f87ad84b625c8f1")
+		gomega.Expect(clusterError).To(gomega.BeNil())
+		err := s.Configure(conf)
 		gomega.Expect(err).To(gomega.BeNil())
 	})
 
@@ -65,7 +87,7 @@ func NewScaffold() *Scaffold {
 		for consumerGroup := range s.consumerGroups {
 			s.DeleteConsumerGroup(consumerGroup)
 		}
-		for pluginMetadata, _ := range s.pluginMetadatas {
+		for pluginMetadata := range s.pluginMetadatas {
 			s.DeletePluginMetadata(pluginMetadata)
 		}
 	})
@@ -115,9 +137,19 @@ func (s *Scaffold) AddPluginMetadatasFinalizer(pluginsMetadatas ...string) {
 	}
 }
 
-func (s *Scaffold) Configure(host, key string) error {
-	input := host + "\n" + key + "\n"
-	_, err := s.ExecWithInput(input, "configure")
+func (s *Scaffold) Configure(conf cmdconfig.ClientConfig) error {
+	key := conf.Token
+	input := key + "\n"
+
+	args := []string{"configure", "--address", conf.Server, "-f"}
+	if conf.CAPath != "" {
+		args = append(args, "--capath", conf.CAPath, "--cert", conf.Certificate, "--cert-key", conf.CertificateKey)
+		if conf.Insecure {
+			args = append(args, "-k")
+		}
+	}
+
+	_, err := s.ExecWithInput(input, args...)
 	return err
 }
 

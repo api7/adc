@@ -45,8 +45,7 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 	if path == "" {
-		color.Red("Output file path is empty. Please specify a file path: adc dump -o config.yaml")
-		return nil
+		path = "/dev/stdout"
 	}
 
 	save := true
@@ -54,7 +53,10 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		save = false
 	}
 
-	cluster := apisix.NewCluster(context.Background(), rootConfig.Server, rootConfig.Token)
+	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
+	if err != nil {
+		return err
+	}
 
 	svcs, err := cluster.Service().List(context.Background())
 	if err != nil {
