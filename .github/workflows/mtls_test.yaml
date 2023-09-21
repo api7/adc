@@ -1,4 +1,4 @@
-name: Run CLI E2E Test Suites
+name: Run CLI mTLS E2E Test Suites
 
 on:
   push:
@@ -66,13 +66,13 @@ jobs:
         run: |
           make build
 
-      - name: Deploy Apache APISIX
+      - name: Deploy Apache APISIX (mTLS)
         run: |
-          curl -sL https://run.api7.ai/apisix/quickstart | sed 's/3.4.0-debian/dev/g' | sh
+          sh utils/quickstart-mtls.sh
           docker run --name httpbin --network apisix-quickstart-net --hostname httpbin -d kennethreitz/httpbin
 
-      - name: Run E2E Test Suites
+      - name: Run E2E mTLS Test Suites
         working-directory: ./
         run: |
           export PATH=$PWD/bin:$PATH
-          make test
+          make test-mtls
