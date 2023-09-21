@@ -96,10 +96,10 @@ func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
 				routeDescription = operation.Description
 			}
 			routePath := convertPathVariables(path)
-			var tags []string
-			for _, tag := range operation.Tags {
-				tags = append(tags, Slugify(tag))
-			}
+			// var tags []string
+			// for _, tag := range operation.Tags {
+			// tags = append(tags, Slugify(tag))
+			// }
 			route := apitypes.Route{
 				Name:        routeName,
 				Description: routeDescription,

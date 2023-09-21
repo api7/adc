@@ -70,25 +70,32 @@ func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
 
 	ginkgo.AfterEach(func() {
 		for route := range s.routes {
-			s.DeleteRoute(route)
+			err := s.DeleteRoute(route)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for svc := range s.services {
-			s.DeleteService(svc)
+			err := s.DeleteService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for consumer := range s.consumers {
-			s.DeleteConsumer(consumer)
+			err := s.DeleteConsumer(consumer)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for globalRule := range s.globalRules {
-			s.DeleteGlobalRule(globalRule)
+			err := s.DeleteGlobalRule(globalRule)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for pluginConfig := range s.pluginConfigs {
-			s.DeletePluginConfig(pluginConfig)
+			err := s.DeletePluginConfig(pluginConfig)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for consumerGroup := range s.consumerGroups {
-			s.DeleteConsumerGroup(consumerGroup)
+			err := s.DeleteConsumerGroup(consumerGroup)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 		for pluginMetadata := range s.pluginMetadatas {
-			s.DeletePluginMetadata(pluginMetadata)
+			err := s.DeletePluginMetadata(pluginMetadata)
+			gomega.Expect(err).To(gomega.BeNil())
 		}
 	})
 

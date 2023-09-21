@@ -122,7 +122,7 @@ func dumpConfiguration(cmd *cobra.Command) error {
 			return err
 		}
 
-		_, err = fmt.Printf(string(data))
+		_, err = fmt.Println(string(data))
 		if err != nil {
 			return err
 		}
