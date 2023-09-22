@@ -88,7 +88,7 @@ func (e *Event) Output(diffOnly bool) (string, error) {
 		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
 		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
 		if diffOnly {
-			output = fmt.Sprintf("diff %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
+			output = fmt.Sprintf("update %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
 		} else {
 			output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
 		}

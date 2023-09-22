@@ -17,7 +17,7 @@ var _ = ginkgo.Describe("`adc diff` tests", func() {
 +++ service: "svc2"
 +++ route: "route1"
 +++ route: "route2"
-Summary: created 4, updated 0, deleted 0
+Summary: create 4, update 0, delete 0
 `))
 		})
 	})

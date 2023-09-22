@@ -15,7 +15,7 @@ var _ = ginkgo.Describe("`adc diff` consumer group tests", func() {
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(out).To(gomega.Equal(`+++ consumer_group: "company_a"
 +++ consumer: "jack"
-Summary: created 2, updated 0, deleted 0
+Summary: create 2, update 0, delete 0
 `))
 		})
 	})
