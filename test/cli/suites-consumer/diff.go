@@ -13,8 +13,8 @@ var _ = ginkgo.Describe("`adc diff` consumer tests", func() {
 		ginkgo.It("should return the diff result", func() {
 			out, err := s.Diff("suites-consumer/testdata/test.yaml")
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out).To(gomega.Equal(`creating consumer: "jack"
-Summary: created 1, updated 0, deleted 0
+			gomega.Expect(out).To(gomega.Equal(`+++ consumer: "jack"
+Summary: create 1, update 0, delete 0
 `))
 		})
 	})

@@ -82,7 +82,7 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 			summary.deleted++
 		}
 
-		str, err := event.Output()
+		str, err := event.Output(dryRun)
 		if err != nil {
 			color.Red("Failed to get output of the event: %v", err)
 			return err
@@ -108,7 +108,11 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		}
 	}
 
-	color.Green("Summary: created %d, updated %d, deleted %d", summary.created, summary.updated, summary.deleted)
+	if dryRun {
+		color.Green("Summary: create %d, update %d, delete %d", summary.created, summary.updated, summary.deleted)
+	} else {
+		color.Green("Summary: created %d, updated %d, deleted %d", summary.created, summary.updated, summary.deleted)
+	}
 
 	return nil
 }
