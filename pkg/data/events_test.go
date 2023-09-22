@@ -50,7 +50,7 @@ func TestEventOutput(t *testing.T) {
 		Option:       DeleteOption,
 		OldValue:     svc,
 	}
-	output, err := event.Output()
+	output, err := event.Output(false)
 	assert.Nil(t, err, "should not return error")
 	assert.Equal(t, "deleting service: \"svc\"", output)
 
@@ -60,7 +60,7 @@ func TestEventOutput(t *testing.T) {
 		Option:       CreateOption,
 		Value:        svc,
 	}
-	output, err = event.Output()
+	output, err = event.Output(false)
 	assert.Nil(t, err, "should not return error")
 	assert.Equal(t, "creating service: \"svc\"", output)
 
@@ -73,7 +73,7 @@ func TestEventOutput(t *testing.T) {
 		OldValue:     route,
 		Value:        route1,
 	}
-	output, err = event.Output()
+	output, err = event.Output(false)
 	assert.Nil(t, err, "should not return error")
 	assert.Contains(t, output, "updating route: \"route\"", "should contain the route name")
 	assert.Contains(t, output, "+\t\"desc\": \"route1\"", "should contain the changes")

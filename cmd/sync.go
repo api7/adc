@@ -82,7 +82,7 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 			summary.deleted++
 		}
 
-		str, err := event.Output()
+		str, err := event.Output(dryRun)
 		if err != nil {
 			color.Red("Failed to get output of the event: %v", err)
 			return err

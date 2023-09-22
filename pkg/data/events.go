@@ -57,13 +57,21 @@ type Event struct {
 // if the event is create, it will return the message of creating resource.
 // if the event is update, it will return the diff of old value and new value.
 // if the event is delete, it will return the message of deleting resource.
-func (e *Event) Output() (string, error) {
+func (e *Event) Output(diffOnly bool) (string, error) {
 	var output string
 	switch e.Option {
 	case CreateOption:
-		output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
+		if diffOnly {
+			output = fmt.Sprintf("+++ %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
+		} else {
+			output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
+		}
 	case DeleteOption:
-		output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
+		if diffOnly {
+			output = fmt.Sprintf("--- %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
+		} else {
+			output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
+		}
 	case UpdateOption:
 		remote, err := json.MarshalIndent(e.OldValue, "", "\t")
 		if err != nil {
@@ -79,7 +87,11 @@ func (e *Event) Output() (string, error) {
 
 		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
 		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
-		output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
+		if diffOnly {
+			output = fmt.Sprintf("diff %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
+		} else {
+			output = fmt.Sprintf("updating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
+		}
 	}
 
 	return output, nil
