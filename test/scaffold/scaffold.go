@@ -70,25 +70,25 @@ func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
 
 	ginkgo.AfterEach(func() {
 		for route := range s.routes {
-			s.DeleteRoute(route)
+			s.DeleteRoute(route) //nolint:all
 		}
 		for svc := range s.services {
-			s.DeleteService(svc)
+			s.DeleteService(svc) //nolint:all
 		}
 		for consumer := range s.consumers {
-			s.DeleteConsumer(consumer)
+			s.DeleteConsumer(consumer) //nolint:all
 		}
 		for globalRule := range s.globalRules {
-			s.DeleteGlobalRule(globalRule)
+			s.DeleteGlobalRule(globalRule) //nolint:all
 		}
 		for pluginConfig := range s.pluginConfigs {
-			s.DeletePluginConfig(pluginConfig)
+			s.DeletePluginConfig(pluginConfig) //nolint:all
 		}
 		for consumerGroup := range s.consumerGroups {
-			s.DeleteConsumerGroup(consumerGroup)
+			s.DeleteConsumerGroup(consumerGroup) //nolint:all
 		}
 		for pluginMetadata := range s.pluginMetadatas {
-			s.DeletePluginMetadata(pluginMetadata)
+			s.DeletePluginMetadata(pluginMetadata) //nolint:all
 		}
 	})
 
