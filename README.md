@@ -60,7 +60,7 @@ Pings the configured APISIX instance to verify connectivity.
 ### adc validate
 
 ```shell
-adc validate -f config.yaml
+adc validate -f apisix.yaml
 ```
 
 Validates the provided APISIX configuration file.
@@ -71,12 +71,12 @@ Validates the provided APISIX configuration file.
 adc sync
 ```
 
-Syncs the local configuration present in the `adc.yaml` file (or specified configuration file) to the connected APISIX instance.
+Syncs the local configuration present in the `$HOME/adc.yaml` file (or specified configuration file) to the connected APISIX instance.
 
 ### adc dump
 
 ```shell
-adc dump --output config.yaml
+adc dump --output apisix.yaml
 ```
 
 Dumps the configuration of the connected APISIX instance to the specified configuration file.
@@ -92,10 +92,10 @@ Shows the differences in configuration between the connected APISIX instance and
 ### adc openapi2apisix
 
 ```shell
-adc openapi2apisix -o config.yaml -f openAPI.yaml
+adc openapi2apisix -o apisix.yaml -f openAPI.yaml
 ```
 
-Converts the configuration in OpenAPI format (`openAPI.yaml`) to APISIX configuration (`config.yaml`).
+Converts the configuration in OpenAPI format (`openAPI.yaml`) to APISIX configuration (`apisix.yaml`).
 
 ### adc version
 

@@ -42,7 +42,7 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 		return err
 	}
 	if output == "" {
-		color.Red("Output file path is empty. Please specify a file path: adc openapi2apisix -o config.yaml")
+		color.Red("Output file path is empty. Please specify a file path: adc openapi2apisix -o apisix.yaml")
 		return nil
 	}
 
