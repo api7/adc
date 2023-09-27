@@ -21,6 +21,6 @@ func newDiffCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("file", "f", "adc.yaml", "configuration file path")
+	cmd.Flags().StringP("file", "f", "apisix.yaml", "configuration file path")
 	return cmd
 }

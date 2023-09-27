@@ -21,7 +21,7 @@ func newSyncCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Sync local configuration to APISIX",
-		Long:  `Syncs the configuration in adc.yaml (or other provided file) to APISIX.`,
+		Long:  `Syncs the configuration in apisix.yaml (or other provided file) to APISIX.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
@@ -31,7 +31,7 @@ func newSyncCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("file", "f", "adc.yaml", "configuration file path")
+	cmd.Flags().StringP("file", "f", "apisix.yaml", "configuration file path")
 
 	return cmd
 }

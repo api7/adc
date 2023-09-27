@@ -31,7 +31,7 @@ func newValidateCmd() *cobra.Command {
 				return err
 			}
 			if file == "" {
-				color.Red("File path is empty. Please specify a file path: adc validate -f config.yaml")
+				color.Red("File path is empty. Please specify a file path: adc validate -f apisix.yaml")
 				return nil
 			}
 
@@ -91,7 +91,7 @@ func newValidateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("file", "f", "adc.yaml", "configuration file path")
+	cmd.Flags().StringP("file", "f", "apisix.yaml", "configuration file path")
 
 	return cmd
 }
