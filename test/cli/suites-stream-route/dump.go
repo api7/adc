@@ -1,8 +1,6 @@
 package basic
 
 import (
-	"fmt"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -18,7 +16,7 @@ var _ = ginkgo.Describe("`adc dump` tests", func() {
 
 			out, err := s.Dump()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out).To(gomega.Equal(fmt.Sprintf(`name: ""
+			gomega.Expect(out).To(gomega.Equal(`name: ""
 services:
 - id: svc1
   name: svc1
@@ -37,7 +35,7 @@ stream_routes:
   server_port: 9100
   service_id: svc1
 version: ""
-`)))
+`))
 
 			err = s.DeleteStreamRoute("1")
 			gomega.Expect(err).To(gomega.BeNil(), "check stream_route delete")
