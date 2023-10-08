@@ -34,6 +34,10 @@ var (
 	ConsumerGroupResourceType ResourceType = "consumer_group"
 	// PluginMetadataResourceType is the resource type of consumer group
 	PluginMetadataResourceType ResourceType = "plugin_metadata"
+	// StreamRouteResourceType is the resource type of stream route
+	StreamRouteResourceType ResourceType = "stream_route"
+	// UpstreamResourceType is the resource type of upstream
+	UpstreamResourceType ResourceType = "upstream"
 )
 
 const (
@@ -143,6 +147,14 @@ func applyPluginMetadata(cluster apisix.Cluster, event *Event) error {
 	return apply[types.PluginMetadata](cluster.PluginMetadata(), event)
 }
 
+func applyStreamRoute(cluster apisix.Cluster, event *Event) error {
+	return apply[types.StreamRoute](cluster.StreamRoute(), event)
+}
+
+func applyUpstream(cluster apisix.Cluster, event *Event) error {
+	return apply[types.Upstream](cluster.Upstream(), event)
+}
+
 func (e *Event) Apply(cluster apisix.Cluster) error {
 	switch e.ResourceType {
 	case ServiceResourceType:
@@ -161,6 +173,10 @@ func (e *Event) Apply(cluster apisix.Cluster) error {
 		return applyConsumerGroup(cluster, e)
 	case PluginMetadataResourceType:
 		return applyPluginMetadata(cluster, e)
+	case StreamRouteResourceType:
+		return applyStreamRoute(cluster, e)
+	case UpstreamResourceType:
+		return applyUpstream(cluster, e)
 	}
 
 	return nil

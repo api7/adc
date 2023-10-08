@@ -91,6 +91,26 @@ var schema = &memdb.DBSchema{
 				},
 			},
 		},
+		"stream_routes": {
+			Name: "stream_routes",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
+		"upstreams": {
+			Name: "upstreams",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "ID"},
+				},
+			},
+		},
 	},
 }
 
@@ -161,8 +181,22 @@ func NewMemDB(config *types.Configuration) (*DB, error) {
 		}
 	}
 
-	for _, consumerGroup := range config.PluginMetadatas {
-		err = txn.Insert("plugin_metadatas", consumerGroup)
+	for _, pluginMetadata := range config.PluginMetadatas {
+		err = txn.Insert("plugin_metadatas", pluginMetadata)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, streamRoute := range config.StreamRoutes {
+		err = txn.Insert("stream_routes", streamRoute)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, upstream := range config.Upstreams {
+		err = txn.Insert("upstreams", upstream)
 		if err != nil {
 			return nil, err
 		}
@@ -216,4 +250,12 @@ func (db *DB) GetConsumerGroupByID(id string) (*types.ConsumerGroup, error) {
 
 func (db *DB) GetPluginMetadataByID(id string) (*types.PluginMetadata, error) {
 	return getByID[types.PluginMetadata](db, "plugin_metadatas", id)
+}
+
+func (db *DB) GetStreamRouteByID(id string) (*types.StreamRoute, error) {
+	return getByID[types.StreamRoute](db, "stream_routes", id)
+}
+
+func (db *DB) GetUpstreamByID(id string) (*types.Upstream, error) {
+	return getByID[types.Upstream](db, "upstreams", id)
 }

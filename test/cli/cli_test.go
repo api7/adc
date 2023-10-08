@@ -15,6 +15,9 @@ import (
 	_ "github.com/api7/adc/test/cli/suites-usecase"
 )
 
+// once apisix updated with stream_route service_id, enable this
+//_ "github.com/api7/adc/test/cli/suites-stream-route"
+
 func TestADC(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "ADC CLI test suites")
