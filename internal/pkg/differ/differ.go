@@ -22,24 +22,32 @@ func _key(typ data.ResourceType, option int) string {
 }
 
 // order is the events order to ensure the data dependency. Higher takes priority
-// route requires: service, plugin config, consumer (soft require)
+// stream route requires: upstream, service.
+// service requires: upstream (shouldn't)
+// route requires: service, plugin config, consumer (soft require), upstream (shouldn't, use service instead)
 // consumer requires: consumer group
 // The dependent resources should be created/updated first but deleted later
 var order = map[string]int{
+	_key(data.UpstreamResourceType, data.DeleteOption):      _order(),
 	_key(data.ServiceResourceType, data.DeleteOption):       _order(),
 	_key(data.PluginConfigResourceType, data.DeleteOption):  _order(),
 	_key(data.ConsumerGroupResourceType, data.DeleteOption): _order(),
 	_key(data.ConsumerResourceType, data.DeleteOption):      _order(),
+	_key(data.StreamRouteResourceType, data.DeleteOption):   _order(),
 	_key(data.RouteResourceType, data.DeleteOption):         _order(),
 
 	_key(data.RouteResourceType, data.UpdateOption):         _order(),
+	_key(data.StreamRouteResourceType, data.UpdateOption):   _order(),
 	_key(data.ServiceResourceType, data.UpdateOption):       _order(),
+	_key(data.UpstreamResourceType, data.UpdateOption):      _order(),
 	_key(data.PluginConfigResourceType, data.UpdateOption):  _order(),
 	_key(data.ConsumerResourceType, data.UpdateOption):      _order(),
 	_key(data.ConsumerGroupResourceType, data.UpdateOption): _order(),
 
 	_key(data.RouteResourceType, data.CreateOption):         _order(),
+	_key(data.StreamRouteResourceType, data.CreateOption):   _order(),
 	_key(data.ServiceResourceType, data.CreateOption):       _order(),
+	_key(data.UpstreamResourceType, data.CreateOption):      _order(),
 	_key(data.PluginConfigResourceType, data.CreateOption):  _order(),
 	_key(data.ConsumerResourceType, data.CreateOption):      _order(),
 	_key(data.ConsumerGroupResourceType, data.CreateOption): _order(),
@@ -109,22 +117,32 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 		return nil, err
 	}
 
-	globalRuleEvents, err := d.diffGlobalRule()
+	globalRuleEvents, err := d.diffGlobalRules()
 	if err != nil {
 		return nil, err
 	}
 
-	pluginConfigEvents, err := d.diffPluginConfig()
+	pluginConfigEvents, err := d.diffPluginConfigs()
 	if err != nil {
 		return nil, err
 	}
 
-	consumerGroupEvents, err := d.diffConsumerGroup()
+	consumerGroupEvents, err := d.diffConsumerGroups()
 	if err != nil {
 		return nil, err
 	}
 
 	pluginMetadataEvents, err := d.diffPluginMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	streamRouteEvents, err := d.diffStreamRoutes()
+	if err != nil {
+		return nil, err
+	}
+
+	upstreamEvents, err := d.diffUpstreams()
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +155,8 @@ func (d *Differ) Diff() ([]*data.Event, error) {
 	events = append(events, pluginConfigEvents...)
 	events = append(events, pluginMetadataEvents...)
 	events = append(events, consumerGroupEvents...)
+	events = append(events, streamRouteEvents...)
+	events = append(events, upstreamEvents...)
 
 	sortEvents(events)
 
@@ -304,7 +324,7 @@ func (d *Differ) diffConsumers() ([]*data.Event, error) {
 	return events, nil
 }
 
-// diffSSLs compares the routes between local and remote.
+// diffSSLs compares the SSLs between local and remote.
 func (d *Differ) diffSSLs() ([]*data.Event, error) {
 	var events []*data.Event
 	var mark = make(map[string]bool)
@@ -356,8 +376,8 @@ func (d *Differ) diffSSLs() ([]*data.Event, error) {
 	return events, nil
 }
 
-// diffGlobalRule compares the global_rules between local and remote.
-func (d *Differ) diffGlobalRule() ([]*data.Event, error) {
+// diffGlobalRules compares the GlobalRules between local and remote.
+func (d *Differ) diffGlobalRules() ([]*data.Event, error) {
 	var events []*data.Event
 	var mark = make(map[string]bool)
 
@@ -409,8 +429,8 @@ func (d *Differ) diffGlobalRule() ([]*data.Event, error) {
 	return events, nil
 }
 
-// diffPluginConfig compares the global_rules between local and remote.
-func (d *Differ) diffPluginConfig() ([]*data.Event, error) {
+// diffPluginConfigs compares the PluginConfigs between local and remote.
+func (d *Differ) diffPluginConfigs() ([]*data.Event, error) {
 	var events []*data.Event
 	var mark = make(map[string]bool)
 
@@ -462,8 +482,8 @@ func (d *Differ) diffPluginConfig() ([]*data.Event, error) {
 	return events, nil
 }
 
-// diffConsumerGroup compares the global_rules between local and remote.
-func (d *Differ) diffConsumerGroup() ([]*data.Event, error) {
+// diffConsumerGroups compares the ConsumerGroups between local and remote.
+func (d *Differ) diffConsumerGroups() ([]*data.Event, error) {
 	var events []*data.Event
 	var mark = make(map[string]bool)
 
@@ -562,6 +582,112 @@ func (d *Differ) diffPluginMetadata() ([]*data.Event, error) {
 			ResourceType: data.PluginMetadataResourceType,
 			Option:       data.CreateOption,
 			Value:        pluginMetadata,
+		})
+	}
+
+	return events, nil
+}
+
+// diffStreamRoutes compares the StreamRoutes between local and remote.
+func (d *Differ) diffStreamRoutes() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteStreamRoute := range d.remoteConfig.StreamRoutes {
+		localStreamRoute, err := d.localDB.GetStreamRouteByID(remoteStreamRoute.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.StreamRouteResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteStreamRoute,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localStreamRoute.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localStreamRoute, remoteStreamRoute); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.StreamRouteResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteStreamRoute,
+			Value:        localStreamRoute,
+		})
+	}
+
+	// only in local, create
+	for _, streamRoute := range d.localConfig.StreamRoutes {
+		if mark[streamRoute.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.StreamRouteResourceType,
+			Option:       data.CreateOption,
+			Value:        streamRoute,
+		})
+	}
+
+	return events, nil
+}
+
+// diffUpstreams compares the Upstreams between local and remote.
+func (d *Differ) diffUpstreams() ([]*data.Event, error) {
+	var events []*data.Event
+	var mark = make(map[string]bool)
+
+	for _, remoteUpstream := range d.remoteConfig.Upstreams {
+		localUpstream, err := d.localDB.GetUpstreamByID(remoteUpstream.ID)
+		if err != nil {
+			// we can't find in local config, should delete it
+			if err == db.NotFound {
+				e := data.Event{
+					ResourceType: data.UpstreamResourceType,
+					Option:       data.DeleteOption,
+					OldValue:     remoteUpstream,
+				}
+				events = append(events, &e)
+				continue
+			}
+
+			return nil, err
+		}
+
+		mark[localUpstream.ID] = true
+		// skip when equals
+		if equal := reflect.DeepEqual(localUpstream, remoteUpstream); equal {
+			continue
+		}
+
+		// otherwise update
+		events = append(events, &data.Event{
+			ResourceType: data.UpstreamResourceType,
+			Option:       data.UpdateOption,
+			OldValue:     remoteUpstream,
+			Value:        localUpstream,
+		})
+	}
+
+	// only in local, create
+	for _, upstream := range d.localConfig.Upstreams {
+		if mark[upstream.ID] {
+			continue
+		}
+
+		events = append(events, &data.Event{
+			ResourceType: data.UpstreamResourceType,
+			Option:       data.CreateOption,
+			Value:        upstream,
 		})
 	}
 

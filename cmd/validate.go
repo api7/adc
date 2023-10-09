@@ -76,6 +76,14 @@ func newValidateCmd() *cobra.Command {
 			//	msg += fmt.Sprintf(", plugin_metadatas: %v", len(d.PluginMetadatas))
 			//	changed = true
 			//}
+			if len(d.StreamRoutes) > 0 {
+				msg += fmt.Sprintf(", stream_routes: %v", len(d.StreamRoutes))
+				changed = true
+			}
+			if len(d.Upstreams) > 0 {
+				msg += fmt.Sprintf(", upstreams: %v", len(d.StreamRoutes))
+				changed = true
+			}
 			if !changed {
 				msg += "nothing changed"
 			}

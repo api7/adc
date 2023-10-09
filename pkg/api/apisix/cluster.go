@@ -27,6 +27,8 @@ type cluster struct {
 	pluginConfig   PluginConfig
 	consumerGroup  ConsumerGroup
 	pluginMetadata PluginMetadata
+	streamRoute    StreamRoute
+	upstream       Upstream
 }
 
 func NewCluster(ctx context.Context, conf config.ClientConfig) (Cluster, error) {
@@ -85,6 +87,8 @@ func NewCluster(ctx context.Context, conf config.ClientConfig) (Cluster, error) 
 	c.pluginConfig = newPluginConfig(cli)
 	c.consumerGroup = newConsumerGroup(cli)
 	c.pluginMetadata = newPluginMetadata(cli)
+	c.streamRoute = newStreamRoute(cli)
+	c.upstream = newUpstream(cli)
 
 	return c, nil
 }
@@ -127,4 +131,14 @@ func (c *cluster) ConsumerGroup() ConsumerGroup {
 // PluginMetadata implements Cluster.PluginMetadata method.
 func (c *cluster) PluginMetadata() PluginMetadata {
 	return c.pluginMetadata
+}
+
+// StreamRoute implements Cluster.StreamRoute method.
+func (c *cluster) StreamRoute() StreamRoute {
+	return c.streamRoute
+}
+
+// Upstream implements Cluster.Upstream method.
+func (c *cluster) Upstream() Upstream {
+	return c.upstream
 }

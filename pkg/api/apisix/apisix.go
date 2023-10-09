@@ -15,6 +15,8 @@ type Cluster interface {
 	PluginConfig() PluginConfig
 	ConsumerGroup() ConsumerGroup
 	PluginMetadata() PluginMetadata
+	StreamRoute() StreamRoute
+	Upstream() Upstream
 }
 
 type ResourceClient[T any] interface {
@@ -56,4 +58,12 @@ type ConsumerGroup interface {
 
 type PluginMetadata interface {
 	ResourceClient[types.PluginMetadata]
+}
+
+type StreamRoute interface {
+	ResourceClient[types.StreamRoute]
+}
+
+type Upstream interface {
+	ResourceClient[types.Upstream]
 }

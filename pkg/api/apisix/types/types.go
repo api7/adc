@@ -21,6 +21,8 @@ type Configuration struct {
 	PluginConfigs   []*PluginConfig   `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
 	ConsumerGroups  []*ConsumerGroup  `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
 	PluginMetadatas []*PluginMetadata `yaml:"plugin_metadatas,omitempty" json:"plugin_metadatas,omitempty"`
+	StreamRoutes    []*StreamRoute    `yaml:"stream_routes,omitempty" json:"stream_routes,omitempty"`
+	Upstreams       []*Upstream       `yaml:"upstreams,omitempty" json:"upstreams,omitempty"`
 }
 
 // Labels is the APISIX resource labels
@@ -397,4 +399,19 @@ func (s *PluginMetadata) UnmarshalJSON(p []byte) error {
 	s.Config = config
 
 	return nil
+}
+
+// StreamRoute represents the stream_route object in APISIX.
+type StreamRoute struct {
+	ID         string            `json:"id,omitempty" yaml:"id,omitempty"`
+	Desc       string            `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	RemoteAddr string            `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
+	ServerAddr string            `json:"server_addr,omitempty" yaml:"server_addr,omitempty"`
+	ServerPort int               `json:"server_port,omitempty" yaml:"server_port,omitempty"`
+	SNI        string            `json:"sni,omitempty" yaml:"sni,omitempty"`
+	UpstreamId string            `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
+	ServiceId  string            `json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Upstream   *Upstream         `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	Plugins    Plugins           `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }

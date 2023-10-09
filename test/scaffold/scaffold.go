@@ -27,6 +27,7 @@ type Scaffold struct {
 	pluginConfigs   map[string]struct{}
 	consumerGroups  map[string]struct{}
 	pluginMetadatas map[string]struct{}
+	streamRoutes    map[string]struct{}
 }
 
 func NewScaffold() *Scaffold {
@@ -60,6 +61,7 @@ func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
 		pluginConfigs:   map[string]struct{}{},
 		consumerGroups:  map[string]struct{}{},
 		pluginMetadatas: map[string]struct{}{},
+		streamRoutes:    map[string]struct{}{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -89,6 +91,9 @@ func newScaffold(conf cmdconfig.ClientConfig) *Scaffold {
 		}
 		for pluginMetadata := range s.pluginMetadatas {
 			s.DeletePluginMetadata(pluginMetadata) //nolint:all
+		}
+		for streamRoute := range s.streamRoutes {
+			s.DeleteStreamRoute(streamRoute) //nolint:all
 		}
 	})
 
@@ -131,9 +136,15 @@ func (s *Scaffold) AddConsumerGroupsFinalizer(consumerGroups ...string) {
 	}
 }
 
-func (s *Scaffold) AddPluginMetadatasFinalizer(pluginsMetadatas ...string) {
-	for _, pluginsMetadata := range pluginsMetadatas {
-		s.pluginMetadatas[pluginsMetadata] = struct{}{}
+func (s *Scaffold) AddPluginMetadatasFinalizer(pluginMetadatas ...string) {
+	for _, pluginMetadata := range pluginMetadatas {
+		s.pluginMetadatas[pluginMetadata] = struct{}{}
+	}
+}
+
+func (s *Scaffold) AddStreamRoutesFinalizer(streamRoutes ...string) {
+	for _, streamRoute := range streamRoutes {
+		s.streamRoutes[streamRoute] = struct{}{}
 	}
 }
 
@@ -214,6 +225,10 @@ func (s *Scaffold) Sync(path string) (string, error) {
 
 	for _, pluginMetadata := range conf.PluginMetadatas {
 		s.AddPluginMetadatasFinalizer(pluginMetadata.ID)
+	}
+
+	for _, streamRoute := range conf.StreamRoutes {
+		s.AddStreamRoutesFinalizer(streamRoute.ID)
 	}
 
 	tmpFile := path + ".tmp"
@@ -419,4 +434,30 @@ func (s *Scaffold) DeletePluginMetadata(id string) error {
 	delete(s.pluginMetadatas, id)
 
 	return s.cluster.PluginMetadata().Delete(context.Background(), id)
+}
+
+func (s *Scaffold) GetStreamRoute(id string) (*types.StreamRoute, error) {
+	return s.cluster.StreamRoute().Get(context.Background(), id)
+}
+
+func (s *Scaffold) ListStreamRoute() ([]*types.StreamRoute, error) {
+	return s.cluster.StreamRoute().List(context.Background())
+}
+
+func (s *Scaffold) CreateStreamRoute(streamRoute *types.StreamRoute) (*types.StreamRoute, error) {
+	s.streamRoutes[streamRoute.ID] = struct{}{}
+
+	return s.cluster.StreamRoute().Create(context.Background(), streamRoute)
+}
+
+func (s *Scaffold) UpdateStreamRoute(streamRoute *types.StreamRoute) (*types.StreamRoute, error) {
+	s.streamRoutes[streamRoute.ID] = struct{}{}
+
+	return s.cluster.StreamRoute().Update(context.Background(), streamRoute)
+}
+
+func (s *Scaffold) DeleteStreamRoute(id string) error {
+	delete(s.streamRoutes, id)
+
+	return s.cluster.StreamRoute().Delete(context.Background(), id)
 }

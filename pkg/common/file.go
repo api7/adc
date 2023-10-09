@@ -103,6 +103,16 @@ func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) 
 		return nil, err
 	}
 
+	streamRoutes, err := cluster.StreamRoute().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	upstream, err := cluster.Upstream().List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Configuration{
 		Routes:          routes,
 		Services:        svcs,
@@ -112,6 +122,8 @@ func GetContentFromRemote(cluster apisix.Cluster) (*types.Configuration, error) 
 		PluginConfigs:   pluginConfigs,
 		ConsumerGroups:  consumerGroups,
 		PluginMetadatas: pluginMetadatas,
+		StreamRoutes:    streamRoutes,
+		Upstreams:       upstream,
 	}, nil
 }
 

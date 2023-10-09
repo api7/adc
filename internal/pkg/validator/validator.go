@@ -106,5 +106,21 @@ func (v *Validator) Validate() []error {
 	//	}
 	//}
 
+	for _, streamRoute := range v.localConfig.StreamRoutes {
+		streamRoute := streamRoute
+		err := v.cluster.StreamRoute().Validate(context.Background(), streamRoute)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
+	for _, upstream := range v.localConfig.Upstreams {
+		upstream := upstream
+		err := v.cluster.Upstream().Validate(context.Background(), upstream)
+		if err != nil {
+			allErr = append(allErr, err)
+		}
+	}
+
 	return allErr
 }

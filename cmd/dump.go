@@ -98,6 +98,16 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	streamRoutes, err := cluster.StreamRoute().List(context.Background())
+	if err != nil {
+		return err
+	}
+
+	upstreams, err := cluster.Upstream().List(context.Background())
+	if err != nil {
+		return err
+	}
+
 	conf := &types.Configuration{
 		Routes:          routes,
 		Services:        svcs,
@@ -107,6 +117,8 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		PluginConfigs:   pluginConfigs,
 		ConsumerGroups:  consumerGroups,
 		PluginMetadatas: pluginMetadatas,
+		StreamRoutes:    streamRoutes,
+		Upstreams:       upstreams,
 	}
 
 	if save {
