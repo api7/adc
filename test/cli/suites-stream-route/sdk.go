@@ -42,14 +42,14 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				gomega.Expect(expect.RemoteAddr).To(gomega.Equal(toBe.RemoteAddr))
 				gomega.Expect(expect.ServerAddr).To(gomega.Equal(toBe.ServerAddr))
 				gomega.Expect(expect.ServerPort).To(gomega.Equal(toBe.ServerPort))
-				gomega.Expect(expect.ServiceId).To(gomega.Equal(toBe.ServiceId))
+				gomega.Expect(expect.ServiceID).To(gomega.Equal(toBe.ServiceID))
 			}
 
 			// create route 1
 			baseStreamRoute1 := &types.StreamRoute{
 				ID:         "route1",
 				ServerPort: 9100,
-				ServiceId:  "svc1",
+				ServiceID:  "svc1",
 			}
 			_, err = s.CreateStreamRoute(baseStreamRoute1)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				ID:         "route2",
 				ServerAddr: "127.0.0.10",
 				ServerPort: 9101,
-				ServiceId:  "svc1",
+				ServiceID:  "svc1",
 			}
 			route, err = s.CreateStreamRoute(baseStreamRoute2)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 			baseStreamRoute1 = &types.StreamRoute{
 				ID:         "route1",
 				ServerPort: 9101,
-				ServiceId:  "svc1",
+				ServiceID:  "svc1",
 			}
 			_, err = s.UpdateStreamRoute(baseStreamRoute1)
 			gomega.Expect(err).To(gomega.BeNil())
