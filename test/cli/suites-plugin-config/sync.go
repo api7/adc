@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 				"GET",
 			},
 			ServiceID:      "svc",
-			PluginConfigId: id,
+			PluginConfigID: id,
 		}
 	)
 

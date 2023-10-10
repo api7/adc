@@ -33,8 +33,7 @@ type Vars [][]StringOrSlice
 
 // Route apisix route object
 type Route struct {
-	ID string `json:"id" yaml:"id"`
-
+	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
 	Labels      Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Description string `json:"desc,omitempty" yaml:"desc,omitempty"`
@@ -42,18 +41,26 @@ type Route struct {
 	Host            string           `json:"host,omitempty" yaml:"host,omitempty"`
 	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	Uri             string           `json:"uri,omitempty" yaml:"uri,omitempty"`
+	Uris            []string         `json:"uris,omitempty" yaml:"uris,omitempty"`
 	Priority        int              `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Timeout         *UpstreamTimeout `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Vars            Vars             `json:"vars,omitempty" yaml:"vars,omitempty"`
-	Uris            []string         `json:"uris,omitempty" yaml:"uris,omitempty"`
 	Methods         []string         `json:"methods,omitempty" yaml:"methods,omitempty"`
 	EnableWebsocket bool             `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
+	RemoteAddr      string           `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
 	RemoteAddrs     []string         `json:"remote_addrs,omitempty" yaml:"remote_addrs,omitempty"`
-	UpstreamId      string           `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
+	Upstream        *Upstream         `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	UpstreamID      string           `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
 	ServiceID       string           `json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	Plugins         Plugins          `json:"plugins,omitempty" yaml:"plugins,omitempty"`
-	PluginConfigId  string           `json:"plugin_config_id,omitempty" yaml:"plugin_config_id,omitempty"`
+	PluginConfigID  string           `json:"plugin_config_id,omitempty" yaml:"plugin_config_id,omitempty"`
 	FilterFunc      string           `json:"filter_func,omitempty" yaml:"filter_func,omitempty"`
+	Script          string           `json:"script,omitempty" yaml:"script,omitempty"`
+	ScriptID        string           `json:"script_id,omitempty" yaml:"script_id,omitempty"`
+	Status          int              `json:"status,omitempty" yaml:"status,omitempty"`
+
+	// api7
+	StripPathPrefix bool `json:"strip_path_prefix,omitempty" yaml:"strip_path_prefix,omitempty"`
 }
 
 // Service is the abstraction of a backend service on API gateway.
@@ -70,29 +77,37 @@ type Service struct {
 	Plugins Plugins `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	// Upstream settings for the Service.
 	Upstream Upstream `json:"upstream,omitempty" yaml:"upstream,omitempty"`
-	// UpstreamId settings for the Service.
-	UpstreamId string `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
+	// UpstreamID settings for the Service.
+	UpstreamID string `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
 	EnableWebsocket bool `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
+
+	Script string `json:"script,omitempty" yaml:"script,omitempty"`
+
+	// api7
+	PathPrefix string `json:"path_prefix,omitempty" yaml:"path_prefix,omitempty"`
+	Status     int    `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // Upstream is the definition of the upstream on Service.
 type Upstream struct {
 	// ID is the upstream name. It should be unique among all upstreams
 	// in the same service.
-	ID string `json:"id" yaml:"id"`
+	ID   string `json:"id" yaml:"id"`
+	Name string `json:"name" yaml:"name"`
 
-	Name     string               `json:"name" yaml:"name"`
-	Type     string               `json:"type,omitempty" yaml:"type,omitempty"`
-	HashOn   string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
-	Key      string               `json:"key,omitempty" yaml:"key,omitempty"`
-	Checks   *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
-	Nodes    UpstreamNodes        `json:"nodes" yaml:"nodes"`
-	Scheme   string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
-	Retries  *int                 `json:"retries,omitempty" yaml:"retries,omitempty"`
-	Timeout  *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	TLS      *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
-	PassHost string               `json:"passhost,omitempty" yaml:"passhostomitempty"`
+	Type         string               `json:"type,omitempty" yaml:"type,omitempty"`
+	HashOn       string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
+	Key          string               `json:"key,omitempty" yaml:"key,omitempty"`
+	Checks       *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Nodes        UpstreamNodes        `json:"nodes" yaml:"nodes"`
+	Scheme       string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	Retries      int                  `json:"retries,omitempty" yaml:"retries,omitempty"`
+	RetryTimeout int                  `json:"retry_timeout,omitempty" yaml:"retry_timeout,omitempty"`
+	Timeout      *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	TLS          *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
+	PassHost     string               `json:"pass_host,omitempty" yaml:"pass_host,omitempty"`
+	UpstreamHost string               `json:"upstream_host,omitempty" yaml:"upstream_host,omitempty"`
 
 	// for Service Discovery
 	ServiceName   string            `json:"service_name,omitempty" yaml:"service_name,omitempty"`
@@ -102,9 +117,11 @@ type Upstream struct {
 
 // UpstreamNode is the node in upstream
 type UpstreamNode struct {
-	Host   string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port   int    `json:"port,omitempty" yaml:"port,omitempty"`
-	Weight int    `json:"weight,omitempty" yaml:"weight,omitempty"`
+	Host     string                 `json:"host,omitempty" yaml:"host,omitempty"`
+	Port     int                    `json:"port,omitempty" yaml:"port,omitempty"`
+	Weight   int                    `json:"weight,omitempty" yaml:"weight,omitempty"`
+	Priority int                    `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 // UpstreamNodes is the upstream node list.
@@ -203,6 +220,11 @@ type UpstreamPassiveHealthCheckUnhealthy struct {
 type ClientTLS struct {
 	Cert string `json:"client_cert,omitempty" yaml:"client_cert,omitempty"`
 	Key  string `json:"client_key,omitempty" yaml:"client_key,omitempty"`
+	// ClientCertID is the referenced SSL id, can't be used with client_cert and client_key
+	ClientCertID string `json:"client_cert_id,omitempty"`
+
+	// Verify Turn on server certificate verification, currently only kafka upstream is supported
+	Verify bool `json:"verify,omitempty" yaml:"verify,omitempty"`
 }
 
 // UpstreamTimeout represents the timeout settings on Upstream.
@@ -321,12 +343,28 @@ type Consumer struct {
 
 // SSL represents the ssl object in APISIX.
 type SSL struct {
-	ID     string `json:"id" yaml:"id"`
-	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
+	ID            string                 `json:"id" yaml:"id"`
+	Labels        Labels                 `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Type          string                 `json:"type,omitempty" yaml:"type,omitempty"`
+	SNI           string                 `json:"sni" yaml:"sni"`
+	SNIs          []string               `json:"snis" yaml:"snis"`
+	Cert          string                 `json:"cert,omitempty" yaml:"cert,omitempty"`
+	Key           string                 `json:"key,omitempty" yaml:"key,omitempty"`
+	Certs         []string               `json:"certs,omitempty" yaml:"certs,omitempty"`
+	Keys          []string               `json:"keys,omitempty" yaml:"keys,omitempty"`
+	Client        *MutualTLSClientConfig `json:"client,omitempty" yaml:"client,omitempty"`
+	ExpTime       int                    `json:"exptime,omitempty" yaml:"exptime,omitempty"`
+	Status        int                    `json:"status,omitempty" yaml:"status,omitempty"`
+	SSLProtocols  []string               `json:"ssl_protocols,omitempty" yaml:"ssl_protocols,omitempty"`
+	ValidityStart int                    `json:"validity_start,omitempty" yaml:"validity_start,omitempty"`
+	ValidityEnd   int                    `json:"validity_end,omitempty" yaml:"validity_end,omitempty"`
+}
 
-	SNIs []string `json:"snis" yaml:"snis"`
-	Cert string   `json:"cert,omitempty" yaml:"cert,omitempty"`
-	Key  string   `json:"key,omitempty" yaml:"key,omitempty"`
+// MutualTLSClientConfig apisix SSL client field
+type MutualTLSClientConfig struct {
+	CA               string   `json:"ca,omitempty" yaml:"ca,omitempty"`
+	Depth            int      `json:"depth,omitempty" yaml:"depth,omitempty"`
+	SkipMtlsUriRegex []string `json:"skip_mtls_uri_regex,omitempty" yaml:"skip_mtls_uri_regex,omitempty"`
 }
 
 // GlobalRule represents the global_rule object in APISIX.
@@ -403,15 +441,16 @@ func (s *PluginMetadata) UnmarshalJSON(p []byte) error {
 
 // StreamRoute represents the stream_route object in APISIX.
 type StreamRoute struct {
-	ID         string            `json:"id,omitempty" yaml:"id,omitempty"`
-	Desc       string            `json:"desc,omitempty" yaml:"desc,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	RemoteAddr string            `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
-	ServerAddr string            `json:"server_addr,omitempty" yaml:"server_addr,omitempty"`
-	ServerPort int               `json:"server_port,omitempty" yaml:"server_port,omitempty"`
-	SNI        string            `json:"sni,omitempty" yaml:"sni,omitempty"`
-	UpstreamId string            `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
-	ServiceId  string            `json:"service_id,omitempty" yaml:"service_id,omitempty"`
-	Upstream   *Upstream         `json:"upstream,omitempty" yaml:"upstream,omitempty"`
-	Plugins    Plugins           `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	ID         string    `json:"id,omitempty" yaml:"id,omitempty"`
+	Desc       string    `json:"desc,omitempty" yaml:"desc,omitempty"`
+	Labels     Labels    `json:"labels,omitempty" yaml:"labels,omitempty"`
+	RemoteAddr string    `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
+	ServerAddr string    `json:"server_addr,omitempty" yaml:"server_addr,omitempty"`
+	ServerPort int       `json:"server_port,omitempty" yaml:"server_port,omitempty"`
+	SNI        string    `json:"sni,omitempty" yaml:"sni,omitempty"`
+	Upstream   *Upstream `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	UpstreamID string    `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
+	ServiceID  string    `json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Plugins    Plugins   `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	// Protocol
 }

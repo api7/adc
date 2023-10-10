@@ -40,7 +40,7 @@ func pingAPISIX() error {
 		ID:         "test",
 		Name:       "test",
 		Uri:        "*",
-		UpstreamId: "abcd",
+		UpstreamID: "abcd",
 	})
 	if err != nil {
 		color.Red("Failed to ping APISIX: %v", err.Error())

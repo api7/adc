@@ -25,12 +25,14 @@ routes:
   - PUT
   name: route1
   service_id: svc1
+  status: 1
   uri: /get
 - id: route2
   methods:
   - GET
   name: route2
   service_id: svc2
+  status: 1
   uri: /get
 services:
 - hosts:
@@ -45,6 +47,7 @@ services:
     - host: HTTPBIN_PLACEHOLDER
       port: 80
       weight: 1
+    pass_host: pass
     scheme: http
     type: roundrobin
 - hosts:
@@ -59,6 +62,7 @@ services:
     - host: HTTPBIN_PLACEHOLDER
       port: 80
       weight: 1
+    pass_host: pass
     scheme: http
     type: roundrobin
 version: ""

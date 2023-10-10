@@ -28,6 +28,7 @@ services:
     - host: 127.0.0.1
       port: 3306
       weight: 1
+    pass_host: pass
     scheme: http
     type: roundrobin
 stream_routes:

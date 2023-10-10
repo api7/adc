@@ -21,7 +21,7 @@ Summary: created 2, updated 0, deleted 0`))
 			gomega.Expect(err).To(gomega.BeNil(), "check stream_route get")
 			gomega.Expect(sr.ID).To(gomega.Equal("1"))
 			gomega.Expect(sr.ServerPort).To(gomega.Equal(9100))
-			gomega.Expect(sr.ServiceId).To(gomega.Equal("svc1"))
+			gomega.Expect(sr.ServiceID).To(gomega.Equal("svc1"))
 
 			svc, err := s.GetService("svc1")
 			gomega.Expect(err).To(gomega.BeNil(), "check service get")
