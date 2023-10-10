@@ -1,8 +1,6 @@
 package basic
 
 import (
-	"fmt"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -19,7 +17,7 @@ var _ = ginkgo.Describe("`adc dump` tests", func() {
 
 			out, err := s.Dump()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(out).To(gomega.Equal(fmt.Sprintf(`name: ""
+			gomega.Expect(out).To(gomega.Equal(config.ReplaceUpstream(`name: ""
 routes:
 - id: route1
   methods:
@@ -27,12 +25,14 @@ routes:
   - PUT
   name: route1
   service_id: svc1
+  status: 1
   uri: /get
 - id: route2
   methods:
   - GET
   name: route2
   service_id: svc2
+  status: 1
   uri: /get
 services:
 - hosts:
@@ -44,9 +44,10 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: %v
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       weight: 1
+    pass_host: pass
     scheme: http
     type: roundrobin
 - hosts:
@@ -58,13 +59,14 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: %v
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       weight: 1
+    pass_host: pass
     scheme: http
     type: roundrobin
 version: ""
-`, config.TestUpstream, config.TestUpstream)))
+`)))
 
 			err = s.DeleteRoute("route1")
 			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
