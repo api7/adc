@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -61,12 +62,18 @@ func Execute() {
 
 func initConfig() {
 	if cfgFile == "" {
-		cfgFile = "$HOME/.adc.yaml"
+		home, err := homedir.Dir()
+		if err != nil {
+			color.Red(err)
+			os.Exit(1)
+		}
+		viper.AddConfigPath(home)
+		viper.SetConfigName(".adc")
+		viper.SetConfigType("yaml")
+		cfgFile = home + "/.adc.yaml"
+	} else {
+		viper.SetConfigFile(cfgFile)
 	}
-	viper.SetConfigFile(cfgFile)
-	viper.SetConfigName(".adc")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("$HOME/")
 
 	if _, err := os.Stat(os.ExpandEnv(cfgFile)); err != nil {
 		color.Yellow("Config file not found at %s. Creating...", cfgFile)

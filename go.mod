@@ -9,6 +9,7 @@ require (
 	github.com/getkin/kin-openapi v0.120.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/hexops/gotextdiff v1.0.3
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mozillazg/go-slugify v0.2.0
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
