@@ -64,7 +64,7 @@ func initConfig() {
 	if cfgFile == "" {
 		home, err := homedir.Dir()
 		if err != nil {
-			color.Red(err)
+			color.Red("Failed to get home dir: %s", err)
 			os.Exit(1)
 		}
 		viper.AddConfigPath(home)
