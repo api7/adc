@@ -49,7 +49,7 @@ type Route struct {
 	EnableWebsocket bool             `json:"enable_websocket,omitempty" yaml:"enable_websocket,omitempty"`
 	RemoteAddr      string           `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
 	RemoteAddrs     []string         `json:"remote_addrs,omitempty" yaml:"remote_addrs,omitempty"`
-	Upstream        *Upstream         `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	Upstream        *Upstream        `json:"upstream,omitempty" yaml:"upstream,omitempty"`
 	UpstreamID      string           `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
 	ServiceID       string           `json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	Plugins         Plugins          `json:"plugins,omitempty" yaml:"plugins,omitempty"`
