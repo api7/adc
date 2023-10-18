@@ -47,7 +47,7 @@ adc configure
 
 Configures ADC with APISIX's server address and token. Running this command will prompt you for an APISIX server address and API token and saves them to a configuration file.
 
-By default, ADC creates a configuration file at `$HOME/adc.yaml` and this can be changed manually.
+By default, ADC creates a configuration file at `$HOME/apisix.yaml` and this can be changed manually.
 
 ### adc ping
 
@@ -71,7 +71,7 @@ Validates the provided APISIX configuration file.
 adc sync
 ```
 
-Syncs the local configuration present in the `$HOME/adc.yaml` file (or specified configuration file) to the connected APISIX instance.
+Syncs the local configuration present in the `$HOME/apisix.yaml` file (or specified configuration file) to the connected APISIX instance.
 
 ### adc dump
 
