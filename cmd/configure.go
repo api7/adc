@@ -147,8 +147,19 @@ func saveConfiguration(cmd *cobra.Command) error {
 	reader := bufio.NewReader(os.Stdin)
 	if rootConfig.Server == "" {
 		fmt.Println("Please enter the APISIX server address: ")
-		server, _ := reader.ReadString('\n')
+		server, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
 		rootConfig.Server = strings.TrimSpace(server)
+	}
+
+	if !strings.HasPrefix(rootConfig.Server, "http://") && !strings.HasPrefix(rootConfig.Server, "https://") {
+		color.Yellow("APISIX address " + rootConfig.Server + " is configured without protocol, using HTTP")
+		rootConfig.Server = "http://" + rootConfig.Server
+	}
+	if strings.HasSuffix(rootConfig.Server, "/") {
+		rootConfig.Server = strings.TrimSuffix(rootConfig.Server, "/")
 	}
 
 	_, err = url.Parse(rootConfig.Server)
@@ -157,10 +168,13 @@ func saveConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
-	if rootConfig.Token == "" {
+	if rootConfig.Token == "" || overwrite {
 		fmt.Println("Please enter the APISIX token: ")
-		token, _ := reader.ReadString('\n')
-		rootConfig.Token = strings.TrimSpace(token)
+		token, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		rootConfig.Token = strings.TrimSpace(string(token))
 	}
 
 	// use viper to save the configuration

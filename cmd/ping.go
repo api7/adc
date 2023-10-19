@@ -4,13 +4,11 @@ Copyright © 2023 API7.ai
 package cmd
 
 import (
-	"context"
+	"io"
+	"net/http"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-
-	"github.com/api7/adc/pkg/api/apisix"
-	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 // newPingCmd represents the ping command
@@ -29,23 +27,44 @@ func newPingCmd() *cobra.Command {
 	return cmd
 }
 
+func readBody(r io.ReadCloser) (string, error) {
+	defer r.Close()
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // pingAPISIX check the connection to the APISIX
 func pingAPISIX() error {
-	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
+	if rootConfig.Server == "" || rootConfig.Token == "" {
+		color.Yellow("adc not configured, you can use `adc configure` first: " + rootConfig.Server + ", " + rootConfig.Token)
+		return nil
+	}
+
+	httpClient := &http.Client{}
+	req, err := http.NewRequest("GET", rootConfig.Server+"/apisix/admin/routes", nil)
 	if err != nil {
+		color.Red("Failed to connect to backend")
+		return err
+	}
+	req.Header.Set("X-API-KEY", rootConfig.Token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		color.Red("Failed to connect to backend")
 		return err
 	}
 
-	err = cluster.Route().Validate(context.Background(), &types.Route{
-		ID:         "test",
-		Name:       "test",
-		Uri:        "*",
-		UpstreamID: "abcd",
-	})
-	if err != nil {
-		color.Red("Failed to ping APISIX: %v", err.Error())
+	if resp.StatusCode != http.StatusOK {
+		body, err := readBody(resp.Body)
+		if err != nil {
+			body = err.Error()
+		}
+		color.Red("Failed to ping backend, response: \n%s", body)
 	} else {
-		color.Green("Connected to APISIX successfully!")
+		color.Green("Connected to backend successfully!")
 	}
 	return nil
 }
