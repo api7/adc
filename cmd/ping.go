@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"context"
-	"io"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -27,16 +26,6 @@ func newPingCmd() *cobra.Command {
 	}
 
 	return cmd
-}
-
-func readBody(r io.ReadCloser) (string, error) {
-	defer r.Close()
-
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
 
 // pingAPISIX check the connection to the APISIX
