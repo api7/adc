@@ -12,11 +12,9 @@ import (
 	_ "github.com/api7/adc/test/cli/suites-global-rule"
 	_ "github.com/api7/adc/test/cli/suites-plugin-config"
 	_ "github.com/api7/adc/test/cli/suites-plugin-metadata"
+	_ "github.com/api7/adc/test/cli/suites-stream-route"
 	_ "github.com/api7/adc/test/cli/suites-usecase"
 )
-
-// once apisix updated with stream_route service_id, enable this
-//_ "github.com/api7/adc/test/cli/suites-stream-route"
 
 func TestADC(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
