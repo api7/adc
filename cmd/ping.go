@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/api7/adc/pkg/api/apisix"
-	"github.com/api7/adc/pkg/api/apisix/types"
 )
 
 // newPingCmd represents the ping command
@@ -36,16 +35,11 @@ func pingAPISIX() error {
 		return err
 	}
 
-	err = cluster.Route().Validate(context.Background(), &types.Route{
-		ID:         "test",
-		Name:       "test",
-		Uri:        "*",
-		UpstreamID: "abcd",
-	})
+	err = cluster.Ping()
 	if err != nil {
-		color.Red("Failed to ping APISIX: %v", err.Error())
+		color.Red("Failed to ping backend, response: %s", err.Error())
 	} else {
-		color.Green("Connected to APISIX successfully!")
+		color.Green("Connected to backend successfully!")
 	}
 	return nil
 }

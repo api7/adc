@@ -17,6 +17,7 @@ type Cluster interface {
 	PluginMetadata() PluginMetadata
 	StreamRoute() StreamRoute
 	Upstream() Upstream
+	Ping() error
 }
 
 type ResourceClient[T any] interface {

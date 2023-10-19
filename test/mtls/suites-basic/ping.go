@@ -13,7 +13,7 @@ var _ = ginkgo.Describe("`adc ping` tests", func() {
 		ginkgo.It("should connect to APISIX", func() {
 			output, err := s.Ping()
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(output).To(gomega.Equal("Connected to APISIX successfully!\n"))
+			gomega.Expect(output).To(gomega.Equal("Connected to backend successfully!\n"))
 		})
 	})
 })

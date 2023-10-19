@@ -142,3 +142,8 @@ func (c *cluster) StreamRoute() StreamRoute {
 func (c *cluster) Upstream() Upstream {
 	return c.upstream
 }
+
+func (c *cluster) Ping() error {
+	_, err := c.Route().List(context.Background())
+	return err
+}
