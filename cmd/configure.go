@@ -158,9 +158,7 @@ func saveConfiguration(cmd *cobra.Command) error {
 		color.Yellow("APISIX address " + rootConfig.Server + " is configured without protocol, using HTTP")
 		rootConfig.Server = "http://" + rootConfig.Server
 	}
-	if strings.HasSuffix(rootConfig.Server, "/") {
-		rootConfig.Server = strings.TrimSuffix(rootConfig.Server, "/")
-	}
+	rootConfig.Server = strings.TrimSuffix(rootConfig.Server, "/")
 
 	_, err = url.Parse(rootConfig.Server)
 	if err != nil {
