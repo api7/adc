@@ -64,7 +64,7 @@ func initConfig() {
 	if cfgFile == "" {
 		home, err := homedir.Dir()
 		if err != nil {
-			color.Red("Failed to get home dir: %s", err)
+			color.Red("Failed to get home dir: %s", err.Error())
 			os.Exit(1)
 		}
 		viper.AddConfigPath(home)
@@ -79,7 +79,7 @@ func initConfig() {
 		color.Yellow("Config file not found at %s. Creating...", cfgFile)
 		_, err := os.Create(os.ExpandEnv(cfgFile))
 		if err != nil {
-			color.Red("Failed to initialize configuration file: %s", err)
+			color.Red("Failed to initialize configuration file: %s", err.Error())
 		}
 	}
 
@@ -97,7 +97,7 @@ func initConfig() {
 	rootConfig.Insecure = viper.GetBool("insecure")
 	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
 	if err != nil {
-		color.RedString("Failed to create a new cluster: %v", err)
+		color.RedString("Failed to create a new cluster: %v", err.Error())
 		return
 	}
 	rootConfig.APISIXCluster = cluster

@@ -4,11 +4,13 @@ Copyright © 2023 API7.ai
 package cmd
 
 import (
+	"context"
 	"io"
-	"net/http"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+
+	"github.com/api7/adc/pkg/api/apisix"
 )
 
 // newPingCmd represents the ping command
@@ -39,30 +41,14 @@ func readBody(r io.ReadCloser) (string, error) {
 
 // pingAPISIX check the connection to the APISIX
 func pingAPISIX() error {
-	if rootConfig.Server == "" || rootConfig.Token == "" {
-		color.Yellow("adc not configured, you can use `adc configure` first: " + rootConfig.Server + ", " + rootConfig.Token)
-		return nil
-	}
-
-	httpClient := &http.Client{}
-	req, err := http.NewRequest("GET", rootConfig.Server+"/apisix/admin/routes", nil)
+	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
 	if err != nil {
-		color.Red("Failed to connect to backend")
-		return err
-	}
-	req.Header.Set("X-API-KEY", rootConfig.Token)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		color.Red("Failed to connect to backend")
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		body, err := readBody(resp.Body)
-		if err != nil {
-			body = err.Error()
-		}
-		color.Red("Failed to ping backend, response: \n%s", body)
+	err = cluster.Ping()
+	if err != nil {
+		color.Red("Failed to ping backend, response: %s", err.Error())
 	} else {
 		color.Green("Connected to backend successfully!")
 	}
