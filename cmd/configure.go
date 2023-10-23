@@ -17,6 +17,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 // newConfigureCmd represents the configure command
@@ -32,8 +33,9 @@ func newConfigureCmd() *cobra.Command {
 
 	cmd.Flags().BoolP("overwrite", "f", false, "overwrite existed configuration file")
 
-	cmd.Flags().StringP("address", "a", "", "apisix server address")
+	cmd.Flags().StringP("address", "a", "", "APISIX server address")
 
+	cmd.Flags().StringP("token", "t", "", "APISIX token")
 	cmd.Flags().String("capath", "", "ca path for mtls connection")
 	cmd.Flags().String("cert", "", "certificate for mtls connection")
 	cmd.Flags().String("cert-key", "", "certificate key for mtls connection")
@@ -56,7 +58,13 @@ func saveConfiguration(cmd *cobra.Command) error {
 
 	rootConfig.Server, err = cmd.Flags().GetString("address")
 	if err != nil {
-		color.Red("Failed to get apisix address: %v", err)
+		color.Red("Failed to get APISIX address: %v", err)
+		return err
+	}
+
+	rootConfig.Token, err = cmd.Flags().GetString("token")
+	if err != nil {
+		color.Red("Failed to get token: %v", err)
 		return err
 	}
 
@@ -168,11 +176,11 @@ func saveConfiguration(cmd *cobra.Command) error {
 
 	if rootConfig.Token == "" || overwrite {
 		fmt.Println("Please enter the APISIX token: ")
-		token, err := reader.ReadString('\n')
+		byteToken, err := term.ReadPassword(0)
 		if err != nil {
 			return err
 		}
-		rootConfig.Token = strings.TrimSpace(string(token))
+		rootConfig.Token = strings.TrimSpace(string(byteToken))
 	}
 
 	// use viper to save the configuration
