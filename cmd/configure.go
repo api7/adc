@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -176,7 +177,7 @@ func saveConfiguration(cmd *cobra.Command) error {
 
 	if rootConfig.Token == "" || overwrite {
 		fmt.Println("Please enter the APISIX token: ")
-		byteToken, err := term.ReadPassword(0)
+		byteToken, err := term.ReadPassword(syscall.Stdin)
 		if err != nil {
 			return err
 		}
