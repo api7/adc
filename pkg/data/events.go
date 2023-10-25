@@ -2,8 +2,8 @@ package data
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
 
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -65,25 +65,46 @@ func (e *Event) Output(diffOnly bool) (string, error) {
 	var output string
 	switch e.Option {
 	case CreateOption:
+		local, err := yaml.Marshal(e.Value)
+		if err != nil {
+			return "", err
+		}
+		local = append(local, '\n')
+
+		remote := ""
+
+		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
+		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
+
 		if diffOnly {
-			output = fmt.Sprintf("+++ %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
+			output = fmt.Sprintf("+++ %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
 		} else {
-			output = fmt.Sprintf("creating %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.Value))
+			output = fmt.Sprintf("creating %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.Value), diff)
 		}
 	case DeleteOption:
-		if diffOnly {
-			output = fmt.Sprintf("--- %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
-		} else {
-			output = fmt.Sprintf("deleting %s: \"%s\"", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue))
-		}
-	case UpdateOption:
-		remote, err := json.MarshalIndent(e.OldValue, "", "\t")
+		remote, err := yaml.Marshal(e.OldValue)
 		if err != nil {
 			return "", err
 		}
 		remote = append(remote, '\n')
 
-		local, err := json.MarshalIndent(e.Value, "", "\t")
+		local := ""
+		edits := myers.ComputeEdits(span.URIFromPath("remote"), string(remote), string(local))
+		diff := fmt.Sprint(gotextdiff.ToUnified("remote", "local", string(remote), edits))
+
+		if diffOnly {
+			output = fmt.Sprintf("--- %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue), diff)
+		} else {
+			output = fmt.Sprintf("deleting %s: \"%s\"\n%s", e.ResourceType, apisix.GetResourceUniqueKey(e.OldValue), diff)
+		}
+	case UpdateOption:
+		remote, err := yaml.Marshal(e.OldValue)
+		if err != nil {
+			return "", err
+		}
+		remote = append(remote, '\n')
+
+		local, err := yaml.Marshal(e.Value)
 		if err != nil {
 			return "", err
 		}

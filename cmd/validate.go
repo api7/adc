@@ -6,7 +6,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
@@ -41,55 +40,6 @@ func newValidateCmd() *cobra.Command {
 				return err
 			}
 
-			msg := fmt.Sprintf("Read configuration file successfully: config name: %v, version: %v", d.Name, d.Version)
-			changed := false
-			if len(d.Routes) > 0 {
-				msg += fmt.Sprintf(", routes: %v", len(d.Routes))
-				changed = true
-			}
-			if len(d.Services) > 0 {
-				msg += fmt.Sprintf(", services: %v", len(d.Services))
-				changed = true
-			}
-			if len(d.Consumers) > 0 {
-				msg += fmt.Sprintf(", consumers: %v", len(d.Consumers))
-				changed = true
-			}
-			if len(d.SSLs) > 0 {
-				msg += fmt.Sprintf(", ssls: %v", len(d.SSLs))
-				changed = true
-			}
-			if len(d.GlobalRules) > 0 {
-				msg += fmt.Sprintf(", global_rules: %v", len(d.GlobalRules))
-				changed = true
-			}
-			if len(d.PluginConfigs) > 0 {
-				msg += fmt.Sprintf(", plugin_configs: %v", len(d.PluginConfigs))
-				changed = true
-			}
-			if len(d.ConsumerGroups) > 0 {
-				msg += fmt.Sprintf(", consumer_groups: %v", len(d.ConsumerGroups))
-				changed = true
-			}
-			// TODO: enable this when APISIX supports
-			//if len(d.PluginMetadatas) > 0 {
-			//	msg += fmt.Sprintf(", plugin_metadatas: %v", len(d.PluginMetadatas))
-			//	changed = true
-			//}
-			if len(d.StreamRoutes) > 0 {
-				msg += fmt.Sprintf(", stream_routes: %v", len(d.StreamRoutes))
-				changed = true
-			}
-			if len(d.Upstreams) > 0 {
-				msg += fmt.Sprintf(", upstreams: %v", len(d.StreamRoutes))
-				changed = true
-			}
-			if !changed {
-				msg += "nothing changed"
-			}
-			msg += "."
-			color.Green(msg)
-
 			err = validateContent(d)
 			if err != nil {
 				color.Red("Failed to validate configuration file: %v", err)
@@ -104,12 +54,74 @@ func newValidateCmd() *cobra.Command {
 	return cmd
 }
 
+func displayConfigOverview(d *types.Configuration) {
+	msg := fmt.Sprintf("Read configuration file successfully: config name: %v, version: %v", d.Name, d.Version)
+	changed := false
+	if len(d.Routes) > 0 {
+		msg += fmt.Sprintf(", routes: %v", len(d.Routes))
+		changed = true
+	}
+	if len(d.Services) > 0 {
+		msg += fmt.Sprintf(", services: %v", len(d.Services))
+		changed = true
+	}
+	if len(d.Consumers) > 0 {
+		msg += fmt.Sprintf(", consumers: %v", len(d.Consumers))
+		changed = true
+	}
+	if len(d.SSLs) > 0 {
+		msg += fmt.Sprintf(", ssls: %v", len(d.SSLs))
+		changed = true
+	}
+	if len(d.GlobalRules) > 0 {
+		msg += fmt.Sprintf(", global_rules: %v", len(d.GlobalRules))
+		changed = true
+	}
+	if len(d.PluginConfigs) > 0 {
+		msg += fmt.Sprintf(", plugin_configs: %v", len(d.PluginConfigs))
+		changed = true
+	}
+	if len(d.ConsumerGroups) > 0 {
+		msg += fmt.Sprintf(", consumer_groups: %v", len(d.ConsumerGroups))
+		changed = true
+	}
+	// TODO: enable this when APISIX supports
+	//if len(d.PluginMetadatas) > 0 {
+	//	msg += fmt.Sprintf(", plugin_metadatas: %v", len(d.PluginMetadatas))
+	//	changed = true
+	//}
+	if len(d.StreamRoutes) > 0 {
+		msg += fmt.Sprintf(", stream_routes: %v", len(d.StreamRoutes))
+		changed = true
+	}
+	if len(d.Upstreams) > 0 {
+		msg += fmt.Sprintf(", upstreams: %v", len(d.StreamRoutes))
+		changed = true
+	}
+	if !changed {
+		msg += "nothing changed"
+	}
+	msg += "."
+	color.Green(msg)
+}
+
 // validateContent validates the content of the configuration file
 func validateContent(c *types.Configuration) error {
 	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
 	if err != nil {
 		return err
 	}
+	supportValidate, err := cluster.SupportValidate()
+	if err != nil {
+		return err
+	}
+	if !supportValidate {
+		color.Yellow("Backend doesn't support validate API, abort")
+		return nil
+	}
+
+	displayConfigOverview(c)
+
 	v, err := validator.NewValidator(c, cluster)
 	if err != nil {
 		color.Red("Failed to create validator: %v", err)

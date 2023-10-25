@@ -49,6 +49,18 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		return err
 	}
 
+	if len(config.StreamRoutes) > 0 {
+		supportStreamRoute, err := rootConfig.APISIXCluster.SupportStreamRoute()
+		if err != nil {
+			color.Red("Failed to check stream mode: %v", err)
+			return err
+		}
+		if !supportStreamRoute {
+			color.Yellow("Backend stream mode is disabled but configuration contains stream routes, abort")
+			return nil
+		}
+	}
+
 	remoteConfig, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
 		color.Red("Failed to get remote configuration: %v", err)
@@ -98,6 +110,11 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		}
 
 		for _, line := range strings.Split(str, "\n") {
+			if event.Option == data.CreateOption || event.Option == data.DeleteOption {
+				if line == "--- remote" || line == "+++ local" {
+					continue
+				}
+			}
 			if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "creating") {
 				color.Green(line)
 			} else if strings.HasPrefix(line, "-") || strings.HasPrefix(line, "deleting") {
