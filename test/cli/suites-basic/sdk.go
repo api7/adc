@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 				Hosts: []string{
 					"foo.com",
 				},
-				Upstream: types.Upstream{
+				Upstream: &types.Upstream{
 					ID:   "ups1",
 					Name: "ups1",
 					Nodes: []types.UpstreamNode{

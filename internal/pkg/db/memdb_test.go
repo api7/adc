@@ -20,7 +20,7 @@ var (
 			"label1": "v1",
 			"label2": "v2",
 		},
-		Upstream: types.Upstream{
+		Upstream: &types.Upstream{
 			Name: "upstream1",
 			Nodes: []types.UpstreamNode{
 				{

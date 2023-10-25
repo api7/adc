@@ -22,7 +22,7 @@ var _ = ginkgo.Describe("adc APISIX SDK tests", func() {
 			_, err = s.CreateService(&types.Service{
 				ID:   "svc1",
 				Name: "svc1",
-				Upstream: types.Upstream{
+				Upstream: &types.Upstream{
 					ID:   "ups1",
 					Name: "ups1",
 					Nodes: []types.UpstreamNode{
