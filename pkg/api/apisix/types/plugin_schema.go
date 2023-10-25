@@ -6,14 +6,14 @@ import (
 )
 
 var (
-	//go:embed data/default_values.json
-	DefaultValues []byte
+	//go:embed data/plugin_default_values.json
+	PluginDefaultValuesJson []byte
 
 	PluginDefaultValues map[string]Plugin
 )
 
 func init() {
-	err := json.Unmarshal(DefaultValues, &PluginDefaultValues)
+	err := json.Unmarshal(PluginDefaultValuesJson, &PluginDefaultValues)
 	if err != nil {
 		panic("failed to parse plugin defaults values")
 	}
