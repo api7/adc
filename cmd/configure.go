@@ -184,7 +184,10 @@ func saveConfiguration(cmd *cobra.Command) error {
 	viper.Set("insecure", rootConfig.Insecure)
 
 	if overwrite {
-		err = viper.WriteConfig()
+		// because WriteConfig fails to write if the file does not exist
+		// and WriteConfigAs does write even if the file does not exist
+		// see: https://github.com/spf13/viper/issues/433
+		err = viper.WriteConfigAs(cfgFile)
 	} else {
 		err = viper.SafeWriteConfig()
 	}
