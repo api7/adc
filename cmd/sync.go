@@ -110,11 +110,6 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		}
 
 		for _, line := range strings.Split(str, "\n") {
-			if event.Option == data.CreateOption || event.Option == data.DeleteOption {
-				if line == "--- remote" || line == "+++ local" {
-					continue
-				}
-			}
 			if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "creating") {
 				color.Green(line)
 			} else if strings.HasPrefix(line, "-") || strings.HasPrefix(line, "deleting") {
