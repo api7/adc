@@ -75,12 +75,19 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
-		color.Yellow("Configuration file %s doesn't exist.", cfgFile)
-		return
+	_, err := os.Stat(cfgFile)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			color.Yellow("Configuration file %s doesn't exist.", cfgFile)
+			return
+		} else {
+			color.Red("Failed to read configuration file: %s", err.Error())
+			return
+		}
 	}
 
-	err := viper.ReadInConfig()
+	err = viper.ReadInConfig()
 	if err != nil {
 		color.Red("Failed to read configuration file: %s", err.Error())
 		return
