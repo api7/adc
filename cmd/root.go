@@ -82,7 +82,7 @@ func initConfig() {
 			color.Yellow("Configuration file %s doesn't exist.", cfgFile)
 			return
 		} else {
-			color.Red("Failed to read configuration file: %s", err.Error())
+			color.Red("Error reading configuration file: %s", err.Error())
 			return
 		}
 	}
