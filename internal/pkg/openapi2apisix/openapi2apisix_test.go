@@ -95,7 +95,7 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: `API 101 template for learning API request basics. Follow along with the webinar / video or just open the first request and hit **Send**!`,
-						Upstream:    apitypes.Upstream{},
+						Upstream:    &apitypes.Upstream{},
 						//  Labels:      make([]apitypes.Labels, 0),
 					},
 				},
@@ -149,7 +149,7 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    apitypes.Upstream{},
+						Upstream:    &apitypes.Upstream{},
 						// Labels:        make([]apitypes.Labels, 0),
 					},
 				},
@@ -182,7 +182,7 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    apitypes.Upstream{},
+						Upstream:    &apitypes.Upstream{},
 						// Labels: apitypes.Labels{
 						//		"web-spider", "blockchain",
 						//	},
@@ -210,7 +210,7 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    apitypes.Upstream{},
+						Upstream:    &apitypes.Upstream{},
 						// Labels: []apitypes.Labels{
 						// "web-spider", "blockchain",
 						//},

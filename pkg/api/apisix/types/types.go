@@ -42,7 +42,7 @@ type Route struct {
 	Hosts           []string         `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	Uri             string           `json:"uri,omitempty" yaml:"uri,omitempty"`
 	Uris            []string         `json:"uris,omitempty" yaml:"uris,omitempty"`
-	Priority        int              `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Priority        *int             `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Timeout         *UpstreamTimeout `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Vars            Vars             `json:"vars,omitempty" yaml:"vars,omitempty"`
 	Methods         []string         `json:"methods,omitempty" yaml:"methods,omitempty"`
@@ -57,10 +57,25 @@ type Route struct {
 	FilterFunc      string           `json:"filter_func,omitempty" yaml:"filter_func,omitempty"`
 	Script          string           `json:"script,omitempty" yaml:"script,omitempty"`
 	ScriptID        string           `json:"script_id,omitempty" yaml:"script_id,omitempty"`
-	Status          int              `json:"status,omitempty" yaml:"status,omitempty"`
+	Status          *int             `json:"status,omitempty" yaml:"status,omitempty"`
 
 	// api7
 	StripPathPrefix bool `json:"strip_path_prefix,omitempty" yaml:"strip_path_prefix,omitempty"`
+}
+
+func (r *Route) UnmarshalJSON(cont []byte) error {
+	type unmarshalerRoute Route
+
+	var route unmarshalerRoute
+	err := json.Unmarshal(cont, &route)
+	if err != nil {
+		return err
+	}
+
+	*r = Route(route)
+
+	SetRouteDefaultValues(r)
+	return nil
 }
 
 // Service is the abstraction of a backend service on API gateway.
@@ -76,7 +91,7 @@ type Service struct {
 	// Plugin settings on Service level
 	Plugins Plugins `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	// Upstream settings for the Service.
-	Upstream Upstream `json:"upstream,omitempty" yaml:"upstream,omitempty"`
+	Upstream *Upstream `json:"upstream,omitempty" yaml:"upstream,omitempty"`
 	// UpstreamID settings for the Service.
 	UpstreamID string `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
 	// Enables a websocket. Set to false by default.
@@ -89,6 +104,21 @@ type Service struct {
 	Status     int    `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+func (s *Service) UnmarshalJSON(cont []byte) error {
+	type unmarshalerService Service
+
+	var route unmarshalerService
+	err := json.Unmarshal(cont, &route)
+	if err != nil {
+		return err
+	}
+
+	*s = Service(route)
+
+	SetServiceDefaultValues(s)
+	return nil
+}
+
 // Upstream is the definition of the upstream on Service.
 type Upstream struct {
 	// ID is the upstream name. It should be unique among all upstreams
@@ -96,18 +126,19 @@ type Upstream struct {
 	ID   string `json:"id" yaml:"id"`
 	Name string `json:"name" yaml:"name"`
 
-	Type         string               `json:"type,omitempty" yaml:"type,omitempty"`
-	HashOn       string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
-	Key          string               `json:"key,omitempty" yaml:"key,omitempty"`
-	Checks       *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
-	Nodes        UpstreamNodes        `json:"nodes" yaml:"nodes"`
-	Scheme       string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
-	Retries      int                  `json:"retries,omitempty" yaml:"retries,omitempty"`
-	RetryTimeout int                  `json:"retry_timeout,omitempty" yaml:"retry_timeout,omitempty"`
-	Timeout      *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	TLS          *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
-	PassHost     string               `json:"pass_host,omitempty" yaml:"pass_host,omitempty"`
-	UpstreamHost string               `json:"upstream_host,omitempty" yaml:"upstream_host,omitempty"`
+	Type          string               `json:"type,omitempty" yaml:"type,omitempty"`
+	HashOn        string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
+	Key           string               `json:"key,omitempty" yaml:"key,omitempty"`
+	Checks        *UpstreamHealthCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Nodes         UpstreamNodes        `json:"nodes" yaml:"nodes"`
+	Scheme        string               `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	Retries       int                  `json:"retries,omitempty" yaml:"retries,omitempty"`
+	RetryTimeout  int                  `json:"retry_timeout,omitempty" yaml:"retry_timeout,omitempty"`
+	Timeout       *UpstreamTimeout     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	TLS           *ClientTLS           `json:"tls,omitempty" yaml:"tls,omitempty"`
+	KeepalivePool *KeepalivePool       `json:"keepalive_pool,omitempty" yaml:"keepalive_pool,omitempty"`
+	PassHost      string               `json:"pass_host,omitempty" yaml:"pass_host,omitempty"`
+	UpstreamHost  string               `json:"upstream_host,omitempty" yaml:"upstream_host,omitempty"`
 
 	// for Service Discovery
 	ServiceName   string            `json:"service_name,omitempty" yaml:"service_name,omitempty"`
@@ -115,12 +146,33 @@ type Upstream struct {
 	DiscoveryArgs map[string]string `json:"discovery_args,omitempty" yaml:"discovery_args,omitempty"`
 }
 
+func (u *Upstream) UnmarshalJSON(cont []byte) error {
+	type unmarshalerUpstream Upstream
+
+	var route unmarshalerUpstream
+	err := json.Unmarshal(cont, &route)
+	if err != nil {
+		return err
+	}
+
+	*u = Upstream(route)
+
+	SetUpstreamDefaultValues(u)
+	return nil
+}
+
+type KeepalivePool struct {
+	Size        *int `json:"size,omitempty" yaml:"size,omitempty"`
+	IdleTimeout *int `json:"idle_timeout,omitempty" yaml:"idle_timeout,omitempty"`
+	Requests    *int `json:"requests,omitempty" yaml:"requests,omitempty"`
+}
+
 // UpstreamNode is the node in upstream
 type UpstreamNode struct {
 	Host     string                 `json:"host,omitempty" yaml:"host,omitempty"`
 	Port     int                    `json:"port,omitempty" yaml:"port,omitempty"`
 	Weight   int                    `json:"weight,omitempty" yaml:"weight,omitempty"`
-	Priority int                    `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Priority *int                   `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
@@ -166,12 +218,12 @@ type UpstreamHealthCheck struct {
 // UpstreamActiveHealthCheck defines the active kind of upstream health check.
 type UpstreamActiveHealthCheck struct {
 	Type               string                             `json:"type,omitempty" yaml:"type,omitempty"`
-	Timeout            int                                `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	Concurrency        int                                `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+	Timeout            *int                               `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Concurrency        *int                               `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
 	Host               string                             `json:"host,omitempty" yaml:"host,omitempty"`
 	Port               int32                              `json:"port,omitempty" yaml:"port,omitempty"`
 	HTTPPath           string                             `json:"http_path,omitempty" yaml:"http_path,omitempty"`
-	HTTPSVerifyCert    bool                               `json:"https_verify_certificate,omitempty" yaml:"https_verify_certificate,omitempty"`
+	HTTPSVerifyCert    *bool                              `json:"https_verify_certificate,omitempty" yaml:"https_verify_certificate,omitempty"`
 	HTTPRequestHeaders []string                           `json:"req_headers,omitempty" yaml:"req_headers,omitempty"`
 	Healthy            UpstreamActiveHealthCheckHealthy   `json:"healthy,omitempty" yaml:"healthy,omitempty"`
 	Unhealthy          UpstreamActiveHealthCheckUnhealthy `json:"unhealthy,omitempty" yaml:"unhealthy,omitempty"`
@@ -189,14 +241,14 @@ type UpstreamPassiveHealthCheck struct {
 type UpstreamActiveHealthCheckHealthy struct {
 	UpstreamPassiveHealthCheckHealthy `json:",inline" yaml:",inline"`
 
-	Interval int `json:"interval,omitempty" yaml:"interval,omitempty"`
+	Interval *int `json:"interval,omitempty" yaml:"interval,omitempty"`
 }
 
 // UpstreamPassiveHealthCheckHealthy defines the conditions to judge whether
 // an upstream node is healthy with the passive manner.
 type UpstreamPassiveHealthCheckHealthy struct {
 	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
-	Successes    int   `json:"successes,omitempty" yaml:"successes,omitempty"`
+	Successes    *int  `json:"successes,omitempty" yaml:"successes,omitempty"`
 }
 
 // UpstreamActiveHealthCheckUnhealthy defines the conditions to judge whether
@@ -204,16 +256,16 @@ type UpstreamPassiveHealthCheckHealthy struct {
 type UpstreamActiveHealthCheckUnhealthy struct {
 	UpstreamPassiveHealthCheckUnhealthy `json:",inline" yaml:",inline"`
 
-	Interval int `json:"interval,omitempty" yaml:"interval,omitempty"`
+	Interval *int `json:"interval,omitempty" yaml:"interval,omitempty"`
 }
 
 // UpstreamPassiveHealthCheckUnhealthy defines the conditions to judge whether
 // an upstream node is unhealthy with the passive manager.
 type UpstreamPassiveHealthCheckUnhealthy struct {
 	HTTPStatuses []int `json:"http_statuses,omitempty" yaml:"http_statuses,omitempty"`
-	HTTPFailures int   `json:"http_failures,omitempty" yaml:"http_failures,omitempty"`
-	TCPFailures  int   `json:"tcp_failures,omitempty" yaml:"tcp_failures,omitempty"`
-	Timeouts     int   `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
+	HTTPFailures *int  `json:"http_failures,omitempty" yaml:"http_failures,omitempty"`
+	TCPFailures  *int  `json:"tcp_failures,omitempty" yaml:"tcp_failures,omitempty"`
+	Timeouts     *int  `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
 }
 
 // ClientTLS is tls cert and key use in mTLS
@@ -224,7 +276,7 @@ type ClientTLS struct {
 	ClientCertID string `json:"client_cert_id,omitempty"`
 
 	// Verify Turn on server certificate verification, currently only kafka upstream is supported
-	Verify bool `json:"verify,omitempty" yaml:"verify,omitempty"`
+	Verify *bool `json:"verify,omitempty" yaml:"verify,omitempty"`
 }
 
 // UpstreamTimeout represents the timeout settings on Upstream.
@@ -354,16 +406,31 @@ type SSL struct {
 	Keys          []string               `json:"keys,omitempty" yaml:"keys,omitempty"`
 	Client        *MutualTLSClientConfig `json:"client,omitempty" yaml:"client,omitempty"`
 	ExpTime       int                    `json:"exptime,omitempty" yaml:"exptime,omitempty"`
-	Status        int                    `json:"status,omitempty" yaml:"status,omitempty"`
+	Status        *int                   `json:"status,omitempty" yaml:"status,omitempty"`
 	SSLProtocols  []string               `json:"ssl_protocols,omitempty" yaml:"ssl_protocols,omitempty"`
 	ValidityStart int                    `json:"validity_start,omitempty" yaml:"validity_start,omitempty"`
 	ValidityEnd   int                    `json:"validity_end,omitempty" yaml:"validity_end,omitempty"`
 }
 
+func (ssl *SSL) UnmarshalJSON(cont []byte) error {
+	type unmarshalerSSL SSL
+
+	var route unmarshalerSSL
+	err := json.Unmarshal(cont, &route)
+	if err != nil {
+		return err
+	}
+
+	*ssl = SSL(route)
+
+	SetSSLDefaultValues(ssl)
+	return nil
+}
+
 // MutualTLSClientConfig apisix SSL client field
 type MutualTLSClientConfig struct {
 	CA               string   `json:"ca,omitempty" yaml:"ca,omitempty"`
-	Depth            int      `json:"depth,omitempty" yaml:"depth,omitempty"`
+	Depth            *int     `json:"depth,omitempty" yaml:"depth,omitempty"`
 	SkipMtlsUriRegex []string `json:"skip_mtls_uri_regex,omitempty" yaml:"skip_mtls_uri_regex,omitempty"`
 }
 
@@ -453,4 +520,19 @@ type StreamRoute struct {
 	ServiceID  string    `json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	Plugins    Plugins   `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	// Protocol
+}
+
+func (s *StreamRoute) UnmarshalJSON(cont []byte) error {
+	type unmarshalerStreamRoute StreamRoute
+
+	var route unmarshalerStreamRoute
+	err := json.Unmarshal(cont, &route)
+	if err != nil {
+		return err
+	}
+
+	*s = StreamRoute(route)
+
+	SetStreamRouteDefaultValues(s)
+	return nil
 }
