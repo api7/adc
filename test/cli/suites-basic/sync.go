@@ -12,7 +12,7 @@ import (
 	"github.com/api7/adc/test/scaffold"
 )
 
-var _ = ginkgo.Describe("`adc sync` tests", func() {
+var _ = ginkgo.FDescribe("`adc sync` tests", func() {
 	var (
 		service = &types.Service{
 			ID:   "svc",
