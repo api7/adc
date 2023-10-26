@@ -177,11 +177,19 @@ func saveConfiguration(cmd *cobra.Command) error {
 
 	if rootConfig.Token == "" || overwrite {
 		fmt.Println("Please enter the APISIX token: ")
-		byteToken, err := term.ReadPassword(syscall.Stdin)
-		if err != nil {
-			return err
+		if term.IsTerminal(syscall.Stdin) {
+			token, err := term.ReadPassword(syscall.Stdin)
+			if err != nil {
+				return err
+			}
+			rootConfig.Token = strings.TrimSpace(string(token))
+		} else {
+			token, err := reader.ReadString('\n')
+			if err != nil {
+				return err
+			}
+			rootConfig.Token = strings.TrimSpace(string(token))
 		}
-		rootConfig.Token = strings.TrimSpace(string(byteToken))
 	}
 
 	// use viper to save the configuration
