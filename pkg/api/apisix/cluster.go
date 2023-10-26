@@ -5,13 +5,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"github.com/api7/adc/pkg/api/apisix/types"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/fatih/color"
 
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/config"
 )
 
