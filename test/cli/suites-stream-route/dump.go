@@ -27,6 +27,7 @@ services:
     nodes:
     - host: 127.0.0.1
       port: 3306
+      priority: 0
       weight: 1
     pass_host: pass
     scheme: http

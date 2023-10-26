@@ -27,7 +27,7 @@ func NormalizeConfiguration(content *types.Configuration) {
 		if service.ID == "" {
 			service.ID = service.Name
 		}
-		if service.Upstream.ID == "" {
+		if service.Upstream != nil && service.Upstream.ID == "" {
 			service.Upstream.ID = service.Upstream.Name
 		}
 	}

@@ -23,7 +23,7 @@ services:
 - name: svc1
   hosts:
   - svc1.example.com
-  -`
+`
 	if _, err := tmpfile.Write([]byte(expectedContent)); err != nil {
 		t.Fatal(err)
 	}

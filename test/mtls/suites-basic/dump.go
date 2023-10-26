@@ -24,6 +24,7 @@ routes:
   - GET
   - PUT
   name: route1
+  priority: 0
   service_id: svc1
   status: 1
   uri: /get
@@ -31,6 +32,7 @@ routes:
   methods:
   - GET
   name: route2
+  priority: 0
   service_id: svc2
   status: 1
   uri: /get
@@ -46,6 +48,7 @@ services:
     nodes:
     - host: HTTPBIN_PLACEHOLDER
       port: 80
+      priority: 0
       weight: 1
     pass_host: pass
     scheme: http
@@ -61,6 +64,7 @@ services:
     nodes:
     - host: HTTPBIN_PLACEHOLDER
       port: 80
+      priority: 0
       weight: 1
     pass_host: pass
     scheme: http

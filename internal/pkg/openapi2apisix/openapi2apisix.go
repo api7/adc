@@ -52,7 +52,7 @@ func Convert(ctx context.Context, oas []byte) (*apitypes.Configuration, error) {
 			Name:        doc.Info.Title,
 			Description: doc.Info.Description,
 			//Labels:      getLabelsByTags(doc.Tags),
-			Upstream: apitypes.Upstream{},
+			Upstream: &apitypes.Upstream{},
 		},
 	}
 

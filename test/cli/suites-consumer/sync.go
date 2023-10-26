@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			Hosts: []string{
 				"foo.com",
 			},
-			Upstream: types.Upstream{
+			Upstream: &types.Upstream{
 				ID:   "httpbin",
 				Name: "httpbin",
 				Nodes: []types.UpstreamNode{
