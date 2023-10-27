@@ -75,7 +75,7 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	_, err := os.Stat(cfgFile)
+	_, err := os.Stat(os.ExpandEnv(cfgFile))
 
 	if err != nil {
 		if os.IsNotExist(err) {
