@@ -168,7 +168,7 @@ func createUpstream(targets []*url.URL, varUris []string) *apitypes.Upstream {
 	}
 	for _, uri := range varUris {
 		host := strings.ReplaceAll(uri, "https://", "")
-		host = strings.ReplaceAll(uri, "http://", "")
+		host = strings.ReplaceAll(host, "http://", "")
 		upstreamNodes = append(upstreamNodes, apitypes.UpstreamNode{
 			Host:   host,
 			Port:   getURLPortFromString(uri),
