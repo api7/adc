@@ -18,6 +18,8 @@ type Cluster interface {
 	StreamRoute() StreamRoute
 	Upstream() Upstream
 	Ping() error
+	SupportValidate() (bool, error)
+	SupportStreamRoute() (bool, error)
 }
 
 type ResourceClient[T any] interface {

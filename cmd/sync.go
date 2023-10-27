@@ -49,6 +49,18 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 		return err
 	}
 
+	if len(config.StreamRoutes) > 0 {
+		supportStreamRoute, err := rootConfig.APISIXCluster.SupportStreamRoute()
+		if err != nil {
+			color.Red("Failed to check stream mode: %v", err)
+			return err
+		}
+		if !supportStreamRoute {
+			color.Yellow("Backend stream mode is disabled but configuration contains stream routes, abort")
+			return nil
+		}
+	}
+
 	remoteConfig, err := common.GetContentFromRemote(rootConfig.APISIXCluster)
 	if err != nil {
 		color.Red("Failed to get remote configuration: %v", err)
