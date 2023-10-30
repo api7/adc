@@ -3,11 +3,13 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/api7/adc/internal/pkg/openapi2apisix"
 	"github.com/api7/adc/pkg/common"
@@ -30,7 +32,7 @@ func newOpenAPI2APISIXCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("file", "f", "", "OpenAPI configuration file path")
-	cmd.Flags().StringP("output", "o", "", "output file path")
+	cmd.Flags().StringP("output", "o", "/dev/stdout", "output file path")
 
 	return cmd
 }
@@ -42,8 +44,12 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 		return err
 	}
 	if output == "" {
-		color.Red("Output file path is empty. Please specify a file path: adc openapi2apisix -o apisix.yaml")
-		return nil
+		output = "/dev/stdout"
+	}
+
+	save := true
+	if output == "/dev/stdout" {
+		save = false
 	}
 
 	filename, err := cmd.Flags().GetString("file")
@@ -76,10 +82,24 @@ func openAPI2APISIX(cmd *cobra.Command) error {
 		return err
 	}
 
-	err = common.SaveAPISIXConfiguration(output, conf)
-	if err != nil {
-		return err
+	if save {
+		err = common.SaveAPISIXConfiguration(output, conf)
+		if err != nil {
+			return err
+		}
+		color.Green("Converted OpenAPI file to %s successfully ", output)
+	} else {
+		data, err := yaml.Marshal(conf)
+		if err != nil {
+			color.Red(err.Error())
+			return err
+		}
+
+		_, err = fmt.Printf("%s", data)
+		if err != nil {
+			return err
+		}
 	}
-	color.Green("Converted OpenAPI file to %s successfully ", output)
+
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	apitypes "github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 var (
@@ -34,7 +35,7 @@ func Slugify(name ...string) string {
 	return strings.Join(name, "_")
 }
 
-// Convert convert OAS to API Service and Routes
+// Convert converts OAS to API Service and Routes
 func Convert(ctx context.Context, oas []byte) (*apitypes.Configuration, error) {
 
 	result := apitypes.Configuration{}
@@ -44,15 +45,33 @@ func Convert(ctx context.Context, oas []byte) (*apitypes.Configuration, error) {
 		return nil, errors.Wrap(LoadOpenAPIError, err.Error())
 	}
 
+	serverUris, varUris, err := parseServerUris(&doc.Servers)
+	if err != nil {
+		return nil, errors.Wrap(LoadOpenAPIError, err.Error())
+	}
+
+	ups := &apitypes.Upstream{
+		Nodes: []apitypes.UpstreamNode{
+			apitypes.UpstreamNode{},
+		},
+	}
+
+	if len(serverUris)+len(varUris) > 0 {
+		ups = createUpstream(serverUris, varUris)
+	}
+
 	// handle services
+	upsName := Slugify("Upstream for ", doc.Info.Title)
+	ups.Name = upsName
+	ups.ID = common.GenID(ups.Name)
 
 	result.Services = []*apitypes.Service{
-
 		&apitypes.Service{
+			ID:          common.GenID(doc.Info.Title),
 			Name:        doc.Info.Title,
 			Description: doc.Info.Description,
 			//Labels:      getLabelsByTags(doc.Tags),
-			Upstream: &apitypes.Upstream{},
+			Upstream: ups,
 		},
 	}
 
@@ -101,6 +120,7 @@ func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
 			// tags = append(tags, Slugify(tag))
 			// }
 			route := apitypes.Route{
+				ID:          common.GenID(routeName),
 				Name:        routeName,
 				Description: routeDescription,
 				// Labels:      tags,
@@ -137,8 +157,7 @@ func getServiceProtocols(targets []*url.URL) []string {
 	return result
 }
 
-//nolint:unused
-func createUpstream(targets []*url.URL) *apitypes.Upstream {
+func createUpstream(targets []*url.URL, varUris []string) *apitypes.Upstream {
 	var upstreamNodes apitypes.UpstreamNodes
 	for _, target := range targets {
 		upstreamNodes = append(upstreamNodes, apitypes.UpstreamNode{
@@ -147,8 +166,16 @@ func createUpstream(targets []*url.URL) *apitypes.Upstream {
 			Weight: 100,
 		})
 	}
+	for _, uri := range varUris {
+		host := strings.ReplaceAll(uri, "https://", "")
+		host = strings.ReplaceAll(host, "http://", "")
+		upstreamNodes = append(upstreamNodes, apitypes.UpstreamNode{
+			Host:   host,
+			Port:   getURLPortFromString(uri),
+			Weight: 100,
+		})
+	}
 	upstream := apitypes.Upstream{
-		Name:   "default",
 		Scheme: targets[0].Scheme,
 		Nodes:  upstreamNodes,
 		Timeout: &apitypes.UpstreamTimeout{
@@ -164,41 +191,47 @@ func createUpstream(targets []*url.URL) *apitypes.Upstream {
 
 // parseServerUris parses the server uri's after rendering the template variables.
 // result will always have at least 1 entry, but not necessarily a hostname/port/scheme
-//
-//nolint:unused
-func parseServerUris(servers *openapi3.Servers) ([]*url.URL, error) {
-	var targets []*url.URL
+func parseServerUris(servers *openapi3.Servers) ([]*url.URL, []string, error) {
+	var (
+		targets []*url.URL
+		ignored []string
+	)
 
 	if servers == nil || len(*servers) == 0 {
 		uriObject, _ := url.ParseRequestURI("/") // path '/' is the default for empty server blocks
 		targets = make([]*url.URL, 1)
 		targets[0] = uriObject
 	} else {
-		targets = make([]*url.URL, len(*servers))
+		targets = []*url.URL{}
 
-		for i, server := range *servers {
+		for _, server := range *servers {
 			uriString := server.URL
 			for name, svar := range server.Variables {
 				uriString = strings.ReplaceAll(uriString, "{"+name+"}", svar.Default)
 			}
+			if strings.Contains(uriString, "{") && strings.Contains(uriString, "}") {
+				//color.Yellow("Server url with variable " + uriString + " ignored")
+				ignored = append(ignored, uriString)
+				continue
+			}
 
 			uriObject, err := url.ParseRequestURI(uriString)
 			if err != nil {
-				return targets, fmt.Errorf("failed to parse uri '%s'; %w", uriString, err)
+				return targets, ignored, fmt.Errorf("failed to parse uri '%s'; %w", uriString, err)
 			}
 
 			if uriObject.Path == "" {
 				uriObject.Path = "/" // path '/' is the default
 			}
 
-			targets[i] = uriObject
+			targets = append(targets, uriObject)
+			//targets[i] = uriObject
 		}
 	}
 
-	return targets, nil
+	return targets, ignored, nil
 }
 
-//nolint:unused
 func getURLPort(u *url.URL) int {
 	var port int
 	if u.Port() != "" {
@@ -212,4 +245,19 @@ func getURLPort(u *url.URL) int {
 	}
 
 	return port
+}
+
+func getURLPortFromString(s string) int {
+	port := 80
+	if strings.HasPrefix(s, "https://") {
+		port = 443
+	}
+
+	s = strings.ReplaceAll(s, "{", "")
+	s = strings.ReplaceAll(s, "}", "")
+	uri, err := url.ParseRequestURI(s)
+	if err != nil {
+		return port
+	}
+	return getURLPort(uri)
 }
