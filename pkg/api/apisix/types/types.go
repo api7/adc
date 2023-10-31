@@ -9,20 +9,72 @@ import (
 	"strings"
 )
 
+type HasLabels interface {
+	GetLabels() Labels
+	SetLabel(k, v string)
+}
+
+var (
+	_ HasLabels = (*Route)(nil)
+	_ HasLabels = (*Service)(nil)
+	_ HasLabels = (*Consumer)(nil)
+	_ HasLabels = (*SSL)(nil)
+	_ HasLabels = (*PluginConfig)(nil)
+	_ HasLabels = (*ConsumerGroup)(nil)
+	_ HasLabels = (*StreamRoute)(nil)
+	_ HasLabels = (*Upstream)(nil)
+)
+
+func FilterResources[T HasLabels](filters Labels, resources []T) []T {
+	if len(filters) == 0 {
+		return resources
+	}
+	var filtered []T
+	for _, res := range resources {
+		labels := res.GetLabels()
+		if len(labels) > 0 {
+			matchAll := true
+			for k, v := range filters {
+				if label, ok := labels[k]; !ok || label != v {
+					matchAll = false
+					break
+				}
+			}
+			if matchAll {
+				filtered = append(filtered, res)
+			}
+		}
+	}
+	return filtered
+}
+
 // Configuration is the configuration of services
 type Configuration struct {
-	Name            string            `yaml:"name" json:"name"`
-	Version         string            `yaml:"version" json:"version"`
-	Services        []*Service        `yaml:"services,omitempty" json:"services,omitempty"`
-	Routes          []*Route          `yaml:"routes,omitempty" json:"routes,omitempty"`
-	Consumers       []*Consumer       `yaml:"consumers,omitempty" json:"consumers,omitempty"`
-	SSLs            []*SSL            `yaml:"ssls,omitempty" json:"ssls,omitempty"`
-	GlobalRules     []*GlobalRule     `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
-	PluginConfigs   []*PluginConfig   `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
-	ConsumerGroups  []*ConsumerGroup  `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
-	PluginMetadatas []*PluginMetadata `yaml:"plugin_metadatas,omitempty" json:"plugin_metadatas,omitempty"`
-	StreamRoutes    []*StreamRoute    `yaml:"stream_routes,omitempty" json:"stream_routes,omitempty"`
-	Upstreams       []*Upstream       `yaml:"upstreams,omitempty" json:"upstreams,omitempty"`
+	Name            string             `yaml:"name" json:"name"`
+	Version         string             `yaml:"version" json:"version"`
+	Meta            *ConfigurationMeta `yaml:"meta,omitempty" json:"meta,omitempty"`
+	Services        []*Service         `yaml:"services,omitempty" json:"services,omitempty"`
+	Routes          []*Route           `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Consumers       []*Consumer        `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+	SSLs            []*SSL             `yaml:"ssls,omitempty" json:"ssls,omitempty"`
+	GlobalRules     []*GlobalRule      `yaml:"global_rules,omitempty" json:"global_rules,omitempty"`
+	PluginConfigs   []*PluginConfig    `yaml:"plugin_configs,omitempty" json:"plugin_configs,omitempty"`
+	ConsumerGroups  []*ConsumerGroup   `yaml:"consumer_groups,omitempty" json:"consumer_groups,omitempty"`
+	PluginMetadatas []*PluginMetadata  `yaml:"plugin_metadatas,omitempty" json:"plugin_metadatas,omitempty"`
+	StreamRoutes    []*StreamRoute     `yaml:"stream_routes,omitempty" json:"stream_routes,omitempty"`
+	Upstreams       []*Upstream        `yaml:"upstreams,omitempty" json:"upstreams,omitempty"`
+}
+
+type ConfigurationMode string
+
+var (
+	ModeFull    ConfigurationMode = "full"
+	ModePartial ConfigurationMode = "partial"
+)
+
+type ConfigurationMeta struct {
+	Mode   ConfigurationMode `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Labels Labels            `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // Labels is the APISIX resource labels
@@ -61,6 +113,17 @@ type Route struct {
 
 	// api7
 	StripPathPrefix bool `json:"strip_path_prefix,omitempty" yaml:"strip_path_prefix,omitempty"`
+}
+
+func (r *Route) GetLabels() Labels {
+	return r.Labels
+}
+
+func (r *Route) SetLabel(k, v string) {
+	if r.Labels == nil {
+		r.Labels = map[string]string{}
+	}
+	r.Labels[k] = v
 }
 
 func (r *Route) UnmarshalJSON(cont []byte) error {
@@ -104,6 +167,17 @@ type Service struct {
 	Status     int    `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+func (s *Service) GetLabels() Labels {
+	return s.Labels
+}
+
+func (s *Service) SetLabel(k, v string) {
+	if s.Labels == nil {
+		s.Labels = map[string]string{}
+	}
+	s.Labels[k] = v
+}
+
 func (s *Service) UnmarshalJSON(cont []byte) error {
 	type unmarshalerService Service
 
@@ -123,8 +197,9 @@ func (s *Service) UnmarshalJSON(cont []byte) error {
 type Upstream struct {
 	// ID is the upstream name. It should be unique among all upstreams
 	// in the same service.
-	ID   string `json:"id" yaml:"id"`
-	Name string `json:"name" yaml:"name"`
+	ID     string `json:"id" yaml:"id"`
+	Name   string `json:"name" yaml:"name"`
+	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	Type          string               `json:"type,omitempty" yaml:"type,omitempty"`
 	HashOn        string               `json:"hash_on,omitempty" yaml:"hash_on,omitempty"`
@@ -144,6 +219,17 @@ type Upstream struct {
 	ServiceName   string            `json:"service_name,omitempty" yaml:"service_name,omitempty"`
 	DiscoveryType string            `json:"discovery_type,omitempty" yaml:"discovery_type,omitempty"`
 	DiscoveryArgs map[string]string `json:"discovery_args,omitempty" yaml:"discovery_args,omitempty"`
+}
+
+func (u *Upstream) GetLabels() Labels {
+	return u.Labels
+}
+
+func (u *Upstream) SetLabel(k, v string) {
+	if u.Labels == nil {
+		u.Labels = map[string]string{}
+	}
+	u.Labels[k] = v
 }
 
 func (u *Upstream) UnmarshalJSON(cont []byte) error {
@@ -393,6 +479,17 @@ type Consumer struct {
 	GroupID string  `json:"group_id,omitempty" yaml:"group_id,omitempty"`
 }
 
+func (c *Consumer) GetLabels() Labels {
+	return c.Labels
+}
+
+func (c *Consumer) SetLabel(k, v string) {
+	if c.Labels == nil {
+		c.Labels = map[string]string{}
+	}
+	c.Labels[k] = v
+}
+
 // SSL represents the ssl object in APISIX.
 type SSL struct {
 	ID            string                 `json:"id" yaml:"id"`
@@ -410,6 +507,17 @@ type SSL struct {
 	SSLProtocols  []string               `json:"ssl_protocols,omitempty" yaml:"ssl_protocols,omitempty"`
 	ValidityStart int                    `json:"validity_start,omitempty" yaml:"validity_start,omitempty"`
 	ValidityEnd   int                    `json:"validity_end,omitempty" yaml:"validity_end,omitempty"`
+}
+
+func (ssl *SSL) GetLabels() Labels {
+	return ssl.Labels
+}
+
+func (ssl *SSL) SetLabel(k, v string) {
+	if ssl.Labels == nil {
+		ssl.Labels = map[string]string{}
+	}
+	ssl.Labels[k] = v
 }
 
 func (ssl *SSL) UnmarshalJSON(cont []byte) error {
@@ -449,6 +557,17 @@ type PluginConfig struct {
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
 }
 
+func (p *PluginConfig) GetLabels() Labels {
+	return p.Labels
+}
+
+func (p *PluginConfig) SetLabel(k, v string) {
+	if p.Labels == nil {
+		p.Labels = map[string]string{}
+	}
+	p.Labels[k] = v
+}
+
 // ConsumerGroup apisix consumer group object
 type ConsumerGroup struct {
 	ID     string `json:"id,omitempty" yaml:"id,omitempty"`
@@ -456,6 +575,17 @@ type ConsumerGroup struct {
 	Labels Labels `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	Plugins Plugins `json:"plugins" yaml:"plugins"`
+}
+
+func (c *ConsumerGroup) GetLabels() Labels {
+	return c.Labels
+}
+
+func (c *ConsumerGroup) SetLabel(k, v string) {
+	if c.Labels == nil {
+		c.Labels = map[string]string{}
+	}
+	c.Labels[k] = v
 }
 
 const (
@@ -520,6 +650,17 @@ type StreamRoute struct {
 	ServiceID  string    `json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	Plugins    Plugins   `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	// Protocol
+}
+
+func (s *StreamRoute) GetLabels() Labels {
+	return s.Labels
+}
+
+func (s *StreamRoute) SetLabel(k, v string) {
+	if s.Labels == nil {
+		s.Labels = map[string]string{}
+	}
+	s.Labels[k] = v
 }
 
 func (s *StreamRoute) UnmarshalJSON(cont []byte) error {

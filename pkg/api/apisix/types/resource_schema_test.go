@@ -1,9 +1,10 @@
 package types
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
-	"testing"
 )
 
 func ExpectInputHasOutput(t *testing.T, input string, output string) {

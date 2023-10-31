@@ -152,4 +152,130 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 			gomega.Expect(err).To(gomega.BeNil(), "check svc delete")
 		})
 	})
+
+	ginkgo.Context("Test sync in partial mode", func() {
+		s := scaffold.NewScaffold()
+		ginkgo.It("should sync data to APISIX", func() {
+			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
+
+			_, err := s.UpdateService(service)
+			gomega.Expect(err).To(gomega.BeNil(), "check service update")
+			_, err = s.UpdateRoute(route)
+			gomega.Expect(err).To(gomega.BeNil(), "check route update")
+			expect.GET("/get").WithHost("foo.com").Expect().Status(http.StatusOK).Body().Contains(`"Host": "foo.com"`)
+			_, err = s.UpdateService(service1)
+			gomega.Expect(err).To(gomega.BeNil(), "check service update")
+			expect.GET("/get").WithHost("bar.com").Expect().Status(http.StatusNotFound)
+
+			output, err := s.Sync("suites-basic/testdata/test2.yaml")
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 0, updated 2, deleted 1"))
+
+			output, err = s.Sync("suites-basic/testdata/test-partial.yaml")
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 2, updated 0, deleted 0"))
+		})
+	})
+
+	ginkgo.Context("Test sync in multiple file mode", func() {
+		s := scaffold.NewScaffold()
+		ginkgo.It("should sync data to APISIX", func() {
+			output, err := s.Sync("suites-basic/testdata/test.yaml", "suites-basic/testdata/test-partial.yaml")
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 6, updated 0, deleted 0"))
+		})
+	})
+
+	ginkgo.FContext("Test sync with common labels", func() {
+		s := scaffold.NewScaffold()
+		ginkgo.It("should sync data to APISIX", func() {
+			output, err := s.Sync("suites-basic/testdata/test-with-common-labels.yaml")
+			gomega.Expect(err).To(gomega.BeNil(), "check sync command")
+			gomega.Expect(output).To(gomega.ContainSubstring("Summary: created 4, updated 0, deleted 0"))
+
+			out, err := s.DumpWithLabels(types.Labels{
+				"a": "1",
+			})
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(out).To(gomega.Equal(config.ReplaceUpstream(`meta:
+  labels:
+    a: "1"
+  mode: partial
+name: ""
+routes:
+- id: route1
+  labels:
+    a: "1"
+  methods:
+  - GET
+  - PUT
+  name: route1
+  priority: 0
+  service_id: svc1
+  status: 1
+  uri: /get
+- id: route2
+  labels:
+    a: "1"
+  methods:
+  - GET
+  name: route2
+  priority: 0
+  service_id: svc2
+  status: 1
+  uri: /get
+services:
+- hosts:
+  - foo1.com
+  id: svc1
+  labels:
+    a: "1"
+  name: svc1
+  upstream:
+    hash_on: vars
+    id: httpbin
+    name: httpbin
+    nodes:
+    - host: httpbin.org
+      port: 80
+      priority: 0
+      weight: 1
+    pass_host: pass
+    scheme: http
+    type: roundrobin
+- hosts:
+  - svc.com
+  id: svc2
+  labels:
+    a: "1"
+  name: svc2
+  upstream:
+    hash_on: vars
+    id: httpbin
+    name: httpbin
+    nodes:
+    - host: httpbin.org
+      port: 80
+      priority: 0
+      weight: 1
+    pass_host: pass
+    scheme: http
+    type: roundrobin
+version: ""
+`)))
+
+			out, err = s.DumpWithLabels(types.Labels{
+				"c": "1",
+			})
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(out).To(gomega.Equal(config.ReplaceUpstream(`meta:
+  labels:
+    c: "1"
+  mode: partial
+name: ""
+version: ""
+`)))
+
+		})
+	})
 })

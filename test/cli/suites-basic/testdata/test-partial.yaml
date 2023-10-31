@@ -1,0 +1,31 @@
+meta:
+  mode: partial
+name: ""
+routes:
+  - id: route3
+    methods:
+      - GET
+      - PUT
+    name: route3
+    priority: 0
+    service_id: svc3
+    status: 1
+    uri: /get
+services:
+  - hosts:
+      - foo1.com
+    id: svc3
+    name: svc3
+    upstream:
+      hash_on: vars
+      id: httpbin
+      name: httpbin
+      nodes:
+        - host: httpbin.org
+          port: 80
+          priority: 0
+          weight: 1
+      pass_host: pass
+      scheme: http
+      type: roundrobin
+version: ""

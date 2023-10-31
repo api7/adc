@@ -187,63 +187,84 @@ func (s *Scaffold) Ping() (string, error) {
 	return s.Exec("ping")
 }
 
-func (s *Scaffold) Sync(path string) (string, error) {
-	conf, err := common.GetContentFromFile(path)
+func (s *Scaffold) Sync(files ...string) (string, error) {
+	var paths []string
 
-	for _, service := range conf.Services {
-		for j, node := range service.Upstream.Nodes {
-			if node.Host == "HTTPBIN_PLACEHOLDER" {
-				service.Upstream.Nodes[j].Host = config.TestUpstream
+	for _, path := range files {
+		conf, err := common.GetContentFromFile(path)
+		gomega.Expect(err).To(gomega.BeNil(), "load config from file "+path)
+
+		for _, service := range conf.Services {
+			for j, node := range service.Upstream.Nodes {
+				if node.Host == "HTTPBIN_PLACEHOLDER" {
+					service.Upstream.Nodes[j].Host = config.TestUpstream
+				}
 			}
 		}
+
+		for _, route := range conf.Routes {
+			s.AddRoutesFinalizer(route.ID)
+		}
+
+		for _, service := range conf.Services {
+			s.AddServicesFinalizer(service.ID)
+		}
+
+		for _, consumer := range conf.Consumers {
+			s.AddConsumersFinalizer(consumer.Username)
+		}
+
+		for _, globalRule := range conf.GlobalRules {
+			s.AddGlobalRulesFinalizer(globalRule.ID)
+		}
+
+		for _, pluginConfig := range conf.PluginConfigs {
+			s.AddPluginConfigsFinalizer(pluginConfig.ID)
+		}
+
+		for _, consumerGroup := range conf.ConsumerGroups {
+			s.AddConsumerGroupsFinalizer(consumerGroup.ID)
+		}
+
+		for _, pluginMetadata := range conf.PluginMetadatas {
+			s.AddPluginMetadatasFinalizer(pluginMetadata.ID)
+		}
+
+		for _, streamRoute := range conf.StreamRoutes {
+			s.AddStreamRoutesFinalizer(streamRoute.ID)
+		}
+
+		tmpFile := path + ".tmp"
+		err = common.SaveAPISIXConfiguration(tmpFile, conf)
+		gomega.Expect(err).To(gomega.BeNil(), "save temp file to "+tmpFile)
+
+		paths = append(paths, tmpFile)
 	}
 
-	gomega.Expect(err).To(gomega.BeNil(), "load config from file "+path)
-	for _, route := range conf.Routes {
-		s.AddRoutesFinalizer(route.ID)
-	}
-
-	for _, service := range conf.Services {
-		s.AddServicesFinalizer(service.ID)
-	}
-
-	for _, consumer := range conf.Consumers {
-		s.AddConsumersFinalizer(consumer.Username)
-	}
-
-	for _, globalRule := range conf.GlobalRules {
-		s.AddGlobalRulesFinalizer(globalRule.ID)
-	}
-
-	for _, pluginConfig := range conf.PluginConfigs {
-		s.AddPluginConfigsFinalizer(pluginConfig.ID)
-	}
-
-	for _, consumerGroup := range conf.ConsumerGroups {
-		s.AddConsumerGroupsFinalizer(consumerGroup.ID)
-	}
-
-	for _, pluginMetadata := range conf.PluginMetadatas {
-		s.AddPluginMetadatasFinalizer(pluginMetadata.ID)
-	}
-
-	for _, streamRoute := range conf.StreamRoutes {
-		s.AddStreamRoutesFinalizer(streamRoute.ID)
-	}
-
-	tmpFile := path + ".tmp"
 	defer func() {
-		err = os.Remove(tmpFile)
-		gomega.Expect(err).To(gomega.BeNil(), "delete temp file at "+tmpFile)
+		for _, tmpFile := range paths {
+			err := os.Remove(tmpFile)
+			gomega.Expect(err).To(gomega.BeNil(), "delete temp file at "+tmpFile)
+		}
 	}()
-	err = common.SaveAPISIXConfiguration(tmpFile, conf)
-	gomega.Expect(err).To(gomega.BeNil(), "save temp file to "+tmpFile)
+	args := []string{"sync"}
+	for _, path := range paths {
+		args = append(args, "-f", path)
+	}
 
-	return s.Exec("sync", "-f", tmpFile)
+	return s.Exec(args...)
 }
 
 func (s *Scaffold) Dump() (string, error) {
 	return s.Exec("dump", "-o", "/dev/stdout")
+}
+
+func (s *Scaffold) DumpWithLabels(labels types.Labels) (string, error) {
+	var l []string
+	for k, v := range labels {
+		l = append(l, k+"="+v)
+	}
+	return s.Exec("dump", "-o", "/dev/stdout", "-l", strings.Join(l, ","))
 }
 
 func (s *Scaffold) Diff(path string) (string, error) {
