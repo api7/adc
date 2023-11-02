@@ -75,17 +75,21 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	if _, err := os.Stat(os.ExpandEnv(cfgFile)); err != nil {
-		color.Yellow("Config file not found at %s. Creating...", cfgFile)
-		_, err := os.Create(os.ExpandEnv(cfgFile))
-		if err != nil {
-			color.Red("Failed to initialize configuration file: %s", err.Error())
+	_, err := os.Stat(os.ExpandEnv(cfgFile))
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			color.Yellow("Configuration file %s doesn't exist.", cfgFile)
+			return
+		} else {
+			color.Red("Error reading configuration file: %s", err.Error())
+			return
 		}
 	}
 
-	err := viper.ReadInConfig()
+	err = viper.ReadInConfig()
 	if err != nil {
-		color.Red("Failed to read configuration file, please run `adc configure` first to configure ADC.")
+		color.Red("Failed to read configuration file: %s", err.Error())
 		return
 	}
 

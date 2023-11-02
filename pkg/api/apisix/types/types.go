@@ -255,8 +255,8 @@ type KeepalivePool struct {
 
 // UpstreamNode is the node in upstream
 type UpstreamNode struct {
-	Host     string                 `json:"host,omitempty" yaml:"host,omitempty"`
-	Port     int                    `json:"port,omitempty" yaml:"port,omitempty"`
+	Host     string                 `json:"host" yaml:"host"`
+	Port     int                    `json:"port" yaml:"port"`
 	Weight   int                    `json:"weight,omitempty" yaml:"weight,omitempty"`
 	Priority *int                   `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`

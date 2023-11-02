@@ -7,9 +7,11 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 
+	"github.com/api7/adc/pkg/api/apisix/types"
 	"github.com/api7/adc/pkg/config"
 )
 
@@ -146,4 +148,45 @@ func (c *cluster) Upstream() Upstream {
 func (c *cluster) Ping() error {
 	_, err := c.Route().List(context.Background())
 	return err
+}
+
+func (c *cluster) SupportValidate() (bool, error) {
+	err := c.Route().Validate(context.Background(), &types.Route{
+		ID:   "test_validate_api",
+		Name: "test_validate_api",
+		Host: "httpbin.org",
+		Uri:  "/*",
+		Upstream: &types.Upstream{
+			ID:   "test_validate_api",
+			Name: "test_validate_api",
+			Type: "roundrobin",
+			Nodes: []types.UpstreamNode{
+				{
+					Host:   "httpbin.org",
+					Port:   80,
+					Weight: 1,
+				},
+			},
+		},
+	})
+	if err == nil {
+		return true, nil
+	}
+	if strings.Contains(err.Error(), "not found") {
+		return false, nil
+	}
+
+	return false, err
+}
+
+func (c *cluster) SupportStreamRoute() (bool, error) {
+	cli := newResourceClient[types.StreamRoute](c.cli, "stream_routes")
+	_, err := cli.List(context.Background())
+	if err != nil {
+		if strings.Contains(err.Error(), "stream mode is disabled") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

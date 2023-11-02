@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	apitypes "github.com/api7/adc/pkg/api/apisix/types"
+	"github.com/api7/adc/pkg/common"
 )
 
 func TestSlugify(t *testing.T) {
@@ -95,7 +96,27 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: `API 101 template for learning API request basics. Follow along with the webinar / video or just open the first request and hit **Send**!`,
-						Upstream:    &apitypes.Upstream{},
+						Upstream: &apitypes.Upstream{
+							Scheme: "https",
+							Nodes: []apitypes.UpstreamNode{
+								{
+									Host:   "api-101.glitch.me",
+									Port:   443,
+									Weight: 100,
+								},
+								{
+									Host:   "{{apiurl}}",
+									Port:   80,
+									Weight: 100,
+								},
+							},
+							Timeout: &apitypes.UpstreamTimeout{
+								Connect: 60,
+								Send:    60,
+								Read:    60,
+							},
+							PassHost: "host",
+						},
 						//  Labels:      make([]apitypes.Labels, 0),
 					},
 				},
@@ -149,7 +170,22 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    &apitypes.Upstream{},
+						Upstream: &apitypes.Upstream{
+							Scheme: "https",
+							Nodes: []apitypes.UpstreamNode{
+								{
+									Host:   "api-101.glitch.me",
+									Port:   443,
+									Weight: 100,
+								},
+							},
+							Timeout: &apitypes.UpstreamTimeout{
+								Connect: 60,
+								Send:    60,
+								Read:    60,
+							},
+							PassHost: "host",
+						},
 						// Labels:        make([]apitypes.Labels, 0),
 					},
 				},
@@ -182,7 +218,22 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    &apitypes.Upstream{},
+						Upstream: &apitypes.Upstream{
+							Scheme: "https",
+							Nodes: []apitypes.UpstreamNode{
+								{
+									Host:   "api-101.glitch.me",
+									Port:   443,
+									Weight: 100,
+								},
+							},
+							Timeout: &apitypes.UpstreamTimeout{
+								Connect: 60,
+								Send:    60,
+								Read:    60,
+							},
+							PassHost: "host",
+						},
 						// Labels: apitypes.Labels{
 						//		"web-spider", "blockchain",
 						//	},
@@ -210,7 +261,22 @@ func TestConvert(t *testing.T) {
 					&apitypes.Service{
 						Name:        "API 101",
 						Description: "modify operationId",
-						Upstream:    &apitypes.Upstream{},
+						Upstream: &apitypes.Upstream{
+							Scheme: "https",
+							Nodes: []apitypes.UpstreamNode{
+								{
+									Host:   "api-101.glitch.me",
+									Port:   443,
+									Weight: 100,
+								},
+							},
+							Timeout: &apitypes.UpstreamTimeout{
+								Connect: 60,
+								Send:    60,
+								Read:    60,
+							},
+							PassHost: "host",
+						},
 						// Labels: []apitypes.Labels{
 						// "web-spider", "blockchain",
 						//},
@@ -237,6 +303,21 @@ func TestConvert(t *testing.T) {
 				return
 			}
 			if got != nil {
+				for _, route := range tt.want.Routes {
+					route.ID = common.GenID(route.Name)
+				}
+				for _, svc := range tt.want.Services {
+					svc.ID = common.GenID(svc.Name)
+					if svc.Upstream != nil {
+						if svc.Upstream.Nodes == nil {
+							svc.Upstream.Nodes = []apitypes.UpstreamNode{
+								apitypes.UpstreamNode{},
+							}
+						}
+						svc.Upstream.Name = Slugify("Upstream for", svc.Name)
+						svc.Upstream.ID = common.GenID(svc.Upstream.Name)
+					}
+				}
 				assert.Equal(t, tt.want.Services, got.Services)
 				assert.Equal(t, tt.want.Routes, got.Routes)
 			}
