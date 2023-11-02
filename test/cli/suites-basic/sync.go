@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 		})
 	})
 
-	ginkgo.FContext("Test sync with common labels", func() {
+	ginkgo.Context("Test sync with common labels", func() {
 		s := scaffold.NewScaffold()
 		ginkgo.It("should sync data to APISIX", func() {
 			output, err := s.Sync("suites-basic/testdata/test-with-common-labels.yaml")
@@ -236,7 +236,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1
@@ -254,7 +254,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1

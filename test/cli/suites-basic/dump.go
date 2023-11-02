@@ -138,7 +138,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1
@@ -157,7 +157,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1
@@ -204,7 +204,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1
@@ -253,7 +253,7 @@ services:
     id: httpbin
     name: httpbin
     nodes:
-    - host: httpbin.org
+    - host: HTTPBIN_PLACEHOLDER
       port: 80
       priority: 0
       weight: 1
