@@ -16,11 +16,12 @@ func newDiffCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checkConfig()
 
-			_ = sync(cmd, true)
-			return nil
+			// todo: support multiple files
+			err := sync(cmd, true)
+			return err
 		},
 	}
 
-	cmd.Flags().StringP("file", "f", "apisix.yaml", "configuration file path")
+	cmd.Flags().StringArrayP("file", "f", []string{"apisix.yaml"}, "configuration file path")
 	return cmd
 }

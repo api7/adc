@@ -27,8 +27,8 @@ func newSyncCmd() *cobra.Command {
 			checkConfig()
 
 			// TODO: add validate before sync
-			_ = sync(cmd, false)
-			return nil
+			err := sync(cmd, false)
+			return err
 		},
 	}
 
@@ -138,15 +138,24 @@ func syncFile(dryRun, partial bool, file string) (*summary, error) {
 }
 
 func sync(cmd *cobra.Command, dryRun bool) error {
-	partial, err := cmd.Flags().GetBool("partial")
-	if err != nil {
-		return err
-	}
-
 	files, err := cmd.Flags().GetStringArray("file")
 	if err != nil {
 		color.Red("Failed to get the configuration file: %v", err)
 		return err
+	}
+	if len(files) == 0 {
+		color.Red("No input files")
+		return nil
+	}
+
+	partial := false
+
+	if !dryRun {
+		partial, err = cmd.Flags().GetBool("partial")
+		if err != nil {
+			color.Red("Failed to get partial option: %v", err)
+			return err
+		}
 	}
 
 	if len(files) > 1 {
