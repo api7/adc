@@ -27,7 +27,6 @@ test-mtls: ## Run cli test for mtls
 
 .PHONY: unit-test
 unit-test: ## Run unit test
-	cat cmd/sync.go
 	@go test -v $$(go list ./... | grep -v /test/)
 
 .PHONY: fmt

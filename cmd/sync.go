@@ -60,11 +60,15 @@ func syncFile(dryRun, partial bool, file string) (*summary, error) {
 		supportStreamRoute, err := rootConfig.APISIXCluster.SupportStreamRoute()
 		if err != nil {
 			color.Red("Failed to check stream mode: %v", err)
-			return err
+			return nil, err
 		}
 		if !supportStreamRoute {
 			color.Yellow("Backend stream mode is disabled but configuration contains stream routes, abort")
-			return nil
+			return &summary{
+				created: 0,
+				updated: 0,
+				deleted: 0,
+			}, nil
 		}
 	}
 
