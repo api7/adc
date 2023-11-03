@@ -31,6 +31,51 @@ func NormalizeConfiguration(content *types.Configuration) {
 			service.Upstream.ID = service.Upstream.Name
 		}
 	}
+
+	if content.Meta != nil && len(content.Meta.Labels) > 0 {
+		labels := content.Meta.Labels
+
+		for _, route := range content.Routes {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.Services {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.Consumers {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.SSLs {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.PluginConfigs {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.ConsumerGroups {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.StreamRoutes {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+		for _, route := range content.Upstreams {
+			for k, v := range labels {
+				route.SetLabel(k, v)
+			}
+		}
+	}
 }
 
 func GetContentFromFile(filename string) (*types.Configuration, error) {

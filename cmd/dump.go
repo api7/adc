@@ -34,6 +34,7 @@ func newDumpCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("output", "o", "/dev/stdout", "output file path")
+	cmd.Flags().StringToStringP("labels", "l", map[string]string{}, "labels to filter resources")
 
 	return cmd
 }
@@ -53,6 +54,11 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		save = false
 	}
 
+	labels, err := cmd.Flags().GetStringToString("labels")
+	if err != nil {
+		return err
+	}
+
 	cluster, err := apisix.NewCluster(context.Background(), rootConfig.ClientConfig)
 	if err != nil {
 		return err
@@ -63,20 +69,28 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	svcs = types.FilterResources(labels, svcs)
+
 	routes, err := cluster.Route().List(context.Background())
 	if err != nil {
 		return err
 	}
+
+	routes = types.FilterResources(labels, routes)
 
 	consumers, err := cluster.Consumer().List(context.Background())
 	if err != nil {
 		return err
 	}
 
+	consumers = types.FilterResources(labels, consumers)
+
 	ssls, err := cluster.SSL().List(context.Background())
 	if err != nil {
 		return err
 	}
+
+	ssls = types.FilterResources(labels, ssls)
 
 	globalRules, err := cluster.GlobalRule().List(context.Background())
 	if err != nil {
@@ -88,10 +102,14 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	pluginConfigs = types.FilterResources(labels, pluginConfigs)
+
 	consumerGroups, err := cluster.ConsumerGroup().List(context.Background())
 	if err != nil {
 		return err
 	}
+
+	consumerGroups = types.FilterResources(labels, consumerGroups)
 
 	pluginMetadatas, err := cluster.PluginMetadata().List(context.Background())
 	if err != nil {
@@ -103,10 +121,14 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		return err
 	}
 
+	streamRoutes = types.FilterResources(labels, streamRoutes)
+
 	upstreams, err := cluster.Upstream().List(context.Background())
 	if err != nil {
 		return err
 	}
+
+	upstreams = types.FilterResources(labels, upstreams)
 
 	conf := &types.Configuration{
 		Routes:          routes,
@@ -119,6 +141,13 @@ func dumpConfiguration(cmd *cobra.Command) error {
 		PluginMetadatas: pluginMetadatas,
 		StreamRoutes:    streamRoutes,
 		Upstreams:       upstreams,
+	}
+
+	if len(labels) > 0 {
+		conf.Meta = &types.ConfigurationMeta{
+			Mode:   types.ModePartial,
+			Labels: labels,
+		}
 	}
 
 	if save {
