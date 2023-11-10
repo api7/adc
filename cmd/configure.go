@@ -9,16 +9,14 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
-	"strings"
-	"syscall"
-
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 // newConfigureCmd represents the configure command
@@ -177,8 +175,8 @@ func saveConfiguration(cmd *cobra.Command) error {
 
 	if rootConfig.Token == "" || overwrite {
 		fmt.Println("Please enter the APISIX token: ")
-		if term.IsTerminal(syscall.Stdin) {
-			token, err := term.ReadPassword(syscall.Stdin)
+		if term.IsTerminal(int(os.Stdin.Fd())) {
+			token, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return err
 			}
