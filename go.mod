@@ -19,7 +19,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/term v0.13.0
+	golang.org/x/term v0.14.0
 	sigs.k8s.io/yaml v1.4.0
 )
 
