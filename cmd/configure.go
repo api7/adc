@@ -9,14 +9,15 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"golang.org/x/term"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 // newConfigureCmd represents the configure command
@@ -35,10 +36,10 @@ func newConfigureCmd() *cobra.Command {
 	cmd.Flags().StringP("address", "a", "", "APISIX server address")
 
 	cmd.Flags().StringP("token", "t", "", "APISIX token")
-	cmd.Flags().String("capath", "", "ca path for mtls connection")
-	cmd.Flags().String("cert", "", "certificate for mtls connection")
-	cmd.Flags().String("cert-key", "", "certificate key for mtls connection")
-	cmd.Flags().BoolP("insecure", "k", false, "insecure connection for mtls connection")
+	cmd.Flags().String("capath", "", "path to CA certificate for mTLS connection")
+	cmd.Flags().String("cert", "", "path to client certificate for mTLS connection")
+	cmd.Flags().String("cert-key", "", "path to client certificate key for mTLS connection")
+	cmd.Flags().BoolP("insecure", "k", false, "set to true to accept any certificate presented by APISIX server and any host name in that certificate")
 
 	return cmd
 }
