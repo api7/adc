@@ -6,6 +6,7 @@ OS="$(uname)"
 # convert to standard arch names used in files
 if [ "x${ARCH}" = "xx86_64" ]; then
     ARCH="amd64"
+fi
 
 # convert to standard os names used in files
 # TODO: support Windows
