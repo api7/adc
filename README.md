@@ -6,35 +6,24 @@ It is built using the [Cobra](https://github.com/spf13/cobra) library.
 
 ## Installation
 
-### macOS/Linux
+ADC can be installed using the `go install` command:
 
-You can install ADC using the install script by running:
-
-```shell
-curl -sL https://run.api7.ai/adc/install | sh
+```
+go install github.com/api7/adc@latest
 ```
 
-To install a specific version or set a custom install directory, use the `ADC_VERSION` and `ADC_DIR` environment variables respectievely:
-
-```shell
-export ADC_VERSION=0.5.0
-export ADC_DIR=/bin
-```
+This will install the `adc` binary to your `$GOPATH/bin` directory.
 
 You can also download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
 
 ```bash
-wget https://github.com/api7/adc/releases/download/v0.5.0/adc_0.5.0_linux_amd64.tar.gz
-tar -zxvf adc_0.5.0_linux_amd64.tar.gz
+wget https://github.com/api7/adc/releases/download/v0.1.0/adc_0.1.0_linux_amd64.tar.gz
+tar -zxvf adc_0.1.0_linux_amd64.tar.gz
 mv adc /usr/local/bin/adc
 ```
 
 > [!IMPORTANT]
 > Make sure that these directories are in your `$PATH` environment variable.
-
-### Windows
-
-You can download the release for Windows from the [releases page](https://github.com/api7/adc/releases) and extract it. You can then use the `adc.exe` executable to run ADC.
 
 ## Usage
 
