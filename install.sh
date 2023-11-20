@@ -25,7 +25,7 @@ fi
 
 if [ "x${ADC_VERSION}" = "x" ]; then
     printf "Unable to find the latest version of ADC. Please set the ADC_VERSION environment variable and try again. For example, export ADC_VERSION=0.5.0\n"
-    exit
+    exit 1
 fi
 
 # if version has v in prefix, remove it
