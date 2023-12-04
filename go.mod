@@ -6,7 +6,7 @@ require (
 	github.com/api7/gopkg v0.2.0
 	github.com/fatih/color v1.16.0
 	github.com/gavv/httpexpect/v2 v2.16.0
-	github.com/getkin/kin-openapi v0.120.0
+	github.com/getkin/kin-openapi v0.122.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/mitchellh/go-homedir v1.1.0
