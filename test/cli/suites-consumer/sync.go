@@ -71,14 +71,12 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 		ginkgo.It("should sync data to APISIX", func() {
 			expect := httpexpect.Default(ginkgo.GinkgoT(), "http://127.0.0.1:9080")
 
-			err := s.DeleteRoute("route")
-			gomega.Expect(err).To(gomega.BeNil(), "check route delete")
-			err = s.DeleteService("svc")
-			gomega.Expect(err).To(gomega.BeNil(), "check service delete")
-			err = s.DeleteConsumer(user)
-			gomega.Expect(err).To(gomega.BeNil(), "check consumer delete")
+			resp := expect.GET("/get").WithHeader("apikey", authKey).
+				WithHost("foo.com").Expect()
+			resp.Status(http.StatusOK)
+			resp.Header("X-Ratelimit-Remaining").IsEqual("1")
 
-			_, err = s.UpdateConsumer(consumer)
+			_, err := s.UpdateConsumer(consumer)
 			gomega.Expect(err).To(gomega.BeNil(), "check consumer update")
 			_, err = s.UpdateService(service)
 			gomega.Expect(err).To(gomega.BeNil(), "check service update")
@@ -87,7 +85,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 
 			time.Sleep(time.Second * 1)
 
-			resp := expect.GET("/get").WithHeader("apikey", authKey).
+			resp = expect.GET("/get").WithHeader("apikey", authKey).
 				WithHost("foo.com").Expect()
 			resp.Status(http.StatusOK)
 			resp.Header("X-Ratelimit-Remaining").IsEqual("1")
