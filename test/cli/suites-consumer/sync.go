@@ -29,6 +29,7 @@ var _ = ginkgo.Describe("`adc sync` tests", func() {
 					"time_window":   60,
 					"rejected_code": 503,
 					"key":           "remote_addr",
+					"_vid":          "suites-consumer",
 				},
 			},
 		}
