@@ -93,7 +93,7 @@ func TestConvert(t *testing.T) {
 			},
 			want: &apitypes.Configuration{
 				Services: []*apitypes.Service{
-					&apitypes.Service{
+					{
 						Name:        "API 101",
 						Description: `API 101 template for learning API request basics. Follow along with the webinar / video or just open the first request and hit **Send**!`,
 						Upstream: &apitypes.Upstream{
@@ -121,35 +121,35 @@ func TestConvert(t *testing.T) {
 					},
 				},
 				Routes: []*apitypes.Route{
-					&apitypes.Route{
+					{
 						Name:        "api-101_get_customer",
 						Description: "Get one customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"GET"},
 						Uris:    []string{"/customer"},
 					},
-					&apitypes.Route{
+					{
 						Name:        "api-101_post_customer",
 						Description: "Add new customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"POST"},
 						Uris:    []string{"/customer"},
 					},
-					&apitypes.Route{
+					{
 						Name:        "api-101_delete_customer-customer-id",
 						Description: "Remove customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"DELETE"},
 						Uris:    []string{"/customer/*"},
 					},
-					&apitypes.Route{
+					{
 						Name:        "api-101_put_customer-customer-id",
 						Description: "Update customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"PUT"},
 						Uris:    []string{"/customer/*"},
 					},
-					&apitypes.Route{
+					{
 						Name:        "api-101_get_customers",
 						Description: "Get all customers",
 						// Labels:      []string{"default"},
@@ -167,7 +167,7 @@ func TestConvert(t *testing.T) {
 			},
 			want: &apitypes.Configuration{
 				Services: []*apitypes.Service{
-					&apitypes.Service{
+					{
 						Name:        "API 101",
 						Description: "modify operationId",
 						Upstream: &apitypes.Upstream{
@@ -190,14 +190,14 @@ func TestConvert(t *testing.T) {
 					},
 				},
 				Routes: []*apitypes.Route{
-					&apitypes.Route{
+					{
 						Name:        "update Customer",
 						Description: "Update customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"PUT"},
 						Uris:    []string{"/customer/*"},
 					},
-					&apitypes.Route{
+					{
 						Name:        "getCustomers",
 						Description: "Get all customers",
 						// Labels:      []string{"default"},
@@ -215,7 +215,7 @@ func TestConvert(t *testing.T) {
 			},
 			want: &apitypes.Configuration{
 				Services: []*apitypes.Service{
-					&apitypes.Service{
+					{
 						Name:        "API 101",
 						Description: "modify operationId",
 						Upstream: &apitypes.Upstream{
@@ -240,7 +240,7 @@ func TestConvert(t *testing.T) {
 					},
 				},
 				Routes: []*apitypes.Route{
-					&apitypes.Route{
+					{
 						Name:        "getCustomers",
 						Description: "Get all customers",
 						// Labels:      []string{"default", "customer"},
@@ -258,7 +258,7 @@ func TestConvert(t *testing.T) {
 			},
 			want: &apitypes.Configuration{
 				Services: []*apitypes.Service{
-					&apitypes.Service{
+					{
 						Name:        "API 101",
 						Description: "modify operationId",
 						Upstream: &apitypes.Upstream{
@@ -283,7 +283,7 @@ func TestConvert(t *testing.T) {
 					},
 				},
 				Routes: []*apitypes.Route{
-					&apitypes.Route{
+					{
 						Name:        "getCustomers",
 						Description: "Get all customers",
 						// Labels:      []string{"default", "customer"},
@@ -303,21 +303,24 @@ func TestConvert(t *testing.T) {
 				return
 			}
 			if got != nil {
+				// normally the converter should only generate one service
+				svc := tt.want.Services[0]
+				svc.ID = common.GenID(svc.Name)
+				if svc.Upstream != nil {
+					if svc.Upstream.Nodes == nil {
+						svc.Upstream.Nodes = []apitypes.UpstreamNode{
+							{},
+						}
+					}
+					svc.Upstream.Name = Slugify("Upstream for", svc.Name)
+					svc.Upstream.ID = common.GenID(svc.Upstream.Name)
+				}
+
 				for _, route := range tt.want.Routes {
 					route.ID = common.GenID(route.Name)
+					route.ServiceID = svc.ID
 				}
-				for _, svc := range tt.want.Services {
-					svc.ID = common.GenID(svc.Name)
-					if svc.Upstream != nil {
-						if svc.Upstream.Nodes == nil {
-							svc.Upstream.Nodes = []apitypes.UpstreamNode{
-								apitypes.UpstreamNode{},
-							}
-						}
-						svc.Upstream.Name = Slugify("Upstream for", svc.Name)
-						svc.Upstream.ID = common.GenID(svc.Upstream.Name)
-					}
-				}
+
 				assert.Equal(t, tt.want.Services, got.Services)
 				assert.Equal(t, tt.want.Routes, got.Routes)
 			}

@@ -66,7 +66,7 @@ func Convert(ctx context.Context, oas []byte) (*apitypes.Configuration, error) {
 	ups.ID = common.GenID(ups.Name)
 
 	result.Services = []*apitypes.Service{
-		&apitypes.Service{
+		{
 			ID:          common.GenID(doc.Info.Title),
 			Name:        doc.Info.Title,
 			Description: doc.Info.Description,
@@ -76,13 +76,13 @@ func Convert(ctx context.Context, oas []byte) (*apitypes.Configuration, error) {
 	}
 
 	// handle routes
-	routes := createRoutes(doc, doc.Info.Title)
+	routes := createRoutes(doc, result.Services[0].ID)
 	result.Routes = routes
 
 	return &result, nil
 }
 
-func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
+func createRoutes(doc *openapi3.T, serviceID string) []*apitypes.Route {
 	// create a sorted array of paths, to be deterministic in our output order
 	sortedPaths := make([]string, len(doc.Paths))
 	i := 0
@@ -108,7 +108,7 @@ func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
 			// route name
 			routeName := operation.OperationID
 			if routeName == "" {
-				routeName = Slugify(serviceName, method, path)
+				routeName = Slugify(doc.Info.Title, method, path)
 			}
 			routeDescription := operation.Summary
 			if routeDescription == "" {
@@ -124,8 +124,9 @@ func createRoutes(doc *openapi3.T, serviceName string) []*apitypes.Route {
 				Name:        routeName,
 				Description: routeDescription,
 				// Labels:      tags,
-				Methods: []string{method},
-				Uris:    []string{routePath},
+				Methods:   []string{method},
+				Uris:      []string{routePath},
+				ServiceID: serviceID,
 			}
 			routes = append(routes, &route)
 		}
