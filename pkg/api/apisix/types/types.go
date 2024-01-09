@@ -589,7 +589,7 @@ func (c *ConsumerGroup) SetLabel(k, v string) {
 }
 
 const (
-	UpstreamPassHost = "host"
+	UpstreamPassHostPass = "pass"
 )
 
 type PluginMetadata struct {

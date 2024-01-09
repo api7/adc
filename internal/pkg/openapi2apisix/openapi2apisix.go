@@ -184,7 +184,7 @@ func createUpstream(targets []*url.URL, varUris []string) *apitypes.Upstream {
 			Send:    60,
 			Read:    60,
 		},
-		PassHost: apitypes.UpstreamPassHost,
+		PassHost: apitypes.UpstreamPassHostPass,
 	}
 
 	return &upstream
