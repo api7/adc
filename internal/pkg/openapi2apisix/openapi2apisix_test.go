@@ -74,6 +74,8 @@ var (
 	tagsTest []byte
 	//go:embed testdata/tags.json
 	tagsJsonTest []byte
+	//go:embed testdata/urlVariables.yaml
+	urlVariables []byte
 )
 
 func TestConvert(t *testing.T) {
@@ -140,14 +142,14 @@ func TestConvert(t *testing.T) {
 						Description: "Remove customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"DELETE"},
-						Uris:    []string{"/customer/*"},
+						Uris:    []string{"/customer/:customer_id"},
 					},
 					{
 						Name:        "api-101_put_customer-customer-id",
 						Description: "Update customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"PUT"},
-						Uris:    []string{"/customer/*"},
+						Uris:    []string{"/customer/:customer_id"},
 					},
 					{
 						Name:        "api-101_get_customers",
@@ -195,7 +197,7 @@ func TestConvert(t *testing.T) {
 						Description: "Update customer",
 						// Labels:      []string{"default"},
 						Methods: []string{"PUT"},
-						Uris:    []string{"/customer/*"},
+						Uris:    []string{"/customer/:customer_id"},
 					},
 					{
 						Name:        "getCustomers",
@@ -289,6 +291,57 @@ func TestConvert(t *testing.T) {
 						// Labels:      []string{"default", "customer"},
 						Methods: []string{"GET"},
 						Uris:    []string{"/customers"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "urlVariables",
+			args: args{
+				content: urlVariables,
+			},
+			want: &apitypes.Configuration{
+				Services: []*apitypes.Service{
+					{
+						Name: "URL variables",
+						Upstream: &apitypes.Upstream{
+							Scheme: "https",
+							Nodes: []apitypes.UpstreamNode{
+								{
+									Host:   "example.com",
+									Port:   443,
+									Weight: 100,
+								},
+							},
+							Timeout: &apitypes.UpstreamTimeout{
+								Connect: 60,
+								Send:    60,
+								Read:    60,
+							},
+							PassHost: apitypes.UpstreamPassHostPass,
+						},
+						//  Labels:      make([]apitypes.Labels, 0),
+					},
+				},
+				Routes: []*apitypes.Route{
+					{
+						Name: "url-variables_get_base64-value",
+						// Labels:      []string{"default"},
+						Methods: []string{"GET"},
+						Uris:    []string{"/base64/:value"},
+					},
+					{
+						Name: "url-variables_get_basic-auth-user-passwd",
+						// Labels:      []string{"default"},
+						Methods: []string{"GET"},
+						Uris:    []string{"/basic-auth/:user/:passwd"},
+					},
+					{
+						Name: "url-variables_get_digest-auth-qop-user-passwd-algorithm-stale-after",
+						// Labels:      []string{"default"},
+						Methods: []string{"GET"},
+						Uris:    []string{"/digest-auth/:qop/:user/:passwd/:algorithm/:stale_after"},
 					},
 				},
 			},
