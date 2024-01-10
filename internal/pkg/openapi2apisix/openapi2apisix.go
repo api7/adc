@@ -22,7 +22,9 @@ var (
 )
 
 func convertPathVariables(path string) string {
-	return _pathVariableRegex.ReplaceAllString(path, "*")
+	return _pathVariableRegex.ReplaceAllStringFunc(path, func(match string) string {
+		return ":" + match[1:len(match)-1]
+	})
 }
 
 // Slugify converts a name to a valid name by removing and replacing unallowed characters

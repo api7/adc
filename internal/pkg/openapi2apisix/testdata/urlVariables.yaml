@@ -1,0 +1,86 @@
+openapi: 3.0.1
+info:
+  title: URL variables
+  version: 1.0.0
+servers:
+- url: https://example.com/
+paths:
+  /base64/{value}:
+    get:
+      tags:
+      - Dynamic data
+      parameters:
+      - name: value
+        in: path
+        required: true
+        schema:
+          type: string
+          default: SFRUUEJJTiBpcyBhd2Vzb21l
+      responses:
+        200:
+          description: Decoded base64 content.
+          content: {}
+  /basic-auth/{user}/{passwd}:
+    get:
+      tags:
+      - Auth
+      parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: passwd
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: Sucessful authentication.
+          content: {}
+        401:
+          description: Unsuccessful authentication.
+          content: {}
+  /digest-auth/{qop}/{user}/{passwd}/{algorithm}/{stale_after}:
+    get:
+      tags:
+      - Auth
+      parameters:
+      - name: qop
+        in: path
+        description: auth or auth-int
+        required: true
+        schema:
+          type: string
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: passwd
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: algorithm
+        in: path
+        description: MD5, SHA-256, SHA-512
+        required: true
+        schema:
+          type: string
+          default: MD5
+      - name: stale_after
+        in: path
+        required: true
+        schema:
+          type: string
+          default: never
+      responses:
+        200:
+          description: Sucessful authentication.
+          content: {}
+        401:
+          description: Unsuccessful authentication.
+          content: {}
+components: {}
