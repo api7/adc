@@ -47,7 +47,23 @@ adc configure
 
 Configures ADC with APISIX's server address and token. Running this command will prompt you for an APISIX server address and API token and saves them to a configuration file.
 
-By default, ADC creates a configuration file at `$HOME/apisix.yaml` and this can be changed manually.
+By default, ADC creates a configuration file at `$HOME/.adc.yaml` and this can be changed manually.
+
+#### Enable mTLS
+
+You can also enable mututal TLS (mTLS) to protect the ADC-APISIX Admin API communication. These configuration options are available as flags to the `configure` subcommand:
+
+| Option   | Type   | Description                                                                                                                                      |
+| -------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| capath   | string | Path to the certificate authority certificate for mTLS connection                                                                                |
+| cert     | string | Path to client certificate for mTLS connection                                                                                                   |
+| cert-key | string | Path to client certificate key for mTLS connection                                                                                               |
+| insecure | bool   | If set to `true`, accepts any certificate presented by the APISIX server and any host name in that certificate. Should be used only for testing. |
+
+> [!NOTE]
+> You can also directly add these options to your configuration file (`$HOME/.adc.yaml`).
+
+To learn more about enabling mTLS, see "[Configure mTLS for client to APISIX](https://apisix.apache.org/docs/apisix/tutorials/client-to-apisix-mtls/)."
 
 ### adc ping
 
@@ -71,7 +87,7 @@ Validates the provided APISIX configuration file.
 adc sync
 ```
 
-Syncs the local configuration present in the `$HOME/apisix.yaml` file (or specified configuration file) to the connected APISIX instance.
+Syncs the local configuration present in the `apisix.yaml` file (or specified configuration file) to the connected APISIX instance.
 
 ### adc dump
 
