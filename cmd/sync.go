@@ -34,6 +34,7 @@ func newSyncCmd() *cobra.Command {
 
 	cmd.Flags().StringArrayP("file", "f", []string{"apisix.yaml"}, "configuration file path")
 	cmd.Flags().BoolP("partial", "p", false, "partial apply mode. In partial mode, only add and update event will be applied.")
+	cmd.Flags().BoolP("dryRun", "d", false, "dry run mode. In dry run mode, no configuration will be applied.")
 
 	return cmd
 }
@@ -146,6 +147,12 @@ func sync(cmd *cobra.Command, dryRun bool) error {
 	if len(files) == 0 {
 		color.Red("No input files")
 		return nil
+	}
+
+	dryRun, err = cmd.Flags().GetBool("dryRun")
+	if err != nil {
+		color.Red("Failed to get dry run option: %v", err)
+		return err
 	}
 
 	partial := false
