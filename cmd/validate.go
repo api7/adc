@@ -96,7 +96,7 @@ func displayConfigOverview(d *types.Configuration) {
 		changed = true
 	}
 	if len(d.Upstreams) > 0 {
-		msg += fmt.Sprintf(", upstreams: %v", len(d.StreamRoutes))
+		msg += fmt.Sprintf(", upstreams: %v", len(d.Upstreams))
 		changed = true
 	}
 	if !changed {
