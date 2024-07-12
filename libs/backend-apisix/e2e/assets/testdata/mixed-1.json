@@ -1,0 +1,307 @@
+[
+  {
+    "resourceType": "ssl",
+    "type": "create",
+    "resourceId": "5f543afdb6ba8aeef955c6c951d3bd70c1de8361",
+    "resourceName": "test.com",
+    "newValue": {
+      "type": "server",
+      "snis": ["test.com"],
+      "certificates": [
+        {
+          "certificate": "-----BEGIN CERTIFICATE-----\nMIICrTCCAZUCFCcH5+jEDUhpTxEQo/pZYC91e2aYMA0GCSqGSIb3DQEBCwUAMBEx\nDzANBgNVBAMMBlJPT1RDQTAgFw0yNDAxMTgwNjAzMDNaGA8yMTIzMTIyNTA2MDMw\nM1owEzERMA8GA1UEAwwIdGVzdC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQCVkfufMRK2bckdpQ/aRfcaTxmjsv5Mb+sJdhb0QuEuXp/VgN3yzFM0\nzCmAeBZwNKpU3HZDv0tnkTx7OARYpj5Bw1ole0EfPVPKBRjlLE56tabzyd4vdLV2\nbk7jYH+H8NjGZNEYLm9MdWiB4Ulyc0+XFA0ZL5WWKOi+oSQVUibT8QK0CENFKNLP\nQjEXlbyujzRS3u6r99EEEy8+3psBA2EELq8GAjEp+jilWggBhUEpLQxCHhHeNevR\nkg5iEvhOhEVKtr5xvgolg5Wvz7GmDulIW9MCu0dIXim52H/spPwgi3yRraY1XjxU\nREyj5tcY7n7LBESkx/ODXEyCkICIPpo9AgMBAAEwDQYJKoZIhvcNAQELBQADggEB\nADBU5XvbnjaF4rpQoqdzgK6BuRvD/Ih/rh+xc+G9mm+qaHx0g3TdTqyhCvSg6aRW\njDq4Z0NILdb6wmJcunua1jjmOQMXER5y34Xfn21+dzjLN2Bl+/vZ/HyXlCjxkppG\nZAsd1H0/jmXqN1zddIThxOccmRcDEP+9GT3hba50sijFbO30Zx+ORJCoT8he6Kyw\nKdOs/yyukafoAtlpoPR+ao/kumto6w/rLfFlEsehU0dMGNgPVSxxVNtBSdxPTUBk\nD6mfqB4f//2DuAmiO+l5RmPUmumqzcYlpd+oAdy3OSnNEHbgxishZr/GI3s6DmUh\n16bgI69aQ5F+MnN3trvaufc=\n-----END CERTIFICATE-----\n",
+          "key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCVkfufMRK2bckd\npQ/aRfcaTxmjsv5Mb+sJdhb0QuEuXp/VgN3yzFM0zCmAeBZwNKpU3HZDv0tnkTx7\nOARYpj5Bw1ole0EfPVPKBRjlLE56tabzyd4vdLV2bk7jYH+H8NjGZNEYLm9MdWiB\n4Ulyc0+XFA0ZL5WWKOi+oSQVUibT8QK0CENFKNLPQjEXlbyujzRS3u6r99EEEy8+\n3psBA2EELq8GAjEp+jilWggBhUEpLQxCHhHeNevRkg5iEvhOhEVKtr5xvgolg5Wv\nz7GmDulIW9MCu0dIXim52H/spPwgi3yRraY1XjxUREyj5tcY7n7LBESkx/ODXEyC\nkICIPpo9AgMBAAECggEADKrg+zIOSioRKvQUXCGp1G4Xl1AtDm86IkKAni5d4O39\nrnjsE0iv0VxrNWi2ScmEFYzYbVNxwPNBgpQTdiiaRDqV02/Va55njsgQvDQc73Kc\nEbCqoy1Iwx+Dield07cXvPHD7b7dCUY2VC2u6UUP3BVEKLppel67m42NP0sGY9O4\nALutC42zU8BFLRnt0koSfcTdEcwFPFDQ0N8H2wI/Z7Y65QniilUqD4AS/SH8MesO\n4pjEXhZz9ok7WgduK2LVukGvt1QedTsRh8qwHm3PgT/pF2+35eeT0nYTz2VscPBI\ngazEtLQFLhtXZ4aH3MUTsXVkQLEe7XeILHrsnCGbBwKBgQC7q8LzHFdVHc46qqiB\nppMfGEYlV4LCoWbHfEl+nPznKCtcjrN8unoN6nyGq+lt2bwUqZdnpvYSqydPMujH\nCAWnRIX+7H4ELIRKV62oVibd2ovfubMGIzCGUTObl8Vn2m/ovtMwZn9mvPCY4hve\n8TY80apdZae+Ew0Bfn2ZNDo+vwKBgQDMBviZdbE78tONwfKbfDeLVN62/TC5mQad\nIzz2G5AbolTKq6qByJlO7ZfcjdsLJTpeKfbzU2pHMpWNnTjN0mHgyBFuvLgoaN1n\n2qXnOPyv8Xir/N7eHZ2K9lvGrSPY4vszzLTabKqVYiufJYjb0okH0AWg8+4FxIHb\n+gms0eWiAwKBgEu3U7MUByQfH1pKCiws0YSlHX/pW6c8ySPIwDomCl8UtNHl/QJg\nlefRaCZJa6dXRmurtJssIHGNvhFU/9d1JBrFKa6dKYZzk3gPAdA92fZ+OxqraFAc\nmHJIhqLKy+lHlwj3HGuVnucLaaK07vu2o+RLzwlZfyDPvNqSdwf9q1YvAoGAdoia\nR7XbuUNzawlB5Nl+/6DYH6Hre/iOoh6F3UnYKGXgMzsWvX4Iq5VXxBhaKRiA15Iz\n2dwdg628u2CbTuCqYsh5cEeOClQaRar+9d3i2GlGvU0VQiAclk5YtY2DpQ8B+G82\npyu40z8MrtJEt8mSOQq/KmptX8Zx15ZlppTvf3cCgYBYxCWn49saCr0FnhIheenc\njlExhQ3ebcwJBSuzNKd2y94zUrQScVpxg27ZAXUfJpppcoY73elvYnczRe3JNaVY\n1b+66bQSAevT5GE8n2C3olLtNmZMvT41Pra0s3St0YnyPtH8acgeHw8Vy5/0/MhZ\nm7/qElKtlWlmUQO1CLdZhQ==\n-----END PRIVATE KEY-----\n"
+        }
+      ]
+    }
+  },
+  {
+    "resourceType": "service",
+    "type": "create",
+    "resourceId": "6e899c1108b88e75d4887b85f9a62c26d9571739",
+    "resourceName": "service1",
+    "newValue": {
+      "name": "service1",
+      "description": "service1 description",
+      "upstream": {
+        "name": "default",
+        "scheme": "http",
+        "type": "roundrobin",
+        "hash_on": "vars",
+        "nodes": [
+          {
+            "host": "host",
+            "port": 1100,
+            "weight": 1100,
+            "priority": 0
+          }
+        ],
+        "retry_timeout": 0,
+        "pass_host": "pass",
+        "checks": {
+          "active": {
+            "type": "tcp",
+            "timeout": 1,
+            "concurrency": 10,
+            "http_path": "/",
+            "https_verify_certificate": true,
+            "healthy": {
+              "interval": 1,
+              "http_statuses": [200, 302],
+              "successes": 2
+            },
+            "unhealthy": {
+              "interval": 1,
+              "http_statuses": [429, 404, 500, 501, 502, 503, 504, 505],
+              "http_failures": 5,
+              "tcp_failures": 2,
+              "timeouts": 3
+            }
+          }
+        }
+      },
+      "plugins": {
+        "limit-count": {
+          "_meta": {
+            "disable": false
+          },
+          "allow_degradation": false,
+          "count": 2,
+          "key": "$consumer_name $remote_addr",
+          "key_type": "var_combination",
+          "policy": "local",
+          "rejected_code": 503,
+          "show_limit_quota_header": true,
+          "time_window": 60
+        }
+      },
+      "routes": [
+        {
+          "uris": ["/anything"],
+          "name": "route1.1",
+          "description": "",
+          "methods": ["GET"],
+          "enable_websocket": false,
+          "plugins": {
+            "limit-count": {
+              "_meta": {
+                "disable": false
+              },
+              "allow_degradation": false,
+              "count": 2,
+              "key": "$consumer_name $remote_addr",
+              "key_type": "var_combination",
+              "policy": "local",
+              "rejected_code": 503,
+              "show_limit_quota_header": true,
+              "time_window": 60
+            }
+          }
+        },
+        {
+          "uris": ["/anything"],
+          "name": "route1.2",
+          "description": "",
+          "methods": ["POST"],
+          "enable_websocket": false
+        }
+      ]
+    }
+  },
+  {
+    "resourceType": "service",
+    "type": "create",
+    "resourceId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a",
+    "resourceName": "service2",
+    "newValue": {
+      "name": "service2",
+      "description": "service2 description",
+      "upstream": {
+        "name": "default",
+        "scheme": "http",
+        "type": "roundrobin",
+        "hash_on": "vars",
+        "nodes": [
+          {
+            "host": "host",
+            "port": 1100,
+            "weight": 1100,
+            "priority": 0
+          }
+        ],
+        "retry_timeout": 0,
+        "pass_host": "pass"
+      },
+      "routes": [
+        {
+          "uris": ["/getSomething"],
+          "name": "route2.1",
+          "description": "",
+          "methods": ["GET", "POST"],
+          "enable_websocket": false,
+          "plugins": {
+            "limit-count": {
+              "_meta": {
+                "disable": false
+              },
+              "allow_degradation": false,
+              "count": 2,
+              "key": "$consumer_name $remote_addr",
+              "key_type": "var_combination",
+              "policy": "local",
+              "rejected_code": 503,
+              "show_limit_quota_header": true,
+              "time_window": 60
+            }
+          }
+        },
+        {
+          "uris": ["/postSomething"],
+          "name": "route2.2",
+          "description": "",
+          "methods": ["POST", "PUT"],
+          "enable_websocket": false
+        }
+      ]
+    }
+  },
+  {
+    "resourceType": "route",
+    "type": "create",
+    "resourceId": "801b75f6eb1432c889cd15d3cffb2fa28b7bf95c",
+    "resourceName": "route1.1",
+    "newValue": {
+      "uris": ["/anything"],
+      "name": "route1.1",
+      "description": "",
+      "methods": ["GET"],
+      "enable_websocket": false,
+      "plugins": {
+        "limit-count": {
+          "_meta": {
+            "disable": false
+          },
+          "allow_degradation": false,
+          "count": 2,
+          "key": "$consumer_name $remote_addr",
+          "key_type": "var_combination",
+          "policy": "local",
+          "rejected_code": 503,
+          "show_limit_quota_header": true,
+          "time_window": 60
+        }
+      }
+    },
+    "parentId": "6e899c1108b88e75d4887b85f9a62c26d9571739"
+  },
+  {
+    "resourceType": "route",
+    "type": "create",
+    "resourceId": "9764db8eeb0f13c2a9762161c418504d74ac64a2",
+    "resourceName": "route1.2",
+    "newValue": {
+      "uris": ["/anything"],
+      "name": "route1.2",
+      "description": "",
+      "methods": ["POST"],
+      "enable_websocket": false
+    },
+    "parentId": "6e899c1108b88e75d4887b85f9a62c26d9571739"
+  },
+  {
+    "resourceType": "route",
+    "type": "create",
+    "resourceId": "143e485dfbcace6afb3d40cd26a20cb6f3d8a469",
+    "resourceName": "route2.1",
+    "newValue": {
+      "uris": ["/getSomething"],
+      "name": "route2.1",
+      "description": "",
+      "methods": ["GET", "POST"],
+      "enable_websocket": false,
+      "plugins": {
+        "limit-count": {
+          "_meta": {
+            "disable": false
+          },
+          "allow_degradation": false,
+          "count": 2,
+          "key": "$consumer_name $remote_addr",
+          "key_type": "var_combination",
+          "policy": "local",
+          "rejected_code": 503,
+          "show_limit_quota_header": true,
+          "time_window": 60
+        }
+      }
+    },
+    "parentId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a"
+  },
+  {
+    "resourceType": "route",
+    "type": "create",
+    "resourceId": "12e10811f0bf2d39998936bf81e33314ad7ff6ae",
+    "resourceName": "route2.2",
+    "newValue": {
+      "uris": ["/postSomething"],
+      "name": "route2.2",
+      "description": "",
+      "methods": ["POST", "PUT"],
+      "enable_websocket": false
+    },
+    "parentId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a"
+  },
+  {
+    "resourceType": "consumer",
+    "type": "create",
+    "resourceId": "tom",
+    "resourceName": "tom",
+    "newValue": {
+      "username": "tom",
+      "description": "",
+      "plugins": {
+        "key-auth": {
+          "key": "tom"
+        }
+      }
+    }
+  },
+  {
+    "resourceType": "global_rule",
+    "type": "create",
+    "resourceId": "prometheus",
+    "resourceName": "prometheus",
+    "newValue": {
+      "_meta": {
+        "disable": false
+      },
+      "prefer_name": false
+    }
+  },
+  {
+    "resourceType": "plugin_metadata",
+    "type": "create",
+    "resourceId": "http-logger",
+    "resourceName": "http-logger",
+    "newValue": {
+      "log_format": {
+        "@timestamp": "$time_iso8601",
+        "client_ip": "$remote_addr",
+        "host": "$host"
+      }
+    }
+  },
+  {
+    "resourceType": "plugin_metadata",
+    "type": "create",
+    "resourceId": "tcp-logger",
+    "resourceName": "tcp-logger",
+    "newValue": {
+      "log_format": {
+        "@timestamp": "$time_iso8601",
+        "client_ip": "$remote_addr",
+        "host": "$host"
+      }
+    }
+  }
+]

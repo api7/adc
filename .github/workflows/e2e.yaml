@@ -1,0 +1,59 @@
+name: E2E Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  apisix:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_APISIX_VERSION: 3.9.0-debian
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup backend environment
+      - name: Setup Apache APISIX
+        working-directory: ./libs/backend-apisix/e2e/assets
+        run: docker compose up -d; sleep 10
+
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: npx nx run backend-apisix:e2e
+
+  api7:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [3.2.13.0, 3.2.14.0]
+    env:
+      BACKEND_API7_DOWNLOAD_URL: https://run.api7.ai/api7-ee/api7-ee-v${{ matrix.version }}.tar.gz
+      BACKEND_API7_LICENSE: ${{ secrets.BACKEND_API7_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run API7 E2E tests
+      - name: Run E2E tests
+        run: npx nx run backend-api7:e2e

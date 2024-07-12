@@ -1,0 +1,53 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: http://httpbin.us/{test1}/{test2}
+    variables:
+      test1:
+        default: "test1Value"
+      test2:
+        default: "test2Value"
+  - url: https://httpbin.org/testPath
+paths:
+  /anything:
+    get:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    post:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    delete:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    patch:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

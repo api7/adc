@@ -1,0 +1,27 @@
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  enable_control: true
+  control:
+    ip: "0.0.0.0"
+    port: 9092
+deployment:
+  admin:
+    allow_admin:
+      - 0.0.0.0/0
+    admin_key:
+      - name: "admin"
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin
+    https_admin: true
+    admin_api_mtls:
+      admin_ssl_cert: "/mtls/server.cer"
+      admin_ssl_cert_key: "/mtls/server.key"
+      admin_ssl_ca_cert: "/mtls/ca.cer"
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+    timeout: 30
+nginx_config:
+  worker_processes: 1
