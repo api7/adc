@@ -1,4 +1,4 @@
-# Apache APISIX backend for ADC
+# Apache APISIX Backend for ADC
 
 **This backend is experimental and still has many unresolved issues.**
 
@@ -6,10 +6,10 @@
 
 | Features      | Supported |
 | ------------- | --------- |
-| Dump to ADC   | ✅         |
-| Sync from ADC | ✅         |
+| Dump to ADC   | ✅        |
+| Sync from ADC | ✅        |
 
-## Known issues/limitations
+## Known Issues/Limitations
 
 ### ID-based upstream references are not supported
 
