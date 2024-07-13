@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { BackendAPISIX } from '../src';
+import { server, token } from './support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -17,8 +18,8 @@ describe('Sync and Dump - 1', () => {
 
   beforeAll(() => {
     backend = new BackendAPISIX({
-      server: globalThis.server,
-      token: globalThis.token,
+      server,
+      token,
       tlsSkipVerify: true,
       gatewayGroup: 'default',
     });

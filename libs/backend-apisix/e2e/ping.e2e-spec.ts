@@ -1,12 +1,13 @@
 import { join } from 'path';
 
 import { BackendAPISIX } from '../src';
+import { server, token } from './support/constants';
 
 describe('Ping', () => {
   it('should success (http)', async () => {
     const backend = new BackendAPISIX({
-      server: globalThis.server,
-      token: globalThis.token,
+      server,
+      token,
     });
     await backend.ping();
   });
@@ -14,7 +15,7 @@ describe('Ping', () => {
   it('should success (mTLS)', async () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
-      token: globalThis.token,
+      token,
       tlsClientCertFile: join(__dirname, 'assets/apisix_conf/mtls/client.cer'),
       tlsClientKeyFile: join(__dirname, 'assets/apisix_conf/mtls/client.key'),
       caCertFile: join(__dirname, 'assets/apisix_conf/mtls/ca.cer'),
@@ -35,7 +36,7 @@ describe('Ping', () => {
   it('should failed (self-signed certificate)', async () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
-      token: globalThis.token,
+      token,
     });
     await expect(backend.ping()).rejects.toThrow(
       'unable to verify the first certificate',
@@ -45,7 +46,7 @@ describe('Ping', () => {
   it('should failed (miss client certificates)', async () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
-      token: globalThis.token,
+      token,
       caCertFile: join(__dirname, 'assets/apisix_conf/mtls/ca.cer'),
     });
 
