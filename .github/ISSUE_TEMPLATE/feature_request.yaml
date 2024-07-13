@@ -1,0 +1,22 @@
+name: Feature Request
+description: Suggest a new feature
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to suggest a new feature.
+
+        _The more information you share, the faster we can help you._
+
+        Please check the [open issues](https://github.com/api7/adc/issues) to avoid duplication.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature you would like to see.
+      placeholder: |
+        As a user, I want to..., so that...
+    validations:
+      required: true
