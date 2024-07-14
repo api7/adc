@@ -61,7 +61,7 @@ const generateToken = async () => {
     { validateStatus: () => true },
   );
 
-  globalThis.token = resp.data.value.token;
+  process.env.TOKEN = resp.data.value.token;
 };
 
 export default async () => {
@@ -69,5 +69,5 @@ export default async () => {
   await activateAPI7();
   await generateToken();
 
-  globalThis.server = 'https://localhost:7443';
+  process.env.SERVER = 'https://localhost:7443';
 };

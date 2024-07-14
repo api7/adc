@@ -3,8 +3,8 @@ import { BackendAPI7 } from '../src';
 describe('Ping', () => {
   it('should success', async () => {
     const backend = new BackendAPI7({
-      server: globalThis.server,
-      token: globalThis.token,
+      server: process.env.SERVER,
+      token: process.env.TOKEN,
       tlsSkipVerify: true,
     });
     await backend.ping();
@@ -22,8 +22,8 @@ describe('Ping', () => {
 
   it('should failed (self-signed certificate)', async () => {
     const backend = new BackendAPI7({
-      server: globalThis.server,
-      token: globalThis.token,
+      server: process.env.SERVER,
+      token: process.env.TOKEN,
     });
     await expect(backend.ping()).rejects.toThrow('self-signed certificate');
   });
