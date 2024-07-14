@@ -19,6 +19,8 @@ jobs:
         with:
           version: latest
       - name: Build ADC
+        env:
+          NODE_VERSION: 20.15.1
         run: |
           pnpm install
           NODE_ENV=production npx nx build cli
