@@ -12,7 +12,7 @@
     "@nx/js": "18.3.4",
     "@nx/node": "18.3.4",
     "@nx/webpack": "18.3.4",
-    "@nx/workspace": "18.3.4",
+    "@nx/workspace": "19.4.3",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.13",
     "@svgr/webpack": "^8.1.0",
     "@swc-node/register": "~1.8.0",
