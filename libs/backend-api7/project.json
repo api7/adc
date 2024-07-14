@@ -26,7 +26,8 @@
       ],
       "options": {
         "jestConfig": "libs/backend-api7/jest.config.e2e.ts",
-        "passWithNoTests": true
+        "passWithNoTests": true,
+        "runInBand": true
       }
     }
   },

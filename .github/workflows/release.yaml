@@ -15,10 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-      - uses: pnpm/action-setup@v2
-        with:
-          version: latest
+      - uses: pnpm/action-setup@v4
       - name: Build ADC
+        env:
+          NODE_VERSION: 20.15.1
         run: |
           pnpm install
           NODE_ENV=production npx nx build cli

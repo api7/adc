@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
 import { Listr } from 'listr2';
 
-const version = process.env.NODE_VERSION ?? '20.12.2';
+const version = process.env.NODE_VERSION ?? '20.15.1';
 
 const tasks = new Listr([
   {
