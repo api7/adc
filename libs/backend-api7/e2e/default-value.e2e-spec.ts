@@ -6,8 +6,8 @@ describe('Default Value', () => {
 
   beforeAll(() => {
     backend = new BackendAPI7({
-      server: globalThis.server,
-      token: globalThis.token,
+      server: process.env.SERVER,
+      token: process.env.TOKEN,
       tlsSkipVerify: true,
       gatewayGroup: 'default',
     });
