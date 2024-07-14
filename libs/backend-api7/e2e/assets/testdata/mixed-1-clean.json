@@ -1,0 +1,72 @@
+[
+  {
+    "resourceType": "route",
+    "type": "delete",
+    "resourceId": "9764db8eeb0f13c2a9762161c418504d74ac64a2",
+    "resourceName": "route1.2",
+    "parentId": "6e899c1108b88e75d4887b85f9a62c26d9571739"
+  },
+  {
+    "resourceType": "route",
+    "type": "delete",
+    "resourceId": "801b75f6eb1432c889cd15d3cffb2fa28b7bf95c",
+    "resourceName": "route1.1",
+    "parentId": "6e899c1108b88e75d4887b85f9a62c26d9571739"
+  },
+  {
+    "resourceType": "route",
+    "type": "delete",
+    "resourceId": "12e10811f0bf2d39998936bf81e33314ad7ff6ae",
+    "resourceName": "route2.2",
+    "parentId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a"
+  },
+  {
+    "resourceType": "route",
+    "type": "delete",
+    "resourceId": "143e485dfbcace6afb3d40cd26a20cb6f3d8a469",
+    "resourceName": "route2.1",
+    "parentId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a"
+  },
+  {
+    "resourceType": "service",
+    "type": "delete",
+    "resourceId": "6e899c1108b88e75d4887b85f9a62c26d9571739",
+    "resourceName": "service1"
+  },
+  {
+    "resourceType": "service",
+    "type": "delete",
+    "resourceId": "45d48919804fadc2db9d0180a65fe0ee0a8ddf9a",
+    "resourceName": "service2"
+  },
+  {
+    "resourceType": "consumer",
+    "type": "delete",
+    "resourceId": "tom",
+    "resourceName": "tom"
+  },
+  {
+    "resourceType": "ssl",
+    "type": "delete",
+    "resourceId": "5f543afdb6ba8aeef955c6c951d3bd70c1de8361",
+    "resourceName": "test.com"
+  },
+  {
+    "resourceType": "global_rule",
+    "type": "delete",
+    "resourceId": "prometheus",
+    "resourceName": "prometheus"
+  },
+  {
+    "resourceType": "plugin_metadata",
+    "type": "delete",
+    "resourceId": "tcp-logger",
+    "resourceName": "tcp-logger"
+  },
+  {
+    "resourceType": "plugin_metadata",
+    "type": "delete",
+    "resourceId": "http-logger",
+    "resourceName": "http-logger"
+  }
+]

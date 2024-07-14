@@ -1,0 +1,34 @@
+{
+  "name": "backend-api7",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend-api7/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ]
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "jestConfig": "libs/backend-api7/jest.config.ts"
+      }
+    },
+    "e2e": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{e2eProjectRoot}"
+      ],
+      "options": {
+        "jestConfig": "libs/backend-api7/jest.config.e2e.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}
