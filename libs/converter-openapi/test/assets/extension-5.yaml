@@ -1,0 +1,33 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+x-adc-plugins:
+  test1:
+    test1-key: test1-value
+  test2:
+    test2-key: test2-value
+x-adc-plugin-test2:
+  test2-key: test3-value-override
+x-adc-plugin-test3:
+  test3-key: test3-value
+servers:
+  - url: https://httpbin.org/
+paths:
+  /anything:
+    get:
+      x-adc-plugins:
+        test1:
+          test1-key: test1-value
+        test2:
+          test2-key: test2-value
+      x-adc-plugin-test2:
+        test2-key: test3-value-override
+      x-adc-plugin-test3:
+        test3-key: test3-value
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

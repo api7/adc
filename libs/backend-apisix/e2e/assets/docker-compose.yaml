@@ -1,0 +1,49 @@
+services:
+  apisix_http:
+    image: apache/apisix:${BACKEND_APISIX_VERSION:-3.9.0-debian}
+    restart: always
+    volumes:
+      - ./apisix_conf/http.yaml:/usr/local/apisix/conf/config.yaml:ro
+    depends_on:
+      - etcd
+    ports:
+      - "19180:9180/tcp"
+      - "19080:9080/tcp"
+    networks:
+      apisix:
+
+  apisix_mtls:
+    image: apache/apisix:${BACKEND_APISIX_VERSION:-3.9.0-debian}
+    restart: always
+    volumes:
+      - ./apisix_conf/mtls.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix_conf/mtls:/mtls:ro
+    depends_on:
+      - etcd
+    ports:
+      - "29180:9180/tcp"
+      - "29080:9080/tcp"
+    networks:
+      apisix:
+
+  etcd:
+    image: bitnami/etcd:3.5
+    restart: always
+    volumes:
+      - etcd_data:/bitnami/etcd
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+    ports:
+      - "2379:2379/tcp"
+    networks:
+      apisix:
+
+networks:
+  apisix:
+    driver: bridge
+
+volumes:
+  etcd_data:
+    driver: local

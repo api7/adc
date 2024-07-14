@@ -1,0 +1,65 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org
+paths:
+  /absolute-redirect/{n}:
+    get:
+      tags:
+        - Redirects
+      summary: Absolutely 302 Redirects n times.
+      parameters:
+        - name: "n"
+          in: path
+          required: true
+          schema: {}
+      responses:
+        "302":
+          description: A redirection.
+          content: {}
+  /anything:
+    servers:
+      - url: https://httpbin.net
+    get:
+      servers:
+        - url: https://httpbin.com
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    post:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    delete:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    patch:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

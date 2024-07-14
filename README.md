@@ -1,117 +1,119 @@
-# APISIX Declarative CLI (ADC)
+# API Declarative CLI (ADC)
 
-ADC is a command line utility to interface with APISIX's API.
+ADC is a command line utility that interfaces with API7 Enterprise and Apache APISIX Admin APIs.
 
-It is built using the [Cobra](https://github.com/spf13/cobra) library.
+## Supported Backends
+
+The following backend types are supported in ADC:
+
+1. [API7 Enterprise](libs/backend-api7/README.md)
+2. [Apache APISIX](libs/backend-apisix/README.md)
+
+## Supported Converters
+
+The following converters are supported to convert API specifications to ADC configuration:
+
+1. [OpenAPI Spec 3](libs/converter-openapi/README.md)
 
 ## Installation
 
-ADC can be installed using the `go install` command:
-
-```
-go install github.com/api7/adc@latest
-```
-
-This will install the `adc` binary to your `$GOPATH/bin` directory.
-
-You can also download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
+You can download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
 
 ```bash
-wget https://github.com/api7/adc/releases/download/v0.1.0/adc_0.1.0_linux_amd64.tar.gz
-tar -zxvf adc_0.1.0_linux_amd64.tar.gz
+wget https://github.com/api7/adc/releases/download/v0.10.0/adc_0.10.0_linux_amd64.tar.gz
+tar -zxvf adc_0.10.0_linux_amd64.tar.gz
 mv adc /usr/local/bin/adc
 ```
 
-> [!IMPORTANT]
-> Make sure that these directories are in your `$PATH` environment variable.
+Pre-built binaries for `amd64` and `arm64` on Linux, Windows, and macOS are available now.
+
+## Configure ADC
+
+You can configure ADC through environment variables or command line flags. Run `adc help [command]` to see the available configuration options for a command.
+
+ADC supports dotenv, so you can store and use your environment variables in a `.env` file. The examples below show how to configure ADC for both API7 Enterprise and Apache APISIX backends.
+
+### Example API7 Enterprise Configuration
+
+```bash
+ADC_BACKEND=api7ee
+ADC_SERVER=https://localhost:7443
+ADC_TOKEN=<token generated from the dashboard>
+```
+
+### Example Apache APISIX Configuration
+
+```bash
+ADC_SERVER=http://localhost:9180
+ADC_TOKEN=<APISIX Admin API key>
+```
 
 ## Usage
 
-To view a list of all available commands, run:
+This section highlights some of the common ADC commands.
 
-```shell
-adc --help
-```
+### Check Connectivity
 
-To learn how to use a particular subcommand, for example, `ping` run:
+The `ping` command verifies the configuration by trying to connect to the configured backend:
 
-```shell
-adc ping --help
-```
-
-### adc configure
-
-```shell
-adc configure
-```
-
-Configures ADC with APISIX's server address and token. Running this command will prompt you for an APISIX server address and API token and saves them to a configuration file.
-
-By default, ADC creates a configuration file at `$HOME/apisix.yaml` and this can be changed manually.
-
-### adc ping
-
-```shell
+```bash
 adc ping
 ```
 
-Pings the configured APISIX instance to verify connectivity.
+### Dump Configuration in ADC Format
 
-### adc validate
+The `dump` command fetches the current configuration of the backend and saves it in the ADC configuration file format:
 
-```shell
-adc validate -f apisix.yaml
+```bash
+adc dump -o adc.yaml
 ```
 
-Validates the provided APISIX configuration file.
+### Show the Difference between Local and Remote Configuration
 
-### adc sync
+The `diff` command compares the configuration in the specified ADC configuration file with the current configuration of the backend:
 
-```shell
-adc sync
+```bash
+adc diff -f adc.yaml
 ```
 
-Syncs the local configuration present in the `$HOME/apisix.yaml` file (or specified configuration file) to the connected APISIX instance.
+### Synchronize Local Configuration
 
-### adc dump
+The `sync` command synchronizes the configuration in the specified ADC configuration file with the backend:
 
-```shell
-adc dump --output apisix.yaml
+```bash
+adc sync -f adc.yaml
 ```
 
-Dumps the configuration of the connected APISIX instance to the specified configuration file.
+### Convert API Specifications
 
-### adc diff
+The `convert` command converts API specifications to ADC configuration. Currently, it supports converting an OpenAPI 3 specification to ADC configuration.
 
-```shell
-adc diff
+```bash
+adc convert openapi -f openapi.yaml
 ```
 
-Shows the differences in configuration between the connected APISIX instance and the local configuration file.
+### Verify ADC Configuration
 
-### adc openapi2apisix
+The `lint` command verifies the provided ADC configuration file locally.
 
-```shell
-adc openapi2apisix -o apisix.yaml -f openAPI.yaml
+```bash
+adc lint -f adc.yaml
 ```
 
-Converts the configuration in OpenAPI format (`openAPI.yaml`) to APISIX configuration (`apisix.yaml`).
+## Development
 
-### adc version
+To build ADC from source, [install Nx](https://nx.dev/getting-started/installation) and run:
 
-```shell
-adc version
+```bash
+pnpm install
+nx build cli
 ```
 
-Prints the version of ADC. See [Installation](#installation) for details on installing the latest version.
+To use the binary, run:
 
-### adc completion
-
-```shell
-adc completion <bash|zsh|fish|powershell>
+```bash
+node dist/apps/cli/main.js -h
 ```
-
-Generates autocompletion scripts for the specified shell.
 
 ## License
 

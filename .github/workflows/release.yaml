@@ -1,63 +1,117 @@
-name: release
-
+name: Release
 on:
   push:
     tags:
-      - 'v*.*'
-
-permissions:
-  contents: write
-
+      - 'v*.*.*'
 jobs:
-  goreleaser:
+  adc:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+      - name: Setup release flow
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
         with:
-          go-version: '1.20'
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
         with:
-          distribution: goreleaser
-          version: v1.20.0
-          args: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+      - name: Build ADC
+        run: |
+          pnpm install
+          NODE_ENV=production npx nx build cli
+          node --experimental-sea-config apps/cli/node-sea.json
+          npx ts-node apps/cli/scripts/download-node.ts
+          npx postject ./node-binary/linux-amd64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          npx postject ./node-binary/linux-arm64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          npx postject ./node-binary/win-x64.exe NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          npx postject ./node-binary/win-arm64.exe NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
 
-      - name: Upload assets
-        uses: actions/upload-artifact@v3
+      - name: Compress ADC
+        run: |
+          mkdir -p release
+          mv ./node-binary/linux-amd64 ./adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz ./adc && rm -rf ./adc
+          mv ./node-binary/linux-arm64 ./adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz ./adc && rm -rf ./adc
+          mv ./node-binary/win-x64.exe ./adc.exe
+          zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_amd64.zip ./adc.exe && rm -rf ./adc.exe
+          mv ./node-binary/win-arm64.exe ./adc.exe
+          zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip ./adc.exe && rm -rf ./adc.exe
+
+      - name: Upload ADC to GitHub release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: dist
-          path: dist/*
+          files: |
+            release/adc_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_windows_amd64.zip
+            release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip
 
-  docker:
-    runs-on: ubuntu-latest
+      - name: Configure AWS S3 credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Upload ADC to AWS S3
+        run: |
+          aws s3 sync ./release s3://api7ai-docs-resources/adc/release
+
+  adc-macos:
+    runs-on: macos-14
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+      - name: Setup release flow
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
         with:
-          push: true
-          tags: api7/adc:${{ github.ref_name }}
+          version: latest
+      - name: Build ADC
+        run: |
+          pnpm install
+          NODE_ENV=production npx nx build cli
+          node --experimental-sea-config apps/cli/node-sea.json
+          npx ts-node apps/cli/scripts/download-node.ts
+          codesign --remove-signature ./node-binary/darwin-arm64
+          codesign --remove-signature ./node-binary/darwin-x64
+          npx postject ./node-binary/darwin-arm64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA
+          npx postject ./node-binary/darwin-x64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA
+          codesign --sign - ./node-binary/darwin-arm64
+          codesign --sign - ./node-binary/darwin-x64
+
+      - name: Compress ADC
+        run: |
+          mkdir release
+          mv ./node-binary/darwin-arm64 ./adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz ./adc && rm -rf ./adc
+          mv ./node-binary/darwin-x64 ./adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz ./adc && rm -rf ./adc
+
+      - name: Upload ADC to GitHub release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
+
+      - name: Configure AWS S3 credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Upload ADC to AWS S3
+        run: |
+          aws s3 sync ./release s3://api7ai-docs-resources/adc/release

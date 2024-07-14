@@ -1,0 +1,36 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+    x-adc-upstream-node-defaults:
+      test1: test1
+      test2: test2
+      test3: test3
+  - url: https://httpbin.com/
+    x-adc-upstream-node-defaults:
+      test4: test4
+paths:
+  /anything:
+    get:
+      servers:
+        - url: https://httpbin.org/
+          x-adc-upstream-node-defaults:
+            test1: test1-override
+            test2: test2-override
+            test3: test3-override
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
