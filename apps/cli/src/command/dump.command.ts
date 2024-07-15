@@ -1,3 +1,4 @@
+import { BackendAPI7 } from '@api7/adc-backend-api7';
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, ListrTask } from 'listr2';
 import { writeFile } from 'node:fs/promises';
@@ -41,7 +42,9 @@ export const LoadRemoteConfigurationTask = ({
       {
         title: 'Filter configuration resource type',
         enabled: () =>
-          includeResourceType?.length > 0 || excludeResourceType?.length > 0,
+          //TODO implement API-level resource filtering on APISIX backend
+          !(backend instanceof BackendAPI7) &&
+          (includeResourceType?.length > 0 || excludeResourceType?.length > 0),
         task: () => {
           ctx.remote = filterResourceType(
             ctx.remote,
