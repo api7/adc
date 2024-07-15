@@ -178,7 +178,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
   }
 
   public async dump(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
-    const fetcher = new Fetcher(this.client);
+    const fetcher = new Fetcher(this.client, this.opts);
 
     return new Listr<{ remote: ADCSDK.Configuration }>(
       [
