@@ -21,5 +21,7 @@ jobs:
       # Run unit tests
       - name: Run CLI unit tests
         run: npx nx run cli:test
+      - name: Run API7 Backend unit tests
+        run: npx nx run backend-api7:test
       - name: Run OpenAPI Converter unit tests
-        run: NODE_OPTIONS=--experimental-vm-modules npx nx run converter-openapi:test
+        run: npx nx run converter-openapi:test
