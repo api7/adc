@@ -12,6 +12,10 @@ export interface BackendOptions {
   tlsClientKeyFile?: string;
   tlsSkipVerify?: boolean;
   verbose?: number;
+
+  labelSelector?: Record<string, string>;
+  includeResourceType?: Array<ADCSDK.ResourceType>;
+  excludeResourceType?: Array<ADCSDK.ResourceType>;
 }
 
 export interface Backend {

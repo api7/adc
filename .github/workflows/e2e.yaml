@@ -36,7 +36,7 @@ jobs:
 
   api7:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'test/api7')
+    if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
       matrix:
         version: [3.2.13.0, 3.2.14.0]
