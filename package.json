@@ -15,7 +15,7 @@
     "@nx/workspace": "19.4.3",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.13",
     "@svgr/webpack": "^8.1.0",
-    "@swc-node/register": "1.9.2",
+    "@swc-node/register": "1.10.9",
     "@swc/core": "1.5.7",
     "@swc/helpers": "0.5.12",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
