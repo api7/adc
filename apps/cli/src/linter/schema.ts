@@ -53,6 +53,7 @@ const upstreamHealthCheckType = z
   .default('http');
 const upstreamSchema = z
   .object({
+    name: nameSchema.optional(),
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
 

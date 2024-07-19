@@ -34,6 +34,9 @@
           "upstream": {
             "type": "object",
             "properties": {
+              "name": {
+                "$ref": "#/properties/services/items/properties/name"
+              },
               "description": {
                 "$ref": "#/properties/services/items/properties/description"
               },
