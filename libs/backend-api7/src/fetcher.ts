@@ -2,12 +2,14 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
 import { isEmpty } from 'lodash';
+import { SemVer, gte as semVerGTE } from 'semver';
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
 import { buildReqAndRespDebugOutput } from './utils';
 
 type FetchTask = ListrTask<{
+  api7Version: SemVer;
   gatewayGroupId: string;
   remote: ADCSDK.Configuration;
 }>;
@@ -129,15 +131,11 @@ export class Fetcher {
       title: 'Fetch plugin metadata',
       skip: this.isSkip([ADCSDK.ResourceType.PLUGIN_METADATA]),
       task: async (ctx, task) => {
-        const resp = await this.client.get<{
-          value: ADCSDK.Plugins;
-        }>('/apisix/admin/plugin_metadata', {
-          params: { gateway_group_id: ctx.gatewayGroupId },
-        });
-        task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
-        ctx.remote.plugin_metadata = this.toADC.transformPluginMetadatas(
-          resp.data.value,
-        );
+        if (semVerGTE(ctx.api7Version, '3.2.14')) {
+          return this.listMetadatasGTE03021400(ctx, task);
+        } else {
+          return this.listMetadatasLT03021400(ctx, task);
+        }
       },
     };
   }
@@ -166,6 +164,59 @@ export class Fetcher {
       }
     };
   }
+
+  // Get plugin metadata on API7 3.2.14.0 and up
+  private listMetadatasGTE03021400: FetchTask['task'] = async (ctx, task) => {
+    const resp = await this.client.get<{
+      value: ADCSDK.Plugins;
+    }>('/apisix/admin/plugin_metadata', {
+      params: { gateway_group_id: ctx.gatewayGroupId },
+    });
+    task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
+    ctx.remote.plugin_metadata = this.toADC.transformPluginMetadatas(
+      resp.data.value,
+    );
+  };
+
+  // Get plugin metadata below API7 3.2.14.0
+  private listMetadatasLT03021400: FetchTask['task'] = async (ctx, task) => {
+    const resp = await this.client.get<Array<string>>(
+      '/apisix/admin/plugins/list',
+      {
+        params: { has_metadata: true },
+      },
+    );
+    task.output = buildReqAndRespDebugOutput(
+      resp,
+      'Get plugins that contain plugin metadata',
+    );
+
+    const plugins = resp.data;
+    const getMetadataConfig = plugins.map<
+      Promise<[string, typing.PluginMetadata]>
+    >(async (pluginName) => {
+      try {
+        const resp = await this.client.get<{
+          value: typing.PluginMetadata;
+        }>(`/apisix/admin/plugin_metadata/${pluginName}`, {
+          params: { gateway_group_id: ctx.gatewayGroupId },
+        });
+        task.output = buildReqAndRespDebugOutput(
+          resp,
+          `Get plugin metadata for "${pluginName}"`,
+        );
+        return [pluginName, resp?.data?.value];
+      } catch (err) {
+        return [pluginName, null];
+      }
+    });
+    const metadataObj = Object.fromEntries(
+      (await Promise.all(getMetadataConfig)).filter((item) => item[1]),
+    );
+
+    ctx.remote.plugin_metadata =
+      this.toADC.transformPluginMetadatas(metadataObj);
+  };
 
   public allTask() {
     return [
