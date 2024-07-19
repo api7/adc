@@ -5,5 +5,5 @@ import { ConfigurationSchema } from './schema';
 
 writeFileSync(
   'schema.json',
-  JSON.stringify(zodToJsonSchema(ConfigurationSchema)),
+  JSON.stringify(zodToJsonSchema(ConfigurationSchema), null, 2),
 );
