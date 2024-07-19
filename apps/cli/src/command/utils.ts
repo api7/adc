@@ -2,6 +2,7 @@ import { BackendAPI7 } from '@api7/adc-backend-api7';
 import { BackendAPISIX } from '@api7/adc-backend-apisix';
 import * as ADCSDK from '@api7/adc-sdk';
 import chalk from 'chalk';
+import { isObject, mapValues } from 'lodash';
 import path from 'node:path';
 import pluralize from 'pluralize';
 
@@ -267,6 +268,31 @@ export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
         }
       });
   });
+};
+
+export const recursiveReplaceEnvVars = (
+  c: ADCSDK.Configuration,
+  dataSource = process.env,
+): ADCSDK.Configuration => {
+  const envVarRegex = /\$\{(\w+)\}/g;
+  const replaceValue = (value: unknown): unknown => {
+    if (typeof value === 'string')
+      return value.replace(
+        envVarRegex,
+        (_, envVar) => dataSource?.[envVar] || '',
+      );
+
+    return value;
+  };
+
+  const recurseReplace = (value: unknown): unknown =>
+    isObject(value) && !Array.isArray(value)
+      ? mapValues(value, recurseReplace)
+      : Array.isArray(value)
+        ? value.map(recurseReplace)
+        : replaceValue(value);
+
+  return mapValues(c, recurseReplace) as ADCSDK.Configuration;
 };
 
 export const configurePluralize = () => {
