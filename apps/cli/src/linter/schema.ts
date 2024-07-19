@@ -174,7 +174,7 @@ const routeSchema = z
     timeout: timeoutSchema.optional(),
     vars: exprSchema.optional(),
     methods: z
-      .set(
+      .array(
         z.enum([
           'GET',
           'POST',
@@ -268,7 +268,7 @@ const sslSchema = z
       .strict()
       .optional(),
     ssl_protocols: z
-      .set(z.enum(['TLSv1.1', 'TLSv1.2', 'TLSv1.3']))
+      .array(z.enum(['TLSv1.1', 'TLSv1.2', 'TLSv1.3']))
       .nonempty()
       .optional(),
   })
