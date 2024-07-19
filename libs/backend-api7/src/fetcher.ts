@@ -129,42 +129,15 @@ export class Fetcher {
       title: 'Fetch plugin metadata',
       skip: this.isSkip([ADCSDK.ResourceType.PLUGIN_METADATA]),
       task: async (ctx, task) => {
-        const resp = await this.client.get<Array<string>>(
-          '/apisix/admin/plugins/list',
-          {
-            params: { has_metadata: true },
-          },
-        );
-        task.output = buildReqAndRespDebugOutput(
-          resp,
-          'Get plugins that contain plugin metadata',
-        );
-
-        const plugins = resp.data;
-        const getMetadataConfig = plugins.map<
-          Promise<[string, typing.PluginMetadata]>
-        >(async (pluginName) => {
-          try {
-            const resp = await this.client.get<{
-              value: typing.PluginMetadata;
-            }>(`/apisix/admin/plugin_metadata/${pluginName}`, {
-              params: { gateway_group_id: ctx.gatewayGroupId },
-            });
-            task.output = buildReqAndRespDebugOutput(
-              resp,
-              `Get plugin metadata for "${pluginName}"`,
-            );
-            return [pluginName, resp?.data?.value];
-          } catch (err) {
-            return [pluginName, null];
-          }
+        const resp = await this.client.get<{
+          value: ADCSDK.Plugins;
+        }>('/apisix/admin/plugin_metadata', {
+          params: { gateway_group_id: ctx.gatewayGroupId },
         });
-        const metadataObj = Object.fromEntries(
-          (await Promise.all(getMetadataConfig)).filter((item) => item[1]),
+        task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
+        ctx.remote.plugin_metadata = this.toADC.transformPluginMetadatas(
+          resp.data.value,
         );
-
-        ctx.remote.plugin_metadata =
-          this.toADC.transformPluginMetadatas(metadataObj);
       },
     };
   }
