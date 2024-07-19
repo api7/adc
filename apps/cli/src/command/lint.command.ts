@@ -4,6 +4,7 @@ import pluralize from 'pluralize';
 import { ZodError } from 'zod';
 
 import { check } from '../linter';
+import { SignaleRenderer } from '../utils/listr';
 import { LoadLocalConfigurationTask } from './diff.command';
 import { BaseCommand } from './helper';
 
@@ -28,7 +29,13 @@ export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
 
           // normal case
           const resourceType = pluralize.singular(error.path[0] as string);
-          const resourceName = ctx.local[error.path[0]][error.path[1]].name;
+          const resource = ctx.local[error.path[0]][error.path[1]];
+          const resourceName =
+            resourceType === 'ssl'
+              ? resource.snis
+              : resourceType === 'consumer'
+                ? resource.username
+                : resource.name;
           err += `#${idx + 1} ${
             error.message
           } at ${resourceType}: "${resourceName}", field: "${(
@@ -59,10 +66,13 @@ export const LintCommand = new BaseCommand('lint')
   .action(async () => {
     const opts = LintCommand.optsWithGlobals();
 
-    const tasks = new Listr([
-      LoadLocalConfigurationTask(opts.file, {}),
-      LintTask(),
-    ]);
+    const tasks = new Listr(
+      [LoadLocalConfigurationTask(opts.file, {}), LintTask()],
+      {
+        renderer: SignaleRenderer,
+        rendererOptions: { verbose: opts.verbose },
+      },
+    );
 
     try {
       await tasks.run();
