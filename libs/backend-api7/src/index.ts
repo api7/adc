@@ -5,6 +5,7 @@ import { Listr, ListrTask } from 'listr2';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
 import { AgentOptions, Agent as httpsAgent } from 'node:https';
+import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
 import { OperateContext, Operator } from './operator';
@@ -17,6 +18,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
   private readonly gatewayGroup: string;
   private static logScope = ['API7'];
 
+  private version: SemVer;
   private gatewayGroupId: string;
   private defaultValue: ADCSDK.DefaultValue;
 
@@ -177,11 +179,30 @@ export class BackendAPI7 implements ADCSDK.Backend {
     };
   }
 
+  private getAPI7VersionTask(): ListrTask {
+    return {
+      enabled: (ctx) => !ctx.api7Version,
+      task: async (ctx, task) => {
+        if (this.version) {
+          ctx.api7Version = this.version;
+          return;
+        }
+
+        const resp = await this.client.get<{ value: string }>('/api/version');
+        task.output = buildReqAndRespDebugOutput(resp, `Get API7 version`);
+        ctx.api7Version = this.version = semver.coerce(
+          resp?.data.value || '0.0.0',
+        );
+      },
+    };
+  }
+
   public async dump(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
     const fetcher = new Fetcher(this.client, this.opts);
 
     return new Listr<{ remote: ADCSDK.Configuration }>(
       [
+        this.getAPI7VersionTask(),
         this.getResourceDefaultValueTask(),
         this.getGatewayGroupIdTask(this.gatewayGroup),
         ...fetcher.allTask(),
@@ -197,6 +218,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     const operator = new Operator(this.client, this.gatewayGroup);
     return new Listr<OperateContext>(
       [
+        this.getAPI7VersionTask(),
         this.getGatewayGroupIdTask(this.gatewayGroup),
         this.syncPreprocessEventsTask(),
         {
