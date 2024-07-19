@@ -74,7 +74,9 @@ export class Fetcher {
         const resp = await this.client.get<{ list: Array<typing.Consumer> }>(
           '/apisix/admin/consumers',
           {
-            params: { gateway_group_id: ctx.gatewayGroupId },
+            params: this.attachLabelSelector({
+              gateway_group_id: ctx.gatewayGroupId,
+            }),
           },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get consumers');
@@ -94,7 +96,9 @@ export class Fetcher {
         const resp = await this.client.get<{ list: Array<typing.SSL> }>(
           '/apisix/admin/ssls',
           {
-            params: { gateway_group_id: ctx.gatewayGroupId },
+            params: this.attachLabelSelector({
+              gateway_group_id: ctx.gatewayGroupId,
+            }),
           },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get ssls');
@@ -138,6 +142,16 @@ export class Fetcher {
         }
       },
     };
+  }
+
+  public allTask() {
+    return [
+      this.listServices(),
+      this.listConsumers(),
+      this.listSSLs(),
+      this.listGlobalRules(),
+      this.listMetadatas(),
+    ];
   }
 
   private isSkip(
@@ -218,13 +232,13 @@ export class Fetcher {
       this.toADC.transformPluginMetadatas(metadataObj);
   };
 
-  public allTask() {
-    return [
-      this.listServices(),
-      this.listConsumers(),
-      this.listSSLs(),
-      this.listGlobalRules(),
-      this.listMetadatas(),
-    ];
+  private attachLabelSelector(
+    params: Record<string, string>,
+  ): Record<string, string> {
+    if (this.backendOpts?.labelSelector)
+      Object.entries(this.backendOpts.labelSelector).forEach(([key, value]) => {
+        params[`labels[${key}]`] = value;
+      });
+    return params;
   }
 }

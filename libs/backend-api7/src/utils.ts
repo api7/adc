@@ -1,4 +1,4 @@
-import { AxiosResponse } from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 export const capitalizeFirstLetter = (str: string) =>
   str.charAt(0).toUpperCase() + str.slice(1);
@@ -24,7 +24,7 @@ export const buildReqAndRespDebugOutput = (
     messages: [
       `${desc ?? ''}\n`, //TODO time consumption
       // request
-      `${config.method.toUpperCase()} ${config.url}\n`,
+      `${config.method.toUpperCase()} ${axios.getUri(config)}\n`,
       ...transformHeaders(config.headers),
       config?.data ? `\n${config.data}\n` : '',
       '\n',
