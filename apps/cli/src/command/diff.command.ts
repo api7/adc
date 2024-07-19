@@ -15,6 +15,7 @@ import {
   filterResourceType,
   loadBackend,
   mergeKVConfigurations,
+  recursiveReplaceEnvVars,
   toConfiguration,
   toKVConfiguration,
 } from './utils';
@@ -85,6 +86,12 @@ export const LoadLocalConfigurationTask = (
               ),
             );
             ctx.local = toConfiguration(localKVConfiguration);
+          },
+        },
+        {
+          title: 'Resolve value variables',
+          task: async () => {
+            ctx.local = recursiveReplaceEnvVars(ctx.local);
           },
         },
         {

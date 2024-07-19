@@ -1,6 +1,10 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { fillLabels, recursiveRemoveMetadataField } from './utils';
+import {
+  fillLabels,
+  recursiveRemoveMetadataField,
+  recursiveReplaceEnvVars,
+} from './utils';
 
 describe('CLI utils', () => {
   it('should fill label selector for local resources', () => {
@@ -247,6 +251,85 @@ describe('CLI utils', () => {
         },
       ],
       ssls: [{ certificates: [], snis: ['test'] }],
+    });
+  });
+
+  describe('Environment Variables', () => {
+    it('mock config', () => {
+      const config: ADCSDK.Configuration = {
+        services: [
+          {
+            name: 'Test ${NAME}',
+            routes: [
+              {
+                name: 'Test ${NAME}',
+                uris: ['/test/${NAME}'],
+              },
+            ],
+          },
+        ],
+        consumers: [
+          {
+            username: 'TEST_${NAME}',
+            plugins: {
+              'key-auth': {
+                key: '${SECRET}',
+              },
+            },
+          },
+        ],
+        ssls: [
+          {
+            snis: ['test.com'],
+            certificates: [
+              {
+                certificate: '${CERT}',
+                key: '${KEY}',
+              },
+            ],
+          },
+        ],
+        global_rules: {
+          // object key contains variables will not be parsed
+          '${GLOBAL_PLUGIN}': {
+            key: '${SECRET}',
+          },
+        },
+        plugin_metadata: {
+          'file-logger': {
+            log_format: {
+              note: '${NOTE}',
+            },
+          },
+        },
+      };
+      expect(
+        recursiveReplaceEnvVars(config, {
+          NAME: 'name',
+          SECRET: 'secret',
+          CERT: '-----',
+          KEY: '-----',
+          NOTE: 'note',
+        }),
+      ).toEqual({
+        consumers: [
+          { plugins: { 'key-auth': { key: 'secret' } }, username: 'TEST_name' },
+        ],
+        global_rules: { '${GLOBAL_PLUGIN}': { key: 'secret' } },
+        plugin_metadata: { 'file-logger': { log_format: { note: 'note' } } },
+        services: [
+          {
+            name: 'Test name',
+            routes: [{ name: 'Test name', uris: ['/test/name'] }],
+          },
+        ],
+        ssls: [
+          {
+            certificates: [{ certificate: '-----', key: '-----' }],
+            snis: ['test.com'],
+          },
+        ],
+      });
     });
   });
 });
