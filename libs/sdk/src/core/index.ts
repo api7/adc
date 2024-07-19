@@ -20,7 +20,6 @@ export interface Route {
   enable_websocket?: boolean;
   remote_addrs?: Array<string>;
   plugins?: Plugins;
-  plugin_config_id?: string;
   filter_func?: string;
   service_id?: string;
 
@@ -83,7 +82,7 @@ export interface UpstreamHealthCheck {
   passive: UpstreamHealthCheckPassive;
 }
 export interface UpstreamHealthCheckActive {
-  type?: string;
+  type?: 'http' | 'https' | 'tcp';
   timeout?: number;
   concurrency?: number;
   host: string;
