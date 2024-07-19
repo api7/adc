@@ -31,11 +31,13 @@ export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
           const resourceType = pluralize.singular(error.path[0] as string);
           const resource = ctx.local[error.path[0]][error.path[1]];
           const resourceName =
-            resourceType === 'ssl'
-              ? resource.snis
-              : resourceType === 'consumer'
-                ? resource.username
-                : resource.name;
+            resourceType === 'global_rule' || resourceType === 'plugin_metadata'
+              ? error.path[1]
+              : resourceType === 'ssl'
+                ? resource.snis
+                : resourceType === 'consumer'
+                  ? resource.username
+                  : resource.name;
           err += `#${idx + 1} ${
             error.message
           } at ${resourceType}: "${resourceName}", field: "${(

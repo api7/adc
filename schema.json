@@ -452,7 +452,6 @@
                 },
                 "methods": {
                   "type": "array",
-                  "uniqueItems": true,
                   "items": {
                     "type": "string",
                     "enum": [
@@ -618,7 +617,6 @@
           },
           "ssl_protocols": {
             "type": "array",
-            "uniqueItems": true,
             "items": {
               "type": "string",
               "enum": [
