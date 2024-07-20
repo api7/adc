@@ -65,32 +65,30 @@ const upstreamSchema = z
     key: z.string().optional(),
     checks: z
       .object({
-        active: z
-          .object({
-            type: upstreamHealthCheckType.optional(),
-            timeout: z.number().default(1).optional(),
-            concurrency: z.number().default(10).optional(),
-            host: z.string(),
-            port: portSchema,
-            http_path: z.string().default('/').optional(),
-            https_verify_cert: z.boolean().default(true).optional(),
-            http_request_headers: z.array(z.string()).min(1).optional(),
-            healthy: z
-              .object({
-                interval: z.number().int().min(1).default(1),
-              })
-              .merge(upstreamHealthCheckPassiveHealthy)
-              .strict()
-              .optional(),
-            unhealthy: z
-              .object({
-                interval: z.number().int().min(1).default(1),
-              })
-              .merge(upstreamHealthCheckPassiveUnhealthy)
-              .strict()
-              .optional(),
-          })
-          .optional(),
+        active: z.object({
+          type: upstreamHealthCheckType.optional(),
+          timeout: z.number().default(1).optional(),
+          concurrency: z.number().default(10).optional(),
+          host: z.string(),
+          port: portSchema,
+          http_path: z.string().default('/').optional(),
+          https_verify_cert: z.boolean().default(true).optional(),
+          http_request_headers: z.array(z.string()).min(1).optional(),
+          healthy: z
+            .object({
+              interval: z.number().int().min(1).default(1),
+            })
+            .merge(upstreamHealthCheckPassiveHealthy)
+            .strict()
+            .optional(),
+          unhealthy: z
+            .object({
+              interval: z.number().int().min(1).default(1),
+            })
+            .merge(upstreamHealthCheckPassiveUnhealthy)
+            .strict()
+            .optional(),
+        }),
         passive: z
           .object({
             type: upstreamHealthCheckType.optional(),

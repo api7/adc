@@ -8,7 +8,8 @@ import YAML from 'yaml';
 import { DifferV3 } from '../differ/differv3';
 import { SignaleRenderer } from '../utils/listr';
 import { LoadRemoteConfigurationTask } from './dump.command';
-import { BackendCommand } from './helper';
+import { BackendCommand, NoLintOption } from './helper';
+import { LintTask } from './lint.command';
 import { BackendOptions } from './typing';
 import {
   fillLabels,
@@ -22,6 +23,7 @@ import {
 
 type DiffOptions = BackendOptions & {
   file: Array<string>;
+  lint: boolean;
 };
 
 export interface TaskContext {
@@ -163,6 +165,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     'The files you want to synchronize, can be set more than one.',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
+  .addOption(NoLintOption)
   .addExample('adc diff -f service-a.yaml -f service-b.yaml')
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
@@ -175,6 +178,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
           opts.includeResourceType,
           opts.excludeResourceType,
         ),
+        opts.lint ? LintTask() : { task: () => undefined },
         LoadRemoteConfigurationTask({
           backend,
           labelSelector: opts.labelSelector,
