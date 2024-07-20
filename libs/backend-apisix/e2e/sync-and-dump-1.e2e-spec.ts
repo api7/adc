@@ -206,7 +206,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Delete stream route', async () =>
       syncEvents(backend, [
-        deleteEvent(ADCSDK.ResourceType.ROUTE, route1Name, serviceName),
+        deleteEvent(ADCSDK.ResourceType.STREAM_ROUTE, route1Name, serviceName),
       ]));
 
     it('Dump again (non-route)', async () => {
