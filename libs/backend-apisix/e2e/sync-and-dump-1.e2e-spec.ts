@@ -188,7 +188,12 @@ describe('Sync and Dump - 1', () => {
     it('Create resources', async () =>
       syncEvents(backend, [
         createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
-        createEvent(ADCSDK.ResourceType.ROUTE, route1Name, route1, serviceName),
+        createEvent(
+          ADCSDK.ResourceType.STREAM_ROUTE,
+          route1Name,
+          route1,
+          serviceName,
+        ),
       ]));
 
     it('Dump', async () => {
