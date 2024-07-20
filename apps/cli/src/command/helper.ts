@@ -203,3 +203,5 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       );
   }
 }
+
+export const NoLintOption = new Option('--no-lint', 'Disable lint check');

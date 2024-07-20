@@ -7,12 +7,14 @@ import {
   TaskContext,
 } from './diff.command';
 import { LoadRemoteConfigurationTask } from './dump.command';
-import { BackendCommand } from './helper';
+import { BackendCommand, NoLintOption } from './helper';
+import { LintTask } from './lint.command';
 import { BackendOptions } from './typing';
 import { loadBackend } from './utils';
 
 type SyncOption = BackendOptions & {
   file: Array<string>;
+  lint: boolean;
 };
 
 export const SyncCommand = new BackendCommand<SyncOption>(
@@ -24,6 +26,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     'The files you want to synchronize, can be set more than one.',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
+  .addOption(NoLintOption)
   .addExample('adc sync -f service-a.yaml -f service-b.yaml')
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
@@ -36,6 +39,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
           opts.includeResourceType,
           opts.excludeResourceType,
         ),
+        opts.lint ? LintTask() : { task: () => undefined },
         LoadRemoteConfigurationTask({
           backend,
           labelSelector: opts.labelSelector,
