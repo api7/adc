@@ -213,7 +213,7 @@ describe('Sync and Dump - 1', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].stream_routes).toHaveLength(0);
+      expect(result.services[0].stream_routes).toBeUndefined();
     });
 
     it('Delete service', async () =>
