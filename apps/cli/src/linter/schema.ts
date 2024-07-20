@@ -218,12 +218,7 @@ const serviceSchema = z
 
     upstream: upstreamSchema.optional(),
     plugins: pluginsSchema.optional(),
-    path_prefix: z
-      .string()
-      .optional()
-      .refine((val) => val?.startsWith('/'), {
-        message: 'Path prefix must start with "/"',
-      }),
+    path_prefix: z.string().optional(),
     strip_path_prefix: z.boolean().optional(),
     hosts: z.array(z.string()).optional(),
 
@@ -236,6 +231,15 @@ const serviceSchema = z
     {
       message:
         'HTTP routes and Stream routes are mutually exclusive and should not exist in the same service',
+    },
+  )
+  .refine(
+    (val) => {
+      if (!val.path_prefix) return true;
+      return val.path_prefix.startsWith('/');
+    },
+    {
+      message: 'Path prefix must start with "/"',
     },
   );
 

@@ -1,9 +1,20 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { isEmpty, unset } from 'lodash';
+import { filter, isEmpty, unset } from 'lodash';
 
 import * as typing from './typing';
 
 export class ToADC {
+  private static transformLabels(labels?: ADCSDK.Labels): ADCSDK.Labels {
+    if (!labels) return undefined;
+    const filteredLabels = filter(
+      labels,
+      (val, key) => key !== '__ADC_NAME',
+    ) as unknown as ADCSDK.Labels;
+    return Object.values(filteredLabels).length > 0
+      ? filteredLabels
+      : undefined;
+  }
+
   public transformRoute(route: typing.Route): ADCSDK.Route {
     return ADCSDK.utils.recursiveOmitUndefined({
       name: route.name ?? route.id,
@@ -120,9 +131,9 @@ export class ToADC {
     streamRoute: typing.StreamRoute,
   ): ADCSDK.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined({
-      name: streamRoute.name ?? streamRoute.id,
+      name: streamRoute.labels?.__ADC_NAME ?? streamRoute.id,
       description: streamRoute.desc,
-      labels: streamRoute.labels,
+      labels: ToADC.transformLabels(streamRoute.labels),
 
       remote_addr: streamRoute.remote_addr,
       server_addr: streamRoute.server_addr,
@@ -343,10 +354,18 @@ export class FromADC {
     streamRoute: ADCSDK.StreamRoute,
   ): typing.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined({
-      ...streamRoute,
       id: undefined,
-      labels: FromADC.transformLabels(streamRoute.labels),
-    });
+      desc: streamRoute.description,
+      labels: {
+        ...FromADC.transformLabels(streamRoute.labels),
+        __ADC_NAME: streamRoute.name,
+      },
+      plugins: streamRoute.plugins,
+      remote_addr: streamRoute.remote_addr,
+      server_addr: streamRoute.server_addr,
+      server_port: streamRoute.server_port,
+      sni: streamRoute.sni,
+    } as typing.StreamRoute);
   }
 
   public transformUpstream(upstream: ADCSDK.Upstream): typing.Upstream {

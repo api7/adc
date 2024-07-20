@@ -108,7 +108,7 @@ export interface StreamRoute {
   id: string;
   desc?: string;
   labels?: Labels;
-  name: string;
+  //name: string; // As of 3.9.1, APISIX does not support name on the stream route
 
   remote_addr?: string;
   server_addr?: string;
