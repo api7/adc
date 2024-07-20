@@ -164,6 +164,64 @@ describe('Sync and Dump - 1', () => {
     });
   });
 
+  describe('Sync and dump service with stream route', () => {
+    const serviceName = 'test';
+    const service = {
+      name: serviceName,
+      upstream: {
+        scheme: 'tcp',
+        nodes: [
+          {
+            host: '1.1.1.1',
+            port: 5432,
+            weight: 100,
+          },
+        ],
+      },
+    } as ADCSDK.Service;
+    const route1Name = 'postgres';
+    const route1 = {
+      name: route1Name,
+      server_port: 54320,
+    } as ADCSDK.StreamRoute;
+
+    it('Create resources', async () =>
+      syncEvents(backend, [
+        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
+        createEvent(ADCSDK.ResourceType.ROUTE, route1Name, route1, serviceName),
+      ]));
+
+    it('Dump', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0].stream_routes).toHaveLength(1);
+      expect(result.services[0].stream_routes[0]).toMatchObject(route1);
+    });
+
+    it('Delete stream route', async () =>
+      syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.ROUTE, route1Name, serviceName),
+      ]));
+
+    it('Dump again (non-route)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0].stream_routes).toHaveLength(0);
+    });
+
+    it('Delete service', async () =>
+      syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
+      ]));
+
+    it('Dump again (service should not exist)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(0);
+    });
+  });
+
   describe('Sync and dump consumers', () => {
     const consumer1Name = 'consumer1';
     const consumer1 = {
