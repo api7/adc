@@ -51,17 +51,6 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_windows_amd64.zip
             release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip
 
-      - name: Configure AWS S3 credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Upload ADC to AWS S3
-        run: |
-          aws s3 sync ./release s3://api7ai-docs-resources/adc/release
-
   adc-macos:
     runs-on: macos-14
     steps:
@@ -104,14 +93,3 @@ jobs:
           files: |
             release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
             release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
-
-      - name: Configure AWS S3 credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Upload ADC to AWS S3
-        run: |
-          aws s3 sync ./release s3://api7ai-docs-resources/adc/release
