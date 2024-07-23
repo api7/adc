@@ -9,7 +9,6 @@ if [ "x${ARCH}" = "xx86_64" ]; then
 fi
 
 # convert to standard os names used in files
-# TODO: support Windows
 if [ "x${OS}" = "xDarwin" ]; then
     OS="darwin"
 else
