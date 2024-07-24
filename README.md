@@ -17,11 +17,17 @@ The following converters are supported to convert API specifications to ADC conf
 
 ## Installation
 
-You can download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
+The easiest way to install ADC is through the install script:
 
 ```bash
-wget https://github.com/api7/adc/releases/download/v0.10.0/adc_0.10.0_linux_amd64.tar.gz
-tar -zxvf adc_0.10.0_linux_amd64.tar.gz
+curl -sL "https://run.api7.ai/adc/install" | sh
+```
+
+Or, you can download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
+
+```bash
+wget https://github.com/api7/adc/releases/download/v0.12.0/adc_0.12.0_linux_amd64.tar.gz
+tar -zxvf adc_0.12.0_linux_amd64.tar.gz
 mv adc /usr/local/bin/adc
 ```
 
