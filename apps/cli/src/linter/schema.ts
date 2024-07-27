@@ -106,15 +106,17 @@ const upstreamSchema = z
         },
       )
       .optional(),
-    nodes: z.array(
-      z.object({
-        host: z.string(),
-        port: portSchema.optional(),
-        weight: z.number().int().min(0),
-        priority: z.number().default(0).optional(),
-        metadata: z.record(z.string(), z.any()).optional(),
-      }),
-    ),
+    nodes: z
+      .array(
+        z.object({
+          host: z.string(),
+          port: portSchema.optional(),
+          weight: z.number().int().min(0),
+          priority: z.number().default(0).optional(),
+          metadata: z.record(z.string(), z.any()).optional(),
+        }),
+      )
+      .optional(),
     scheme: z
       .enum(['grpc', 'grpcs', 'http', 'https', 'tcp', 'tls', 'udp', 'kafka'])
       .default('http')
