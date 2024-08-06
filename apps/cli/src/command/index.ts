@@ -16,7 +16,7 @@ export const setupCommands = (): Command => {
   program
     .configureHelp({ showGlobalOptions: true })
     .passThroughOptions()
-    .version('0.12.0');
+    .version('0.12.1');
 
   program
     .addCommand(PingCommand)
