@@ -380,9 +380,6 @@
                 "additionalProperties": {}
               }
             },
-            "required": [
-              "nodes"
-            ],
             "additionalProperties": false
           },
           "plugins": {
@@ -576,14 +573,29 @@
               "type": "object",
               "properties": {
                 "certificate": {
-                  "type": "string",
-                  "minLength": 128,
-                  "maxLength": 65536
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 128,
+                      "maxLength": 65536
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$(secret|env):\\/\\/"
+                    }
+                  ]
                 },
                 "key": {
-                  "type": "string",
-                  "minLength": 32,
-                  "maxLength": 65536
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 32,
+                      "maxLength": 65536
+                    },
+                    {
+                      "$ref": "#/properties/ssls/items/properties/certificates/items/properties/certificate/anyOf/1"
+                    }
+                  ]
                 }
               },
               "required": [
