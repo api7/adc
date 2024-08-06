@@ -1,4 +1,3 @@
-import { max } from 'lodash';
 import { z } from 'zod';
 
 const nameSchema = z.string().min(1).max(100);
@@ -17,14 +16,21 @@ const timeoutSchema = z.object({
   read: z.number().gt(0),
 });
 const portSchema = z.number().int().min(1).max(65535);
-const certificateSchema = z
-  .string()
-  .min(128)
-  .max(64 * 1024);
-const certificateKeySchema = z
-  .string()
-  .min(32)
-  .max(64 * 1024);
+const secretRefSchema = z.string().regex(/^\$(secret|env):\/\//);
+const certificateSchema = z.union([
+  z
+    .string()
+    .min(128)
+    .max(64 * 1024),
+  secretRefSchema,
+]);
+const certificateKeySchema = z.union([
+  z
+    .string()
+    .min(32)
+    .max(64 * 1024),
+  secretRefSchema,
+]);
 
 const upstreamHealthCheckPassiveHealthy = z
   .object({
