@@ -1,0 +1,47 @@
+name: Schema Test
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/cli/src/linter/schema.ts'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/cli/src/linter/schema.ts'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run schema tests
+      - name: Prepare
+        run: |
+          apt install jq -y
+          mv schema.json compare.json
+      - name: Generate HEAD schema.json
+        run: npx nx run cli:export-schema
+      - name: Test
+        shell: bash
+        run: |
+          file1="./schema.json"
+          file2="./compare.json"
+          keys1=$(jq -r 'keys[]' "$file1")
+          keys2=$(jq -r 'keys[]' "$file2")
+          diff_keys=$(diff <(echo "$keys1") <(echo "$keys2") | grep "<" | awk '{print $2}')
+          for key in $diff_keys; do
+              value1=$(jq -r ".$key" "$file1")
+              value2=$(jq -r ".$key" "$file2")
+              echo "Key: $key"
+              echo "Value in file1: $value1"
+              echo "Value in file2: $value2"
+              echo "------------------------"
+          done
