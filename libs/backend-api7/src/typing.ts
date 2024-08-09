@@ -28,6 +28,7 @@ export interface Route {
 
   // misc
   enable_websocket?: boolean;
+  priority?: number;
 }
 export interface StreamRoute {
   id?: string;

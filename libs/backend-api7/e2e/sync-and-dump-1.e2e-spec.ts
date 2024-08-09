@@ -117,6 +117,7 @@ describe('Sync and Dump - 1', () => {
     const route1 = {
       name: route1Name,
       uris: ['/route1'],
+      priority: 100,
     } as ADCSDK.Route;
     const route2Name = 'route2';
     const route2 = {
