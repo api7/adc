@@ -83,7 +83,8 @@
                         "default": 10
                       },
                       "host": {
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 1
                       },
                       "port": {
                         "type": "integer",
@@ -184,10 +185,6 @@
                         "additionalProperties": false
                       }
                     },
-                    "required": [
-                      "host",
-                      "port"
-                    ],
                     "additionalProperties": false
                   },
                   "passive": {
@@ -241,7 +238,7 @@
                   "type": "object",
                   "properties": {
                     "host": {
-                      "type": "string"
+                      "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
                     },
                     "port": {
                       "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/port"
@@ -367,7 +364,7 @@
                 "default": "pass"
               },
               "upstream_host": {
-                "type": "string"
+                "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
               },
               "service_name": {
                 "type": "string"
@@ -398,7 +395,7 @@
           "hosts": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
             }
           },
           "routes": {
@@ -418,7 +415,7 @@
                 "hosts": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
                   }
                 },
                 "uris": {
@@ -514,7 +511,7 @@
                   "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/port"
                 },
                 "sni": {
-                  "type": "string"
+                  "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
                 }
               },
               "required": [
@@ -549,8 +546,7 @@
           "snis": {
             "type": "array",
             "items": {
-              "type": "string",
-              "minLength": 1
+              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
             },
             "minItems": 1
           },

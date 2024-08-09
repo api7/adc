@@ -13,6 +13,7 @@ const timeoutSchema = z.object({
   send: z.number().gt(0),
   read: z.number().gt(0),
 });
+const hostSchema = z.string().min(1);
 const portSchema = z.number().int().min(1).max(65535);
 const secretRefSchema = z.string().regex(/^\$(secret|env):\/\//);
 const certificateSchema = z.union([
@@ -73,8 +74,8 @@ const upstreamSchema = z
           type: upstreamHealthCheckType.optional(),
           timeout: z.number().default(1).optional(),
           concurrency: z.number().default(10).optional(),
-          host: z.string(),
-          port: portSchema,
+          host: hostSchema.optional(),
+          port: portSchema.optional(),
           http_path: z.string().default('/').optional(),
           https_verify_cert: z.boolean().default(true).optional(),
           http_request_headers: z.array(z.string()).min(1).optional(),
@@ -113,7 +114,7 @@ const upstreamSchema = z
     nodes: z
       .array(
         z.object({
-          host: z.string(),
+          host: hostSchema,
           port: portSchema.optional(),
           weight: z.number().int().min(0),
           priority: z.number().default(0).optional(),
@@ -149,7 +150,7 @@ const upstreamSchema = z
       })
       .optional(),
     pass_host: z.enum(['pass', 'node', 'rewrite']).default('pass').optional(),
-    upstream_host: z.string().optional(),
+    upstream_host: hostSchema.optional(),
 
     service_name: z.string().optional(),
     discovery_type: z.string().optional(),
@@ -172,7 +173,7 @@ const routeSchema = z
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
 
-    hosts: z.array(z.string()).optional(),
+    hosts: z.array(hostSchema).optional(),
     uris: z.array(z.string()).min(1),
     priority: z.number().int().optional(),
     timeout: timeoutSchema.optional(),
@@ -212,7 +213,7 @@ const streamRouteSchema = z
     remote_addr: z.string().optional(),
     server_addr: z.string().optional(),
     server_port: portSchema.optional(),
-    sni: z.string().optional(),
+    sni: hostSchema.optional(),
   })
   .strict();
 
@@ -226,7 +227,7 @@ const serviceSchema = z
     plugins: pluginsSchema.optional(),
     path_prefix: z.string().optional(),
     strip_path_prefix: z.boolean().optional(),
-    hosts: z.array(z.string()).optional(),
+    hosts: z.array(hostSchema).optional(),
 
     routes: z.array(routeSchema).optional(),
     stream_routes: z.array(streamRouteSchema).optional(),
@@ -254,7 +255,7 @@ const sslSchema = z
     labels: labelsSchema.optional(),
 
     type: z.enum(['server', 'client']).default('server').optional(),
-    snis: z.array(z.string().min(1)).min(1),
+    snis: z.array(hostSchema).min(1),
     certificates: z
       .array(
         z

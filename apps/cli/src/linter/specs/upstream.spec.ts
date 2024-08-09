@@ -59,6 +59,40 @@ describe('Upstream Linter', () => {
       } as ADCSDK.Configuration,
       expect: true,
     },
+    {
+      name: 'should check active health checker optional field',
+      input: {
+        services: [
+          {
+            name: 'No_HealthChecker_HostPort',
+            upstream: {
+              nodes: [
+                {
+                  host: '1.1.1.1',
+                  port: 443,
+                  weight: 100,
+                },
+              ],
+              checks: {
+                active: {
+                  type: 'http',
+                  http_path: '/',
+                  healthy: {
+                    interval: 2,
+                    successes: 1,
+                  },
+                  unhealthy: {
+                    interval: 1,
+                    timeouts: 3,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+    },
   ];
 
   // test cases runner
