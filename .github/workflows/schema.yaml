@@ -25,7 +25,7 @@ jobs:
       # Run schema tests
       - name: Prepare
         run: |
-          apt install jq -y
+          sudo apt install jq -y
           mv schema.json compare.json
       - name: Generate HEAD schema.json
         run: npx nx run cli:export-schema
