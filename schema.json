@@ -435,20 +435,7 @@
                   "$ref": "#/properties/services/items/properties/upstream/properties/timeout"
                 },
                 "vars": {
-                  "type": "array",
-                  "items": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/properties/services/items/properties/routes/items/properties/vars"
-                        }
-                      }
-                    ]
-                  }
+                  "type": "array"
                 },
                 "methods": {
                   "type": "array",
