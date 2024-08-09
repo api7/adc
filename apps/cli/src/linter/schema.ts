@@ -7,9 +7,7 @@ const labelsSchema = z.record(
   z.union([z.string(), z.array(z.string())]),
 );
 const pluginsSchema = z.record(z.string(), z.record(z.string(), z.any()));
-const exprSchema = z.array(
-  z.union([z.string(), z.array(z.lazy(() => exprSchema))]),
-);
+const exprSchema = z.array(z.any());
 const timeoutSchema = z.object({
   connect: z.number().gt(0),
   send: z.number().gt(0),
