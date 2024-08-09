@@ -24,6 +24,7 @@ export class ToADC {
       methods: route.methods,
       enable_websocket: route.enable_websocket,
       plugins: route.plugins,
+      priority: route.priority,
       metadata: { id: route.route_id },
     });
   }
@@ -117,7 +118,7 @@ export class FromADC {
   }
 
   public transformRoute(route: ADCSDK.Route, serviceId: string): typing.Route {
-    return ADCSDK.utils.recursiveOmitUndefined({
+    return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
       route_id: ADCSDK.utils.generateId(route.name),
       name: route.name,
       desc: route.description,
@@ -127,6 +128,7 @@ export class FromADC {
       plugins: route.plugins,
       service_id: serviceId,
       paths: [route.uris[0]],
+      priority: route.priority,
     });
   }
 
