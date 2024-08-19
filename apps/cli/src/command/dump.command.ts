@@ -66,15 +66,16 @@ export const LoadRemoteConfigurationTask = ({
 
 export const DumpCommand = new BackendCommand<DumpOptions>(
   'dump',
-  'Dump configurations from the backend',
+  'save the configuration of the backend to a file',
+	'Save the configuration of the backend to the specified YAML file.',
 )
   .option(
     '-o, --output <file-path>',
-    'Specify the file path where data is dumped from the backend',
+    'path of the file to save the configuration',
     'adc.yaml',
   )
   .addExample('adc dump')
-  .addExample('adc dump -o other-name.yaml')
+  .addExample('adc dump -o service-configuration.yaml')
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(

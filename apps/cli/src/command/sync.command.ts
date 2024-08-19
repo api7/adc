@@ -19,14 +19,16 @@ type SyncOption = BackendOptions & {
 
 export const SyncCommand = new BackendCommand<SyncOption>(
   'sync',
-  'Sync local configurations to backend',
+  'sync the local configuration to the backend',
+	'Synchronize the configuration from the local file(s) to the backend.',
 )
   .option(
     '-f, --file <file-path>',
-    'The files you want to synchronize, can be set more than one.',
+    'file(s) to synchronize',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)
+  .addExample('adc sync -f adc.yaml')
   .addExample('adc sync -f service-a.yaml -f service-b.yaml')
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
