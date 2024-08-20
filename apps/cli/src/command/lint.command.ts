@@ -57,13 +57,15 @@ export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
 
 export const LintCommand = new BaseCommand('lint')
   .description(
-    'Check provided configuration files, local execution only, ensuring inputs meet ADC requirements',
+    'Lint the local configuration file(s) to ensure it meets ADC requirements.',
   )
+  .summary('lint the local configuration')
   .option(
-    '-f, --file <file-path...>',
-    'The files you want to synchronize, can be set more than one.',
+    '-f, --file <file-path>',
+    'file to lint',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
+  .addExample('adc lint -f adc.yaml')
   .addExample('adc lint -f service-a.yaml -f service-b.yaml')
   .action(async () => {
     const opts = LintCommand.optsWithGlobals();

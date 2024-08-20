@@ -21,13 +21,14 @@ class BaseConvertCommand extends BaseCommand {
     super(name);
     this.option(
       '-f, --file <openapi-file-path>',
-      'OpenAPI configuration file path',
+      'OpenAPI specification file path',
     ).option('-o, --output <output-path>', 'output file path');
   }
 }
 
 const OpenAPICommand = new BaseConvertCommand('openapi')
-  .description('Converting OpenAPI to ADC Configuration')
+  .description('Convert an OpenAPI specification to equivalent ADC configuration.\n\nLearn more at: https://docs.api7.ai/enterprise/reference/openapi-adc')
+  .summary('convert OpenAPI spec to ADC configuration')
   .action(async () => {
     const opts = OpenAPICommand.optsWithGlobals<ConvertOptions>();
 
@@ -92,5 +93,6 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
   });
 
 export const ConvertCommand = new BaseCommand('convert')
-  .description('Convert other API spec to ADC configurations')
+  .description('Convert API definitions in other formats to equivalent ADC configuration.')
+  .summary('convert API definitions in other formats to ADC configuration')
   .addCommand(OpenAPICommand);

@@ -172,7 +172,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
         const gatewayGroups = resp?.data?.list;
         if (!gatewayGroups.length) {
-          throw Error(`Gateway group ${this.gatewayGroup} does not exist`);
+          throw Error(`Gateway group "${this.gatewayGroup}" does not exist`);
         }
         ctx.gatewayGroupId = this.gatewayGroupId = gatewayGroups[0].id;
       },
