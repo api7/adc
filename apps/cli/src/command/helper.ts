@@ -13,7 +13,7 @@ export class BaseCommand extends Command {
   constructor(name: string, summary?: string, description?: string) {
     super(name);
 
-		if (summary) this.summary(summary);
+    if (summary) this.summary(summary);
     if (description) this.description(description);
 
     // Add global flag - verbose

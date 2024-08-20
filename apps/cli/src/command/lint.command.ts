@@ -59,10 +59,10 @@ export const LintCommand = new BaseCommand('lint')
   .description(
     'Lint the local configuration file(s) to ensure it meets ADC requirements.',
   )
-	.summary('lint the local configuration')
+  .summary('lint the local configuration')
   .option(
-    '-f, --file <file-path...>',
-    'files to synchronize',
+    '-f, --file <file-path>',
+    'file to lint',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addExample('adc lint -f adc.yaml')

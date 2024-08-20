@@ -20,11 +20,11 @@ type SyncOption = BackendOptions & {
 export const SyncCommand = new BackendCommand<SyncOption>(
   'sync',
   'sync the local configuration to the backend',
-	'Synchronize the configuration from the local file(s) to the backend.',
+  'Synchronize the configuration from the local file(s) to the backend.',
 )
   .option(
     '-f, --file <file-path>',
-    'file(s) to synchronize',
+    'file to synchronize',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)

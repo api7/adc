@@ -9,7 +9,7 @@ type PingOptions = BackendOptions;
 export const PingCommand = new BackendCommand<PingOptions>(
   'ping',
   'check connectivity with the backend',
-	'Check connectivity with the configured backend.',
+  'Check connectivity with the configured backend.',
 ).handle(async (opts) => {
   const backend = loadBackend(opts.backend, opts);
 

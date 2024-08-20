@@ -67,7 +67,7 @@ export const LoadRemoteConfigurationTask = ({
 export const DumpCommand = new BackendCommand<DumpOptions>(
   'dump',
   'save the configuration of the backend to a file',
-	'Save the configuration of the backend to the specified YAML file.',
+  'Save the configuration of the backend to the specified YAML file.',
 )
   .option(
     '-o, --output <file-path>',
