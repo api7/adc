@@ -167,8 +167,16 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)
-  .addExample('adc diff -f adc.yaml')
-  .addExample('adc diff -f service-a.yaml -f service-b.yaml')
+  .addExamples([
+    {
+      title: 'Compare configuration in a specified file with the backend configuration',
+      command: 'adc diff -f adc.yaml',
+    },
+    {
+      title: 'Compare configuration in multiple specified files with the backend configuration',
+      command: 'adc diff -f service-a.yaml -f service-b.yaml',
+    },
+  ])
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
 

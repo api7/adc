@@ -65,8 +65,16 @@ export const LintCommand = new BaseCommand('lint')
     'file to lint',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
-  .addExample('adc lint -f adc.yaml')
-  .addExample('adc lint -f service-a.yaml -f service-b.yaml')
+  .addExamples([
+    {
+      title: 'Lint the specified configuration file',
+      command: 'adc lint -f adc.yaml',
+    },
+    {
+      title: 'Lint multiple configuration files',
+      command: 'adc lint -f service-a.yaml -f service-b.yaml',
+    },
+  ])
   .action(async () => {
     const opts = LintCommand.optsWithGlobals();
 

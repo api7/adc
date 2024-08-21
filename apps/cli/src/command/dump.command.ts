@@ -74,8 +74,24 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
     'path of the file to save the configuration',
     'adc.yaml',
   )
-  .addExample('adc dump')
-  .addExample('adc dump -o service-configuration.yaml')
+  .addExamples([
+    {
+      title: 'Save backend configuration to the default adc.yaml file',
+      command: 'adc dump'
+    },
+    {
+      title: 'Save backend configuration to the specified file',
+      command: 'adc dump -o service-configuration.yaml'
+    },
+    {
+      title: 'Save only specified resource types from the backend',
+      command: 'adc dump --include-resource-type global_rule --include-resource-type plugin_metadata',
+    },
+    {
+      title: 'Save only the resources with the specified labels',
+      command: 'adc dump --label-selector app=catalog',
+    },
+  ])
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
