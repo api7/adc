@@ -88,7 +88,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
       command: 'adc dump --include-resource-type global_rule --include-resource-type plugin_metadata',
     },
     {
-      title: 'Save only the resources with the specified lables',
+      title: 'Save only the resources with the specified labels',
       command: 'adc dump --label-selector app=catalog',
     },
   ])

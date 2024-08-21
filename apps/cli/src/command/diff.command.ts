@@ -169,7 +169,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
   .addOption(NoLintOption)
   .addExamples([
     {
-      title: 'Compare configuration in specified file with the backend configuration',
+      title: 'Compare configuration in a specified file with the backend configuration',
       command: 'adc diff -f adc.yaml',
     },
     {
