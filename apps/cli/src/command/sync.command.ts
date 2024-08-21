@@ -47,7 +47,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     },
     {
       title: 'Synchronize configuration with debug logs',
-      command: 'adc sync -f adc.yaml --verbose',
+      command: 'adc sync -f adc.yaml --verbose 2',
     },
     {
       title: 'Synchronize only specified resource types from the configuration file',
