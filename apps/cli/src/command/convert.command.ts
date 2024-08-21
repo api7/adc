@@ -22,13 +22,23 @@ class BaseConvertCommand extends BaseCommand {
     this.option(
       '-f, --file <openapi-file-path>',
       'OpenAPI specification file path',
-    ).option('-o, --output <output-path>', 'output file path');
+    ).option('-o, --output <output-path>', 'output file path', 'adc.yaml');
   }
 }
 
 const OpenAPICommand = new BaseConvertCommand('openapi')
   .description('Convert an OpenAPI specification to equivalent ADC configuration.\n\nLearn more at: https://docs.api7.ai/enterprise/reference/openapi-adc')
   .summary('convert OpenAPI spec to ADC configuration')
+  .addExamples([
+    {
+      title: 'Convert OpenAPI specification in YAML format to ADC configuration and write to the default adc.yaml file',
+      command: 'adc convert openapi -f openapi.yaml',
+    },
+    {
+      title: 'Convert OpenAPI specification in JSON format to ADC configuration and write to the specified file',
+      command: 'adc convert openapi -f openapi.json -o converted-adc.yaml',
+    }
+  ])
   .action(async () => {
     const opts = OpenAPICommand.optsWithGlobals<ConvertOptions>();
 
@@ -70,7 +80,6 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
           title: 'Write converted OpenAPI file',
           task: (ctx, task) => {
             const yamlStr = stringify(ctx.local, {});
-            if (!opts.output) opts.output = './adc.yaml';
             writeFileSync(opts.output, yamlStr);
             task.title = `Converted OpenAPI file to "${resolve(
               opts.output,

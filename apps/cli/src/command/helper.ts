@@ -8,7 +8,7 @@ import parseDuration from 'parse-duration';
 import qs from 'qs';
 
 export class BaseCommand extends Command {
-  private exmaples: Array<string> = [];
+  private examples: Array<{ title: string; command: string }> = [];
 
   constructor(name: string, summary?: string, description?: string) {
     super(name);
@@ -32,15 +32,21 @@ export class BaseCommand extends Command {
     );
   }
 
-  public addExample(exmaple: string) {
-    if (this.exmaples.length === 0)
-      this.addHelpText('after', () => {
-        return `\nExamples:\n\n${this.exmaples
-          .map((example) => `  $ ${example}`)
-          .join('\n')}\n`;
-      });
+  // Appends the provided examples to description
+  public addExamples(examples: Array<{ title: string, command: string }>) {
+    this.examples.push(...examples);
 
-    this.exmaples.push(exmaple);
+    // Title of each example is a comment which describes the actual command
+    const exampleText = this.examples
+      .map((example) => `  # ${example.title}\n  ${example.command}`)
+      .join('\n\n');
+
+    const exampleHeader = this.examples.length === 1 ? 'Example:' : 'Examples:';
+
+    const currDescription = this.description() || '';
+
+    // Append the examples to the description
+    this.description(`${currDescription}\n\n${exampleHeader}\n${exampleText}`);
     return this;
   }
 }

@@ -28,8 +28,36 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)
-  .addExample('adc sync -f adc.yaml')
-  .addExample('adc sync -f service-a.yaml -f service-b.yaml')
+  .addExamples([
+    {
+      title: 'Synchronize configuration from a single file',
+      command: 'adc sync -f adc.yaml',
+    },
+    {
+      title: 'Synchronize configuration from multiple files',
+      command: 'adc sync -f service-a.yaml -f service-b.yaml',
+    },
+    {
+      title: 'Synchronize configuration to a specific gateway group',
+      command: 'adc sync -f adc.yaml --gateway-group production',
+    },
+    {
+      title: 'Synchronize configuration without lint check',
+      command: 'adc sync -f adc.yaml --no-lint',
+    },
+    {
+      title: 'Synchronize configuration with debug logs',
+      command: 'adc sync -f adc.yaml --verbose',
+    },
+    {
+      title: 'Synchronize only specified resource types from the configuration file',
+      command: 'adc sync -f adc.yaml --include-resource-type global_rule --include-resource-type plugin_metadata',
+    },
+    {
+      title: 'Synchronize only the resources with the specified lables',
+      command: 'adc sync -f adc.yaml --label-selector app=catalog',
+    },
+  ])
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
 
