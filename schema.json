@@ -13,7 +13,7 @@
           },
           "description": {
             "type": "string",
-            "maxLength": 256
+            "maxLength": 65536
           },
           "labels": {
             "type": "object",
