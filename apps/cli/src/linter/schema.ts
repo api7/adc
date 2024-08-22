@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 const nameSchema = z.string().min(1).max(100);
-const descriptionSchema = z.string().max(256).optional();
+const descriptionSchema = z
+  .string()
+  .max(64 * 1024)
+  .optional();
 const labelsSchema = z.record(
   z.string(),
   z.union([z.string(), z.array(z.string())]),
