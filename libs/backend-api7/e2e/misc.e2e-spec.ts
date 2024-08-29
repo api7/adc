@@ -24,8 +24,13 @@ describe('Miscellaneous', () => {
     });
   });
 
-  describe('Sync resources with the description greater than 256 bytes', () => {
-    const service1Name = 'service1';
+  describe('Sync resources with the name/description greater than 256 bytes', () => {
+    const routeName = ''.padEnd(64 * 1024, '0'); // 65536 bytes
+    const service1Name = ''.padEnd(64 * 1024, '0'); // 65536 bytes
+    const route = {
+      name: routeName,
+      uris: ['/test'],
+    };
     const service1 = {
       name: service1Name,
       description: ''.padEnd(64 * 1024, '0'), // 65536 bytes
@@ -39,6 +44,7 @@ describe('Miscellaneous', () => {
           },
         ],
       },
+      routes: [route],
     } as ADCSDK.Service;
 
     it('Create services', async () =>
@@ -50,6 +56,8 @@ describe('Miscellaneous', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service1);
+      expect(result.services[0]).toMatchObject(service1);
+      expect(result.services[0].routes[0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>
