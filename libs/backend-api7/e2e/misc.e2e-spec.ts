@@ -26,13 +26,13 @@ describe('Miscellaneous', () => {
 
   describe('Sync resources with the name/description greater than 256 bytes', () => {
     const routeName = ''.padEnd(64 * 1024, '0'); // 65536 bytes
-    const service1Name = ''.padEnd(64 * 1024, '0'); // 65536 bytes
+    const serviceName = ''.padEnd(64 * 1024, '0'); // 65536 bytes
     const route = {
       name: routeName,
       uris: ['/test'],
     };
-    const service1 = {
-      name: service1Name,
+    const service = {
+      name: serviceName,
       description: ''.padEnd(64 * 1024, '0'), // 65536 bytes
       upstream: {
         scheme: 'https',
@@ -49,20 +49,21 @@ describe('Miscellaneous', () => {
 
     it('Create services', async () =>
       syncEvents(backend, [
-        createEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
+        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
+        createEvent(ADCSDK.ResourceType.ROUTE, routeName, route),
       ]));
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service1);
-      expect(result.services[0]).toMatchObject(service1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0]).toMatchObject(service);
       expect(result.services[0].routes[0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>
       syncEvents(backend, [
-        deleteEvent(ADCSDK.ResourceType.SERVICE, service1Name),
+        deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
       ]));
 
     it('Dump again', async () => {
