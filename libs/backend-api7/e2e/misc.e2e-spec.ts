@@ -1,7 +1,4 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { BackendAPI7 } from '../src';
 import {
@@ -9,7 +6,6 @@ import {
   deleteEvent,
   dumpConfiguration,
   syncEvents,
-  updateEvent,
 } from './support/utils';
 
 describe('Miscellaneous', () => {
