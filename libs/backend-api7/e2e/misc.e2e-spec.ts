@@ -1,7 +1,4 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { BackendAPI7 } from '../src';
 import {
@@ -9,7 +6,6 @@ import {
   deleteEvent,
   dumpConfiguration,
   syncEvents,
-  updateEvent,
 } from './support/utils';
 
 describe('Miscellaneous', () => {
@@ -24,10 +20,15 @@ describe('Miscellaneous', () => {
     });
   });
 
-  describe('Sync resources with the description greater than 256 bytes', () => {
-    const service1Name = 'service1';
-    const service1 = {
-      name: service1Name,
+  describe('Sync resources with the name/description greater than 256 bytes', () => {
+    const routeName = ''.padEnd(64 * 1024, '0'); // 65536 bytes
+    const serviceName = ''.padEnd(64 * 1024, '0'); // 65536 bytes
+    const route = {
+      name: routeName,
+      uris: ['/test'],
+    };
+    const service = {
+      name: serviceName,
       description: ''.padEnd(64 * 1024, '0'), // 65536 bytes
       upstream: {
         scheme: 'https',
@@ -39,22 +40,27 @@ describe('Miscellaneous', () => {
           },
         ],
       },
+      routes: [route],
     } as ADCSDK.Service;
 
     it('Create services', async () =>
       syncEvents(backend, [
-        createEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
+        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
+        createEvent(ADCSDK.ResourceType.ROUTE, routeName, route, serviceName),
       ]));
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0].routes[0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>
       syncEvents(backend, [
-        deleteEvent(ADCSDK.ResourceType.SERVICE, service1Name),
+        deleteEvent(ADCSDK.ResourceType.ROUTE, routeName, serviceName),
+        deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
       ]));
 
     it('Dump again', async () => {

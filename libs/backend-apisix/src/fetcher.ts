@@ -32,6 +32,10 @@ export class Fetcher {
 
   private allTask(): Array<FetchTask> {
     return Object.values(ADCSDK.ResourceType)
+      .filter(
+        (resourceType) =>
+          resourceType !== ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE, // ignore internal only types
+      )
       .map((resourceType): [ADCSDK.ResourceType, string] => [
         resourceType,
         resourceTypeToAPIName(resourceType),

@@ -122,6 +122,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
                   switch (type) {
                     case ADCSDK.ResourceType.ROUTE:
                       return toADC.transformRoute;
+                    case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
                     case ADCSDK.ResourceType.SERVICE:
                       return toADC.transformService;
                     case ADCSDK.ResourceType.SSL:

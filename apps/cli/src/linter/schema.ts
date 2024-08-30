@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-const nameSchema = z.string().min(1).max(100);
+const nameSchema = z
+  .string()
+  .min(1)
+  .max(64 * 1024);
 const descriptionSchema = z
   .string()
   .max(64 * 1024)

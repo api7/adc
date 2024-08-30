@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { randomUUID } from 'crypto';
 import { diff as objectDiff } from 'deep-diff';
-import { cloneDeep, isEmpty, isEqual, isNil, unset } from 'lodash';
+import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash';
 import winston from 'winston';
 
 const order = {
@@ -359,6 +359,20 @@ export class DifferV3 {
         );
       }
 
+      // Services will have two different default value rules depending on
+      // the type of route they contain, one for HTTP services and another
+      // for stream services.
+      // Therefore, before merging the default values, we should decide
+      // the default value table according to the type of service. This type
+      // is only used for merging default values, other processes still
+      // use the ResourceType.SERVICE type.
+      const resourceTypeForDefault =
+        resourceType != ADCSDK.ResourceType.SERVICE
+          ? resourceType
+          : has(localItem, 'stream_routes')
+            ? ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE
+            : ADCSDK.ResourceType.SERVICE;
+
       // Merges local resources into a table of default values for this type.
       // The Admin API merges the default values specified in the schema into
       // the data, so default values not contained in the local data will
@@ -368,7 +382,8 @@ export class DifferV3 {
       // As such, each backend implementation needs to provide its table of
       // default values, which merges the local resources to the defaults,
       // just as the Admin API does.
-      const defaultValue = this.defaultValue?.core?.[resourceType] ?? {};
+      const defaultValue =
+        this.defaultValue?.core?.[resourceTypeForDefault] ?? {};
       const mergedLocalItem = this.mergeDefault(
         localItem,
         cloneDeep(defaultValue),
