@@ -21,13 +21,24 @@ class BaseConvertCommand extends BaseCommand {
     super(name);
     this.option(
       '-f, --file <openapi-file-path>',
-      'OpenAPI configuration file path',
-    ).option('-o, --output <output-path>', 'output file path');
+      'OpenAPI specification file path',
+    ).option('-o, --output <output-path>', 'output file path', 'adc.yaml');
   }
 }
 
 const OpenAPICommand = new BaseConvertCommand('openapi')
-  .description('Converting OpenAPI to ADC Configuration')
+  .description('Convert an OpenAPI specification to equivalent ADC configuration.\n\nLearn more at: https://docs.api7.ai/enterprise/reference/openapi-adc')
+  .summary('convert OpenAPI spec to ADC configuration')
+  .addExamples([
+    {
+      title: 'Convert OpenAPI specification in YAML format to ADC configuration and write to the default adc.yaml file',
+      command: 'adc convert openapi -f openapi.yaml',
+    },
+    {
+      title: 'Convert OpenAPI specification in JSON format to ADC configuration and write to the specified file',
+      command: 'adc convert openapi -f openapi.json -o converted-adc.yaml',
+    }
+  ])
   .action(async () => {
     const opts = OpenAPICommand.optsWithGlobals<ConvertOptions>();
 
@@ -69,7 +80,6 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
           title: 'Write converted OpenAPI file',
           task: (ctx, task) => {
             const yamlStr = stringify(ctx.local, {});
-            if (!opts.output) opts.output = './adc.yaml';
             writeFileSync(opts.output, yamlStr);
             task.title = `Converted OpenAPI file to "${resolve(
               opts.output,
@@ -92,5 +102,6 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
   });
 
 export const ConvertCommand = new BaseCommand('convert')
-  .description('Convert other API spec to ADC configurations')
+  .description('Convert API definitions in other formats to equivalent ADC configuration.')
+  .summary('convert API definitions in other formats to ADC configuration')
   .addCommand(OpenAPICommand);

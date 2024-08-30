@@ -9,4 +9,7 @@ export enum ResourceType {
   CONSUMER = 'consumer',
   CONSUMER_GROUP = 'consumer_group',
   STREAM_ROUTE = 'stream_route',
+
+  // internal use only
+  INTERNAL_STREAM_SERVICE = 'stream_service',
 }

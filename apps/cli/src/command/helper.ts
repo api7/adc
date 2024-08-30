@@ -8,18 +8,19 @@ import parseDuration from 'parse-duration';
 import qs from 'qs';
 
 export class BaseCommand extends Command {
-  private exmaples: Array<string> = [];
+  private examples: Array<{ title: string; command: string }> = [];
 
-  constructor(name: string, description?: string) {
+  constructor(name: string, summary?: string, description?: string) {
     super(name);
 
+    if (summary) this.summary(summary);
     if (description) this.description(description);
 
     // Add global flag - verbose
     this.addOption(
       new Option(
         '--verbose <integer>',
-        'Override verbose logging levels, it supports 0: no logs, 1: basic logs, 2: debug logs',
+        'set the verbosity level for logs (0: no logs, 1: basic logs, 2: debug logs)',
       )
         .argParser((val) => {
           const int = parseInt(val);
@@ -31,22 +32,28 @@ export class BaseCommand extends Command {
     );
   }
 
-  public addExample(exmaple: string) {
-    if (this.exmaples.length === 0)
-      this.addHelpText('after', () => {
-        return `\nExample:\n\n${this.exmaples
-          .map((example) => `  $ ${example}`)
-          .join('\n')}\n`;
-      });
+  // Appends the provided examples to description
+  public addExamples(examples: Array<{ title: string, command: string }>) {
+    this.examples.push(...examples);
 
-    this.exmaples.push(exmaple);
+    // Title of each example is a comment which describes the actual command
+    const exampleText = this.examples
+      .map((example) => `  # ${example.title}\n  ${example.command}`)
+      .join('\n\n');
+
+    const exampleHeader = this.examples.length === 1 ? 'Example:' : 'Examples:';
+
+    const currDescription = this.description() || '';
+
+    // Append the examples to the description
+    this.description(`${currDescription}\n\n${exampleHeader}\n${exampleText}`);
     return this;
   }
 }
 
 export class BackendCommand<OPTS extends object = object> extends BaseCommand {
-  constructor(name: string, description?: string) {
-    super(name, description);
+  constructor(name: string, summary?: string, description?: string) {
+    super(name, summary, description);
 
     this.addBackendOptions();
   }
@@ -92,7 +99,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
     };
 
     this.addOption(
-      new Option('--backend <backend>', 'Type of backend to connect')
+      new Option('--backend <backend>', 'type of backend to connect to')
         .env('ADC_BACKEND')
         .choices(['apisix', 'api7ee'])
         .default('apisix'),
@@ -100,28 +107,28 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--server <string>',
-          'HTTP address of backend. This value can also be set using the environment variable ADC_SERVER environment variable',
+          'HTTP address of the backend',
         )
           .env('ADC_SERVER')
           .default('http://localhost:9180'),
       )
       .addOption(
-        new Option('--token <string>', 'Token used to access the backend').env(
+        new Option('--token <string>', 'token for ADC to connect to the backend').env(
           'ADC_TOKEN',
         ),
       )
       .addOption(
         new Option(
           '--gateway-group <string>',
-          'Gateway group used to specify the gateway group to operate [API7EE backend only]',
+          'gateway group to operate on (only supported for "api7ee" backend)',
         )
           .env('ADC_GATEWAY_GROUP')
           .default('default'),
       )
       .addOption(
         new Option(
-          '--label-selector <selectors>',
-          'Filter for resource labels (e.g., labelKey=labelValue)',
+          '--label-selector <labelKey=labelValue>',
+          'filter resources by labels',
         ).argParser((val, previous: Record<string, string> = {}) =>
           Object.assign(previous, qs.parse(val, { delimiter: ',' })),
         ),
@@ -129,7 +136,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--include-resource-type <string>',
-          'Filter for resource types, contains only the specified type',
+          'filter resources that only contains the specified type',
         )
           .conflicts('excludeResourceType')
           .choices(Object.values(ADCSDK.ResourceType))
@@ -138,7 +145,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--exclude-resource-type <string>',
-          'Filter for resource types, not contains only the specified type',
+          'filter resources that does not contain the specified type',
         )
           .conflicts('includeResourceType')
           .choices(Object.values(ADCSDK.ResourceType))
@@ -147,7 +154,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--timeout <duration>',
-          'Set a request timeout for the client to connect with Backend Admin API (in duration, e.g., 10s, 1h10m)',
+          'timeout for adc to connect with the backend (examples: 10s, 1h10m)',
         )
           .default(10000, '10s')
           .argParser((value) => {
@@ -157,7 +164,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--ca-cert-file <string>',
-          'Path to CA certificate for verifying the Backend Admin API',
+          'path to the CA certificate to verify the backend',
         )
           .env('ADC_CA_CERT_FILE')
           .argParser((value) =>
@@ -170,33 +177,33 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
       .addOption(
         new Option(
           '--tls-client-cert-file <string>',
-          'Path to Mutual TLS client certificate for verifying the Backend Admin API',
+          'path to the mutual TLS client certificate to verify the backend',
         )
           .env('ADC_TLS_CLIENT_CERT_FILE')
           .argParser((value) =>
             processCertificateFile(
               value,
-              'The specified Mutual TLS client certificate file does not exist',
+              'The specified mutual TLS client certificate file does not exist',
             ),
           ),
       )
       .addOption(
         new Option(
           '--tls-client-key-file <string>',
-          'Path to Mutual TLS client key for verifying the Backend Admin API',
+          'path to the mutual TLS client key to verify the backend',
         )
           .env('ADC_TLS_CLIENT_KEY_FILE')
           .argParser((value) =>
             processCertificateFile(
               value,
-              'The specified Mutual TLS client key file does not exist',
+              'The specified mutual TLS client key file does not exist',
             ),
           ),
       )
       .addOption(
         new Option(
           '--tls-skip-verify',
-          `Disable verification of Backend Admin API TLS certificate`,
+          `disable the verification of the backend TLS certificate`,
         )
           .env('ADC_TLS_SKIP_VERIFY')
           .default(false),
@@ -204,4 +211,4 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
   }
 }
 
-export const NoLintOption = new Option('--no-lint', 'Disable lint check');
+export const NoLintOption = new Option('--no-lint', 'disable lint check');

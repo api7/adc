@@ -158,15 +158,25 @@ export const DiffResourceTask = (
 
 export const DiffCommand = new BackendCommand<DiffOptions>(
   'diff',
-  'Show the difference between local and backend configurations',
+  'show differences between the local and the backend configurations',
+  'Compare the configuration in the specified file(s) with the backend configuration',
 )
   .option(
     '-f, --file <file-path>',
-    'The files you want to synchronize, can be set more than one.',
+    'file to compare',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)
-  .addExample('adc diff -f service-a.yaml -f service-b.yaml')
+  .addExamples([
+    {
+      title: 'Compare configuration in a specified file with the backend configuration',
+      command: 'adc diff -f adc.yaml',
+    },
+    {
+      title: 'Compare configuration in multiple specified files with the backend configuration',
+      command: 'adc diff -f service-a.yaml -f service-b.yaml',
+    },
+  ])
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
 

@@ -9,11 +9,11 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 100
+            "maxLength": 65536
           },
           "description": {
             "type": "string",
-            "maxLength": 256
+            "maxLength": 65536
           },
           "labels": {
             "type": "object",
