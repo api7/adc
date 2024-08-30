@@ -50,7 +50,7 @@ describe('Miscellaneous', () => {
     it('Create services', async () =>
       syncEvents(backend, [
         createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
-        createEvent(ADCSDK.ResourceType.ROUTE, routeName, route),
+        createEvent(ADCSDK.ResourceType.ROUTE, routeName, route, serviceName),
       ]));
 
     it('Dump', async () => {
@@ -63,6 +63,7 @@ describe('Miscellaneous', () => {
 
     it('Delete service', async () =>
       syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.ROUTE, routeName, serviceName),
         deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
       ]));
 
