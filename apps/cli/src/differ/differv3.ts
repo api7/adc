@@ -38,6 +38,9 @@ const order = {
   [`${ADCSDK.ResourceType.PLUGIN_METADATA}.${ADCSDK.EventType.DELETE}`]: 27,
   [`${ADCSDK.ResourceType.PLUGIN_METADATA}.${ADCSDK.EventType.CREATE}`]: 28,
   [`${ADCSDK.ResourceType.PLUGIN_METADATA}.${ADCSDK.EventType.UPDATE}`]: 29,
+  [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.DELETE}`]: 30,
+  [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.CREATE}`]: 31,
+  [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.UPDATE}`]: 32,
 };
 
 export class DifferV3 {
@@ -163,6 +166,19 @@ export class DifferV3 {
           res,
         ]) ?? [],
       ),
+      ...differ.diffResource(
+        ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+        local?.consumer_credentials?.map((res) => [
+          res.name,
+          ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res,
+        ]) ?? [],
+        remote?.consumer_credentials?.map((res) => [
+          res.name,
+          ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res,
+        ]) ?? [],
+      ),
       /* ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,
         local?.upstreams?.map((res) => [
@@ -263,6 +279,15 @@ export class DifferV3 {
     remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.StreamRoute]>,
   ): Array<ADCSDK.Event>;
   private diffResource(
+    resourceType: ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+    local: Array<
+      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerCredential]
+    >,
+    remote: Array<
+      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerCredential]
+    >,
+  ): Array<ADCSDK.Event>;
+  private diffResource(
     resourceType: ADCSDK.ResourceType.UPSTREAM,
     local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Upstream]>,
     remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Upstream]>,
@@ -316,6 +341,8 @@ export class DifferV3 {
           oldValue: remoteItem,
 
           // Special handling of resources containing nested resources
+          // When a consumer is deleted, its credentials are not taken into
+          // consideration.
           subEvents: DifferV3.diff(
             {},
             resourceType === ADCSDK.ResourceType.SERVICE
@@ -392,33 +419,55 @@ export class DifferV3 {
       // Special handling of resources containing nested resources: routes, consumer_groups
       const subEvents: Array<ADCSDK.Event> = [];
       if (
-        resourceType === ADCSDK.ResourceType.SERVICE ||
-        resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
+        [
+          ADCSDK.ResourceType.SERVICE,
+          ADCSDK.ResourceType.CONSUMER_GROUP,
+          ADCSDK.ResourceType.CONSUMER,
+        ].includes(resourceType)
       ) {
         subEvents.push(
           ...DifferV3.diff(
-            resourceType === ADCSDK.ResourceType.SERVICE
+            resourceType ===
+              (ADCSDK.ResourceType.SERVICE as ADCSDK.ResourceType)
               ? {
                   routes: (localItem as ADCSDK.Service).routes,
                   stream_routes: (localItem as ADCSDK.Service).stream_routes,
                 }
-              : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
+              : resourceType ===
+                  (ADCSDK.ResourceType.CONSUMER_GROUP as ADCSDK.ResourceType)
                 ? {
                     consumers: (localItem as ADCSDK.ConsumerGroup).consumers,
                   }
-                : {},
-            resourceType === ADCSDK.ResourceType.SERVICE
+                : resourceType ===
+                    (ADCSDK.ResourceType.CONSUMER as ADCSDK.ResourceType)
+                  ? {
+                      consumer_credentials: (localItem as ADCSDK.Consumer)
+                        .credentials,
+                    }
+                  : {},
+            resourceType ===
+              (ADCSDK.ResourceType.SERVICE as ADCSDK.ResourceType)
               ? {
                   routes: (remoteItem as ADCSDK.Service).routes,
                   stream_routes: (remoteItem as ADCSDK.Service).stream_routes,
                 }
-              : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
+              : resourceType ===
+                  (ADCSDK.ResourceType.CONSUMER_GROUP as ADCSDK.ResourceType)
                 ? {
                     consumers: (remoteItem as ADCSDK.ConsumerGroup).consumers,
                   }
-                : {},
+                : resourceType ===
+                    (ADCSDK.ResourceType.CONSUMER as ADCSDK.ResourceType)
+                  ? {
+                      consumer_credentials: (remoteItem as ADCSDK.Consumer)
+                        .credentials,
+                    }
+                  : {},
             this.defaultValue,
-            resourceType === ADCSDK.ResourceType.SERVICE
+            [
+              ADCSDK.ResourceType.SERVICE,
+              ADCSDK.ResourceType.CONSUMER,
+            ].includes(resourceType)
               ? remoteName
               : undefined,
           ).map(this.postprocessSubEvent(remoteName, remoteId)),
@@ -434,7 +483,9 @@ export class DifferV3 {
         // Remove nested resources to indeed compare the main resource itself.
         (resourceType === ADCSDK.ResourceType.SERVICE
           ? ['routes', 'stream_routes']
-          : ['consumers']
+          : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
+            ? ['consumers']
+            : ['credentials']
         ).map((key) => {
           unset(mergedLocalItem, key);
           unset(remoteItem, key);
@@ -555,10 +606,19 @@ export class DifferV3 {
               ? {
                   consumers: (localItem as ADCSDK.ConsumerGroup).consumers,
                 }
-              : {},
+              : resourceType === ADCSDK.ResourceType.CONSUMER
+                ? {
+                    consumer_credentials: (localItem as ADCSDK.Consumer)
+                      .credentials,
+                  }
+                : {},
           {},
           this.defaultValue,
-          resourceType === ADCSDK.ResourceType.SERVICE ? localName : undefined,
+          [ADCSDK.ResourceType.SERVICE, ADCSDK.ResourceType.CONSUMER].includes(
+            resourceType,
+          )
+            ? localName
+            : undefined,
         ).map(this.postprocessSubEvent(localName, localId)),
       });
     });
