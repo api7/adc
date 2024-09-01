@@ -178,12 +178,25 @@ export type GlobalRule = Record<string, unknown>;
 
 export type PluginMetadata = Record<string, unknown>;
 
+export interface ConsumerCredential {
+  name: string;
+  description?: string;
+  labels?: Labels;
+
+  type: 'key-auth' | 'basic-auth' | 'jwt-auth' | 'hmac-auth';
+
+  config: Plugin;
+
+  metadata?: ResourceMetadata;
+}
+
 export interface Consumer {
   username: string;
   description?: string;
   labels?: Labels;
 
   plugins?: Plugins;
+  credentials?: Array<ConsumerCredential>;
 }
 
 export interface ConsumerGroup {
@@ -226,9 +239,10 @@ export interface Configuration {
   global_rules?: Record<string, GlobalRule>;
   plugin_metadata?: Record<string, PluginMetadata>;
 
-  // APISIX only resources
+  // internal use only
   routes?: Array<Route>;
   stream_routes?: Array<StreamRoute>;
+  consumer_credentials?: Array<ConsumerCredential>;
   /* consumer_groups?: Array<ConsumerGroup>;
   plugin_configs?: Array<PluginConfig>;
   upstreams?: Array<Upstream>; */
