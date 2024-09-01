@@ -53,6 +53,20 @@ export class Operator {
             { validateStatus: () => true },
           );
           task.output = buildReqAndRespDebugOutput(resp);
+        } else if (
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ) {
+          resp = await this.client.put(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            this.fromADC(event),
+            {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+              },
+              validateStatus: () => true,
+            },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
         } else {
           resp = await this.client.put(
             `/apisix/admin/${this.generateResourceTypeInAPI(event.resourceType)}/${event.resourceId}`,
@@ -149,6 +163,20 @@ export class Operator {
           const resp = await this.client.delete(
             `/api/stream_routes/template/${event.resourceId}`,
             { validateStatus: () => true },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+          return;
+        } else if (
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ) {
+          const resp = await this.client.delete(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+              },
+              validateStatus: () => true,
+            },
           );
           task.output = buildReqAndRespDebugOutput(resp);
           return;
@@ -258,6 +286,10 @@ export class Operator {
         );
       case ADCSDK.ResourceType.SSL:
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
+      case ADCSDK.ResourceType.CONSUMER_CREDENTIAL:
+        return fromADC.transformConsumerCredential(
+          event.newValue as ADCSDK.ConsumerCredential,
+        );
     }
   }
 }
