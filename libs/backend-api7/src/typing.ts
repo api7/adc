@@ -61,11 +61,21 @@ export interface Service {
   routes?: Array<Route>;
   stream_routes?: Array<StreamRoute>;
 }
+export interface ConsumerCredential {
+  id?: string;
+  name: string;
+  desc?: string;
+  labels?: Labels;
+
+  plugins: Plugins;
+}
 export interface Consumer {
   username: string;
   desc?: string;
   labels?: Labels;
   plugins?: Plugins;
+
+  credentials?: Array<ConsumerCredential>;
 }
 export interface SSL {
   id?: string;
