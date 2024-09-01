@@ -2,12 +2,14 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { Axios, AxiosResponse } from 'axios';
 import { ListrTask } from 'listr2';
 import { size } from 'lodash';
+import { SemVer, gte as semVerGTE } from 'semver';
 
 import { FromADC } from './transformer';
 import * as typing from './typing';
 import { buildReqAndRespDebugOutput, capitalizeFirstLetter } from './utils';
 
 export interface OperateContext {
+  api7Version: SemVer;
   diff: Array<ADCSDK.Event>;
   gatewayGroupId: string;
   needPublishServices: Record<string, typing.Service | null>;
@@ -54,7 +56,8 @@ export class Operator {
           );
           task.output = buildReqAndRespDebugOutput(resp);
         } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+          semVerGTE(ctx.api7Version, '3.2.15')
         ) {
           resp = await this.client.put(
             `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
@@ -167,7 +170,8 @@ export class Operator {
           task.output = buildReqAndRespDebugOutput(resp);
           return;
         } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+          semVerGTE(ctx.api7Version, '3.2.15')
         ) {
           const resp = await this.client.delete(
             `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,

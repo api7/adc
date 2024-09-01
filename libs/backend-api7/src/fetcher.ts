@@ -82,26 +82,29 @@ export class Fetcher {
         task.output = buildReqAndRespDebugOutput(resp, 'Get consumers');
 
         const consumers = resp?.data?.list;
-        const fetchCredentials = consumers.map(async (consumer) => {
-          const resp = await this.client.get<{
-            list: Array<typing.ConsumerCredential>;
-          }>(`/apisix/admin/consumers/${consumer.username}/credentials`, {
-            // In the current design, the consumer's credentials are not filtered
-            // using labels because nested labels filters can be misleading. Even
-            // if labels set for the consumer, the labels filter is not attached.
-            params: {
-              gateway_group_id: ctx.gatewayGroupId,
-            },
-          });
-          task.output = buildReqAndRespDebugOutput(
-            resp,
-            `Get credentials of consumer "${consumer.username}"`,
-          );
-          consumer.credentials = resp?.data?.list;
-        });
-        await Promise.all(fetchCredentials);
 
-        ctx.remote.consumers = resp?.data?.list?.map((item) =>
+        if (semVerGTE(ctx.api7Version, '3.2.15')) {
+          const fetchCredentials = consumers.map(async (consumer) => {
+            const resp = await this.client.get<{
+              list: Array<typing.ConsumerCredential>;
+            }>(`/apisix/admin/consumers/${consumer.username}/credentials`, {
+              // In the current design, the consumer's credentials are not filtered
+              // using labels because nested labels filters can be misleading. Even
+              // if labels set for the consumer, the labels filter is not attached.
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+              },
+            });
+            task.output = buildReqAndRespDebugOutput(
+              resp,
+              `Get credentials of consumer "${consumer.username}"`,
+            );
+            consumer.credentials = resp?.data?.list;
+          });
+          await Promise.all(fetchCredentials);
+        }
+
+        ctx.remote.consumers = consumers?.map((item) =>
           this.toADC.transformConsumer(item),
         );
       },
