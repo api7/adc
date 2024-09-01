@@ -648,6 +648,35 @@
           },
           "plugins": {
             "$ref": "#/properties/services/items/properties/plugins"
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/properties/services/items/properties/name"
+                },
+                "description": {
+                  "$ref": "#/properties/services/items/properties/description"
+                },
+                "labels": {
+                  "$ref": "#/properties/services/items/properties/labels"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "config": {
+                  "$ref": "#/properties/services/items/properties/plugins/additionalProperties"
+                }
+              },
+              "required": [
+                "name",
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
