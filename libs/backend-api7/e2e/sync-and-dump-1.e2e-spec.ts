@@ -514,4 +514,82 @@ describe('Sync and Dump - 1', () => {
       expect(Object.keys(result.plugin_metadata)).toHaveLength(0);
     });
   });
+
+  describe('Sync and dump consumer credentials', () => {
+    const consumer1Name = 'consumer1';
+    const consumer1Key = 'consumer1-key';
+    const consumer1Cred = {
+      name: consumer1Key,
+      type: 'key-auth',
+      config: { key: consumer1Key },
+    };
+    const consumer1 = {
+      username: consumer1Name,
+      credentials: [consumer1Cred],
+    } as ADCSDK.Consumer;
+
+    it('Create consumers', async () =>
+      syncEvents(backend, [
+        createEvent(ADCSDK.ResourceType.CONSUMER, consumer1Name, consumer1),
+        createEvent(
+          ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+          consumer1Key,
+          consumer1Cred,
+          consumer1Name,
+        ),
+      ]));
+
+    it('Dump', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.consumers).toHaveLength(1);
+      expect(result.consumers[0]).toMatchObject(consumer1);
+      expect(result.consumers[0].credentials).toMatchObject(
+        consumer1.credentials,
+      );
+    });
+
+    it('Update consumer credential', async () => {
+      consumer1.credentials[0].config.key = 'new-key';
+      await syncEvents(backend, [
+        updateEvent(
+          ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+          consumer1Key,
+          consumer1,
+          consumer1Name,
+        ),
+      ]);
+    });
+
+    it('Dump again (consumer credential updated)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.consumers[0]).toMatchObject(consumer1);
+      expect(result.consumers[0].credentials[0].config.key).toEqual('new-key');
+    });
+
+    it('Delete consumer credential', async () =>
+      syncEvents(backend, [
+        deleteEvent(
+          ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+          consumer1Key,
+          consumer1Name,
+        ),
+      ]));
+
+    it('Dump again (consumer credential should not exist)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.consumers).toHaveLength(1);
+      expect(result.consumers[0]).toMatchObject(consumer1);
+      expect(result.consumers[0].credentials).toHaveLength(0);
+    });
+
+    it('Delete consumer', async () =>
+      syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.CONSUMER, consumer1Name),
+      ]));
+
+    it('Dump again (consumer should not exist)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.consumers).toHaveLength(0);
+    });
+  });
 });
