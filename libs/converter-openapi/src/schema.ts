@@ -37,7 +37,12 @@ export const schema = z.object({
   servers: z
     .array(
       z.object({
-        url: z.string().regex(/https?:\/\//g),
+        url: z
+          .string()
+          .regex(
+            /https?:\/\//g,
+            'The URL must be start with "https://" or "http://"',
+          ),
         variables: z.optional(
           z.record(
             z.string(),
