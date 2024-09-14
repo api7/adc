@@ -11,6 +11,23 @@ const httpClient = axios.create({
   }),
 });
 
+httpClient.interceptors.response.use((response) => {
+  if (response.headers['set-cookie']?.[0]) {
+    //@ts-expect-error forced
+    response.config.sessionToken = response.headers['set-cookie']?.[0];
+  }
+  return response;
+});
+
+httpClient.interceptors.request.use(
+  (config) => {
+    //@ts-expect-error forced
+    config.headers['Cookie'] = config.sessionToken;
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
 const setupAPI7 = async () => {
   return new Promise<void>((resolve, reject) => {
     const ls = spawn(
