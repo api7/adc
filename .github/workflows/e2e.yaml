@@ -57,3 +57,24 @@ jobs:
       # Run API7 E2E tests
       - name: Run E2E tests
         run: npx nx run backend-api7:e2e
+
+  api7-latest:
+    runs-on: ubuntu-lastet
+    if: contains(github.event.pull_request.labels.*.name, 'test/api7-latest') || github.event_name == 'push'
+    env:
+      BACKEND_API7_DOWNLOAD_URL: ${{ secrets.BACKEND_API7_LATEST_DOWNLOAD_URL }}
+      BACKEND_API7_LICENSE: ${{ secrets.BACKEND_API7_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run API7 E2E tests
+      - name: Run E2E tests
+        run: npx nx run backend-api7:e2e
