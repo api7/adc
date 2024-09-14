@@ -60,6 +60,14 @@ const setupAPI7 = async () => {
   });
 };
 
+const modifyPassword = async () => {
+  await httpClient.post(`/api/login`, {
+    username: 'admin',
+    password: 'admin',
+  });
+  await httpClient.post(`/api/password`, { new_password: 'Admin12345!' });
+};
+
 const activateAPI7 = async () => {
   await httpClient.put(`/api/license`, {
     data: process.env.BACKEND_API7_LICENSE,
@@ -67,11 +75,6 @@ const activateAPI7 = async () => {
 };
 
 const generateToken = async () => {
-  await httpClient.post(`/api/login`, {
-    username: 'admin',
-    password: 'admin',
-  });
-  await httpClient.post(`/api/password`, { new_password: 'Admin12345!' });
   const resp = await httpClient.post<{ value: { token: string } }>(
     `/api/tokens`,
     {
@@ -86,6 +89,7 @@ const generateToken = async () => {
 
 export default async () => {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
+  await modifyPassword();
   await activateAPI7();
   await generateToken();
 
