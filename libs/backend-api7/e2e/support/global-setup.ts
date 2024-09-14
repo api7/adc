@@ -5,10 +5,7 @@ import { Agent } from 'node:https';
 
 const httpClient = axios.create({
   baseURL: 'https://localhost:7443',
-  auth: {
-    username: 'admin',
-    password: 'admin',
-  },
+  withCredentials: true,
   httpsAgent: new Agent({
     rejectUnauthorized: false,
   }),
@@ -52,6 +49,11 @@ const activateAPI7 = async () => {
 };
 
 const generateToken = async () => {
+  await httpClient.post(`/api/login`, {
+    username: 'admin',
+    password: 'admin',
+  });
+  await httpClient.post(`/api/password`, { new_password: 'Admin12345!' });
   const resp = await httpClient.post<{ value: { token: string } }>(
     `/api/tokens`,
     {
