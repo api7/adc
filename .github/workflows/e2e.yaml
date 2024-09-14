@@ -59,7 +59,7 @@ jobs:
         run: npx nx run backend-api7:e2e
 
   api7-latest:
-    runs-on: ubuntu-lastet
+    runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7-latest') || github.event_name == 'push'
     env:
       BACKEND_API7_DOWNLOAD_URL: ${{ secrets.BACKEND_API7_LATEST_DOWNLOAD_URL }}
