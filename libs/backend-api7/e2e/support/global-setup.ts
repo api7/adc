@@ -14,7 +14,8 @@ const httpClient = axios.create({
 httpClient.interceptors.response.use((response) => {
   if (response.headers['set-cookie']?.[0]) {
     //@ts-expect-error forced
-    response.config.sessionToken = response.headers['set-cookie']?.[0];
+    response.config.sessionToken =
+      response.headers['set-cookie']?.[0].split(';')[0];
   }
   return response;
 });
