@@ -25,7 +25,7 @@ describe('Consumer E2E', () => {
   });
 
   conditionalDescribe(semverCondition(lt, '3.2.15'))(
-    'Sync and dump consumers (without credentials support)',
+    'Sync and dump consumers (without credential support)',
     () => {
       const consumer1Name = 'consumer1';
       const consumer1 = {
@@ -103,7 +103,7 @@ describe('Consumer E2E', () => {
   );
 
   conditionalDescribe(semverCondition(gte, '3.2.15'))(
-    'Sync and dump consumers (with credentials support)',
+    'Sync and dump consumers (with credential support)',
     () => {
       const consumer1Name = 'consumer1';
       const consumer1Key = 'consumer1-key';
