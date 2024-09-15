@@ -27,7 +27,7 @@ describe('Label Selector', () => {
     backend = new BackendAPI7(commonBackendOpts);
   });
 
-  conditionalDescribe(!semverCondition(lte, '3.2.15'))(
+  conditionalDescribe(semverCondition(lt, '3.2.15'))(
     'Consumer (without credential support)',
     () => {
       const consumer1Name = 'consumer1';
