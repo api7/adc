@@ -112,7 +112,6 @@ describe('Label Selector', () => {
       const consumer1 = {
         username: consumer1Name,
         labels: { team: '1' },
-        credentials: [credential1, credential2],
       } as ADCSDK.Consumer;
       const consumer2Name = 'consumer2';
       const consumer2 = {
