@@ -92,3 +92,16 @@ export const deleteEvent = (
         ),
   parentId: parentName ? ADCSDK.utils.generateId(parentName) : undefined,
 });
+
+type cond = boolean | (() => boolean);
+
+export const conditionalDescribe = (cond: cond) =>
+  cond ? describe : describe.skip;
+
+export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
+
+export const semverCondition = (
+  op: (v1: string, v2: string) => boolean,
+  target: string,
+  base = process.env.BACKEND_API7_VERSION ?? '0.0.0',
+) => op(target, base);
