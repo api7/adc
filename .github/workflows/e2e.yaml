@@ -39,8 +39,9 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
       matrix:
-        version: [3.2.14.6]
+        version: [3.2.14.6, 3.2.15.0]
     env:
+      BACKEND_API7_VERSION: ${{ matrix.version }}
       BACKEND_API7_DOWNLOAD_URL: https://run.api7.ai/api7-ee/api7-ee-v${{ matrix.version }}.tar.gz
       BACKEND_API7_LICENSE: ${{ secrets.BACKEND_API7_LICENSE }}
     steps:
