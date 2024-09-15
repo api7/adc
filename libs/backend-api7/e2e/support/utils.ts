@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
+import * as semver from 'semver';
 
 import { BackendAPI7 } from '../../src';
 
@@ -60,7 +61,11 @@ export const createEvent = (
             parentName ? `${parentName}.${resourceName}` : resourceName,
           ),
   newValue: resource,
-  parentId: parentName ? ADCSDK.utils.generateId(parentName) : undefined,
+  parentId: parentName
+    ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+      ? parentName
+      : ADCSDK.utils.generateId(parentName)
+    : undefined,
 });
 
 export const updateEvent = (
@@ -92,3 +97,16 @@ export const deleteEvent = (
         ),
   parentId: parentName ? ADCSDK.utils.generateId(parentName) : undefined,
 });
+
+type cond = boolean | (() => boolean);
+
+export const conditionalDescribe = (cond: cond) =>
+  cond ? describe : describe.skip;
+
+export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
+
+export const semverCondition = (
+  op: (v1: string | semver.SemVer, v2: string | semver.SemVer) => boolean,
+  base: string,
+  target = semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
+) => op(target, base);

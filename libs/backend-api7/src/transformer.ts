@@ -65,6 +65,23 @@ export class ToADC {
       description: consumer.desc,
       labels: ToADC.transformLabels(consumer.labels),
       plugins: consumer.plugins,
+      credentials: consumer.credentials?.map((item) =>
+        this.transformConsumerCredential(item),
+      ),
+    });
+  }
+
+  public transformConsumerCredential(
+    credential: typing.ConsumerCredential,
+  ): ADCSDK.ConsumerCredential {
+    const [pluginName, config] = Object.entries(credential.plugins)[0];
+    return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerCredential>({
+      name: credential.name,
+      description: credential.desc,
+      labels: credential.labels,
+      type: pluginName as ADCSDK.ConsumerCredential['type'],
+      config,
+      metadata: { id: credential.id },
     });
   }
 
@@ -172,6 +189,20 @@ export class FromADC {
       desc: consumer.description,
       labels: FromADC.transformLabels(consumer.labels),
       plugins: consumer.plugins,
+    });
+  }
+
+  public transformConsumerCredential(
+    credential: ADCSDK.ConsumerCredential,
+  ): typing.ConsumerCredential {
+    return ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerCredential>({
+      id: ADCSDK.utils.generateId(credential.name),
+      name: credential.name,
+      desc: credential.description,
+      labels: FromADC.transformLabels(credential.labels),
+      plugins: {
+        [credential.type]: credential.config,
+      },
     });
   }
 

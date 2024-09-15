@@ -174,15 +174,6 @@ describe('Sync and Dump - 2', () => {
         },
       });
 
-      expect(dump.consumers[0]).toMatchObject({
-        username: 'tom',
-        plugins: {
-          'key-auth': {
-            key: 'tom',
-          },
-        },
-      });
-
       expect(dump.global_rules.prometheus).toMatchObject({
         prefer_name: false,
       });

@@ -34,7 +34,10 @@ export class Fetcher {
     return Object.values(ADCSDK.ResourceType)
       .filter(
         (resourceType) =>
-          resourceType !== ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE, // ignore internal only types
+          ![
+            ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE,
+            ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+          ].includes(resourceType), // ignore internal only types
       )
       .map((resourceType): [ADCSDK.ResourceType, string] => [
         resourceType,

@@ -40,12 +40,6 @@
     "resourceName": "service2"
   },
   {
-    "resourceType": "consumer",
-    "type": "delete",
-    "resourceId": "tom",
-    "resourceName": "tom"
-  },
-  {
     "resourceType": "ssl",
     "type": "delete",
     "resourceId": "5f543afdb6ba8aeef955c6c951d3bd70c1de8361",

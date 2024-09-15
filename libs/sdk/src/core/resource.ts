@@ -8,6 +8,7 @@ export enum ResourceType {
   PLUGIN_METADATA = 'plugin_metadata',
   CONSUMER = 'consumer',
   CONSUMER_GROUP = 'consumer_group',
+  CONSUMER_CREDENTIAL = 'consumer_credential',
   STREAM_ROUTE = 'stream_route',
 
   // internal use only

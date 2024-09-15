@@ -12,7 +12,8 @@ const labelsSchema = z.record(
   z.string(),
   z.union([z.string(), z.array(z.string())]),
 );
-const pluginsSchema = z.record(z.string(), z.record(z.string(), z.any()));
+const pluginSchema = z.record(z.string(), z.any());
+const pluginsSchema = z.record(z.string(), pluginSchema);
 const exprSchema = z.array(z.any());
 const timeoutSchema = z.object({
   connect: z.number().gt(0),
@@ -289,6 +290,25 @@ const sslSchema = z
   })
   .strict();
 
+const consumerCredentialSchema = z
+  .object({
+    name: nameSchema,
+    description: descriptionSchema.optional(),
+    labels: labelsSchema.optional(),
+
+    type: z
+      .string()
+      .refine(
+        (type) =>
+          ['key-auth', 'basic-auth', 'jwt-auth', 'hmac-auth'].includes(type),
+        {
+          message:
+            'Consumer credential only supports "key-auth", "basic-auth", "jwt-auth" and "hmac-auth" types',
+        },
+      ),
+    config: pluginSchema,
+  })
+  .strict();
 const consumerSchema = z
   .object({
     username: nameSchema,
@@ -296,6 +316,7 @@ const consumerSchema = z
     labels: labelsSchema.optional(),
 
     plugins: pluginsSchema.optional(),
+    credentials: z.array(consumerCredentialSchema).optional(),
   })
   .strict();
 

@@ -2,12 +2,14 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { Axios, AxiosResponse } from 'axios';
 import { ListrTask } from 'listr2';
 import { size } from 'lodash';
+import { SemVer, gte as semVerGTE } from 'semver';
 
 import { FromADC } from './transformer';
 import * as typing from './typing';
 import { buildReqAndRespDebugOutput, capitalizeFirstLetter } from './utils';
 
 export interface OperateContext {
+  api7Version: SemVer;
   diff: Array<ADCSDK.Event>;
   gatewayGroupId: string;
   needPublishServices: Record<string, typing.Service | null>;
@@ -51,6 +53,21 @@ export class Operator {
             `/api/stream_routes/template/${event.resourceId}`,
             this.fromADC(event),
             { validateStatus: () => true },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+        } else if (
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+          semVerGTE(ctx.api7Version, '3.2.15')
+        ) {
+          resp = await this.client.put(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            this.fromADC(event),
+            {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+              },
+              validateStatus: () => true,
+            },
           );
           task.output = buildReqAndRespDebugOutput(resp);
         } else {
@@ -149,6 +166,21 @@ export class Operator {
           const resp = await this.client.delete(
             `/api/stream_routes/template/${event.resourceId}`,
             { validateStatus: () => true },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+          return;
+        } else if (
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+          semVerGTE(ctx.api7Version, '3.2.15')
+        ) {
+          const resp = await this.client.delete(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+              },
+              validateStatus: () => true,
+            },
           );
           task.output = buildReqAndRespDebugOutput(resp);
           return;
@@ -258,6 +290,10 @@ export class Operator {
         );
       case ADCSDK.ResourceType.SSL:
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
+      case ADCSDK.ResourceType.CONSUMER_CREDENTIAL:
+        return fromADC.transformConsumerCredential(
+          event.newValue as ADCSDK.ConsumerCredential,
+        );
     }
   }
 }
