@@ -177,8 +177,9 @@ describe('Sync and Dump - 2', () => {
       expect(dump.consumers[0]).toMatchObject({
         username: 'tom',
         plugins: {
-          'key-auth': {
-            key: 'tom',
+          'limit-count': {
+            window: 1,
+            count: 1,
           },
         },
       });

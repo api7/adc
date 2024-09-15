@@ -260,8 +260,9 @@
       "username": "tom",
       "description": "",
       "plugins": {
-        "key-auth": {
-          "key": "tom"
+        "limit-count": {
+          "window": 1,
+          "count": 1
         }
       }
     }
