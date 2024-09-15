@@ -2,7 +2,7 @@ import axios from 'axios';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Agent } from 'node:https';
-import { gte, lt } from 'semver';
+import * as semver from 'semver';
 
 const httpClient = axios.create({
   baseURL: 'https://localhost:7443',
@@ -68,7 +68,12 @@ const initUser = async (username = 'admin', password = 'admin') => {
   });
 
   // If the version is lower than 3.2.15, the license should be activated first.
-  if (lt('3.2.15', process.env.BACKEND_API7_VERSION ?? '0.0.0'))
+  if (
+    semver.lt(
+      '3.2.15',
+      semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
+    )
+  )
     await activateAPI7();
 
   console.log('Modify password');
@@ -88,7 +93,12 @@ const initUser = async (username = 'admin', password = 'admin') => {
 
   // If the version is greater than or equal to 3.2.15, the license should
   // be activated after changing the password.
-  if (gte('3.2.15', process.env.BACKEND_API7_VERSION ?? '0.0.0'))
+  if (
+    semver.gte(
+      '3.2.15',
+      semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
+    )
+  )
     await activateAPI7();
 };
 

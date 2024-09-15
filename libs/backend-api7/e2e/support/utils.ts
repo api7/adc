@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
+import * as semver from 'semver';
 
 import { BackendAPI7 } from '../../src';
 
@@ -101,7 +102,7 @@ export const conditionalDescribe = (cond: cond) =>
 export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
 
 export const semverCondition = (
-  op: (v1: string, v2: string) => boolean,
+  op: (v1: string, v2: string | semver.SemVer) => boolean,
   target: string,
-  base = process.env.BACKEND_API7_VERSION ?? '0.0.0',
+  base = semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
 ) => op(target, base);
