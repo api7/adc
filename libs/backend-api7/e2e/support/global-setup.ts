@@ -60,7 +60,11 @@ const setupAPI7 = async () => {
   });
 };
 
-const initUser = async (username = 'admin', password = 'admin') => {
+const initUser = async (
+  username = 'admin',
+  password = 'admin',
+  fisrtTime = true,
+) => {
   console.log('Log in');
   await httpClient.post(`/api/login`, {
     username: username,
@@ -70,9 +74,10 @@ const initUser = async (username = 'admin', password = 'admin') => {
   // If the version is lower than 3.2.15, the license should be activated first.
   if (
     semver.lt(
-      '3.2.15',
       semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
-    )
+      '3.2.15',
+    ) &&
+    fisrtTime
   )
     await activateAPI7();
 
@@ -95,9 +100,10 @@ const initUser = async (username = 'admin', password = 'admin') => {
   // be activated after changing the password.
   if (
     semver.gte(
-      '3.2.15',
       semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
-    )
+      '3.2.15',
+    ) &&
+    fisrtTime
   )
     await activateAPI7();
 };
@@ -126,7 +132,7 @@ const generateToken = async () => {
   httpClient.sessionToken = '';
 
   console.log('Log in to test user');
-  await initUser('test', 'test');
+  await initUser('test', 'test', false);
 
   console.log('Generate token');
   const resp = await httpClient.post<{ value: { token: string } }>(
@@ -143,8 +149,13 @@ const generateToken = async () => {
 
 export default async () => {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
-  await initUser();
-  await generateToken();
+  try {
+    await initUser();
+    await generateToken();
+  } catch (err) {
+    console.log(err);
+    throw err;
+  }
 
   process.env.SERVER = 'https://localhost:7443';
 };
