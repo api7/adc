@@ -2,6 +2,7 @@ import axios from 'axios';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Agent } from 'node:https';
+import { gte, lt } from 'semver';
 
 const httpClient = axios.create({
   baseURL: 'https://localhost:7443',
@@ -66,6 +67,10 @@ const initUser = async (username = 'admin', password = 'admin') => {
     password: password,
   });
 
+  // If the version is lower than 3.2.15, the license should be activated first.
+  if (lt('3.2.15', process.env.BACKEND_API7_VERSION ?? '0.0.0'))
+    await activateAPI7();
+
   console.log('Modify password');
   await httpClient.put(`/api/password`, {
     old_password: password,
@@ -80,6 +85,11 @@ const initUser = async (username = 'admin', password = 'admin') => {
     username: username,
     password: 'Admin12345!',
   });
+
+  // If the version is greater than or equal to 3.2.15, the license should
+  // be activated after changing the password.
+  if (gte('3.2.15', process.env.BACKEND_API7_VERSION ?? '0.0.0'))
+    await activateAPI7();
 };
 
 const activateAPI7 = async () => {
@@ -124,7 +134,6 @@ const generateToken = async () => {
 export default async () => {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
   await initUser();
-  await activateAPI7();
   await generateToken();
 
   process.env.SERVER = 'https://localhost:7443';
