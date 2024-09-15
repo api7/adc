@@ -57,7 +57,7 @@ describe('Label Selector', () => {
           createEvent(ADCSDK.ResourceType.CONSUMER, consumer2Name, consumer2),
         ]));
 
-      it('Dump consumer whit label team = 1', async () => {
+      it('Dump consumer with label team = 1', async () => {
         const backend = new BackendAPI7({
           ...commonBackendOpts,
           labelSelector: { team: '1' }, // add custom label selector
@@ -69,7 +69,7 @@ describe('Label Selector', () => {
         expect(result.consumers[0]).toMatchObject(consumer1);
       });
 
-      it('Dump consumer whit label team = 2', async () => {
+      it('Dump consumer with label team = 2', async () => {
         const backend = new BackendAPI7({
           ...commonBackendOpts,
           labelSelector: { team: '2' }, // add custom label selector
@@ -137,7 +137,7 @@ describe('Label Selector', () => {
           ),
         ]));
 
-      it('Dump consumer whit label team = 1', async () => {
+      it('Dump consumer with label team = 1', async () => {
         const backend = new BackendAPI7({
           ...commonBackendOpts,
           labelSelector: { team: '1' }, // add custom label selector
@@ -150,7 +150,7 @@ describe('Label Selector', () => {
         expect(result.consumers[0].credentials).toHaveLength(2);
       });
 
-      it('Dump consumer whit label team = 2', async () => {
+      it('Dump consumer with label team = 2', async () => {
         const backend = new BackendAPI7({
           ...commonBackendOpts,
           labelSelector: { team: '2' }, // add custom label selector
@@ -219,7 +219,7 @@ describe('Label Selector', () => {
         createEvent(ADCSDK.ResourceType.SSL, sslName(ssl2SNIs), ssl2),
       ]));
 
-    it('Dump consumer whit label team = 1', async () => {
+    it('Dump consumer with label team = 1', async () => {
       const backend = new BackendAPI7({
         ...commonBackendOpts,
         labelSelector: { team: '1' }, // add custom label selector
@@ -229,7 +229,7 @@ describe('Label Selector', () => {
       expect(result.ssls[0]).toMatchObject(ssl1test);
     });
 
-    it('Dump consumer whit label team = 2', async () => {
+    it('Dump consumer with label team = 2', async () => {
       const backend = new BackendAPI7({
         ...commonBackendOpts,
         labelSelector: { team: '2' }, // add custom label selector
