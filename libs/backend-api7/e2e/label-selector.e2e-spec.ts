@@ -134,7 +134,7 @@ describe('Label Selector', () => {
             ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
             credential2.name,
             credential2,
-            consumer2Name,
+            consumer1Name,
           ),
         ]));
 
