@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { create, unset } from 'lodash';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { gte, lt } from 'semver';
+import { gte, lt, lte } from 'semver';
 
 import { BackendAPI7 } from '../src';
 import {
@@ -27,7 +27,7 @@ describe('Label Selector', () => {
     backend = new BackendAPI7(commonBackendOpts);
   });
 
-  conditionalDescribe(semverCondition(lt, '3.2.15'))(
+  conditionalDescribe(!semverCondition(lte, '3.2.15'))(
     'Consumer (without credential support)',
     () => {
       const consumer1Name = 'consumer1';
