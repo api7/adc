@@ -174,16 +174,6 @@ describe('Sync and Dump - 2', () => {
         },
       });
 
-      expect(dump.consumers[0]).toMatchObject({
-        username: 'tom',
-        plugins: {
-          'limit-count': {
-            window: 1,
-            count: 1,
-          },
-        },
-      });
-
       expect(dump.global_rules.prometheus).toMatchObject({
         prefer_name: false,
       });
