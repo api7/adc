@@ -77,15 +77,16 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
   .addExamples([
     {
       title: 'Save backend configuration to the default adc.yaml file',
-      command: 'adc dump'
+      command: 'adc dump',
     },
     {
       title: 'Save backend configuration to the specified file',
-      command: 'adc dump -o service-configuration.yaml'
+      command: 'adc dump -o service-configuration.yaml',
     },
     {
       title: 'Save only specified resource types from the backend',
-      command: 'adc dump --include-resource-type global_rule --include-resource-type plugin_metadata',
+      command:
+        'adc dump --include-resource-type global_rule --include-resource-type plugin_metadata',
     },
     {
       title: 'Save only the resources with the specified labels',
@@ -126,7 +127,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
     try {
       await tasks.run();
     } catch (err) {
-      //console.log(chalk.red(`Failed to dump backend configuration from backend, ${err}`));
+      if (opts.verbose === 2) console.log(err);
       process.exit(1);
     }
   });

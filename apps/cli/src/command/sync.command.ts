@@ -50,8 +50,10 @@ export const SyncCommand = new BackendCommand<SyncOption>(
       command: 'adc sync -f adc.yaml --verbose 2',
     },
     {
-      title: 'Synchronize only specified resource types from the configuration file',
-      command: 'adc sync -f adc.yaml --include-resource-type global_rule --include-resource-type plugin_metadata',
+      title:
+        'Synchronize only specified resource types from the configuration file',
+      command:
+        'adc sync -f adc.yaml --include-resource-type global_rule --include-resource-type plugin_metadata',
     },
     {
       title: 'Synchronize only the resources with the specified lables',
@@ -93,6 +95,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     try {
       await tasks.run();
     } catch (err) {
+      if (opts.verbose === 2) console.log(err);
       process.exit(1);
     }
   });
