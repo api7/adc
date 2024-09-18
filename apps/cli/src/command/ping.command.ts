@@ -33,6 +33,7 @@ export const PingCommand = new BackendCommand<PingOptions>(
       console.log(
         chalk.red(`Unable to connect to the "${opts.backend}" backend. ${err}`),
       );
+      if (opts.verbose === 2) console.log(err);
       process.exit(1);
     }
   });
