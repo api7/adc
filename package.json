@@ -23,7 +23,7 @@
     "@types/jest": "^29.5.12",
     "@types/js-yaml": "^4.0.9",
     "@types/json-schema": "^7.0.15",
-    "@types/lodash": "^4.17.4",
+    "@types/lodash": "^4.17.9",
     "@types/node": "18.16.9",
     "@types/pluralize": "^0.0.33",
     "@types/qs": "^6.9.15",
