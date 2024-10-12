@@ -144,7 +144,7 @@ export class FromADC {
       enable_websocket: route.enable_websocket,
       plugins: route.plugins,
       service_id: serviceId,
-      paths: [route.uris[0]],
+      paths: route.uris,
       priority: route.priority,
     });
   }
