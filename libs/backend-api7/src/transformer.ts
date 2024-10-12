@@ -17,7 +17,7 @@ export class ToADC {
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Route>({
-      uris: route?.paths?.[0] ? [route?.paths?.[0]] : undefined,
+      uris: route.paths,
       name: route.name,
       description: route.desc,
       labels: ToADC.transformLabels(route.labels),
