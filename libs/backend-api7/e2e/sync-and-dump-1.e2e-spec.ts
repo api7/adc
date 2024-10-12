@@ -116,13 +116,13 @@ describe('Sync and Dump - 1', () => {
     const route1Name = 'route1';
     const route1 = {
       name: route1Name,
-      uris: ['/route1'],
+      uris: ['/route1', '/route1-2'],
       priority: 100,
     } as ADCSDK.Route;
     const route2Name = 'route2';
     const route2 = {
       name: route2Name,
-      uris: ['/route2'],
+      uris: ['/route2', '/route2-2'],
       plugins: {
         'key-auth': {},
       },

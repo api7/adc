@@ -23,7 +23,7 @@ export interface Route {
   plugins?: Plugins;
 
   // matcher
-  paths?: Array<string>;
+  paths: Array<string>;
   methods?: Array<string>;
 
   // misc
