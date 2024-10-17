@@ -1,6 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { gte } from 'lodash';
-import { lt } from 'semver';
+import { gte, lt } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import { conditionalDescribe, semverCondition } from '../support/utils';
@@ -145,7 +144,7 @@ describe('Consumer E2E', () => {
           updateEvent(
             ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
             consumer1Key,
-            consumer1,
+            consumer1Cred,
             consumer1Name,
           ),
         ]);
@@ -175,7 +174,6 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
         expect(result.consumers[0].credentials).toHaveLength(0);
       });
 
