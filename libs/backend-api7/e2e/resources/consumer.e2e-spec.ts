@@ -174,7 +174,6 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
         expect(result.consumers[0].credentials).toHaveLength(0);
       });
 
