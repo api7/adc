@@ -144,7 +144,7 @@ describe('Consumer E2E', () => {
           updateEvent(
             ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
             consumer1Key,
-            consumer1,
+            consumer1Cred,
             consumer1Name,
           ),
         ]);
