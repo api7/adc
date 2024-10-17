@@ -1,6 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { gte } from 'lodash';
-import { lt } from 'semver';
+import { gte, lt } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import { conditionalDescribe, semverCondition } from '../support/utils';
