@@ -25,6 +25,7 @@ export class ToADC {
       enable_websocket: route.enable_websocket,
       plugins: route.plugins,
       priority: route.priority,
+      timeout: route.timeout,
       metadata: { id: route.route_id },
     });
   }
@@ -146,6 +147,7 @@ export class FromADC {
       service_id: serviceId,
       paths: route.uris,
       priority: route.priority,
+      timeout: route.timeout,
     });
   }
 
