@@ -23,7 +23,7 @@ describe('Consumer E2E', () => {
     });
   });
 
-  conditionalDescribe(semverCondition(gte, '0.0.0'))(
+  conditionalDescribe(semverCondition(gte, '3.11.0'))(
     'Sync and dump consumers (with credential support)',
     () => {
       const consumer1Name = 'consumer1';
