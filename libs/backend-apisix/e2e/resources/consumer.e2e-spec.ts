@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { gte, lt } from 'semver';
 
-import { BackendAPI7 } from '../../src';
+import { BackendAPISIX } from '../../src';
 import { conditionalDescribe, semverCondition } from '../support/utils';
 import {
   createEvent,
@@ -12,10 +12,10 @@ import {
 } from '../support/utils';
 
 describe('Consumer E2E', () => {
-  let backend: BackendAPI7;
+  let backend: BackendAPISIX;
 
   beforeAll(() => {
-    backend = new BackendAPI7({
+    backend = new BackendAPISIX({
       server: process.env.SERVER,
       token: process.env.TOKEN,
       tlsSkipVerify: true,
