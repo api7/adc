@@ -3,9 +3,11 @@ import axios, { Axios, CreateAxiosDefaults } from 'axios';
 import { Listr, ListrTask } from 'listr2';
 import { readFileSync } from 'node:fs';
 import { AgentOptions, Agent as httpsAgent } from 'node:https';
+import semver from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
+import { buildReqAndRespDebugOutput } from './utils';
 
 export class BackendAPISIX implements ADCSDK.Backend {
   private readonly client: Axios;
@@ -45,6 +47,24 @@ export class BackendAPISIX implements ADCSDK.Backend {
     await this.client.get(`/apisix/admin/routes`);
   }
 
+  private getAPISIXVersionTask(): ListrTask {
+    return {
+      enabled: (ctx) => !ctx.apisixVersion,
+      task: async (ctx, task) => {
+        const resp = await this.client.get<{ value: string }>(
+          '/apisix/admin/routes',
+        );
+        task.output = buildReqAndRespDebugOutput(resp, `Get APISIX version`);
+
+        ctx.apisixVersion = semver.coerce('0.0.0');
+        if (resp.headers.server) {
+          const version = (resp.headers.server as string).match(/APISIX\/(.*)/);
+          if (version) ctx.apisixVersion = semver.coerce(version[1]);
+        }
+      },
+    };
+  }
+
   public getResourceDefaultValueTask(): Array<ListrTask> {
     return [];
   }
@@ -52,7 +72,11 @@ export class BackendAPISIX implements ADCSDK.Backend {
   public async dump(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
     const fetcher = new Fetcher(this.client);
     return new Listr(
-      [...this.getResourceDefaultValueTask(), ...fetcher.fetch()],
+      [
+        this.getAPISIXVersionTask(),
+        ...this.getResourceDefaultValueTask(),
+        ...fetcher.fetch(),
+      ],
       {
         rendererOptions: { scope: BackendAPISIX.logScope },
       },
@@ -63,6 +87,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
     const operator = new Operator(this.client);
     return new Listr(
       [
+        this.getAPISIXVersionTask(),
         ...this.getResourceDefaultValueTask(),
         {
           task: (ctx, task) =>

@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
+import { SemVer, gte as semVerGTE } from 'semver';
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
@@ -8,6 +9,8 @@ import { buildReqAndRespDebugOutput, resourceTypeToAPIName } from './utils';
 
 type FetchTask = ListrTask<{
   remote: ADCSDK.Configuration;
+
+  apisixVersion: SemVer;
   apisixResources?: typing.Resources;
 }>;
 
@@ -65,7 +68,6 @@ export class Fetcher {
             )
               return;
 
-            // resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
             if (resourceType === ADCSDK.ResourceType.PLUGIN_METADATA) {
               ctx.apisixResources[ADCSDK.ResourceType.PLUGIN_METADATA] =
                 Object.fromEntries(
@@ -90,6 +92,35 @@ export class Fetcher {
             } else {
               ctx.apisixResources[resourceType] = resp.data?.list.map(
                 (item) => item.value,
+              );
+            }
+
+            if (
+              resourceType === ADCSDK.ResourceType.CONSUMER &&
+              semVerGTE(ctx.apisixVersion, '3.11.0')
+            ) {
+              await Promise.all(
+                ctx.apisixResources[resourceType].map(async (item) => {
+                  const resp = await this.client.get<{
+                    list: Array<{
+                      key: string;
+                      value: typing.ConsumerCredential;
+                      createdIndex: number;
+                      modifiedIndex: number;
+                    }>;
+                    total: number;
+                  }>(`/apisix/admin/consumers/${item.username}/credentials`, {
+                    validateStatus: () => true,
+                  });
+                  task.output = buildReqAndRespDebugOutput(
+                    resp,
+                    `Get credentials of consumer "${item.username}"`,
+                  );
+                  if (resp.status === 200)
+                    item.credentials = resp.data.list.map(
+                      (credential) => credential.value,
+                    );
+                }),
               );
             }
           },
