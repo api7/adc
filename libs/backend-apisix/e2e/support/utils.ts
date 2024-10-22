@@ -93,5 +93,5 @@ export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
 export const semverCondition = (
   op: (v1: string | semver.SemVer, v2: string | semver.SemVer) => boolean,
   base: string,
-  target = semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
+  target = semver.coerce(process.env.BACKEND_APISIX_VERSION) ?? '0.0.0',
 ) => op(target, base);

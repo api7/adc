@@ -1,6 +1,6 @@
 services:
   apisix_http:
-    image: apache/apisix:${BACKEND_APISIX_VERSION:-3.9.0-debian}
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-3.9.0-debian}
     restart: always
     volumes:
       - ./apisix_conf/http.yaml:/usr/local/apisix/conf/config.yaml:ro
@@ -13,7 +13,7 @@ services:
       apisix:
 
   apisix_mtls:
-    image: apache/apisix:${BACKEND_APISIX_VERSION:-3.9.0-debian}
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-3.9.0-debian}
     restart: always
     volumes:
       - ./apisix_conf/mtls.yaml:/usr/local/apisix/conf/config.yaml:ro
