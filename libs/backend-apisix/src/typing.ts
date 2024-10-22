@@ -60,6 +60,8 @@ export interface Service {
   enable_websocket?: boolean;
 }
 export interface ConsumerCredential {
+  id?: string;
+  name: string;
   desc?: string;
   labels?: Labels;
 

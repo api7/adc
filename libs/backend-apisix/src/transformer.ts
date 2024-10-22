@@ -63,6 +63,31 @@ export class ToADC {
 
       plugins: consumer.plugins,
       group_id: !removeGroupId ? consumer.group_id : undefined,
+
+      credentials: consumer.credentials
+        ?.map((item) => this.transformConsumerCredential(item))
+        .filter((item) => !!item),
+    } as ADCSDK.Consumer);
+  }
+
+  public transformConsumerCredential(
+    credential: typing.ConsumerCredential,
+  ): ADCSDK.ConsumerCredential {
+    if (!credential.plugins || Object.keys(credential.plugins).length <= 0)
+      return;
+
+    const [pluginName, config] = Object.entries(credential.plugins)[0];
+    if (
+      !['key-auth', 'basic-auth', 'jwt-auth', 'hmac-auth'].includes(pluginName)
+    )
+      return;
+    return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerCredential>({
+      name: credential.name,
+      description: credential.desc,
+      labels: credential.labels,
+      type: pluginName as ADCSDK.ConsumerCredential['type'],
+      config,
+      metadata: { id: credential.id },
     });
   }
 
@@ -258,12 +283,24 @@ export class FromADC {
 
   public transformConsumer(consumer: ADCSDK.Consumer): typing.Consumer {
     return ADCSDK.utils.recursiveOmitUndefined({
-      ...consumer,
-      id: undefined,
+      username: consumer.username,
+      desc: consumer.description,
       labels: FromADC.transformLabels(consumer.labels),
 
-      desc: consumer.description,
-      description: undefined,
+      plugins: consumer.plugins,
+    } as typing.Consumer);
+  }
+
+  public transformConsumerCredential(
+    credential: ADCSDK.ConsumerCredential,
+  ): typing.ConsumerCredential {
+    return ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerCredential>({
+      name: credential.name,
+      desc: credential.description,
+      labels: FromADC.transformLabels(credential.labels),
+      plugins: {
+        [credential.type]: credential.config,
+      },
     });
   }
 
