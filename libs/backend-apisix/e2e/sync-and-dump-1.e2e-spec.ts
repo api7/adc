@@ -21,7 +21,6 @@ describe('Sync and Dump - 1', () => {
       server,
       token,
       tlsSkipVerify: true,
-      gatewayGroup: 'default',
     });
   });
 
