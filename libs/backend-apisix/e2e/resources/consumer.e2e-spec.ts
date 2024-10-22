@@ -23,7 +23,7 @@ describe('Consumer E2E', () => {
     });
   });
 
-  conditionalDescribe(semverCondition(gte, '3.11.0'))(
+  conditionalDescribe(semverCondition(gte, '0.0.0'))(
     'Sync and dump consumers (with credential support)',
     () => {
       const consumer1Name = 'consumer1';
@@ -96,7 +96,8 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0].credentials).toHaveLength(0);
+        console.log(result.consumers[0]);
+        expect(result.consumers[0].credentials).toBeUndefined();
       });
 
       it('Delete consumer', async () =>

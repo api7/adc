@@ -50,7 +50,11 @@ export const createEvent = (
             parentName ? `${parentName}.${resourceName}` : resourceName,
           ),
   newValue: resource,
-  parentId: parentName ? ADCSDK.utils.generateId(parentName) : undefined,
+  parentId: parentName
+    ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+      ? parentName
+      : ADCSDK.utils.generateId(parentName)
+    : undefined,
 });
 
 export const updateEvent = (
@@ -80,7 +84,11 @@ export const deleteEvent = (
       : ADCSDK.utils.generateId(
           parentName ? `${parentName}.${resourceName}` : resourceName,
         ),
-  parentId: parentName ? ADCSDK.utils.generateId(parentName) : undefined,
+  parentId: parentName
+    ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+      ? parentName
+      : ADCSDK.utils.generateId(parentName)
+    : undefined,
 });
 
 type cond = boolean | (() => boolean);
