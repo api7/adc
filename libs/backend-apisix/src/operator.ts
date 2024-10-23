@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
+import { SemVer, lt as semVerLT } from 'semver';
 
 import { FromADC } from './transformer';
 import * as typing from './typing';
@@ -14,6 +15,8 @@ export interface OperateContext {
   diff: Array<ADCSDK.Event>;
   gatewayGroupId: string;
   needPublishServices: Record<string, typing.Service | null>;
+
+  apisixVersion: SemVer;
 }
 type OperateTask = ListrTask<OperateContext>;
 
@@ -24,17 +27,31 @@ export class Operator {
     return {
       title: this.generateTaskName(event),
       task: async (ctx, task) => {
-        const resp = await this.client.put(
-          `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
-          this.fromADC(event),
-          {
-            validateStatus: () => true,
-          },
-        );
-        task.output = buildReqAndRespDebugOutput(resp);
+        if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL) {
+          if (semVerLT(ctx.apisixVersion, '3.11.0')) return;
 
-        if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-        // [200, 201].includes(resp.status);
+          const resp = await this.client.put(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            this.fromADC(event),
+            {
+              validateStatus: () => true,
+            },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+
+          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
+        } else {
+          const resp = await this.client.put(
+            `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
+            this.fromADC(event),
+            {
+              validateStatus: () => true,
+            },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+
+          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
+        }
       },
     };
   }
@@ -43,22 +60,38 @@ export class Operator {
     return {
       title: this.generateTaskName(event),
       task: async (ctx, task) => {
-        const resp = await this.client.delete(
-          `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
-          {
-            validateStatus: () => true,
-          },
-        );
-        task.output = buildReqAndRespDebugOutput(resp);
-
-        // If the resource does not exist, it is not an error for the delete operation
-        if (resp.status === 404) return;
-        if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-        if (resp.data?.deleted <= 0)
-          throw new Error(
-            `Unexpected number of deletions of resources: ${resp.data?.deleted}`,
+        if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL) {
+          const resp = await this.client.delete(
+            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
+            {
+              validateStatus: () => true,
+            },
           );
-        // [200, 404].includes(resp.status);
+          task.output = buildReqAndRespDebugOutput(resp);
+
+          if (resp.status === 404) return;
+          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
+          if (resp.data?.deleted <= 0)
+            throw new Error(
+              `Unexpected number of deletions of resources: ${resp.data?.deleted}`,
+            );
+        } else {
+          const resp = await this.client.delete(
+            `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
+            {
+              validateStatus: () => true,
+            },
+          );
+          task.output = buildReqAndRespDebugOutput(resp);
+
+          // If the resource does not exist, it is not an error for the delete operation
+          if (resp.status === 404) return;
+          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
+          if (resp.data?.deleted <= 0)
+            throw new Error(
+              `Unexpected number of deletions of resources: ${resp.data?.deleted}`,
+            );
+        }
       },
     };
   }
@@ -78,6 +111,10 @@ export class Operator {
         return fromADC.transformConsumerGroup(
           event.newValue as ADCSDK.ConsumerGroup,
         )[0];
+      case ADCSDK.ResourceType.CONSUMER_CREDENTIAL:
+        return fromADC.transformConsumerCredential(
+          event.newValue as ADCSDK.ConsumerCredential,
+        );
       case ADCSDK.ResourceType.GLOBAL_RULE:
         return {
           plugins: {

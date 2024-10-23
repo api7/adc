@@ -10,8 +10,12 @@ on:
 jobs:
   apisix:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [3.8.1, 3.9.1, 3.10.0, 3.11.0]
     env:
-      BACKEND_APISIX_VERSION: 3.9.1-debian
+      BACKEND_APISIX_VERSION: ${{ matrix.version }}
+      BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
       - uses: actions/checkout@v4
 

@@ -253,7 +253,7 @@ export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
     if ('metadata' in obj) delete obj.metadata;
   };
   Object.entries(c).forEach(([key, value]) => {
-    if (['global_rules', 'plugin_metadata', 'consumers'].includes(key)) return;
+    if (['global_rules', 'plugin_metadata'].includes(key)) return;
     if (Array.isArray(value))
       value.forEach((item) => {
         removeMetadata(item);
@@ -265,6 +265,9 @@ export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
         } else if (key === 'consumer_groups') {
           if ('consumers' in item && Array.isArray(item.consumers))
             item.consumers.forEach((c) => removeMetadata(c));
+        } else if (key === 'consumers') {
+          if ('credentials' in item && Array.isArray(item.credentials))
+            item.credentials.forEach((c) => removeMetadata(c));
         }
       });
   });

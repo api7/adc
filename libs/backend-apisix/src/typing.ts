@@ -59,6 +59,14 @@ export interface Service {
   script?: string;
   enable_websocket?: boolean;
 }
+export interface ConsumerCredential {
+  id?: string;
+  name: string;
+  desc?: string;
+  labels?: Labels;
+
+  plugins?: Plugins;
+}
 export interface Consumer {
   username: string;
   desc?: string;
@@ -66,6 +74,7 @@ export interface Consumer {
 
   group_id?: string;
   plugins?: Plugins;
+  credentials?: Array<ConsumerCredential>;
 }
 export interface SSL {
   id: string;
