@@ -67,8 +67,8 @@ export interface UpstreamTimeout {
   read: number;
 }
 export interface UpstreamClientTLS {
-  cert: string;
-  key: string;
+  client_cert: string;
+  client_key: string;
   client_cert_id: string;
   verify: boolean;
 }

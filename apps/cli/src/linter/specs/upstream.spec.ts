@@ -93,6 +93,30 @@ describe('Upstream Linter', () => {
       } as ADCSDK.Configuration,
       expect: true,
     },
+    {
+      name: 'should only allow upstream mtls in client_cert and client_key',
+      input: {
+        services: [
+          {
+            name: 'Upstream mTLS',
+            upstream: {
+              nodes: [
+                {
+                  host: '1.1.1.1',
+                  port: 443,
+                  weight: 100,
+                },
+              ],
+              tls: {
+                client_cert: '0000',
+                client_key: '0000',
+              },
+            },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+    },
   ];
 
   // test cases runner

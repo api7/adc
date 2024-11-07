@@ -312,10 +312,10 @@
               "tls": {
                 "type": "object",
                 "properties": {
-                  "cert": {
+                  "client_cert": {
                     "type": "string"
                   },
-                  "key": {
+                  "client_key": {
                     "type": "string"
                   },
                   "client_cert_id": {
@@ -325,12 +325,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "cert",
-                  "key",
-                  "client_cert_id",
-                  "verify"
-                ],
                 "additionalProperties": false
               },
               "keepalive_pool": {
