@@ -98,7 +98,7 @@ describe('Upstream Linter', () => {
       input: {
         services: [
           {
-            name: 'Upstream TLS',
+            name: 'Upstream mTLS',
             upstream: {
               nodes: [
                 {
