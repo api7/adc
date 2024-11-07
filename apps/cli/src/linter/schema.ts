@@ -143,6 +143,7 @@ const upstreamSchema = z
         client_cert_id: z.string(),
         verify: z.boolean(),
       })
+      .strict()
       .refine(
         (data) =>
           (data.client_cert && data.client_key && !data.client_cert_id) ||
