@@ -138,15 +138,16 @@ const upstreamSchema = z
     timeout: timeoutSchema.optional(),
     tls: z
       .object({
-        cert: z.string(),
-        key: z.string(),
+        client_cert: z.string(),
+        client_key: z.string(),
         client_cert_id: z.string(),
         verify: z.boolean(),
       })
       .refine(
         (data) =>
-          (data.cert && data.key && !data.client_cert_id) ||
-          (data.client_cert_id && !data.cert && !data.key),
+          (data.client_cert && data.client_key && !data.client_cert_id) ||
+          (data.client_cert_id && !data.client_cert && !data.client_key),
+        'The client_cert and client_key certificate pair or client_cert_id SSL reference ID must be set',
       )
       .optional(),
     keepalive_pool: z

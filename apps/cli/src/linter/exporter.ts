@@ -1,7 +1,7 @@
 /**
  * Export jsonschema file by:
  *
- * $ ts-node apps/cli/src/linter/exporter.ts
+ * $ nx export-schema cli
  *
  */
 import { writeFileSync } from 'fs';
