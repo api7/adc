@@ -98,7 +98,7 @@ describe('Upstream Linter', () => {
       input: {
         services: [
           {
-            name: 'No_HealthChecker_HostPort',
+            name: 'Upstream TLS',
             upstream: {
               nodes: [
                 {
