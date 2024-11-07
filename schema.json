@@ -325,12 +325,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "client_cert",
-                  "client_key",
-                  "client_cert_id",
-                  "verify"
-                ],
                 "additionalProperties": false
               },
               "keepalive_pool": {

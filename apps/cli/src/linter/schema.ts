@@ -138,10 +138,10 @@ const upstreamSchema = z
     timeout: timeoutSchema.optional(),
     tls: z
       .object({
-        client_cert: z.string(),
-        client_key: z.string(),
-        client_cert_id: z.string(),
-        verify: z.boolean(),
+        client_cert: z.string().optional(),
+        client_key: z.string().optional(),
+        client_cert_id: z.string().optional(),
+        verify: z.boolean().optional(),
       })
       .strict()
       .refine(
