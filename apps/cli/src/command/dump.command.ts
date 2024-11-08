@@ -18,6 +18,7 @@ import {
 
 type DumpOptions = BackendOptions & {
   output: string;
+  withId: boolean;
 };
 
 export interface LoadRemoteConfigurationTaskOptions {
@@ -110,6 +111,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
         }),
         {
           // Remove output resource metadata fields
+          enabled: !opts.withId,
           task: (ctx) => recursiveRemoveMetadataField(ctx.remote),
         },
         {
