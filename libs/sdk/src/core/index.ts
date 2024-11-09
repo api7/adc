@@ -7,6 +7,7 @@ export type Plugins = Record<string, Plugin>;
 export type Expr = Array<string | Array<Expr>>;
 
 export interface Route {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
@@ -27,6 +28,7 @@ export interface Route {
 }
 
 export interface Service {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
@@ -117,6 +119,7 @@ export type UpstreamHealthCheckActiveUnhealthy = {
 } & UpstreamHealthCheckPassiveUnhealthy;
 
 export interface Upstream {
+  id?: string;
   name?: string;
   description?: string;
   labels?: Labels;
@@ -153,6 +156,7 @@ export interface SSLCertificate {
   key: string;
 }
 export interface SSL {
+  id?: string;
   labels?: Labels;
 
   type?: SSLType;
@@ -165,6 +169,7 @@ export interface SSL {
 }
 
 export interface PluginConfig {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
@@ -179,6 +184,7 @@ export type GlobalRule = Record<string, unknown>;
 export type PluginMetadata = Record<string, unknown>;
 
 export interface ConsumerCredential {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
@@ -200,6 +206,7 @@ export interface Consumer {
 }
 
 export interface ConsumerGroup {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
@@ -212,6 +219,7 @@ export interface ConsumerGroup {
 }
 
 export interface StreamRoute {
+  id?: string;
   name: string;
   description?: string;
   labels?: Labels;
