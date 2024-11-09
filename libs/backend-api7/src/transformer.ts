@@ -17,6 +17,7 @@ export class ToADC {
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Route>({
+      id: route.route_id,
       uris: route.paths,
       name: route.name,
       description: route.desc,
@@ -32,6 +33,7 @@ export class ToADC {
 
   public transformStreamRoute(route: typing.StreamRoute): ADCSDK.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.StreamRoute>({
+      id: route.stream_route_id,
       name: route.name,
       description: route.desc,
       labels: ToADC.transformLabels(route.labels),
@@ -44,6 +46,7 @@ export class ToADC {
 
   public transformService(service: typing.Service): ADCSDK.Service {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Service>({
+      id: service.service_id,
       name: service.name,
       description: service.desc,
       labels: ToADC.transformLabels(service.labels),
@@ -77,6 +80,7 @@ export class ToADC {
   ): ADCSDK.ConsumerCredential {
     const [pluginName, config] = Object.entries(credential.plugins)[0];
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerCredential>({
+      id: credential.id,
       name: credential.name,
       description: credential.desc,
       labels: credential.labels,
@@ -88,6 +92,7 @@ export class ToADC {
 
   public transformSSL(ssl: typing.SSL): ADCSDK.SSL {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.SSL>({
+      id: ssl.id,
       labels: ToADC.transformLabels(ssl.labels),
       type: ssl.type,
       snis: ssl.snis,
