@@ -103,6 +103,7 @@ describe('Miscellaneous', () => {
         overrideEventResourceId(
           createEvent(ADCSDK.ResourceType.ROUTE, routeName, route, serviceName),
           'custom-route',
+          'custom-service',
         ),
       ]));
 
@@ -119,6 +120,7 @@ describe('Miscellaneous', () => {
         overrideEventResourceId(
           deleteEvent(ADCSDK.ResourceType.ROUTE, routeName, serviceName),
           'custom-route',
+          'custom-service',
         ),
         overrideEventResourceId(
           deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
