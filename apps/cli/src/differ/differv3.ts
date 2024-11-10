@@ -567,6 +567,10 @@ export class DifferV3 {
     // Exists locally but not remotely: resource created by user
     local.forEach(([localName, localId, localItem]) => {
       if (checkedRemoteId.includes(localId)) return;
+
+      unset(localItem, 'metadata');
+      unset(localItem, 'id');
+
       return result.push({
         resourceType,
         type: ADCSDK.EventType.CREATE,
