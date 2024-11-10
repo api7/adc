@@ -234,9 +234,8 @@ export interface StreamRoute {
   metadata?: ResourceMetadata;
 }
 
-export interface ResourceMetadata {
-  readonly id: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface ResourceMetadata {}
 
 export interface Configuration {
   services?: Array<Service>;

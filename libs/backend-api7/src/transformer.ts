@@ -27,7 +27,6 @@ export class ToADC {
       plugins: route.plugins,
       priority: route.priority,
       timeout: route.timeout,
-      metadata: { id: route.route_id },
     });
   }
 
@@ -40,7 +39,6 @@ export class ToADC {
       server_addr: route.server_addr,
       server_port: route.server_port,
       remote_addr: route.remote_addr,
-      metadata: { id: route.stream_route_id },
     });
   }
 
@@ -59,7 +57,6 @@ export class ToADC {
       stream_routes: service.stream_routes?.map((item) =>
         this.transformStreamRoute(item),
       ),
-      metadata: { id: service.service_id },
     });
   }
 
@@ -86,7 +83,6 @@ export class ToADC {
       labels: credential.labels,
       type: pluginName as ADCSDK.ConsumerCredential['type'],
       config,
-      metadata: { id: credential.id },
     });
   }
 
@@ -106,7 +102,6 @@ export class ToADC {
             skip_mtls_uri_regex: undefined,
           }
         : undefined,
-      metadata: { id: ssl.id },
     });
   }
 
@@ -142,7 +137,7 @@ export class FromADC {
 
   public transformRoute(route: ADCSDK.Route, serviceId: string): typing.Route {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
-      route_id: ADCSDK.utils.generateId(route.name),
+      route_id: route.id,
       name: route.name,
       desc: route.description,
       labels: FromADC.transformLabels(route.labels),
@@ -161,7 +156,7 @@ export class FromADC {
     serviceId: string,
   ): typing.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined<typing.StreamRoute>({
-      stream_route_id: ADCSDK.utils.generateId(route.name),
+      stream_route_id: route.id,
       name: route.name,
       desc: route.description,
       labels: FromADC.transformLabels(route.labels),
@@ -175,7 +170,7 @@ export class FromADC {
 
   public transformService(service: ADCSDK.Service): typing.Service {
     return ADCSDK.utils.recursiveOmitUndefined({
-      service_id: ADCSDK.utils.generateId(service.name),
+      service_id: service.id,
       name: service.name,
       desc: service.description,
       labels: FromADC.transformLabels(service.labels),
@@ -203,7 +198,7 @@ export class FromADC {
     credential: ADCSDK.ConsumerCredential,
   ): typing.ConsumerCredential {
     return ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerCredential>({
-      id: ADCSDK.utils.generateId(credential.name),
+      id: credential.id,
       name: credential.name,
       desc: credential.description,
       labels: FromADC.transformLabels(credential.labels),
@@ -215,7 +210,7 @@ export class FromADC {
 
   public transformSSL(ssl: ADCSDK.SSL): typing.SSL {
     return ADCSDK.utils.recursiveOmitUndefined({
-      id: ADCSDK.utils.generateId(ssl.snis.join(',')),
+      id: ssl.id,
       labels: FromADC.transformLabels(ssl.labels),
       status: 1,
       certificates: undefined,
