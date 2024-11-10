@@ -278,7 +278,6 @@ export class FromADC {
         .map((route) => ({ ...route, service_id: serviceId })) ?? [];
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
-        ...service,
         id: service.id,
         name: service.name,
         desc: service.description,
