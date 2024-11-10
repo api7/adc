@@ -213,7 +213,6 @@ export class FromADC {
       id: ssl.id,
       labels: FromADC.transformLabels(ssl.labels),
       status: 1,
-      certificates: undefined,
       type: ssl.type,
 
       snis: ssl.snis,
