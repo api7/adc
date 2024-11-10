@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../src';
+import { server, token } from './support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -14,8 +15,8 @@ describe('Miscellaneous', () => {
 
   beforeAll(() => {
     backend = new BackendAPISIX({
-      server: process.env.SERVER,
-      token: process.env.TOKEN,
+      server,
+      token,
     });
   });
 
