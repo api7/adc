@@ -78,27 +78,19 @@ export class DifferV3 {
         ADCSDK.ResourceType.SERVICE,
         local?.services?.map((res) => [
           res.name,
-          ADCSDK.utils.generateId(res.name),
+          res.id ?? ADCSDK.utils.generateId(res.name),
           res,
         ]) ?? [],
-        remote?.services?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
+        remote?.services?.map((res) => [res.name, res.id, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.SSL,
         local?.ssls?.map((res) => [
           res.snis.join(','),
-          ADCSDK.utils.generateId(res.snis.join(',')),
+          res.id ?? ADCSDK.utils.generateId(res.snis.join(',')),
           res,
         ]) ?? [],
-        remote?.ssls?.map((res) => [
-          res.snis.join(','),
-          ADCSDK.utils.generateId(res.snis.join(',')),
-          res,
-        ]) ?? [],
+        remote?.ssls?.map((res) => [res.snis.join(','), res.id, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.CONSUMER,
@@ -144,40 +136,29 @@ export class DifferV3 {
         ADCSDK.ResourceType.ROUTE,
         local?.routes?.map((res) => [
           res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.routes?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
-          res,
-        ]) ?? [],
+        remote?.routes?.map((res) => [res.name, res.id, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.STREAM_ROUTE,
         local?.stream_routes?.map((res) => [
           res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.stream_routes?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
-          res,
-        ]) ?? [],
+        remote?.stream_routes?.map((res) => [res.name, res.id, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
         local?.consumer_credentials?.map((res) => [
           res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.consumer_credentials?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(generateResourceName(res.name)),
-          res,
-        ]) ?? [],
+        remote?.consumer_credentials?.map((res) => [res.name, res.id, res]) ??
+          [],
       ),
       /* ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,
@@ -321,22 +302,16 @@ export class DifferV3 {
 
     const checkedRemoteId: Array<ADCSDK.ResourceId> = [];
     remote.forEach(([remoteName, remoteId, remoteItem]) => {
-      const remoteMetadata = cloneDeep(
-        (remoteItem as { metadata: ADCSDK.ResourceMetadata })?.metadata,
-      );
-      unset(remoteItem, 'metadata');
-      const eventResourceId = remoteMetadata?.id ?? remoteId;
-
       // Asserts that the remote resource should exist locally, and that
       // non-existence means that the user deleted that resource.
-      const localItem = localIdMap[eventResourceId];
+      const localItem = localIdMap[remoteId];
 
       // Exists remotely but not locally: resource deleted by user
       if (!localItem) {
         return result.push({
           resourceType,
           type: ADCSDK.EventType.DELETE,
-          resourceId: eventResourceId,
+          resourceId: remoteId,
           resourceName: remoteName,
           oldValue: remoteItem,
 
@@ -359,13 +334,13 @@ export class DifferV3 {
             resourceType === ADCSDK.ResourceType.SERVICE
               ? remoteName
               : undefined,
-          ).map(this.postprocessSubEvent(remoteName, eventResourceId)),
+          ).map(this.postprocessSubEvent(remoteName, remoteId)),
         });
       }
 
       // Record the remote IDs that have been checked. It will be used
       // to identify locally added resources.
-      checkedRemoteId.push(eventResourceId);
+      checkedRemoteId.push(remoteId);
 
       const originalLocalItem = cloneDeep(localItem);
 
