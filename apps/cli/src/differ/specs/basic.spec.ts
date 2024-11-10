@@ -1,5 +1,4 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
 
 import { DifferV3 } from '../differv3';
 
@@ -343,31 +342,46 @@ describe('Differ V3 - basic', () => {
   it('should update service nested route', () => {
     const serviceName = 'Test Service';
     const routeName = 'Test Route';
-    const oldService: ADCSDK.Service = {
-      name: serviceName,
-      routes: [
-        {
-          name: routeName,
-          uris: ['/test'],
-          plugins: {
-            test: {
-              testKey: 'oldValue',
-            },
-          },
-        },
-      ],
-    };
-
-    const newService = structuredClone(oldService);
-    newService.routes[0].plugins.test.testKey = 'newValue';
 
     expect(
       DifferV3.diff(
         {
-          services: [structuredClone(newService)],
+          services: [
+            {
+              name: serviceName,
+              routes: [
+                {
+                  name: routeName,
+                  uris: ['/test'],
+                  plugins: {
+                    test: {
+                      testKey: 'newValue',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
         {
-          services: [structuredClone(oldService)],
+          services: [
+            {
+              id: ADCSDK.utils.generateId(serviceName),
+              name: serviceName,
+              routes: [
+                {
+                  id: ADCSDK.utils.generateId(`${serviceName}.${routeName}`),
+                  name: routeName,
+                  uris: ['/test'],
+                  plugins: {
+                    test: {
+                      testKey: 'oldValue',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
       ),
     ).toEqual([
@@ -380,8 +394,24 @@ describe('Differ V3 - basic', () => {
             rhs: 'newValue',
           },
         ],
-        newValue: newService.routes[0],
-        oldValue: oldService.routes[0],
+        newValue: {
+          name: routeName,
+          uris: ['/test'],
+          plugins: {
+            test: {
+              testKey: 'newValue',
+            },
+          },
+        },
+        oldValue: {
+          name: routeName,
+          uris: ['/test'],
+          plugins: {
+            test: {
+              testKey: 'oldValue',
+            },
+          },
+        },
         parentId: ADCSDK.utils.generateId(serviceName),
         resourceId: ADCSDK.utils.generateId(`${serviceName}.${routeName}`),
         resourceName: routeName,
@@ -393,39 +423,60 @@ describe('Differ V3 - basic', () => {
 
   it('should update service and its nested route', () => {
     const serviceName = 'Test Service';
+    const serviceId = ADCSDK.utils.generateId(serviceName);
     const routeName = 'Test Route';
-    const oldService: ADCSDK.Service = {
-      name: serviceName,
-      plugins: {
-        test: {
-          testKey: 'serviceOldValue',
-        },
-      },
-      routes: [
-        {
-          name: routeName,
-          uris: ['/test'],
-          plugins: {
-            test: {
-              testKey: 'oldValue',
-            },
-          },
-        },
-      ],
-    };
-
-    const newService = structuredClone(oldService);
-    newService.path_prefix = '/test';
-    newService.plugins.test.testKey = 'serviceNewValue';
-    newService.routes[0].plugins.test.testKey = 'newValue';
+    const routeId = ADCSDK.utils.generateId(`${serviceName}.${routeName}`);
 
     expect(
       DifferV3.diff(
         {
-          services: [structuredClone(newService)],
+          services: [
+            {
+              name: serviceName,
+              path_prefix: '/test',
+              plugins: {
+                test: {
+                  testKey: 'serviceNewValue',
+                },
+              },
+              routes: [
+                {
+                  name: routeName,
+                  uris: ['/test'],
+                  plugins: {
+                    test: {
+                      testKey: 'newValue',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
         {
-          services: [structuredClone(oldService)],
+          services: [
+            {
+              id: serviceId,
+              name: serviceName,
+              plugins: {
+                test: {
+                  testKey: 'serviceOldValue',
+                },
+              },
+              routes: [
+                {
+                  id: routeId,
+                  name: routeName,
+                  uris: ['/test'],
+                  plugins: {
+                    test: {
+                      testKey: 'oldValue',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
       ),
     ).toEqual([
@@ -438,10 +489,26 @@ describe('Differ V3 - basic', () => {
             rhs: 'newValue',
           },
         ],
-        newValue: newService.routes[0],
-        oldValue: oldService.routes[0],
-        parentId: ADCSDK.utils.generateId(serviceName),
-        resourceId: ADCSDK.utils.generateId(`${serviceName}.${routeName}`),
+        newValue: {
+          name: routeName,
+          uris: ['/test'],
+          plugins: {
+            test: {
+              testKey: 'newValue',
+            },
+          },
+        },
+        oldValue: {
+          name: routeName,
+          uris: ['/test'],
+          plugins: {
+            test: {
+              testKey: 'oldValue',
+            },
+          },
+        },
+        parentId: serviceId,
+        resourceId: routeId,
         resourceName: routeName,
         resourceType: ADCSDK.ResourceType.ROUTE,
         type: ADCSDK.EventType.UPDATE,
@@ -469,7 +536,7 @@ describe('Differ V3 - basic', () => {
           name: serviceName,
           plugins: { test: { testKey: 'serviceOldValue' } },
         },
-        resourceId: ADCSDK.utils.generateId(serviceName),
+        resourceId: serviceId,
         resourceName: serviceName,
         resourceType: ADCSDK.ResourceType.SERVICE,
         type: ADCSDK.EventType.UPDATE,
@@ -479,30 +546,36 @@ describe('Differ V3 - basic', () => {
 
   it('should keep plugins when plugins not be changed', () => {
     const serviceName = 'Test Service';
-    const oldService: ADCSDK.Service = {
-      name: serviceName,
-      plugins: {
-        test: {
-          testKey: 'testValue',
-          added: 'added',
-        },
-      },
-    };
-
-    const newService = structuredClone(oldService);
-    newService.path_prefix = '/test';
-    const origNewService = structuredClone(newService);
-
-    // ensure local resource does not include default added field
-    unset(newService, 'plugins.test.added');
+    const serviceId = ADCSDK.utils.generateId(serviceName);
 
     expect(
       DifferV3.diff(
         {
-          services: [structuredClone(newService)],
+          services: [
+            {
+              name: serviceName,
+              path_prefix: '/test',
+              plugins: {
+                test: {
+                  testKey: 'testValue',
+                },
+              },
+            },
+          ],
         },
         {
-          services: [structuredClone(oldService)],
+          services: [
+            {
+              id: serviceId,
+              name: serviceName,
+              plugins: {
+                test: {
+                  testKey: 'testValue',
+                  added: 'added',
+                },
+              },
+            },
+          ],
         },
         {
           plugins: {
@@ -521,9 +594,26 @@ describe('Differ V3 - basic', () => {
             rhs: '/test',
           },
         ],
-        newValue: origNewService,
-        oldValue: oldService,
-        resourceId: ADCSDK.utils.generateId(serviceName),
+        newValue: {
+          name: serviceName,
+          path_prefix: '/test',
+          plugins: {
+            test: {
+              testKey: 'testValue',
+              added: 'added',
+            },
+          },
+        },
+        oldValue: {
+          name: serviceName,
+          plugins: {
+            test: {
+              testKey: 'testValue',
+              added: 'added',
+            },
+          },
+        },
+        resourceId: serviceId,
         resourceName: serviceName,
         resourceType: ADCSDK.ResourceType.SERVICE,
         type: ADCSDK.EventType.UPDATE,
@@ -532,6 +622,8 @@ describe('Differ V3 - basic', () => {
   });
 
   it('should selectively merge the objects in default values, for principle', () => {
+    const serviceName = 'Test Service';
+    const serviceId = ADCSDK.utils.generateId(serviceName);
     expect(
       DifferV3.diff(
         {
@@ -546,6 +638,7 @@ describe('Differ V3 - basic', () => {
         {
           services: [
             {
+              id: serviceId,
               name: 'Test Service',
               test: 'test',
               test1: {
@@ -571,189 +664,6 @@ describe('Differ V3 - basic', () => {
     ).toEqual([]);
   });
 
-  it('ensure remote metadata does not affect the differ, delete', () => {
-    const serviceName = 'Test Service';
-    const routeName = 'Test Route';
-    const route1Name = `${routeName} 1`;
-    const route2Name = `${routeName} 2`;
-    const remoteServiceId = 'not_hashed_service_name';
-    const remoteRouteId = 'not_hashed_route_name';
-    expect(
-      DifferV3.diff(
-        {},
-        {
-          services: [
-            {
-              name: serviceName,
-              routes: [
-                {
-                  name: route1Name,
-                  uris: ['/test1'],
-                },
-                {
-                  name: route2Name,
-                  uris: ['/test2'],
-                  metadata: { id: remoteRouteId },
-                },
-              ],
-              metadata: {
-                id: remoteServiceId,
-              },
-            },
-          ],
-        },
-      ),
-    ).toEqual([
-      {
-        oldValue: { name: route1Name, uris: ['/test1'] },
-        parentId: remoteServiceId,
-        resourceId: ADCSDK.utils.generateId(`${serviceName}.${route1Name}`),
-        resourceName: route1Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.DELETE,
-      },
-      {
-        oldValue: { name: route2Name, uris: ['/test2'] },
-        parentId: remoteServiceId,
-        resourceId: remoteRouteId,
-        resourceName: route2Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.DELETE,
-      },
-      {
-        oldValue: {
-          name: serviceName,
-          routes: [
-            { name: route1Name, uris: ['/test1'] },
-            { name: route2Name, uris: ['/test2'] },
-          ],
-        },
-        resourceId: remoteServiceId,
-        resourceName: serviceName,
-        resourceType: ADCSDK.ResourceType.SERVICE,
-        type: ADCSDK.EventType.DELETE,
-      },
-    ]);
-  });
-
-  it('ensure remote metadata does not affect the differ, update', () => {
-    const serviceName = 'Test Service';
-    const routeName = 'Test Route';
-    const route1Name = `${routeName} 1`;
-    const route2Name = `${routeName} 2`;
-    const remoteServiceId = 'not_hashed_service_name';
-    const remoteRouteId = 'not_hashed_route_name';
-    expect(
-      DifferV3.diff(
-        {
-          services: [
-            {
-              name: serviceName,
-              path_prefix: '/test',
-              routes: [
-                {
-                  name: route1Name,
-                  uris: ['/test1u'],
-                },
-                {
-                  name: route2Name,
-                  uris: ['/test2u'],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          services: [
-            {
-              name: serviceName,
-              routes: [
-                {
-                  name: route1Name,
-                  uris: ['/test1'],
-                },
-                {
-                  name: route2Name,
-                  uris: ['/test2'],
-                  metadata: { id: remoteRouteId },
-                },
-              ],
-              metadata: {
-                id: remoteServiceId,
-              },
-            },
-          ],
-        },
-      ),
-    ).toEqual([
-      {
-        oldValue: { name: route1Name, uris: ['/test1'] },
-        parentId: remoteServiceId,
-        resourceId: ADCSDK.utils.generateId(`${serviceName}.${route1Name}`),
-        resourceName: route1Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.DELETE,
-      },
-      {
-        oldValue: { name: route2Name, uris: ['/test2'] },
-        parentId: remoteServiceId,
-        resourceId: remoteRouteId,
-        resourceName: route2Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.DELETE,
-      },
-      {
-        oldValue: {
-          name: serviceName,
-          routes: [
-            { name: route1Name, uris: ['/test1'] },
-            { name: route2Name, uris: ['/test2'] },
-          ],
-        },
-        resourceId: remoteServiceId,
-        resourceName: serviceName,
-        resourceType: ADCSDK.ResourceType.SERVICE,
-        type: ADCSDK.EventType.DELETE,
-      },
-      {
-        newValue: {
-          name: serviceName,
-          path_prefix: '/test',
-          routes: [
-            { name: route1Name, uris: ['/test1u'] },
-            {
-              name: route2Name,
-              uris: ['/test2u'],
-            },
-          ],
-        },
-        resourceId: ADCSDK.utils.generateId(serviceName),
-        resourceName: serviceName,
-        resourceType: ADCSDK.ResourceType.SERVICE,
-        type: ADCSDK.EventType.CREATE,
-      },
-      {
-        newValue: { name: route1Name, uris: ['/test1u'] },
-        parentId: ADCSDK.utils.generateId(serviceName),
-        resourceId: ADCSDK.utils.generateId(`${serviceName}.${route1Name}`),
-        resourceName: route1Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.CREATE,
-      },
-      {
-        newValue: {
-          name: route2Name,
-          uris: ['/test2u'],
-        },
-        parentId: ADCSDK.utils.generateId(serviceName),
-        resourceId: ADCSDK.utils.generateId(`${serviceName}.${route2Name}`),
-        resourceName: route2Name,
-        resourceType: ADCSDK.ResourceType.ROUTE,
-        type: ADCSDK.EventType.CREATE,
-      },
-    ]);
-  });
-
   it('ensure default values for array nested object formats are merged correctly', () => {
     const serviceName = 'Test Service';
     const newNode: ADCSDK.UpstreamNode = {
@@ -777,6 +687,7 @@ describe('Differ V3 - basic', () => {
         {
           services: [
             {
+              id: ADCSDK.utils.generateId(serviceName),
               name: serviceName,
               upstream: { nodes: [oldNode] },
             },
@@ -796,7 +707,7 @@ describe('Differ V3 - basic', () => {
   });
 
   it('ensure route and stream route id generated currect', () => {
-    const services: Array<ADCSDK.Service> = [
+    const newServices: Array<ADCSDK.Service> = [
       {
         name: 'HTTP',
         routes: [
@@ -817,7 +728,16 @@ describe('Differ V3 - basic', () => {
       },
     ];
 
-    expect(DifferV3.diff({ services }, { services }, {})).toEqual([]);
+    const oldServices = structuredClone(newServices);
+    oldServices[0].id = ADCSDK.utils.generateId('HTTP');
+    oldServices[0].routes[0].id = ADCSDK.utils.generateId('HTTP.HTTP 1');
+    oldServices[1].id = ADCSDK.utils.generateId('Stream');
+    oldServices[1].stream_routes[0].id =
+      ADCSDK.utils.generateId('Stream.Stream 1');
+
+    expect(
+      DifferV3.diff({ services: newServices }, { services: oldServices }, {}),
+    ).toEqual([]);
   });
 
   it('ensure boolean defaults are merged correctly', () => {
@@ -827,6 +747,7 @@ describe('Differ V3 - basic', () => {
       strip_path_prefix: false,
     };
     const oldService = structuredClone(service);
+    oldService.id = ADCSDK.utils.generateId('HTTP');
     oldService.strip_path_prefix = true;
 
     expect(

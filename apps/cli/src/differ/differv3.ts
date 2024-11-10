@@ -302,9 +302,13 @@ export class DifferV3 {
 
     const checkedRemoteId: Array<ADCSDK.ResourceId> = [];
     remote.forEach(([remoteName, remoteId, remoteItem]) => {
+      unset(remoteItem, 'metadata');
+      unset(remoteItem, 'id');
+
       // Asserts that the remote resource should exist locally, and that
       // non-existence means that the user deleted that resource.
       const localItem = localIdMap[remoteId];
+      unset(localItem, 'id');
 
       // Exists remotely but not locally: resource deleted by user
       if (!localItem) {
