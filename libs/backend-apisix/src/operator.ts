@@ -108,10 +108,12 @@ export class Operator {
       case ADCSDK.ResourceType.CONSUMER:
         return fromADC.transformConsumer(event.newValue as ADCSDK.Consumer);
       case ADCSDK.ResourceType.CONSUMER_GROUP:
+        (event.newValue as ADCSDK.ConsumerGroup).id = event.resourceId;
         return fromADC.transformConsumerGroup(
           event.newValue as ADCSDK.ConsumerGroup,
         )[0];
       case ADCSDK.ResourceType.CONSUMER_CREDENTIAL:
+        (event.newValue as ADCSDK.ConsumerCredential).id = event.resourceId;
         return fromADC.transformConsumerCredential(
           event.newValue as ADCSDK.ConsumerCredential,
         );
@@ -124,15 +126,19 @@ export class Operator {
       case ADCSDK.ResourceType.PLUGIN_METADATA:
         return event.newValue;
       case ADCSDK.ResourceType.ROUTE: {
+        (event.newValue as ADCSDK.Route).id = event.resourceId;
         const route = fromADC.transformRoute(event.newValue as ADCSDK.Route);
         if (event.parentId) route.service_id = event.parentId;
         return route;
       }
       case ADCSDK.ResourceType.SERVICE:
+        (event.newValue as ADCSDK.Service).id = event.resourceId;
         return fromADC.transformService(event.newValue as ADCSDK.Service)[0];
       case ADCSDK.ResourceType.SSL:
+        (event.newValue as ADCSDK.SSL).id = event.resourceId;
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
       case ADCSDK.ResourceType.STREAM_ROUTE: {
+        (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         const route = fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
         );

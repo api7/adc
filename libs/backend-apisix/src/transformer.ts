@@ -17,6 +17,7 @@ export class ToADC {
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
     return ADCSDK.utils.recursiveOmitUndefined({
+      id: route.id,
       name: route.name ?? route.id,
       description: route.desc,
       labels: route.labels,
@@ -34,21 +35,18 @@ export class ToADC {
       plugins: route.plugins,
       plugin_config_id: route.plugin_config_id,
       filter_func: route.filter_func,
-
-      metadata: { id: route.id },
     } as ADCSDK.Route);
   }
 
   public transformService(service: typing.Service): ADCSDK.Service {
     return ADCSDK.utils.recursiveOmitUndefined({
+      id: service.id,
       name: service.name ?? service.id,
       description: service.desc,
       labels: service.labels,
 
       upstream: service.upstream,
       plugins: service.plugins,
-
-      metadata: { id: service.id },
     } as ADCSDK.Service);
   }
 
@@ -82,12 +80,12 @@ export class ToADC {
     )
       return;
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerCredential>({
+      id: credential.id,
       name: credential.name,
       description: credential.desc,
       labels: credential.labels,
       type: pluginName as ADCSDK.ConsumerCredential['type'],
       config,
-      metadata: { id: credential.id },
     });
   }
 
@@ -104,6 +102,7 @@ export class ToADC {
     ];
 
     return ADCSDK.utils.recursiveOmitUndefined({
+      id: ssl.id,
       labels: ssl.labels,
 
       type: ssl.type,
@@ -124,8 +123,9 @@ export class ToADC {
     consumerGroup: typing.ConsumerGroup,
     consumers?: Array<typing.Consumer>,
   ): ADCSDK.ConsumerGroup {
-    const adcConsumerGroup: ADCSDK.ConsumerGroup =
-      ADCSDK.utils.recursiveOmitUndefined({
+    const adcConsumerGroup =
+      ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerGroup>({
+        id: consumerGroup.id,
         name: (consumerGroup.labels?.ADC_NAME as string) ?? consumerGroup.id,
         description: consumerGroup.desc,
         labels: consumerGroup.labels,
@@ -156,6 +156,7 @@ export class ToADC {
     streamRoute: typing.StreamRoute,
   ): ADCSDK.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined({
+      id: streamRoute.id,
       name: streamRoute.labels?.__ADC_NAME ?? streamRoute.id,
       description: streamRoute.desc,
       labels: ToADC.transformLabels(streamRoute.labels),
@@ -242,14 +243,24 @@ export class FromADC {
   }
 
   public transformRoute(route: ADCSDK.Route): typing.Route {
-    return ADCSDK.utils.recursiveOmitUndefined({
-      ...route,
-      id: undefined,
-      labels: FromADC.transformLabels(route.labels),
-      status: 1,
-
+    return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
+      id: route.id,
+      name: route.name,
       desc: route.description,
-      description: undefined,
+      labels: FromADC.transformLabels(route.labels),
+      uris: route.uris,
+      hosts: route.hosts,
+      methods: route.methods,
+      remote_addrs: route.remote_addrs,
+      vars: route.vars,
+      filter_func: route.filter_func,
+
+      //service_id: '',
+      enable_websocket: route.enable_websocket,
+      plugins: route.plugins,
+      priority: route.priority,
+      timeout: route.timeout,
+      status: 1,
     });
   }
 
@@ -266,15 +277,15 @@ export class FromADC {
         ?.map(this.transformStreamRoute)
         .map((route) => ({ ...route, service_id: serviceId })) ?? [];
     return [
-      ADCSDK.utils.recursiveOmitUndefined({
+      ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
         ...service,
-        id: undefined,
-        labels: FromADC.transformLabels(service.labels),
-        routes: undefined,
-        stream_routes: undefined,
-
+        id: service.id,
+        name: service.name,
         desc: service.description,
-        description: undefined,
+        labels: FromADC.transformLabels(service.labels),
+        upstream: service.upstream,
+        plugins: service.plugins,
+        hosts: service.hosts,
       }),
       routes,
       streamRoutes,
@@ -286,7 +297,6 @@ export class FromADC {
       username: consumer.username,
       desc: consumer.description,
       labels: FromADC.transformLabels(consumer.labels),
-
       plugins: consumer.plugins,
     } as typing.Consumer);
   }
@@ -295,6 +305,7 @@ export class FromADC {
     credential: ADCSDK.ConsumerCredential,
   ): typing.ConsumerCredential {
     return ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerCredential>({
+      id: credential.id,
       name: credential.name,
       desc: credential.description,
       labels: FromADC.transformLabels(credential.labels),
@@ -305,13 +316,13 @@ export class FromADC {
   }
 
   public transformSSL(ssl: ADCSDK.SSL): typing.SSL {
-    return ADCSDK.utils.recursiveOmitUndefined({
-      ...ssl,
-      id: undefined,
+    return ADCSDK.utils.recursiveOmitUndefined<typing.SSL>({
+      id: ssl.id,
       labels: FromADC.transformLabels(ssl.labels),
       status: 1,
-      certificates: undefined,
+      type: ssl.type,
 
+      snis: ssl.snis,
       cert: ssl.certificates[0].certificate,
       key: ssl.certificates[0].key,
       ...(ssl.certificates.length > 1
@@ -324,6 +335,7 @@ export class FromADC {
               .map((certificate) => certificate.key),
           }
         : {}),
+      client: ssl.client,
     });
   }
 
