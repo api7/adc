@@ -17,7 +17,7 @@ export const setupCommands = (): Command => {
     .description('API Declarative CLI (ADC) is a utility to manage API7 Enterprise and Apache APISIX declaratively.\n\nLearn more at: https://docs.api7.ai/enterprise/reference/adc')
     .configureHelp({ showGlobalOptions: true })
     .passThroughOptions()
-    .version('0.15.0', '-v, --version', 'display ADC version');
+    .version('0.16.0', '-v, --version', 'display ADC version');
 
   program
     .addCommand(PingCommand)
