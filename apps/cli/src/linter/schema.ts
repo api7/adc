@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const idSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-zA-Z0-9-_.]+$/);
 const nameSchema = z
   .string()
   .min(1)
@@ -178,6 +183,7 @@ const upstreamSchema = z
 
 const routeSchema = z
   .object({
+    id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
@@ -213,6 +219,7 @@ const routeSchema = z
 
 const streamRouteSchema = z
   .object({
+    id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
@@ -228,6 +235,7 @@ const streamRouteSchema = z
 
 const serviceSchema = z
   .object({
+    id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
@@ -261,6 +269,7 @@ const serviceSchema = z
 
 const sslSchema = z
   .object({
+    id: idSchema.optional(),
     labels: labelsSchema.optional(),
 
     type: z.enum(['server', 'client']).default('server').optional(),
@@ -294,6 +303,7 @@ const sslSchema = z
 
 const consumerCredentialSchema = z
   .object({
+    id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
@@ -324,6 +334,7 @@ const consumerSchema = z
 
 const consumerGroupSchema = z
   .object({
+    id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
