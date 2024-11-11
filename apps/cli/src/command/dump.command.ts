@@ -18,6 +18,7 @@ import {
 
 type DumpOptions = BackendOptions & {
   output: string;
+  withId: boolean;
 };
 
 export interface LoadRemoteConfigurationTaskOptions {
@@ -74,6 +75,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
     'path of the file to save the configuration',
     'adc.yaml',
   )
+  .option('--with-id', 'dump remote resources id')
   .addExamples([
     {
       title: 'Save backend configuration to the default adc.yaml file',
@@ -92,6 +94,10 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
       title: 'Save only the resources with the specified labels',
       command: 'adc dump --label-selector app=catalog',
     },
+    {
+      title: 'Save the remote resources id',
+      command: 'adc dump --with-id',
+    },
   ])
   .handle(async (opts) => {
     const backend = loadBackend(opts.backend, opts);
@@ -105,6 +111,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
         }),
         {
           // Remove output resource metadata fields
+          enabled: !opts.withId,
           task: (ctx) => recursiveRemoveMetadataField(ctx.remote),
         },
         {

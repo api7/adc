@@ -102,6 +102,16 @@ export const deleteEvent = (
     : undefined,
 });
 
+export const overrideEventResourceId = (
+  event: ADCSDK.Event,
+  resourceId: string,
+  parentId?: string,
+) => {
+  event.resourceId = resourceId;
+  if (parentId) event.parentId = parentId;
+  return event;
+};
+
 type cond = boolean | (() => boolean);
 
 export const conditionalDescribe = (cond: cond) =>

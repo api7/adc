@@ -250,6 +250,7 @@ export const filterResourceType = (
 
 export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
   const removeMetadata = (obj: object) => {
+    if ('id' in obj) delete obj.id;
     if ('metadata' in obj) delete obj.metadata;
   };
   Object.entries(c).forEach(([key, value]) => {

@@ -277,20 +277,25 @@ export class Operator {
       case ADCSDK.ResourceType.PLUGIN_METADATA:
         return event.newValue;
       case ADCSDK.ResourceType.SERVICE:
+        (event.newValue as ADCSDK.Service).id = event.resourceId;
         return fromADC.transformService(event.newValue as ADCSDK.Service);
       case ADCSDK.ResourceType.ROUTE:
+        (event.newValue as ADCSDK.Route).id = event.resourceId;
         return fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
           event.parentId,
         );
       case ADCSDK.ResourceType.STREAM_ROUTE:
+        (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         return fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
           event.parentId,
         );
       case ADCSDK.ResourceType.SSL:
+        (event.newValue as ADCSDK.SSL).id = event.resourceId;
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
       case ADCSDK.ResourceType.CONSUMER_CREDENTIAL:
+        (event.newValue as ADCSDK.ConsumerCredential).id = event.resourceId;
         return fromADC.transformConsumerCredential(
           event.newValue as ADCSDK.ConsumerCredential,
         );

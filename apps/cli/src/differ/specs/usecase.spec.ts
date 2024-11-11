@@ -39,15 +39,18 @@ describe('Differ V3 - usecase', () => {
         {
           services: [
             {
+              id: ADCSDK.utils.generateId('HTTPBIN Service'),
               name: 'HTTPBIN Service',
               description: '',
               routes: [
                 {
+                  id: ADCSDK.utils.generateId('HTTPBIN Service.Anything'),
                   name: 'Anything',
                   methods: ['GET'],
                   uris: ['/anything'],
                 },
                 {
+                  id: ADCSDK.utils.generateId('HTTPBIN Service.Generate UUID'),
                   name: 'Generate UUID',
                   methods: ['GET'],
                   uris: ['/uuid'],
@@ -175,6 +178,7 @@ describe('Differ V3 - usecase', () => {
         {
           services: [
             {
+              id: ADCSDK.utils.generateId('Test Service'),
               name: 'Test Service',
               upstream: {
                 name: 'default',
@@ -194,6 +198,7 @@ describe('Differ V3 - usecase', () => {
               },
               routes: [
                 {
+                  id: ADCSDK.utils.generateId('Test Service.anything'),
                   name: 'anything',
                   uris: ['/anything'],
                 },

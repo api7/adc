@@ -38,6 +38,9 @@ describe('Differ V3 - consumer', () => {
               username: consumerName,
               credentials: [
                 {
+                  id: ADCSDK.utils.generateId(
+                    `${consumerName}.${ADCSDK.EventType.UPDATE}`,
+                  ),
                   name: ADCSDK.EventType.UPDATE,
                   type: 'basic-auth',
                   config: {
@@ -46,6 +49,9 @@ describe('Differ V3 - consumer', () => {
                   },
                 },
                 {
+                  id: ADCSDK.utils.generateId(
+                    `${consumerName}.${ADCSDK.EventType.DELETE}`,
+                  ),
                   name: ADCSDK.EventType.DELETE,
                   type: 'jwt-auth',
                   config: {
