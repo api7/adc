@@ -51,6 +51,25 @@ describe('Common Linter', () => {
         },
       ],
     },
+    {
+      name: 'should check custom resource id',
+      input: {
+        services: [
+          {
+            id: 'custom-service',
+            name: 'test',
+            routes: [
+              {
+                id: 'custom-route',
+                name: 'test',
+                uris: ['/test'],
+              },
+            ],
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+    },
   ];
 
   // test cases runner

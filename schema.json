@@ -6,6 +6,12 @@
       "items": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-zA-Z0-9-_.]+$"
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -397,6 +403,9 @@
             "items": {
               "type": "object",
               "properties": {
+                "id": {
+                  "$ref": "#/properties/services/items/properties/id"
+                },
                 "name": {
                   "$ref": "#/properties/services/items/properties/name"
                 },
@@ -483,6 +492,9 @@
             "items": {
               "type": "object",
               "properties": {
+                "id": {
+                  "$ref": "#/properties/services/items/properties/id"
+                },
                 "name": {
                   "$ref": "#/properties/services/items/properties/name"
                 },
@@ -526,6 +538,9 @@
       "items": {
         "type": "object",
         "properties": {
+          "id": {
+            "$ref": "#/properties/services/items/properties/id"
+          },
           "labels": {
             "$ref": "#/properties/services/items/properties/labels"
           },
@@ -648,6 +663,9 @@
             "items": {
               "type": "object",
               "properties": {
+                "id": {
+                  "$ref": "#/properties/services/items/properties/id"
+                },
                 "name": {
                   "$ref": "#/properties/services/items/properties/name"
                 },
@@ -684,6 +702,9 @@
       "items": {
         "type": "object",
         "properties": {
+          "id": {
+            "$ref": "#/properties/services/items/properties/id"
+          },
           "name": {
             "$ref": "#/properties/services/items/properties/name"
           },
