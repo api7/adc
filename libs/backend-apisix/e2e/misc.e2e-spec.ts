@@ -61,7 +61,6 @@ describe('Miscellaneous', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0]).toMatchObject(service);
       expect(result.services[0].routes[0]).toMatchObject(route);
     });
 
