@@ -3,7 +3,7 @@ import { z } from 'zod';
 const idSchema = z
   .string()
   .min(1)
-  .max(64)
+  .max(256)
   .regex(/^[a-zA-Z0-9-_.]+$/);
 const nameSchema = z
   .string()

@@ -70,6 +70,44 @@ describe('Common Linter', () => {
       } as ADCSDK.Configuration,
       expect: true,
     },
+    {
+      name: 'should check id length (length <= 256)',
+      input: {
+        services: [
+          {
+            id: ''.padEnd(256, '0'),
+            name: 'name',
+            routes: [],
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+      errors: [],
+    },
+    {
+      name: 'should check id length (length > 256)',
+      input: {
+        services: [
+          {
+            id: ''.padEnd(257, '0'),
+            name: 'name',
+            routes: [],
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: false,
+      errors: [
+        {
+          code: 'too_big',
+          exact: false,
+          inclusive: true,
+          maximum: 256,
+          message: 'String must contain at most 256 character(s)',
+          path: ['services', 0, 'id'],
+          type: 'string',
+        },
+      ],
+    },
   ];
 
   // test cases runner
