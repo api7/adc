@@ -5,7 +5,8 @@ on:
       - main
     paths:
       - .github/workflows/update-s3-and-cloudfront.yaml
-      - s3/install
+      - libs/tools/project.json
+      - libs/tools/src/s3/install
 
 jobs:
   update-s3-and-cloudfront:
@@ -24,16 +25,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.S3_BUCKET_REGION }}
-      
+
       - name: Deploy
         # The path to the install script will be /adc/install
-        run: aws s3 sync ./s3 s3://${{ secrets.S3_BUCKET }}/adc
+        run: aws s3 sync ./libs/tools/src/s3 s3://${{ secrets.S3_BUCKET }}/adc
 
       - name: Invalidate CloudFront
         uses: chetan/invalidate-cloudfront-action@v2
         env:
           DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          PATHS: "/"
-          AWS_REGION: "${{ secrets.S3_BUCKET_REGION }}"
+          PATHS: '/'
+          AWS_REGION: '${{ secrets.S3_BUCKET_REGION }}'
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
