@@ -32,7 +32,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=match,pattern=portal-api/(.*),group=1
+            type=match,pattern=v(.*),group=1
 
       - name: Build and push
         uses: docker/build-push-action@v4
