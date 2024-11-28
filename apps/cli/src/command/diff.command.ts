@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { globSync } from 'glob';
 import { Listr, ListrTask } from 'listr2';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -43,11 +44,10 @@ export const LoadLocalConfigurationTask = (
 }> => ({
   title: `Load local configuration`,
   task: async (ctx, task) => {
-    if (!files || files.length <= 0) {
-      task.output =
-        'No configuration file input\nPlease specify the declarative configuration file to use with -f or --file';
-      throw new Error();
-    }
+    if (!files || files.length <= 0)
+      throw new Error(
+        'No configuration file input, please specify the declarative configuration file to use with -f or --file',
+      );
 
     interface LoadLocalContext {
       configurations: Record<string, ADCSDK.Configuration>;
@@ -58,21 +58,25 @@ export const LoadLocalConfigurationTask = (
     return task.newListr<LoadLocalContext>(
       [
         // load yaml files
-        ...files.map((filePath): ListrTask<LoadLocalContext> => {
-          return {
-            title: `Load ${path.resolve(filePath)}`,
-            task: async (subCtx) => {
-              if (!existsSync(filePath))
-                throw new Error(
-                  `File ${path.resolve(filePath)} does not exist`,
-                );
-              const fileContent =
-                (await readFile(filePath, { encoding: 'utf-8' })) ?? '';
+        ...files
+          .flatMap((filePath) =>
+            globSync(filePath, { nodir: true, absolute: true }),
+          )
+          .map((filePath): ListrTask<LoadLocalContext> => {
+            return {
+              title: `Load ${filePath}`,
+              task: async (subCtx) => {
+                if (!existsSync(filePath))
+                  throw new Error(
+                    `File ${path.resolve(filePath)} does not exist`,
+                  );
+                const fileContent =
+                  (await readFile(filePath, { encoding: 'utf-8' })) ?? '';
 
-              subCtx.configurations[filePath] = YAML.parse(fileContent) ?? {};
-            },
-          };
-        }),
+                subCtx.configurations[filePath] = YAML.parse(fileContent) ?? {};
+              },
+            };
+          }),
         // merge yaml files
         {
           title: 'Merge local configurations',
@@ -169,12 +173,19 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
   .addOption(NoLintOption)
   .addExamples([
     {
-      title: 'Compare configuration in a specified file with the backend configuration',
+      title:
+        'Compare configuration in a specified file with the backend configuration',
       command: 'adc diff -f adc.yaml',
     },
     {
-      title: 'Compare configuration in multiple specified files with the backend configuration',
+      title:
+        'Compare configuration in multiple specified files with the backend configuration',
       command: 'adc diff -f service-a.yaml -f service-b.yaml',
+    },
+    {
+      title:
+        'Compare configuration in multiple specified files by glob expression',
+      command: 'adc diff -f "**/*.yaml" -f common.yaml',
     },
   ])
   .handle(async (opts) => {

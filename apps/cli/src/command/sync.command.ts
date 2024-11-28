@@ -38,6 +38,10 @@ export const SyncCommand = new BackendCommand<SyncOption>(
       command: 'adc sync -f service-a.yaml -f service-b.yaml',
     },
     {
+      title: 'Synchronize configuration in multiple files by glob expression',
+      command: 'adc diff -f "**/*.yaml" -f common.yaml',
+    },
+    {
       title: 'Synchronize configuration to a specific gateway group',
       command: 'adc sync -f adc.yaml --gateway-group production',
     },
