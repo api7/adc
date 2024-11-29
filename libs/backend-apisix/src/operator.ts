@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
-import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
+import { SemVer, lt, gte as semVerGTE, lt as semVerLT } from 'semver';
 
 import { FromADC } from './transformer';
 import * as typing from './typing';
@@ -26,6 +26,13 @@ export class Operator {
   public updateResource(event: ADCSDK.Event): OperateTask {
     return {
       title: this.generateTaskName(event),
+      skip: (ctx) => {
+        if (
+          lt(ctx.apisixVersion, '3.7.0') &&
+          event.resourceType === ADCSDK.ResourceType.STREAM_ROUTE
+        )
+          return 'The stream routes on versions below 3.7.0 are not supported as they are not supported configured on the service.';
+      },
       task: async (ctx, task) => {
         if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL) {
           if (semVerLT(ctx.apisixVersion, '3.11.0')) return;
