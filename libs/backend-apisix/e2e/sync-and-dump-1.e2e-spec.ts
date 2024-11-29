@@ -7,6 +7,7 @@ import { gte, lt } from 'semver';
 import { BackendAPISIX } from '../src';
 import { server, token } from './support/constants';
 import {
+  conditionalDescribe,
   conditionalIt,
   createEvent,
   deleteEvent,
@@ -166,78 +167,96 @@ describe('Sync and Dump - 1', () => {
     });
   });
 
-  describe('Sync and dump service with stream route', () => {
-    const serviceName = 'test';
-    const service = {
-      name: serviceName,
-      upstream: {
-        scheme: 'tcp',
-        nodes: [
-          {
-            host: '1.1.1.1',
-            port: 5432,
-            weight: 100,
-          },
-        ],
-      },
-    } as ADCSDK.Service;
-    const route1Name = 'postgres';
-    const route1 = {
-      name: route1Name,
-      server_port: 54320,
-    } as ADCSDK.StreamRoute;
+  conditionalDescribe(semverCondition(gte, '3.7.0'))(
+    'Sync and dump service with stream route',
+    () => {
+      const serviceName = 'test';
+      const service = {
+        name: serviceName,
+        upstream: {
+          scheme: 'tcp',
+          nodes: [
+            {
+              host: '1.1.1.1',
+              port: 5432,
+              weight: 100,
+            },
+          ],
+        },
+      } as ADCSDK.Service;
+      const route1Name = 'postgres';
+      const route1 = {
+        name: route1Name,
+        server_port: 54320,
+      } as ADCSDK.StreamRoute;
 
-    it('Create resources', async () =>
-      syncEvents(backend, [
-        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
-        createEvent(
-          ADCSDK.ResourceType.STREAM_ROUTE,
-          route1Name,
-          route1,
-          serviceName,
-        ),
-      ]));
+      it('Create resources', async () =>
+        syncEvents(backend, [
+          createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
+          createEvent(
+            ADCSDK.ResourceType.STREAM_ROUTE,
+            route1Name,
+            route1,
+            serviceName,
+          ),
+        ]));
 
-    conditionalIt(semverCondition(lt, '3.8.0'))('Dump (<3.8.0)', async () => {
-      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].stream_routes).toHaveLength(1);
-      const route = structuredClone(route1);
-      route.name = result.services[0].stream_routes[0].id;
-      expect(result.services[0].stream_routes[0]).toMatchObject(route);
-    });
+      conditionalIt(semverCondition(lt, '3.8.0'))('Dump (<3.8.0)', async () => {
+        const result = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        expect(result.services).toHaveLength(1);
+        expect(result.services[0]).toMatchObject(service);
+        expect(result.services[0].stream_routes).toHaveLength(1);
+        const route = structuredClone(route1);
+        route.name = result.services[0].stream_routes[0].id;
+        expect(result.services[0].stream_routes[0]).toMatchObject(route);
+      });
 
-    conditionalIt(semverCondition(gte, '3.8.0'))('Dump (>=3.8.0)', async () => {
-      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].stream_routes).toHaveLength(1);
-      expect(result.services[0].stream_routes[0]).toMatchObject(route1);
-    });
+      conditionalIt(semverCondition(gte, '3.8.0'))(
+        'Dump (>=3.8.0)',
+        async () => {
+          const result = (await dumpConfiguration(
+            backend,
+          )) as ADCSDK.Configuration;
+          expect(result.services).toHaveLength(1);
+          expect(result.services[0]).toMatchObject(service);
+          expect(result.services[0].stream_routes).toHaveLength(1);
+          expect(result.services[0].stream_routes[0]).toMatchObject(route1);
+        },
+      );
 
-    it('Delete stream route', async () =>
-      syncEvents(backend, [
-        deleteEvent(ADCSDK.ResourceType.STREAM_ROUTE, route1Name, serviceName),
-      ]));
+      it('Delete stream route', async () =>
+        syncEvents(backend, [
+          deleteEvent(
+            ADCSDK.ResourceType.STREAM_ROUTE,
+            route1Name,
+            serviceName,
+          ),
+        ]));
 
-    it('Dump again (non-route)', async () => {
-      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].stream_routes).toBeUndefined();
-    });
+      it('Dump again (non-route)', async () => {
+        const result = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        expect(result.services).toHaveLength(1);
+        expect(result.services[0]).toMatchObject(service);
+        expect(result.services[0].stream_routes).toBeUndefined();
+      });
 
-    it('Delete service', async () =>
-      syncEvents(backend, [
-        deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
-      ]));
+      it('Delete service', async () =>
+        syncEvents(backend, [
+          deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
+        ]));
 
-    it('Dump again (service should not exist)', async () => {
-      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services).toHaveLength(0);
-    });
-  });
+      it('Dump again (service should not exist)', async () => {
+        const result = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        expect(result.services).toHaveLength(0);
+      });
+    },
+  );
 
   describe('Sync and dump consumers', () => {
     const consumer1Name = 'consumer1';
