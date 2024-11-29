@@ -242,7 +242,7 @@ export class FromADC {
     }, {});
   }
 
-  public transformRoute(route: ADCSDK.Route): typing.Route {
+  public transformRoute(route: ADCSDK.Route, parentId: string): typing.Route {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
       id: route.id,
       name: route.name,
@@ -255,7 +255,7 @@ export class FromADC {
       vars: route.vars,
       filter_func: route.filter_func,
 
-      //service_id: '',
+      service_id: parentId,
       enable_websocket: route.enable_websocket,
       plugins: route.plugins,
       priority: route.priority,
@@ -264,31 +264,16 @@ export class FromADC {
     });
   }
 
-  public transformService(
-    service: ADCSDK.Service,
-  ): [typing.Service, Array<typing.Route>, Array<typing.StreamRoute>] {
-    const serviceId = ADCSDK.utils.generateId(service.name);
-    const routes: Array<typing.Route> =
-      service.routes
-        ?.map(this.transformRoute)
-        .map((route) => ({ ...route, service_id: serviceId })) ?? [];
-    const streamRoutes: Array<typing.StreamRoute> =
-      service.stream_routes
-        ?.map(this.transformStreamRoute)
-        .map((route) => ({ ...route, service_id: serviceId })) ?? [];
-    return [
-      ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
-        id: service.id,
-        name: service.name,
-        desc: service.description,
-        labels: FromADC.transformLabels(service.labels),
-        upstream: service.upstream,
-        plugins: service.plugins,
-        hosts: service.hosts,
-      }),
-      routes,
-      streamRoutes,
-    ];
+  public transformService(service: ADCSDK.Service): typing.Service {
+    return ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
+      id: service.id,
+      name: service.name,
+      desc: service.description,
+      labels: FromADC.transformLabels(service.labels),
+      upstream: service.upstream,
+      plugins: service.plugins,
+      hosts: service.hosts,
+    });
   }
 
   public transformConsumer(consumer: ADCSDK.Consumer): typing.Consumer {
@@ -400,19 +385,25 @@ export class FromADC {
 
   public transformStreamRoute(
     streamRoute: ADCSDK.StreamRoute,
+    parentId: string,
+    injectName = true,
   ): typing.StreamRoute {
+    const labels = FromADC.transformLabels(streamRoute.labels);
     return ADCSDK.utils.recursiveOmitUndefined({
       id: undefined,
       desc: streamRoute.description,
-      labels: {
-        ...FromADC.transformLabels(streamRoute.labels),
-        __ADC_NAME: streamRoute.name,
-      },
+      labels: injectName
+        ? {
+            ...labels,
+            __ADC_NAME: streamRoute.name,
+          }
+        : labels,
       plugins: streamRoute.plugins,
       remote_addr: streamRoute.remote_addr,
       server_addr: streamRoute.server_addr,
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
+      service_id: parentId,
     } as typing.StreamRoute);
   }
 

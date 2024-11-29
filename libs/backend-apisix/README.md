@@ -6,8 +6,28 @@
 
 | Features      | Supported |
 | ------------- | --------- |
-| Dump to ADC   | ✅        |
-| Sync from ADC | ✅        |
+| Dump to ADC   | ✅         |
+| Sync from ADC | ✅         |
+
+## Supported Versions
+
+> Versions not listed below are untested.
+
+| Versions | Supported | Status      |
+| -------- | --------- | ----------- |
+| 3.2.x    | ✅         | Partial [1] |
+| 3.3.x    | ✅         | Partial [1] |
+| 3.4.x    | ✅         | Partial [1] |
+| 3.5.x    | ✅         | Partial [1] |
+| 3.6.x    | ✅         | Partial [1] |
+| 3.7.x    | ✅         | Partial [2] |
+| 3.8.x    | ✅         | Full        |
+| 3.9.x    | ✅         | Full        |
+| 3.10.x   | ✅         | Full        |
+| 3.11.x   | ✅         | Full        |
+
+1. The stream routes will be skipped during synchronization because they cannot be associated to the service on these versions.
+2. The `name` field is lost when the stream route is dumped and synchronized, because it is not defined in the APISIX schema.
 
 ## Known Issues/Limitations
 
