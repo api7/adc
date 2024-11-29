@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
-import { SemVer, lt as semVerLT } from 'semver';
+import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
 
 import { FromADC } from './transformer';
 import * as typing from './typing';
@@ -32,7 +32,7 @@ export class Operator {
 
           const resp = await this.client.put(
             `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
-            this.fromADC(event),
+            this.fromADC(event, ctx.apisixVersion),
             {
               validateStatus: () => true,
             },
@@ -43,7 +43,7 @@ export class Operator {
         } else {
           const resp = await this.client.put(
             `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
-            this.fromADC(event),
+            this.fromADC(event, ctx.apisixVersion),
             {
               validateStatus: () => true,
             },
@@ -102,7 +102,7 @@ export class Operator {
     )} ${event.resourceType}: "${event.resourceName}"`;
   }
 
-  private fromADC(event: ADCSDK.Event) {
+  private fromADC(event: ADCSDK.Event, version: SemVer) {
     const fromADC = new FromADC();
     switch (event.resourceType) {
       case ADCSDK.ResourceType.CONSUMER:
@@ -127,13 +127,16 @@ export class Operator {
         return event.newValue;
       case ADCSDK.ResourceType.ROUTE: {
         (event.newValue as ADCSDK.Route).id = event.resourceId;
-        const route = fromADC.transformRoute(event.newValue as ADCSDK.Route);
+        const route = fromADC.transformRoute(
+          event.newValue as ADCSDK.Route,
+          event.parentId,
+        );
         if (event.parentId) route.service_id = event.parentId;
         return route;
       }
       case ADCSDK.ResourceType.SERVICE:
         (event.newValue as ADCSDK.Service).id = event.resourceId;
-        return fromADC.transformService(event.newValue as ADCSDK.Service)[0];
+        return fromADC.transformService(event.newValue as ADCSDK.Service);
       case ADCSDK.ResourceType.SSL:
         (event.newValue as ADCSDK.SSL).id = event.resourceId;
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
@@ -141,6 +144,8 @@ export class Operator {
         (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         const route = fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
+          event.parentId,
+          semVerGTE(version, '3.8.0'),
         );
         if (event.parentId) route.service_id = event.parentId;
         return route;
