@@ -2,13 +2,16 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { unset } from 'lodash';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gte, lt } from 'semver';
 
 import { BackendAPISIX } from '../src';
 import { server, token } from './support/constants';
 import {
+  conditionalIt,
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  semverCondition,
   syncEvents,
   updateEvent,
 } from './support/utils';
@@ -195,7 +198,17 @@ describe('Sync and Dump - 1', () => {
         ),
       ]));
 
-    it('Dump', async () => {
+    conditionalIt(semverCondition(lt, '3.8.0'))('Dump (<3.8.0)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0].stream_routes).toHaveLength(1);
+      const route = structuredClone(route1);
+      route.name = result.services[0].stream_routes[0].id;
+      expect(result.services[0].stream_routes[0]).toMatchObject(route);
+    });
+
+    conditionalIt(semverCondition(gte, '3.8.0'))('Dump (>=3.8.0)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);

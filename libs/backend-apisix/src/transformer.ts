@@ -393,11 +393,11 @@ export class FromADC {
       id: undefined,
       desc: streamRoute.description,
       labels: injectName
-        ? labels
-        : {
+        ? {
             ...labels,
             __ADC_NAME: streamRoute.name,
-          },
+          }
+        : labels,
       plugins: streamRoute.plugins,
       remote_addr: streamRoute.remote_addr,
       server_addr: streamRoute.server_addr,
