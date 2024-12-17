@@ -3,7 +3,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, ListrTask } from 'listr2';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { stringify } from 'yaml';
+import { Scalar, stringify } from 'yaml';
 
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
@@ -117,7 +117,31 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
         {
           title: 'Write to dump file',
           task: async (ctx, task) => {
-            await writeFile(opts.output, stringify(ctx.remote), {});
+            await writeFile(
+              opts.output,
+              stringify(ctx.remote, {
+                sortMapEntries: (a, b) => {
+                  const nameKey = 'name';
+                  const descKey = 'description';
+                  const labelKey = 'labels';
+                  const aKey = (a.key as Scalar)?.value;
+                  const bKey = (b.key as Scalar)?.value;
+
+                  // make sure the metadata is always at the top
+                  if (aKey && bKey) {
+                    if (aKey === nameKey || bKey === nameKey)
+                      return aKey === nameKey ? -1 : 1;
+                    if (aKey === descKey || bKey === descKey)
+                      return aKey === descKey ? -1 : 1;
+                    if (aKey === labelKey || bKey === labelKey)
+                      return aKey === labelKey ? -1 : 1;
+                  }
+
+                  return a.key > b.key ? 1 : a.key < b.key ? -1 : 0;
+                },
+              }),
+              {},
+            );
             task.output = `Dump backend configuration to ${path.resolve(
               opts.output,
             )} successfully!`;
