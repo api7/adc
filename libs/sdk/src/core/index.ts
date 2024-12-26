@@ -4,7 +4,7 @@ export * from './resource';
 export type Labels = Record<string, string | Array<string>>;
 export type Plugin = Record<string, unknown>;
 export type Plugins = Record<string, Plugin>;
-export type Expr = Array<string | Array<Expr>>;
+export type Expr = Array<unknown>;
 
 export interface Route {
   id?: string;
