@@ -27,6 +27,7 @@ export class ToADC {
       plugins: route.plugins,
       priority: route.priority,
       timeout: route.timeout,
+      vars: route.vars,
     });
   }
 
@@ -148,6 +149,7 @@ export class FromADC {
       paths: route.uris,
       priority: route.priority,
       timeout: route.timeout,
+      vars: route.vars,
     });
   }
 
