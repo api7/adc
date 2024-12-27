@@ -96,7 +96,6 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        console.log(result.consumers[0]);
         expect(result.consumers[0].credentials).toBeUndefined();
       });
 
