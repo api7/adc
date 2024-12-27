@@ -8,13 +8,6 @@ on:
       - main
     types: [opened, synchronize, reopened, labeled]
 jobs:
-  dump:
-    runs-on: ubuntu-latest
-    env:
-      BACKEND_API7_LATEST_DOWNLOAD_URL: ${{ secrets.BACKEND_API7_LATEST_DOWNLOAD_URL }}
-    steps:
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
   apisix:
     runs-on: ubuntu-latest
     strategy:
