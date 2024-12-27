@@ -43,6 +43,7 @@ describe('Sync and Dump - 1', () => {
     const service1 = {
       name: service1Name,
       upstream: structuredClone(upstream),
+      hosts: ['example1.com', 'example2.com'],
     } as ADCSDK.Service;
     const service2Name = 'service2';
     const service2 = {
