@@ -179,21 +179,23 @@ export class ToADC {
       grpc: 80,
       grpcs: 443,
     };
-    const nodes = Array.isArray(upstream.nodes)
-      ? upstream.nodes
-      : Object.keys(upstream.nodes).map<ADCSDK.UpstreamNode>((node) => {
-          const hostport = node.split(':');
-          return {
-            host: hostport[0],
-            port:
-              hostport.length === 2
-                ? parseInt(hostport[1])
-                : defaultPortMap[upstream.scheme]
-                  ? defaultPortMap[upstream.scheme]
-                  : 80,
-            weight: upstream.nodes[node],
-          };
-        });
+    const nodes = upstream.nodes
+      ? Array.isArray(upstream.nodes)
+        ? upstream.nodes
+        : Object.keys(upstream.nodes).map<ADCSDK.UpstreamNode>((node) => {
+            const hostport = node.split(':');
+            return {
+              host: hostport[0],
+              port:
+                hostport.length === 2
+                  ? parseInt(hostport[1])
+                  : defaultPortMap[upstream.scheme]
+                    ? defaultPortMap[upstream.scheme]
+                    : 80,
+              weight: upstream.nodes[node],
+            };
+          })
+      : undefined;
     return ADCSDK.utils.recursiveOmitUndefined({
       name: upstream.name ?? upstream.id,
       description: upstream.desc,
