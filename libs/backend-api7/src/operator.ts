@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios, AxiosResponse } from 'axios';
 import { ListrTask } from 'listr2';
-import { size } from 'lodash';
+import { size, unset } from 'lodash';
 import { SemVer, gte as semVerGTE } from 'semver';
 
 import { FromADC } from './transformer';
@@ -17,19 +17,10 @@ export interface OperateContext {
 type OperateTask = ListrTask<OperateContext>;
 
 export class Operator {
-  private readonly client: Axios;
-  private readonly gatewayGroupName: string;
-  private readonly version: SemVer;
-
-  constructor(opts: {
-    client: Axios;
-    gatewayGroupName: string;
-    version: SemVer;
-  }) {
-    this.client = opts.client;
-    this.gatewayGroupName = opts.gatewayGroupName;
-    this.version = opts.version;
-  }
+  constructor(
+    private readonly client: Axios,
+    private readonly gatewayGroupName: string,
+  ) {}
 
   public updateResource(event: ADCSDK.Event): OperateTask {
     return {
@@ -50,6 +41,8 @@ export class Operator {
           task.output = buildReqAndRespDebugOutput(resp);
         } else if (event.resourceType === ADCSDK.ResourceType.ROUTE) {
           // Create a route template instead of create route directly
+          const route = this.fromADC(event);
+          if (!semVerGTE(ctx.api7Version, '3.2.16')) unset(route, 'vars');
           resp = await this.client.put(
             `/api/routes/template/${event.resourceId}`,
             this.fromADC(event),
@@ -288,15 +281,12 @@ export class Operator {
       case ADCSDK.ResourceType.SERVICE:
         (event.newValue as ADCSDK.Service).id = event.resourceId;
         return fromADC.transformService(event.newValue as ADCSDK.Service);
-      case ADCSDK.ResourceType.ROUTE: {
+      case ADCSDK.ResourceType.ROUTE:
         (event.newValue as ADCSDK.Route).id = event.resourceId;
-        const route = fromADC.transformRoute(
+        return fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
           event.parentId,
         );
-        if (!semVerGTE(this.version, '3.2.16')) delete route.vars;
-        return route;
-      }
       case ADCSDK.ResourceType.STREAM_ROUTE:
         (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         return fromADC.transformStreamRoute(
