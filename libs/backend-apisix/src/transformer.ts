@@ -45,6 +45,8 @@ export class ToADC {
       description: service.desc,
       labels: service.labels,
 
+      hosts: service.hosts,
+
       upstream: service.upstream,
       plugins: service.plugins,
     } as ADCSDK.Service);
