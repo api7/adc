@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Axios, AxiosResponse } from 'axios';
 import { ListrTask } from 'listr2';
-import { size } from 'lodash';
+import { size, unset } from 'lodash';
 import { SemVer, gte as semVerGTE } from 'semver';
 
 import { FromADC } from './transformer';
@@ -41,6 +41,8 @@ export class Operator {
           task.output = buildReqAndRespDebugOutput(resp);
         } else if (event.resourceType === ADCSDK.ResourceType.ROUTE) {
           // Create a route template instead of create route directly
+          const route = this.fromADC(event);
+          if (!semVerGTE(ctx.api7Version, '3.2.16')) unset(route, 'vars');
           resp = await this.client.put(
             `/api/routes/template/${event.resourceId}`,
             this.fromADC(event),

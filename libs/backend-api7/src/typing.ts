@@ -1,6 +1,7 @@
 import {
   PluginMetadata as ADCPluginMetadata,
   Upstream as ADCUpstream,
+  Expr,
   Labels,
   Plugins,
   UpstreamBalancer,
@@ -25,6 +26,7 @@ export interface Route {
   // matcher
   paths: Array<string>;
   methods?: Array<string>;
+  vars: Expr;
 
   // misc
   enable_websocket?: boolean;

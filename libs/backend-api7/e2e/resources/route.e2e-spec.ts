@@ -1,10 +1,13 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { gte } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import {
+  conditionalDescribe,
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  semverCondition,
   syncEvents,
 } from '../support/utils';
 
@@ -46,6 +49,55 @@ describe('Route E2E', () => {
         send: 222,
         read: 333,
       },
+    } as ADCSDK.Route;
+
+    it('Create resources', async () =>
+      syncEvents(backend, [
+        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
+        createEvent(ADCSDK.ResourceType.ROUTE, route1Name, route1, serviceName),
+      ]));
+
+    it('Dump', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(1);
+      expect(result.services[0]).toMatchObject(service);
+      expect(result.services[0].routes).toHaveLength(1);
+      expect(result.services[0].routes[0]).toMatchObject(route1);
+    });
+
+    it('Delete', async () =>
+      syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
+      ]));
+
+    it('Dump again (service should not exist)', async () => {
+      const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      expect(result.services).toHaveLength(0);
+    });
+  });
+
+  conditionalDescribe(semverCondition(gte, '3.2.16'))('Vars', () => {
+    const serviceName = 'test';
+    const service = {
+      name: serviceName,
+      upstream: {
+        scheme: 'https',
+        nodes: [
+          {
+            host: 'httpbin.org',
+            port: 443,
+            weight: 100,
+          },
+        ],
+      },
+      path_prefix: '/test',
+      strip_path_prefix: true,
+    } as ADCSDK.Service;
+    const route1Name = 'route1';
+    const route1 = {
+      name: route1Name,
+      uris: ['/route1'],
+      vars: [['remote_addr', '==', '1.1.1.1']],
     } as ADCSDK.Route;
 
     it('Create resources', async () =>
