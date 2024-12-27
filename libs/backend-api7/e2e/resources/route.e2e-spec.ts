@@ -1,10 +1,13 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { gte } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import {
+  conditionalDescribe,
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  semverCondition,
   syncEvents,
 } from '../support/utils';
 
@@ -73,7 +76,7 @@ describe('Route E2E', () => {
     });
   });
 
-  describe('Vars', () => {
+  conditionalDescribe(semverCondition(gte, '3.2.16'))('Vars', () => {
     const serviceName = 'test';
     const service = {
       name: serviceName,
