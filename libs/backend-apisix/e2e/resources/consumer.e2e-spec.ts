@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { gte, lt } from 'semver';
+import { gte } from 'semver';
 
 import { BackendAPISIX } from '../../src';
 import { server, token } from '../support/constants';
