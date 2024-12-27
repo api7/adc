@@ -216,7 +216,11 @@ export class BackendAPI7 implements ADCSDK.Backend {
   }
 
   public async sync(): Promise<Listr> {
-    const operator = new Operator(this.client, this.gatewayGroup);
+    const operator = new Operator({
+      client: this.client,
+      gatewayGroupName: this.gatewayGroup,
+      version: this.version,
+    });
     return new Listr<OperateContext>(
       [
         this.getAPI7VersionTask(),

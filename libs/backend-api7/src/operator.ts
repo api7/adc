@@ -17,10 +17,19 @@ export interface OperateContext {
 type OperateTask = ListrTask<OperateContext>;
 
 export class Operator {
-  constructor(
-    private readonly client: Axios,
-    private readonly gatewayGroupName: string,
-  ) {}
+  private readonly client: Axios;
+  private readonly gatewayGroupName: string;
+  private readonly version: SemVer;
+
+  constructor(opts: {
+    client: Axios;
+    gatewayGroupName: string;
+    version: SemVer;
+  }) {
+    this.client = opts.client;
+    this.gatewayGroupName = opts.gatewayGroupName;
+    this.version = opts.version;
+  }
 
   public updateResource(event: ADCSDK.Event): OperateTask {
     return {
@@ -279,12 +288,15 @@ export class Operator {
       case ADCSDK.ResourceType.SERVICE:
         (event.newValue as ADCSDK.Service).id = event.resourceId;
         return fromADC.transformService(event.newValue as ADCSDK.Service);
-      case ADCSDK.ResourceType.ROUTE:
+      case ADCSDK.ResourceType.ROUTE: {
         (event.newValue as ADCSDK.Route).id = event.resourceId;
-        return fromADC.transformRoute(
+        const route = fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
           event.parentId,
         );
+        if (!semVerGTE(this.version, '3.2.16')) delete route.vars;
+        return route;
+      }
       case ADCSDK.ResourceType.STREAM_ROUTE:
         (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         return fromADC.transformStreamRoute(
