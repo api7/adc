@@ -225,7 +225,6 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     try {
       await tasks.run();
     } catch (err) {
-      //console.log(chalk.red(`Failed to diff resources, ${err}`));
       process.exit(1);
     }
   });
