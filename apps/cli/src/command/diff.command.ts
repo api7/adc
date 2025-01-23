@@ -25,6 +25,9 @@ import {
 type DiffOptions = BackendOptions & {
   file: Array<string>;
   lint: boolean;
+
+  // experimental feature
+  remoteStateFile: string;
 };
 
 export interface TaskContext {
@@ -33,6 +36,16 @@ export interface TaskContext {
   diff?: ADCSDK.Event[];
   defaultValue?: ADCSDK.DefaultValue;
 }
+
+export const ExperimentalRemoteStateFileTask = (file: string) => ({
+  task: async (ctx) => {
+    const fileContent =
+      (await readFile(file, {
+        encoding: 'utf-8',
+      })) ?? '';
+    ctx.remote = YAML.parse(fileContent);
+  },
+});
 
 export const LoadLocalConfigurationTask = (
   files: Array<string>,
@@ -200,12 +213,14 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
           opts.excludeResourceType,
         ),
         opts.lint ? LintTask() : { task: () => undefined },
-        LoadRemoteConfigurationTask({
-          backend,
-          labelSelector: opts.labelSelector,
-          includeResourceType: opts.includeResourceType,
-          excludeResourceType: opts.excludeResourceType,
-        }),
+        !opts.remoteStateFile
+          ? LoadRemoteConfigurationTask({
+              backend,
+              labelSelector: opts.labelSelector,
+              includeResourceType: opts.includeResourceType,
+              excludeResourceType: opts.excludeResourceType,
+            })
+          : ExperimentalRemoteStateFileTask(opts.remoteStateFile),
         DiffResourceTask(true, true),
         {
           title: 'Write detail diff result to file',

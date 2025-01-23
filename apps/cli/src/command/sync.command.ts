@@ -3,6 +3,7 @@ import { Listr } from 'listr2';
 import { SignaleRenderer } from '../utils/listr';
 import {
   DiffResourceTask,
+  ExperimentalRemoteStateFileTask,
   LoadLocalConfigurationTask,
   TaskContext,
 } from './diff.command';
@@ -15,6 +16,9 @@ import { loadBackend } from './utils';
 type SyncOption = BackendOptions & {
   file: Array<string>;
   lint: boolean;
+
+  // experimental feature
+  remoteStateFile: string;
 };
 
 export const SyncCommand = new BackendCommand<SyncOption>(
@@ -76,12 +80,14 @@ export const SyncCommand = new BackendCommand<SyncOption>(
           opts.excludeResourceType,
         ),
         opts.lint ? LintTask() : { task: () => undefined },
-        LoadRemoteConfigurationTask({
-          backend,
-          labelSelector: opts.labelSelector,
-          includeResourceType: opts.includeResourceType,
-          excludeResourceType: opts.excludeResourceType,
-        }),
+        !opts.remoteStateFile
+          ? LoadRemoteConfigurationTask({
+              backend,
+              labelSelector: opts.labelSelector,
+              includeResourceType: opts.includeResourceType,
+              excludeResourceType: opts.excludeResourceType,
+            })
+          : ExperimentalRemoteStateFileTask(opts.remoteStateFile),
         DiffResourceTask(false, false),
         {
           title: 'Sync configuration',
