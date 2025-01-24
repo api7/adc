@@ -38,8 +38,21 @@ class Logger {
   }
 }
 
+enum featureGate {
+  REMOTE_STATE_FILE = 'remote-state-file',
+  PARALLEL_BACKEND_REQUEST = 'parallel-backend-request',
+}
+const featureGateEnabled = (key: string) => {
+  return (
+    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS &&
+    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS.includes(key)
+  );
+};
+
 export const utils = {
   generateId,
   recursiveOmitUndefined,
   getLogger,
+  featureGate,
+  featureGateEnabled,
 };

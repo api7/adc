@@ -1,3 +1,4 @@
+import * as ADCSDK from '@api7/adc-sdk';
 import { Command } from 'commander';
 import dotenv from 'dotenv';
 
@@ -22,8 +23,7 @@ export const setupCommands = (): Command => {
     .version('0.17.0', '-v, --version', 'display ADC version');
 
   if (
-    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS &&
-    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS.includes('remote-state-file')
+    ADCSDK.utils.featureGateEnabled(ADCSDK.utils.featureGate.REMOTE_STATE_FILE)
   ) {
     const desc =
       'path of the remote state file, which will allow the ADC to skip the initial dump process and use the ADC configuration contained in the remote state file directly';
