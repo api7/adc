@@ -23,7 +23,7 @@ export const setupCommands = (): Command => {
 
   if (
     process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS &&
-    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS.includes('remote-state-cache')
+    process.env.ADC_EXPERIMENTAL_FEATURE_FLAGS.includes('remote-state-file')
   ) {
     const desc =
       'path of the remote state file, which will allow the ADC to skip the initial dump process and use the ADC configuration contained in the remote state file directly';
