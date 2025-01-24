@@ -206,7 +206,16 @@ export class BackendAPI7 implements ADCSDK.Backend {
         this.getAPI7VersionTask(),
         this.getResourceDefaultValueTask(),
         this.getGatewayGroupIdTask(this.gatewayGroup),
-        ...fetcher.allTask(),
+        ...(ADCSDK.utils.featureGateEnabled(
+          ADCSDK.utils.featureGate.PARALLEL_BACKEND_REQUEST,
+        )
+          ? [
+              {
+                task: (_, task) =>
+                  task.newListr(fetcher.allTask(), { concurrent: true }),
+              },
+            ]
+          : fetcher.allTask()),
       ],
       {
         //@ts-expect-error reorg renderer
@@ -222,16 +231,20 @@ export class BackendAPI7 implements ADCSDK.Backend {
         this.getAPI7VersionTask(),
         this.getGatewayGroupIdTask(this.gatewayGroup),
         this.syncPreprocessEventsTask(),
-        {
-          task: (ctx, task) =>
-            task.newListr(
-              ctx.diff.map((event) =>
-                event.type === ADCSDK.EventType.DELETE
-                  ? operator.deleteResource(event)
-                  : operator.updateResource(event),
-              ),
-            ),
-        },
+        ADCSDK.utils.featureGateEnabled(
+          ADCSDK.utils.featureGate.PARALLEL_BACKEND_REQUEST,
+        )
+          ? this.groupSyncTasks(operator)
+          : {
+              task: (ctx, task) =>
+                task.newListr(
+                  ctx.diff.map((event) =>
+                    event.type === ADCSDK.EventType.DELETE
+                      ? operator.deleteResource(event)
+                      : operator.updateResource(event),
+                  ),
+                ),
+            },
         operator.publishService(),
       ],
       {
@@ -313,6 +326,37 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
             return false;
           });
+      },
+    };
+  }
+
+  // Groups tasks so that they are grouped in parallel in order of same
+  // resource type and same operation type.
+  private groupSyncTasks(operator: Operator): ListrTask<OperateContext> {
+    return {
+      task: (ctx, task) => {
+        const groupedEvents = Object.values<Array<ADCSDK.Event>>(
+          ctx.diff.reduce((groups, event) => {
+            const key = `${event.resourceType}.${event.type}`;
+            (groups[key] = groups[key] || []).push(event);
+            return groups;
+          }, {}),
+        );
+
+        return task.newListr(
+          groupedEvents.map((events) => ({
+            task: (_, task) => {
+              return task.newListr(
+                events.map((event) =>
+                  event.type === ADCSDK.EventType.DELETE
+                    ? operator.deleteResource(event)
+                    : operator.updateResource(event),
+                ),
+                { concurrent: true },
+              );
+            },
+          })),
+        );
       },
     };
   }
