@@ -111,7 +111,10 @@ const initUser = async (
 const activateAPI7 = async () => {
   console.log('Upload license');
   await httpClient.put(`/api/license`, {
-    data: process.env.BACKEND_API7_LICENSE,
+    data: Buffer.from(
+      `${process.env.BACKEND_API7_LICENSE}`,
+      'base64',
+    ).toString(),
   });
 };
 
