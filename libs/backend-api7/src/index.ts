@@ -245,7 +245,6 @@ export class BackendAPI7 implements ADCSDK.Backend {
                   ),
                 ),
             },
-        operator.publishService(),
       ],
       {
         //@ts-expect-error TODO reorg renderer

@@ -27,28 +27,41 @@ export class Fetcher {
       title: 'Fetch services',
       skip: this.isSkip([ADCSDK.ResourceType.SERVICE]),
       task: async (ctx, task) => {
-        const resp = await this.client.get<{ list: Array<typing.Service> }>(
-          `/api/gateway_groups/${ctx.gatewayGroupId}/services`,
+        const resp = await this.client.get<typing.ListResponse<typing.Service>>(
+          `/apisix/admin/services`,
+          {
+            params: {
+              gateway_group_id: ctx.gatewayGroupId,
+            },
+          },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get services');
 
         const services = resp?.data?.list;
         const fetchRoutes = services.map(async (service) => {
           if (service.type === 'http') {
-            const resp = await this.client.get<{
-              list: Array<typing.Route>;
-            }>(`/api/service_versions/${service.service_version_id}/routes`);
+            const resp = await this.client.get<
+              typing.ListResponse<typing.Route>
+            >(`/apisix/admin/routes`, {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+                service_id: service.service_id,
+              },
+            });
             task.output = buildReqAndRespDebugOutput(
               resp,
               `Get routes in service "${service.name}"`,
             );
             service.routes = resp?.data?.list;
           } else {
-            const resp = await this.client.get<{
-              list: Array<typing.StreamRoute>;
-            }>(
-              `/api/service_versions/${service.service_version_id}/stream_routes`,
-            );
+            const resp = await this.client.get<
+              typing.ListResponse<typing.StreamRoute>
+            >(`/apisix/admin/stream_routes`, {
+              params: {
+                gateway_group_id: ctx.gatewayGroupId,
+                service_id: service.service_id,
+              },
+            });
             task.output = buildReqAndRespDebugOutput(
               resp,
               `Get stream routes in service "${service.name}"`,
@@ -158,11 +171,16 @@ export class Fetcher {
       title: 'Fetch plugin metadata',
       skip: this.isSkip([ADCSDK.ResourceType.PLUGIN_METADATA]),
       task: async (ctx, task) => {
-        if (semVerGTE(ctx.api7Version, '3.2.14')) {
-          return this.listMetadatasGTE03021400(ctx, task);
-        } else {
-          return this.listMetadatasLT03021400(ctx, task);
-        }
+        const resp = await this.client.get<{
+          value: ADCSDK.Plugins;
+        }>('/apisix/admin/plugin_metadata', {
+          params: { gateway_group_id: ctx.gatewayGroupId },
+        });
+        task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
+
+        ctx.remote.plugin_metadata = this.toADC.transformPluginMetadatas(
+          resp.data.value,
+        );
       },
     };
   }
@@ -201,60 +219,6 @@ export class Fetcher {
       }
     };
   }
-
-  // Get plugin metadata on API7 3.2.14.0 and up
-  private listMetadatasGTE03021400: FetchTask['task'] = async (ctx, task) => {
-    const resp = await this.client.get<{
-      value: ADCSDK.Plugins;
-    }>('/apisix/admin/plugin_metadata', {
-      params: { gateway_group_id: ctx.gatewayGroupId },
-    });
-    task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
-    ctx.remote.plugin_metadata = this.toADC.transformPluginMetadatas(
-      resp.data.value,
-    );
-  };
-
-  // [DEPRECATED] Get plugin metadata below API7 3.2.14.0
-  // Support for 3.2.14.0 has been dropped, so this code will be removed in the future.
-  private listMetadatasLT03021400: FetchTask['task'] = async (ctx, task) => {
-    const resp = await this.client.get<Array<string>>(
-      '/apisix/admin/plugins/list',
-      {
-        params: { has_metadata: true },
-      },
-    );
-    task.output = buildReqAndRespDebugOutput(
-      resp,
-      'Get plugins that contain plugin metadata',
-    );
-
-    const plugins = resp.data;
-    const getMetadataConfig = plugins.map<
-      Promise<[string, typing.PluginMetadata]>
-    >(async (pluginName) => {
-      try {
-        const resp = await this.client.get<{
-          value: typing.PluginMetadata;
-        }>(`/apisix/admin/plugin_metadata/${pluginName}`, {
-          params: { gateway_group_id: ctx.gatewayGroupId },
-        });
-        task.output = buildReqAndRespDebugOutput(
-          resp,
-          `Get plugin metadata for "${pluginName}"`,
-        );
-        return [pluginName, resp?.data?.value];
-      } catch (err) {
-        return [pluginName, null];
-      }
-    });
-    const metadataObj = Object.fromEntries(
-      (await Promise.all(getMetadataConfig)).filter((item) => item[1]),
-    );
-
-    ctx.remote.plugin_metadata =
-      this.toADC.transformPluginMetadatas(metadataObj);
-  };
 
   private attachLabelSelector(
     params: Record<string, string>,
