@@ -43,7 +43,6 @@ export class Operator {
         } else if (event.resourceType === ADCSDK.ResourceType.ROUTE) {
           // Create route directly
           const route = this.fromADC(event);
-          if (!semVerGTE(ctx.api7Version, '3.2.16')) unset(route, 'vars');
           resp = await this.client.put(
             `/apisix/admin/routes/${event.resourceId}`,
             this.fromADC(event),
