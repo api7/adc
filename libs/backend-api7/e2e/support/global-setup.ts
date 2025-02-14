@@ -158,4 +158,12 @@ export default async () => {
   }
 
   process.env.SERVER = 'https://localhost:7443';
+  process.env.GATEWAY_GROUP = 'default';
+
+  // ONLY FOR LOCAL TEST //
+  /* process.env.SERVER = 'https://localhost:7443';
+  process.env.TOKEN = 'a7ee-token';
+  process.env.GATEWAY_GROUP = 'adc';
+  process.env.BACKEND_API7_VERSION = '0.0.0'; */
+  // ONLY FOR LOCAL TEST //
 };

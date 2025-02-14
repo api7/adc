@@ -191,9 +191,8 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
         const resp = await this.client.get<{ value: string }>('/api/version');
         task.output = buildReqAndRespDebugOutput(resp, `Get API7 version`);
-        ctx.api7Version = this.version = semver.coerce(
-          resp?.data.value || '0.0.0',
-        );
+        ctx.api7Version = this.version =
+          semver.coerce(resp?.data?.value) || semver.coerce('0.0.0');
       },
     };
   }
@@ -245,7 +244,6 @@ export class BackendAPI7 implements ADCSDK.Backend {
                   ),
                 ),
             },
-        operator.publishService(),
       ],
       {
         //@ts-expect-error TODO reorg renderer

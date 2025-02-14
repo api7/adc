@@ -139,3 +139,8 @@ export interface Resources {
   globalRules: Array<GlobalRule>;
   pluginMetadatas: PluginMetadata;
 }
+
+export interface ListResponse<T> {
+  list: Array<T>;
+  total: number;
+}

@@ -112,6 +112,9 @@ export const overrideEventResourceId = (
   return event;
 };
 
+export const sortResult = <T>(result: Array<T>, field: string) =>
+  result.sort((a, b) => a[field].localeCompare(b[field]));
+
 type cond = boolean | (() => boolean);
 
 export const conditionalDescribe = (cond: cond) =>

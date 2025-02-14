@@ -17,7 +17,7 @@ export class ToADC {
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Route>({
-      id: route.route_id,
+      id: route.id,
       uris: route.paths,
       name: route.name,
       description: route.desc,
@@ -33,7 +33,7 @@ export class ToADC {
 
   public transformStreamRoute(route: typing.StreamRoute): ADCSDK.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.StreamRoute>({
-      id: route.stream_route_id,
+      id: route.id,
       name: route.name,
       description: route.desc,
       labels: ToADC.transformLabels(route.labels),
@@ -45,7 +45,7 @@ export class ToADC {
 
   public transformService(service: typing.Service): ADCSDK.Service {
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Service>({
-      id: service.service_id,
+      id: service.id,
       name: service.name,
       description: service.desc,
       labels: ToADC.transformLabels(service.labels),
