@@ -8,6 +8,7 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  sortResult,
   syncEvents,
   updateEvent,
 } from './support/utils';
@@ -20,7 +21,7 @@ describe('Sync and Dump - 1', () => {
       server: process.env.SERVER,
       token: process.env.TOKEN,
       tlsSkipVerify: true,
-      gatewayGroup: 'default',
+      gatewayGroup: process.env.GATEWAY_GROUP,
     });
   });
 
@@ -54,9 +55,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      result.services = result.services.sort((a, b) =>
-        a.name.localeCompare(b.name),
-      );
+      result.services = sortResult(result.services, 'name');
       expect(result.services).toHaveLength(2);
       expect(result.services[0]).toMatchObject(service1);
       expect(result.services[1]).toMatchObject(service2);
@@ -137,6 +136,8 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      result.services[0].routes = sortResult(result.services[0].routes, 'name');
+
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);
       expect(result.services[0].routes).toHaveLength(2);
@@ -250,20 +251,20 @@ describe('Sync and Dump - 1', () => {
   describe('Sync and dump ssls', () => {
     const certificates = [
       {
-        certificate: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl1.cer'),
-        ).toString('utf-8'),
-        key: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl1.key'),
-        ).toString('utf-8'),
+        certificate: readFileSync(join(__dirname, 'assets/certs/test-ssl1.cer'))
+          .toString('utf-8')
+          .trim(),
+        key: readFileSync(join(__dirname, 'assets/certs/test-ssl1.key'))
+          .toString('utf-8')
+          .trim(),
       },
       {
-        certificate: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl2.cer'),
-        ).toString('utf-8'),
-        key: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl2.key'),
-        ).toString('utf-8'),
+        certificate: readFileSync(join(__dirname, 'assets/certs/test-ssl2.cer'))
+          .toString('utf-8')
+          .trim(),
+        key: readFileSync(join(__dirname, 'assets/certs/test-ssl2.key'))
+          .toString('utf-8')
+          .trim(),
       },
     ];
     const ssl1SNIs = ['ssl1-1.com', 'ssl1-2.com'];
