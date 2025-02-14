@@ -39,15 +39,14 @@ export class Fetcher {
 
         const services = resp?.data?.list;
         const fetchRoutes = services.map(async (service) => {
+          const params = {
+            gateway_group_id: ctx.gatewayGroupId,
+            service_id: service.id,
+          };
           if (service.type === 'http') {
             const resp = await this.client.get<
               typing.ListResponse<typing.Route>
-            >(`/apisix/admin/routes`, {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-                service_id: service.service_id,
-              },
-            });
+            >(`/apisix/admin/routes`, { params });
             task.output = buildReqAndRespDebugOutput(
               resp,
               `Get routes in service "${service.name}"`,
@@ -56,12 +55,7 @@ export class Fetcher {
           } else {
             const resp = await this.client.get<
               typing.ListResponse<typing.StreamRoute>
-            >(`/apisix/admin/stream_routes`, {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-                service_id: service.service_id,
-              },
-            });
+            >(`/apisix/admin/stream_routes`, { params });
             task.output = buildReqAndRespDebugOutput(
               resp,
               `Get stream routes in service "${service.name}"`,
@@ -96,26 +90,24 @@ export class Fetcher {
 
         const consumers = resp?.data?.list;
 
-        if (semVerGTE(ctx.api7Version, '3.2.15')) {
-          const fetchCredentials = consumers.map(async (consumer) => {
-            const resp = await this.client.get<{
-              list: Array<typing.ConsumerCredential>;
-            }>(`/apisix/admin/consumers/${consumer.username}/credentials`, {
-              // In the current design, the consumer's credentials are not filtered
-              // using labels because nested labels filters can be misleading. Even
-              // if labels set for the consumer, the labels filter is not attached.
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-            });
-            task.output = buildReqAndRespDebugOutput(
-              resp,
-              `Get credentials of consumer "${consumer.username}"`,
-            );
-            consumer.credentials = resp?.data?.list;
+        const fetchCredentials = consumers.map(async (consumer) => {
+          const resp = await this.client.get<{
+            list: Array<typing.ConsumerCredential>;
+          }>(`/apisix/admin/consumers/${consumer.username}/credentials`, {
+            // In the current design, the consumer's credentials are not filtered
+            // using labels because nested labels filters can be misleading. Even
+            // if labels set for the consumer, the labels filter is not attached.
+            params: {
+              gateway_group_id: ctx.gatewayGroupId,
+            },
           });
-          await Promise.all(fetchCredentials);
-        }
+          task.output = buildReqAndRespDebugOutput(
+            resp,
+            `Get credentials of consumer "${consumer.username}"`,
+          );
+          consumer.credentials = resp?.data?.list;
+        });
+        await Promise.all(fetchCredentials);
 
         ctx.remote.consumers = consumers?.map((item) =>
           this.toADC.transformConsumer(item),

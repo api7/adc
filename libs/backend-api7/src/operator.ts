@@ -69,8 +69,7 @@ export class Operator {
           );
           task.output = buildReqAndRespDebugOutput(resp);
         } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
-          semVerGTE(ctx.api7Version, '3.2.15')
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ) {
           resp = await this.client.put(
             `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
@@ -145,8 +144,7 @@ export class Operator {
           );
           task.output = buildReqAndRespDebugOutput(resp);
         } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
-          semVerGTE(ctx.api7Version, '3.2.15')
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ) {
           resp = await this.client.delete(
             `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
