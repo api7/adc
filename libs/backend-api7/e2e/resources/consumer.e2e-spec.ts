@@ -19,7 +19,7 @@ describe('Consumer E2E', () => {
       server: process.env.SERVER,
       token: process.env.TOKEN,
       tlsSkipVerify: true,
-      gatewayGroup: 'default',
+      gatewayGroup: process.env.GATEWAY_GROUP,
     });
   });
 

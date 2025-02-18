@@ -19,7 +19,7 @@ describe('Label Selector', () => {
     server: process.env.SERVER,
     token: process.env.TOKEN,
     tlsSkipVerify: true,
-    gatewayGroup: 'default',
+    gatewayGroup: process.env.GATEWAY_GROUP,
   };
   let backend: BackendAPI7;
 
@@ -178,20 +178,20 @@ describe('Label Selector', () => {
   describe('SSL', () => {
     const certificates = [
       {
-        certificate: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl1.cer'),
-        ).toString('utf-8'),
-        key: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl1.key'),
-        ).toString('utf-8'),
+        certificate: readFileSync(join(__dirname, 'assets/certs/test-ssl1.cer'))
+          .toString('utf-8')
+          .trim(),
+        key: readFileSync(join(__dirname, 'assets/certs/test-ssl1.key'))
+          .toString('utf-8')
+          .trim(),
       },
       {
-        certificate: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl2.cer'),
-        ).toString('utf-8'),
-        key: readFileSync(
-          join(__dirname, 'assets/certs/test-ssl2.key'),
-        ).toString('utf-8'),
+        certificate: readFileSync(join(__dirname, 'assets/certs/test-ssl2.cer'))
+          .toString('utf-8')
+          .trim(),
+        key: readFileSync(join(__dirname, 'assets/certs/test-ssl2.key'))
+          .toString('utf-8')
+          .trim(),
       },
     ];
     const ssl1SNIs = ['ssl1-1.com', 'ssl1-2.com'];

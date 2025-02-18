@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { BackendAPI7 } from '../src';
-import { dumpConfiguration, syncEvents } from './support/utils';
+import { dumpConfiguration, sortResult, syncEvents } from './support/utils';
 
 describe('Sync and Dump - 2', () => {
   let backend: BackendAPI7;
@@ -13,7 +13,7 @@ describe('Sync and Dump - 2', () => {
       server: process.env.SERVER,
       token: process.env.TOKEN,
       tlsSkipVerify: true,
-      gatewayGroup: 'default',
+      gatewayGroup: process.env.GATEWAY_GROUP,
     });
   });
 
@@ -37,13 +37,15 @@ describe('Sync and Dump - 2', () => {
     });
 
     it('Check', () => {
+      dump.ssls[0].certificates[0].certificate =
+        dump.ssls[0].certificates[0].certificate.trim();
       expect(dump.ssls[0]).toMatchObject({
         type: 'server',
         snis: ['test.com'],
         certificates: [
           {
             certificate:
-              '-----BEGIN CERTIFICATE-----\nMIICrTCCAZUCFCcH5+jEDUhpTxEQo/pZYC91e2aYMA0GCSqGSIb3DQEBCwUAMBEx\nDzANBgNVBAMMBlJPT1RDQTAgFw0yNDAxMTgwNjAzMDNaGA8yMTIzMTIyNTA2MDMw\nM1owEzERMA8GA1UEAwwIdGVzdC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQCVkfufMRK2bckdpQ/aRfcaTxmjsv5Mb+sJdhb0QuEuXp/VgN3yzFM0\nzCmAeBZwNKpU3HZDv0tnkTx7OARYpj5Bw1ole0EfPVPKBRjlLE56tabzyd4vdLV2\nbk7jYH+H8NjGZNEYLm9MdWiB4Ulyc0+XFA0ZL5WWKOi+oSQVUibT8QK0CENFKNLP\nQjEXlbyujzRS3u6r99EEEy8+3psBA2EELq8GAjEp+jilWggBhUEpLQxCHhHeNevR\nkg5iEvhOhEVKtr5xvgolg5Wvz7GmDulIW9MCu0dIXim52H/spPwgi3yRraY1XjxU\nREyj5tcY7n7LBESkx/ODXEyCkICIPpo9AgMBAAEwDQYJKoZIhvcNAQELBQADggEB\nADBU5XvbnjaF4rpQoqdzgK6BuRvD/Ih/rh+xc+G9mm+qaHx0g3TdTqyhCvSg6aRW\njDq4Z0NILdb6wmJcunua1jjmOQMXER5y34Xfn21+dzjLN2Bl+/vZ/HyXlCjxkppG\nZAsd1H0/jmXqN1zddIThxOccmRcDEP+9GT3hba50sijFbO30Zx+ORJCoT8he6Kyw\nKdOs/yyukafoAtlpoPR+ao/kumto6w/rLfFlEsehU0dMGNgPVSxxVNtBSdxPTUBk\nD6mfqB4f//2DuAmiO+l5RmPUmumqzcYlpd+oAdy3OSnNEHbgxishZr/GI3s6DmUh\n16bgI69aQ5F+MnN3trvaufc=\n-----END CERTIFICATE-----\n',
+              '-----BEGIN CERTIFICATE-----\nMIICrTCCAZUCFCcH5+jEDUhpTxEQo/pZYC91e2aYMA0GCSqGSIb3DQEBCwUAMBEx\nDzANBgNVBAMMBlJPT1RDQTAgFw0yNDAxMTgwNjAzMDNaGA8yMTIzMTIyNTA2MDMw\nM1owEzERMA8GA1UEAwwIdGVzdC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQCVkfufMRK2bckdpQ/aRfcaTxmjsv5Mb+sJdhb0QuEuXp/VgN3yzFM0\nzCmAeBZwNKpU3HZDv0tnkTx7OARYpj5Bw1ole0EfPVPKBRjlLE56tabzyd4vdLV2\nbk7jYH+H8NjGZNEYLm9MdWiB4Ulyc0+XFA0ZL5WWKOi+oSQVUibT8QK0CENFKNLP\nQjEXlbyujzRS3u6r99EEEy8+3psBA2EELq8GAjEp+jilWggBhUEpLQxCHhHeNevR\nkg5iEvhOhEVKtr5xvgolg5Wvz7GmDulIW9MCu0dIXim52H/spPwgi3yRraY1XjxU\nREyj5tcY7n7LBESkx/ODXEyCkICIPpo9AgMBAAEwDQYJKoZIhvcNAQELBQADggEB\nADBU5XvbnjaF4rpQoqdzgK6BuRvD/Ih/rh+xc+G9mm+qaHx0g3TdTqyhCvSg6aRW\njDq4Z0NILdb6wmJcunua1jjmOQMXER5y34Xfn21+dzjLN2Bl+/vZ/HyXlCjxkppG\nZAsd1H0/jmXqN1zddIThxOccmRcDEP+9GT3hba50sijFbO30Zx+ORJCoT8he6Kyw\nKdOs/yyukafoAtlpoPR+ao/kumto6w/rLfFlEsehU0dMGNgPVSxxVNtBSdxPTUBk\nD6mfqB4f//2DuAmiO+l5RmPUmumqzcYlpd+oAdy3OSnNEHbgxishZr/GI3s6DmUh\n16bgI69aQ5F+MnN3trvaufc=\n-----END CERTIFICATE-----',
           },
         ],
       });
@@ -104,6 +106,8 @@ describe('Sync and Dump - 2', () => {
           },
         },
       });
+
+      dump.services[0].routes = sortResult(dump.services[0].routes, 'name');
       expect(dump.services[0].routes[0]).toMatchObject({
         uris: ['/anything'],
         name: 'route1.1',
