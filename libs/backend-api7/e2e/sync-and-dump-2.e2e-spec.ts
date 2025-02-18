@@ -37,6 +37,7 @@ describe('Sync and Dump - 2', () => {
     });
 
     it('Check', () => {
+      console.log(dump.ssls[0]);
       expect(dump.ssls[0]).toMatchObject({
         type: 'server',
         snis: ['test.com'],
