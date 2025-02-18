@@ -37,7 +37,8 @@ describe('Sync and Dump - 2', () => {
     });
 
     it('Check', () => {
-      console.log(dump.ssls[0]);
+      dump.ssls[0].certificates[0].certificate =
+        dump.ssls[0].certificates[0].certificate.trim();
       expect(dump.ssls[0]).toMatchObject({
         type: 'server',
         snis: ['test.com'],
