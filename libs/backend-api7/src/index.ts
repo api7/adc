@@ -4,7 +4,14 @@ import { JSONSchema4 } from 'json-schema';
 import { Listr, ListrTask } from 'listr2';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
-import { AgentOptions, Agent as httpsAgent } from 'node:https';
+import {
+  Agent as httpAgent,
+  AgentOptions as httpAgentOptions,
+} from 'node:http';
+import {
+  Agent as httpsAgent,
+  AgentOptions as httpsAgentOptions,
+} from 'node:https';
 import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
@@ -23,17 +30,22 @@ export class BackendAPI7 implements ADCSDK.Backend {
   private defaultValue: ADCSDK.DefaultValue;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
+    const keepAlive: httpAgentOptions = {
+      keepAlive: true,
+      keepAliveMsecs: 60000,
+    };
     const config: CreateAxiosDefaults = {
       baseURL: `${opts.server}`,
       headers: {
         'X-API-KEY': opts.token,
         'Content-Type': 'application/json',
-        //'User-Agent': 'ADC/0.9.0-alpha.9 (ADC-API7-BACKEND)',
       },
+      httpAgent: new httpAgent(keepAlive),
     };
 
     if (opts.server.startsWith('https')) {
-      const agentConfig: AgentOptions = {
+      const agentConfig: httpsAgentOptions = {
+        ...keepAlive,
         rejectUnauthorized: !opts?.tlsSkipVerify,
       };
 

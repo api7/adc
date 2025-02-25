@@ -2,7 +2,14 @@ import * as ADCSDK from '@api7/adc-sdk';
 import axios, { Axios, CreateAxiosDefaults } from 'axios';
 import { Listr, ListrTask } from 'listr2';
 import { readFileSync } from 'node:fs';
-import { AgentOptions, Agent as httpsAgent } from 'node:https';
+import {
+  Agent as httpAgent,
+  AgentOptions as httpAgentOptions,
+} from 'node:http';
+import {
+  Agent as httpsAgent,
+  AgentOptions as httpsAgentOptions,
+} from 'node:https';
 import semver from 'semver';
 
 import { Fetcher } from './fetcher';
@@ -14,16 +21,22 @@ export class BackendAPISIX implements ADCSDK.Backend {
   private static logScope = ['APISIX'];
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
+    const keepAlive: httpAgentOptions = {
+      keepAlive: true,
+      keepAliveMsecs: 60000,
+    };
     const config: CreateAxiosDefaults = {
       baseURL: `${opts.server}`,
       headers: {
         'Content-Type': 'application/json',
         'X-API-KEY': opts.token,
       },
+      httpAgent: new httpAgent(keepAlive),
     };
 
     if (opts.server.startsWith('https')) {
-      const agentConfig: AgentOptions = {
+      const agentConfig: httpsAgentOptions = {
+        ...keepAlive,
         rejectUnauthorized: !opts?.tlsSkipVerify,
       };
 
