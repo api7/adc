@@ -15,7 +15,6 @@ export const DiffResourceTask = (
       ctx.remote,
       ctx.defaultValue,
       undefined,
-      task,
     );
 
     if (printSummary) {
