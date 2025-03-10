@@ -1,69 +1,19 @@
-import { BackendAPI7 } from '@api7/adc-backend-api7';
-import * as ADCSDK from '@api7/adc-sdk';
-import { Listr, ListrTask } from 'listr2';
+import { Listr } from 'listr2';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Scalar, stringify } from 'yaml';
 
+import { LoadRemoteConfigurationTask } from '../tasks';
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
 import type { BackendOptions } from './typing';
-import {
-  filterConfiguration,
-  filterResourceType,
-  loadBackend,
-  recursiveRemoveMetadataField,
-} from './utils';
+import { loadBackend, recursiveRemoveMetadataField } from './utils';
 
 type DumpOptions = BackendOptions & {
   output: string;
   withId: boolean;
 };
-
-export interface LoadRemoteConfigurationTaskOptions {
-  backend: ADCSDK.Backend;
-  labelSelector?: BackendOptions['labelSelector'];
-  includeResourceType?: Array<ADCSDK.ResourceType>;
-  excludeResourceType?: Array<ADCSDK.ResourceType>;
-}
-export const LoadRemoteConfigurationTask = ({
-  backend,
-  labelSelector,
-  includeResourceType,
-  excludeResourceType,
-}: LoadRemoteConfigurationTaskOptions): ListrTask => ({
-  title: 'Load remote configuration',
-  task: async (ctx, task) => {
-    return task.newListr([
-      {
-        title: 'Fetch all configuration',
-        task: async () => await backend.dump(),
-      },
-      {
-        title: 'Filter configuration resource type',
-        enabled: () =>
-          //TODO implement API-level resource filtering on APISIX backend
-          !(backend instanceof BackendAPI7) &&
-          (includeResourceType?.length > 0 || excludeResourceType?.length > 0),
-        task: () => {
-          ctx.remote = filterResourceType(
-            ctx.remote,
-            includeResourceType,
-            excludeResourceType,
-          );
-        },
-      },
-      {
-        title: 'Filter remote configuration',
-        enabled: !!labelSelector,
-        task: (ctx) => {
-          [ctx.remote] = filterConfiguration(ctx.remote, labelSelector);
-        },
-      },
-    ]);
-  },
-});
 
 export const DumpCommand = new BackendCommand<DumpOptions>(
   'dump',
