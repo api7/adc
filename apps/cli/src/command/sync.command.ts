@@ -1,15 +1,15 @@
 import { Listr } from 'listr2';
 
-import { SignaleRenderer } from '../utils/listr';
 import {
   DiffResourceTask,
   ExperimentalRemoteStateFileTask,
+  LintTask,
   LoadLocalConfigurationTask,
-  TaskContext,
-} from './diff.command';
-import { LoadRemoteConfigurationTask } from './dump.command';
+  LoadRemoteConfigurationTask,
+} from '../tasks';
+import { SignaleRenderer } from '../utils/listr';
+import { TaskContext } from './diff.command';
 import { BackendCommand, NoLintOption } from './helper';
-import { LintTask } from './lint.command';
 import { BackendOptions } from './typing';
 import { loadBackend } from './utils';
 
