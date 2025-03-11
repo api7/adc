@@ -1,6 +1,8 @@
 import { isUndefined, mapValues, pickBy } from 'lodash';
 import { createHash } from 'node:crypto';
 
+export { Logger, LogEntry, LogEntryOptions } from './utils/logger';
+
 const generateId = (name: string): string => {
   return createHash('sha1').update(name).digest('hex');
 };

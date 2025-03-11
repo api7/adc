@@ -2,7 +2,6 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { randomUUID } from 'crypto';
 import { diff as objectDiff } from 'deep-diff';
 import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash';
-import winston from 'winston';
 
 const order = {
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.DELETE}`]: 0,
@@ -43,33 +42,47 @@ const order = {
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.UPDATE}`]: 32,
 };
 
-export class DifferV3 {
-  private defaultValue: ADCSDK.DefaultValue;
-  private transactionId: string;
+const showLogEntry = () =>
+  ['true', '1'].includes(process?.env?.ADC_DIFFER_DEBUG ?? '');
 
-  private logger = winston.createLogger({
-    level: process?.env?.ADC_DIFFER_DEBUG === '1' ? 'debug' : 'info',
-    format: winston.format.json(),
-    transports: [new winston.transports.Console()],
-  });
+export class DifferV3 {
+  private readonly defaultValue: ADCSDK.DefaultValue;
+  private readonly transactionId: string;
+  private readonly logger?: ADCSDK.Logger;
+
+  constructor(opts: {
+    transactionId: string;
+    defaultValue: ADCSDK.DefaultValue;
+    logger?: ADCSDK.Logger;
+  }) {
+    this.transactionId = opts.transactionId;
+    this.defaultValue = opts.defaultValue;
+    this.logger = opts.logger;
+  }
 
   public static diff(
     local: ADCSDK.Configuration,
     remote: ADCSDK.Configuration,
     defaultValue?: ADCSDK.DefaultValue,
     parentName?: string,
+    logger?: ADCSDK.Logger,
   ): Array<ADCSDK.Event> {
-    const differ = new DifferV3();
-    differ.defaultValue = defaultValue;
-    differ.transactionId = randomUUID();
-
-    differ.logger.debug({
-      message: 'enter differ',
-      local,
-      remote,
+    const differ = new DifferV3({
+      transactionId: randomUUID(),
       defaultValue,
-      transactionId: differ.transactionId,
+      logger,
     });
+
+    differ.logger?.debug(
+      {
+        message: 'Enter differ',
+        transactionId: differ.transactionId,
+        local,
+        remote,
+        defaultValue,
+      },
+      { showLogEntry },
+    );
 
     const generateResourceName = (name: string) =>
       parentName ? `${parentName}.${name}` : name;
@@ -212,12 +225,16 @@ export class DifferV3 {
     });
 
     // sort by resource base rules
-    return unwrapedEvents.sort((a, b) => {
+    const events = unwrapedEvents.sort((a, b) => {
       return (
         order[`${a.resourceType}.${a.type}`] -
         order[`${b.resourceType}.${b.type}`]
       );
     });
+
+    differ.logger.debug({ message: 'Diff result', events }, { showLogEntry });
+
+    return events;
   }
 
   private diffResource(
@@ -338,6 +355,7 @@ export class DifferV3 {
             resourceType === ADCSDK.ResourceType.SERVICE
               ? remoteName
               : undefined,
+            this.logger,
           ).map(this.postprocessSubEvent(remoteName, remoteId)),
         });
       }
@@ -449,15 +467,18 @@ export class DifferV3 {
             ].includes(resourceType)
               ? remoteName
               : undefined,
+            this.logger,
           ).map(this.postprocessSubEvent(remoteName, remoteId)),
         );
 
-        this.logger.debug({
-          message: 'sub resource diff',
-          subEvents,
-
-          transactionId: this.transactionId,
-        });
+        this.logger.debug(
+          {
+            message: 'Diff sub-resources',
+            transactionId: this.transactionId,
+            subEvents,
+          },
+          { showLogEntry },
+        );
 
         // Remove nested resources to indeed compare the main resource itself.
         (resourceType === ADCSDK.ResourceType.SERVICE
@@ -516,16 +537,19 @@ export class DifferV3 {
       // The resources checked are exclusively the current resource itself, without
       // plugins and sub-resources.
       const diff = objectDiff(cloneDeep(remoteItem), mergedLocalItem);
-      this.logger.debug({
-        message: 'main resource diff',
-        diff,
-        local: outputLocalItem,
-        remote: outputRemoteItem,
-        realRemote: remoteItem,
-        realLocal: mergedLocalItem,
-        originalLocal: localItem,
-        transactionId: this.transactionId,
-      });
+      this.logger.debug(
+        {
+          message: 'Diff main resources',
+          transactionId: this.transactionId,
+          diff,
+          local: outputLocalItem,
+          remote: outputRemoteItem,
+          realRemote: remoteItem,
+          realLocal: mergedLocalItem,
+          originalLocal: localItem,
+        },
+        { showLogEntry },
+      );
 
       // If there are changes to the plugins or changes to other properties
       // of the resource, an update event is added.
@@ -602,6 +626,7 @@ export class DifferV3 {
           )
             ? localName
             : undefined,
+          this.logger,
         ).map(this.postprocessSubEvent(localName, localId)),
       });
     });
@@ -614,14 +639,17 @@ export class DifferV3 {
     local: ADCSDK.Plugins,
     remote: ADCSDK.Plugins,
   ): [boolean, ADCSDK.Plugins] {
-    this.logger.debug({
-      message: 'diff plugins',
-      local,
-      remote,
-      emptyLocal: isEmpty(local),
-      emptyRemote: isEmpty(remote),
-      transactionId: this.transactionId,
-    });
+    this.logger.debug(
+      {
+        message: 'Diff plugins',
+        transactionId: this.transactionId,
+        local,
+        remote,
+        isEmptyLocal: isEmpty(local),
+        isEmptyRemote: isEmpty(remote),
+      },
+      { showLogEntry },
+    );
     if (isEmpty(local) && isEmpty(remote)) return [false, local];
 
     // Pre-merge the plugin's default configuration into the local configuration

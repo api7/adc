@@ -1,10 +1,12 @@
+import { LogEntry, LogEntryOptions, Logger } from '@api7/adc-sdk';
 import {
   ListrRenderer,
   ListrTaskEventType,
   ListrTaskObject,
   ListrTaskState,
+  ListrTaskWrapper,
 } from 'listr2';
-import { attempt, isError } from 'lodash';
+import { attempt, isError, isObject } from 'lodash';
 import { Signale } from 'signale';
 
 type SignaleRendererTask<T extends object = object> = ListrTaskObject<
@@ -19,7 +21,7 @@ export interface SignaleRendererOptions {
 }
 
 export interface SignaleRendererOutput {
-  type: string;
+  type: 'debug';
   messages: Array<unknown>;
 }
 
@@ -114,5 +116,33 @@ export class SignaleRenderer implements ListrRenderer {
 
   private getScopedLogger(opts?: SignaleRendererOptions) {
     return this.logger.scope(...(opts?.scope ?? ['ADC']));
+  }
+}
+
+export class ListrOutputLogger implements Logger {
+  constructor(
+    private readonly task: ListrTaskWrapper<
+      unknown,
+      typeof SignaleRenderer,
+      any
+    >,
+  ) {}
+
+  log(message: string): void {
+    this.task.output = message;
+  }
+
+  debug({ message, ...kvs }: LogEntry, opts: LogEntryOptions): void {
+    if (opts?.showLogEntry && !opts?.showLogEntry({ message, ...kvs })) return;
+
+    this.task.output = JSON.stringify({
+      type: 'debug',
+      messages: [
+        `${message}\n`,
+        Object.entries(kvs)
+          .map(([k, v]) => `${k}: ${isObject(v) ? JSON.stringify(v) : v}`)
+          .join('\n'),
+      ],
+    } satisfies SignaleRendererOutput);
   }
 }
