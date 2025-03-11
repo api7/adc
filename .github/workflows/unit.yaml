@@ -19,6 +19,8 @@ jobs:
         run: pnpm install
 
       # Run unit tests
+      - name: Run SDK unit tests
+        run: npx nx run sdk:test
       - name: Run CLI unit tests
         run: npx nx run cli:test
       - name: Run API7 Backend unit tests

@@ -1,9 +1,9 @@
-import { recursiveOmitUndefined } from './utils';
+import { utils } from './utils';
 
 describe('SDK utils', () => {
   it('recursiveOmitUndefined', () => {
     expect(
-      recursiveOmitUndefined({
+      utils.recursiveOmitUndefined({
         test: 'test',
         removed: undefined,
         test2: {
