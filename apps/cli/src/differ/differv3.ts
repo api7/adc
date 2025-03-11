@@ -232,7 +232,7 @@ export class DifferV3 {
       );
     });
 
-    differ.logger.debug({ message: 'Diff result', events }, { showLogEntry });
+    differ.logger?.debug({ message: 'Diff result', events }, { showLogEntry });
 
     return events;
   }
@@ -471,7 +471,7 @@ export class DifferV3 {
           ).map(this.postprocessSubEvent(remoteName, remoteId)),
         );
 
-        this.logger.debug(
+        this.logger?.debug(
           {
             message: 'Diff sub-resources',
             transactionId: this.transactionId,
@@ -537,7 +537,7 @@ export class DifferV3 {
       // The resources checked are exclusively the current resource itself, without
       // plugins and sub-resources.
       const diff = objectDiff(cloneDeep(remoteItem), mergedLocalItem);
-      this.logger.debug(
+      this.logger?.debug(
         {
           message: 'Diff main resources',
           transactionId: this.transactionId,
@@ -639,7 +639,7 @@ export class DifferV3 {
     local: ADCSDK.Plugins,
     remote: ADCSDK.Plugins,
   ): [boolean, ADCSDK.Plugins] {
-    this.logger.debug(
+    this.logger?.debug(
       {
         message: 'Diff plugins',
         transactionId: this.transactionId,
