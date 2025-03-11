@@ -1,11 +1,13 @@
-import * as ADCSDK from '@api7/adc-sdk';
+import { LogEntry, LogEntryOptions, Logger } from '@api7/adc-sdk';
 import {
   ListrRenderer,
   ListrTaskEventType,
   ListrTaskObject,
   ListrTaskState,
+  ListrTaskWrapper,
 } from 'listr2';
-import { attempt, isError } from 'lodash';
+import { attempt, isError, isObject } from 'lodash';
+import { Signale } from 'signale';
 
 type SignaleRendererTask<T extends object = object> = ListrTaskObject<
   T,
@@ -19,7 +21,7 @@ export interface SignaleRendererOptions {
 }
 
 export interface SignaleRendererOutput {
-  type: string;
+  type: 'debug';
   messages: Array<unknown>;
 }
 
@@ -31,7 +33,10 @@ export class SignaleRenderer implements ListrRenderer {
   };
   public static rendererTaskOptions: never;
 
-  // get tasks to be rendered and options of the renderer from the parent
+  private readonly logger = new Signale({
+    config: { displayTimestamp: true },
+  });
+
   constructor(
     private readonly tasks: SignaleRendererTask[],
     private options: SignaleRendererOptions,
@@ -45,6 +50,15 @@ export class SignaleRenderer implements ListrRenderer {
   // implement custom logic for render functionality
   public render() {
     this.renderer(this.tasks);
+  }
+
+  public end(err?: Error) {
+    if (err) {
+      this.getScopedLogger().fatal(err);
+    } else {
+      this.options.verbose > 0 &&
+        this.getScopedLogger().star('All is well, see you next time!');
+    }
   }
 
   private renderer(tasks: SignaleRendererTask[]) {
@@ -63,23 +77,21 @@ export class SignaleRenderer implements ListrRenderer {
 
         if (state === ListrTaskState.STARTED) {
           rendererOptions?.verbose > 0 &&
-            ADCSDK.utils.getLogger(rendererOptions?.scope).start(task.title);
+            this.getScopedLogger(rendererOptions).start(task.title);
         }
         if (state === ListrTaskState.COMPLETED) {
           rendererOptions?.verbose > 0 &&
-            ADCSDK.utils.getLogger(rendererOptions?.scope).success(task.title);
+            this.getScopedLogger(rendererOptions).success(task.title);
         }
         if (state === ListrTaskState.SKIPPED) {
           rendererOptions?.verbose > 0 &&
-            ADCSDK.utils
-              .getLogger(rendererOptions?.scope)
-              .info(
-                `${task.title} is skipped${task.message.skip ? `: ${task.message.skip}` : ''}`,
-              );
+            this.getScopedLogger(rendererOptions).info(
+              `${task.title} is skipped${task.message.skip ? `: ${task.message.skip}` : ''}`,
+            );
         }
         if (state === ListrTaskState.FAILED) {
           rendererOptions?.verbose > 0 &&
-            ADCSDK.utils.getLogger(rendererOptions?.scope).error(task.title);
+            this.getScopedLogger(rendererOptions).error(task.title);
         }
       });
 
@@ -91,9 +103,9 @@ export class SignaleRenderer implements ListrRenderer {
         switch (output.type) {
           case 'debug': {
             if (output?.messages && rendererOptions?.verbose === 2) {
-              ADCSDK.utils
-                .getLogger(rendererOptions?.scope)
-                .debug(output.messages.join(''));
+              this.getScopedLogger(rendererOptions).debug(
+                output.messages.join(''),
+              );
             }
             break;
           }
@@ -102,12 +114,35 @@ export class SignaleRenderer implements ListrRenderer {
     });
   }
 
-  public end(err?: Error) {
-    if (err) {
-      ADCSDK.utils.getLogger().fatal(err);
-    } else {
-      this.options.verbose > 0 &&
-        ADCSDK.utils.getLogger().star('All is well, see you next time!');
-    }
+  private getScopedLogger(opts?: SignaleRendererOptions) {
+    return this.logger.scope(...(opts?.scope ?? ['ADC']));
+  }
+}
+
+export class ListrOutputLogger implements Logger {
+  constructor(
+    private readonly task: ListrTaskWrapper<
+      unknown,
+      typeof SignaleRenderer,
+      any
+    >,
+  ) {}
+
+  log(message: string): void {
+    this.task.output = message;
+  }
+
+  debug({ message, ...kvs }: LogEntry, opts: LogEntryOptions): void {
+    if (opts?.showLogEntry && !opts?.showLogEntry({ message, ...kvs })) return;
+
+    this.task.output = JSON.stringify({
+      type: 'debug',
+      messages: [
+        `${message}\n`,
+        Object.entries(kvs)
+          .map(([k, v]) => `${k}: ${isObject(v) ? JSON.stringify(v) : v}`)
+          .join('\n'),
+      ],
+    } satisfies SignaleRendererOutput);
   }
 }

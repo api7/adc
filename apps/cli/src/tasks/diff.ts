@@ -3,6 +3,7 @@ import { ListrTask } from 'listr2';
 
 import { TaskContext } from '../command/diff.command';
 import { DifferV3 } from '../differ/differv3';
+import { ListrOutputLogger } from '../utils/listr';
 
 export const DiffResourceTask = (
   printSummary = false,
@@ -10,11 +11,13 @@ export const DiffResourceTask = (
 ): ListrTask<TaskContext> => ({
   title: 'Diff configuration',
   task: async (ctx, task) => {
+    const logger = new ListrOutputLogger(task);
     ctx.diff = DifferV3.diff(
       ctx.local,
       ctx.remote,
       ctx.defaultValue,
       undefined,
+      logger,
     );
 
     if (printSummary) {
