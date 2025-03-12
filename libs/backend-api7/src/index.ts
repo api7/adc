@@ -169,6 +169,10 @@ export class BackendAPI7 implements ADCSDK.Backend {
           ctx.gatewayGroupId = this.gatewayGroupId;
           return;
         }
+        if (this.opts?.token?.startsWith('a7adm-')) {
+          ctx.gatewayGroupId = this.gatewayGroupId = '';
+          return;
+        }
 
         const resp = await this.client.get<{ list: Array<{ id: string }> }>(
           '/api/gateway_groups',
@@ -203,6 +207,11 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
         const resp = await this.client.get<{ value: string }>('/api/version');
         task.output = buildReqAndRespDebugOutput(resp, `Get API7 version`);
+
+        if (resp?.data?.value === 'dev') {
+          ctx.api7Version = this.version = semver.coerce('999.999.999');
+          return;
+        }
         ctx.api7Version = this.version =
           semver.coerce(resp?.data?.value) || semver.coerce('0.0.0');
       },
