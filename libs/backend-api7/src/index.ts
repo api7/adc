@@ -163,14 +163,11 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
   private getGatewayGroupIdTask(name: string): ListrTask {
     return {
-      enabled: (ctx) => !ctx.gatewayGroupId,
+      enabled: (ctx) =>
+        !ctx.gatewayGroupId && !this.opts?.token?.startsWith('a7adm-'),
       task: async (ctx, task) => {
         if (this.gatewayGroupId) {
           ctx.gatewayGroupId = this.gatewayGroupId;
-          return;
-        }
-        if (this.opts?.token?.startsWith('a7adm-')) {
-          ctx.gatewayGroupId = this.gatewayGroupId = '';
           return;
         }
 
@@ -271,6 +268,12 @@ export class BackendAPI7 implements ADCSDK.Backend {
         rendererOptions: { scope: BackendAPI7.logScope },
       },
     );
+
+    [
+      'GET_VER',
+      'GET_GG_ID',
+      ['DELETE#1', 'DELETE#2', 'DELETE#3', 'UPDATE#1', 'UPDATE#2'],
+    ];
   }
 
   // Preprocess events for sync:
