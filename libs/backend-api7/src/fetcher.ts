@@ -2,17 +2,18 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { Axios } from 'axios';
 import { ListrTask } from 'listr2';
 import { isEmpty } from 'lodash';
-import { SemVer, gte as semVerGTE } from 'semver';
+import { SemVer } from 'semver';
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
 import { buildReqAndRespDebugOutput } from './utils';
 
-type FetchTask = ListrTask<{
+type FetchTaskContext = {
   api7Version: SemVer;
-  gatewayGroupId: string;
+  gatewayGroupId?: string;
   remote: ADCSDK.Configuration;
-}>;
+};
+type FetchTask = ListrTask<FetchTaskContext>;
 
 export class Fetcher {
   private readonly toADC = new ToADC();
@@ -29,20 +30,15 @@ export class Fetcher {
       task: async (ctx, task) => {
         const resp = await this.client.get<typing.ListResponse<typing.Service>>(
           `/apisix/admin/services`,
-          {
-            params: {
-              gateway_group_id: ctx.gatewayGroupId,
-            },
-          },
+          { params: this.attachLabelSelector(this.attachGatewayGroup(ctx)) },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get services');
 
         const services = resp?.data?.list;
         const fetchRoutes = services.map(async (service) => {
-          const params = {
-            gateway_group_id: ctx.gatewayGroupId,
+          const params = this.attachGatewayGroup(ctx, {
             service_id: service.id,
-          };
+          });
           if (service.type === 'http') {
             const resp = await this.client.get<
               typing.ListResponse<typing.Route>
@@ -80,11 +76,7 @@ export class Fetcher {
       task: async (ctx, task) => {
         const resp = await this.client.get<{ list: Array<typing.Consumer> }>(
           '/apisix/admin/consumers',
-          {
-            params: this.attachLabelSelector({
-              gateway_group_id: ctx.gatewayGroupId,
-            }),
-          },
+          { params: this.attachLabelSelector(this.attachGatewayGroup(ctx)) },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get consumers');
 
@@ -97,9 +89,7 @@ export class Fetcher {
             // In the current design, the consumer's credentials are not filtered
             // using labels because nested labels filters can be misleading. Even
             // if labels set for the consumer, the labels filter is not attached.
-            params: {
-              gateway_group_id: ctx.gatewayGroupId,
-            },
+            params: this.attachGatewayGroup(ctx),
           });
           task.output = buildReqAndRespDebugOutput(
             resp,
@@ -123,11 +113,7 @@ export class Fetcher {
       task: async (ctx, task) => {
         const resp = await this.client.get<{ list: Array<typing.SSL> }>(
           '/apisix/admin/ssls',
-          {
-            params: this.attachLabelSelector({
-              gateway_group_id: ctx.gatewayGroupId,
-            }),
-          },
+          { params: this.attachLabelSelector(this.attachGatewayGroup(ctx)) },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get ssls');
 
@@ -145,9 +131,7 @@ export class Fetcher {
       task: async (ctx, task) => {
         const resp = await this.client.get<{ list: Array<typing.GlobalRule> }>(
           '/apisix/admin/global_rules',
-          {
-            params: { gateway_group_id: ctx.gatewayGroupId },
-          },
+          { params: this.attachLabelSelector(this.attachGatewayGroup(ctx)) },
         );
         task.output = buildReqAndRespDebugOutput(resp, 'Get global rules');
 
@@ -166,7 +150,7 @@ export class Fetcher {
         const resp = await this.client.get<{
           value: ADCSDK.Plugins;
         }>('/apisix/admin/plugin_metadata', {
-          params: { gateway_group_id: ctx.gatewayGroupId },
+          params: this.attachLabelSelector(this.attachGatewayGroup(ctx)),
         });
         task.output = buildReqAndRespDebugOutput(resp, 'Get plugin metadata');
 
@@ -213,12 +197,20 @@ export class Fetcher {
   }
 
   private attachLabelSelector(
-    params: Record<string, string>,
+    params: Record<string, string> = {},
   ): Record<string, string> {
     if (this.backendOpts?.labelSelector)
       Object.entries(this.backendOpts.labelSelector).forEach(([key, value]) => {
         params[`labels[${key}]`] = value;
       });
+    return params;
+  }
+
+  private attachGatewayGroup(
+    ctx: FetchTaskContext,
+    params: Record<string, string> = {},
+  ) {
+    if (ctx.gatewayGroupId) params.gateway_group_id = ctx.gatewayGroupId;
     return params;
   }
 }
