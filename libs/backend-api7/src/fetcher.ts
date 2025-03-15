@@ -53,7 +53,7 @@ export class Fetcher {
     if (this.isSkip(ADCSDK.ResourceType.SERVICE))
       return of<Array<ADCSDK.Service>>([]);
 
-    const taskLog = genTaskLog('Fetch consumers');
+    const taskLog = genTaskLog('Fetch services');
     taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<typing.ListResponse<typing.Service>>(
