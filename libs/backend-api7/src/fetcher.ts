@@ -1,23 +1,36 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios, AxiosResponse } from 'axios';
+import { Axios } from 'axios';
 import { produce } from 'immer';
-import { isEmpty } from 'lodash';
+import { curry, isEmpty } from 'lodash';
 import EventEmitter from 'node:events';
-import {
-  combineLatest,
-  from,
-  map,
-  mergeMap,
-  of,
-  takeLast,
-  tap,
-  toArray,
-} from 'rxjs';
+import { Subject, combineLatest, from, map, mergeMap, of, takeLast, tap, toArray } from 'rxjs';
 import { SemVer } from 'semver';
+
+
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
 
+
+type TaskSubjectInfo = {
+  d: object;
+  desc?: string;
+};
+type TaskSubject = {
+  name: string;
+  event: keyof typeof ADCSDK.BackendEventType;
+  info: TaskSubjectInfo;
+};
+const taskMap = new Map<TaskSubject['name'], TaskSubject[]>();
+const taskSubject = new Subject<TaskSubject>();
+const _genTaskLog = (
+  name: string,
+  event: keyof typeof ADCSDK.BackendEventType,
+  info: TaskSubjectInfo,
+) => {
+  taskSubject.next({ name, event, info });
+};
+const genTaskLog = curry(_genTaskLog);
 export interface FetcherOptions {
   client: Axios;
   version: SemVer;
@@ -36,13 +49,12 @@ export class Fetcher {
     this.eventEmitter = opts.eventEmitter;
   }
 
-  public listServices(buffer: Array<Array<() => void>>) {
+  public listServices() {
     if (this.isSkip(ADCSDK.ResourceType.SERVICE))
       return of<Array<ADCSDK.Service>>([]);
 
-    const taskName = 'Fetch consumers';
-    const taskStateEvent = this.generateTaskStateEvent(taskName);
-    const emits: Array<() => void> = [taskStateEvent[0]];
+    const taskLog = genTaskLog('Fetch consumers');
+    taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<typing.ListResponse<typing.Service>>(
         `/apisix/admin/services`,
@@ -53,7 +65,9 @@ export class Fetcher {
         },
       ),
     ).pipe(
-      tap((resp) => emits.push(() => this.emitDebugLog(resp, taskName))),
+      tap((resp) => {
+        taskLog('AXIOS_DEBUG', { d: resp });
+      }),
       mergeMap((resp) =>
         from(resp.data.list).pipe(
           mergeMap((service) => {
@@ -72,14 +86,12 @@ export class Fetcher {
                     { params },
                   ),
             ).pipe(
-              tap((resp) =>
-                emits.push(() =>
-                  this.emitDebugLog(
-                    resp,
-                    `Get ${service.type === 'stream' ? 'stream routes' : 'routes'} in service "${service.name}"`,
-                  ),
-                ),
-              ),
+              tap((resp) => {
+                taskLog('AXIOS_DEBUG', {
+                  d: resp,
+                  desc: `Get ${service.type === 'stream' ? 'stream routes' : 'routes'} in service "${service.name}"`,
+                });
+              }),
               map((resp) => {
                 const routes = resp.data.list;
                 return produce(service, (draft) => {
@@ -95,17 +107,17 @@ export class Fetcher {
         ),
       ),
       toArray(),
-      tap(() => buffer.push([...emits, taskStateEvent[1]])),
+      tap(() => {
+        taskLog('TASK_DONE', { d: {} });
+      }),
     );
   }
 
-  public listConsumers(buffer: Array<Array<() => void>>) {
+  public listConsumers() {
     if (this.isSkip(ADCSDK.ResourceType.CONSUMER))
       return of<Array<ADCSDK.Consumer>>([]);
-
-    const taskName = 'Fetch consumers';
-    const taskStateEvent = this.generateTaskStateEvent(taskName);
-    const emits: Array<() => void> = [taskStateEvent[0]];
+    const taskLog = genTaskLog('Fetch consumers');
+    taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<{ list: Array<typing.Consumer> }>(
         '/apisix/admin/consumers',
@@ -116,7 +128,9 @@ export class Fetcher {
         },
       ),
     ).pipe(
-      tap((resp) => emits.push(() => this.emitDebugLog(resp, taskName))),
+      tap((resp) => {
+        taskLog('AXIOS_DEBUG', { d: resp });
+      }),
       mergeMap((resp) =>
         from(resp.data.list).pipe(
           mergeMap((consumer) =>
@@ -130,14 +144,12 @@ export class Fetcher {
                 params: { gateway_group_id: this.opts.gatewayGroupId },
               }),
             ).pipe(
-              tap((resp) =>
-                emits.push(() =>
-                  this.emitDebugLog(
-                    resp,
-                    `Get credentials of consumer "${consumer.username}"`,
-                  ),
-                ),
-              ),
+              tap((resp) => {
+                taskLog('AXIOS_DEBUG', {
+                  d: resp,
+                  desc: `Get credentials of consumer "${consumer.username}"`,
+                });
+              }),
               map((resp) =>
                 produce(consumer, (draft) => {
                   draft.credentials = resp?.data?.list;
@@ -149,16 +161,17 @@ export class Fetcher {
       ),
       map((consumer) => this.toADC.transformConsumer(consumer)),
       toArray(),
-      tap(() => buffer.push([...emits, taskStateEvent[1]])),
+      tap(() => {
+        taskLog('TASK_DONE', { d: {} });
+      }),
     );
   }
 
-  public listSSLs(buffer: Array<Array<() => void>>) {
+  public listSSLs() {
     if (this.isSkip(ADCSDK.ResourceType.SSL)) return of<Array<ADCSDK.SSL>>([]);
 
-    const taskName = 'Fetch ssls';
-    const taskStateEvent = this.generateTaskStateEvent(taskName);
-    const emits: Array<() => void> = [taskStateEvent[0]];
+    const taskLog = genTaskLog('Fetch ssls');
+    taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<{ list: Array<typing.SSL> }>('/apisix/admin/ssls', {
         params: this.attachLabelSelector({
@@ -166,22 +179,27 @@ export class Fetcher {
         }),
       }),
     ).pipe(
-      tap((resp) => emits.push(() => this.emitDebugLog(resp, taskName))),
+      tap((resp) => {
+        taskLog('AXIOS_DEBUG', {
+          d: resp,
+        });
+      }),
       mergeMap((resp) =>
         from(resp.data.list).pipe(map((ssl) => this.toADC.transformSSL(ssl))),
       ),
       toArray(),
-      tap(() => buffer.push([...emits, taskStateEvent[1]])),
+      tap(() => {
+        taskLog('TASK_DONE', { d: {} });
+      }),
     );
   }
 
-  public listGlobalRules(buffer: Array<Array<() => void>>) {
+  public listGlobalRules() {
     if (this.isSkip(ADCSDK.ResourceType.GLOBAL_RULE))
       return of<Record<string, ADCSDK.GlobalRule>>({});
 
-    const taskName = 'Fetch global rules';
-    const taskStateEvent = this.generateTaskStateEvent(taskName);
-    const emits: Array<() => void> = [taskStateEvent[0]];
+    const taskLog = genTaskLog('Fetch global rules');
+    taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<{ list: Array<typing.GlobalRule> }>(
         '/apisix/admin/global_rules',
@@ -192,19 +210,24 @@ export class Fetcher {
         },
       ),
     ).pipe(
-      tap((resp) => emits.push(() => this.emitDebugLog(resp, taskName))),
+      tap((resp) => {
+        taskLog('AXIOS_DEBUG', {
+          d: resp,
+        });
+      }),
       map((resp) => this.toADC.transformGlobalRule(resp?.data?.list ?? [])),
-      tap(() => buffer.push([...emits, taskStateEvent[1]])),
+      tap(() => {
+        taskLog('TASK_DONE', { d: {} });
+      }),
     );
   }
 
-  public listMetadatas(buffer: Array<Array<() => void>>) {
+  public listMetadatas() {
     if (this.isSkip(ADCSDK.ResourceType.PLUGIN_METADATA))
       return of<Record<string, ADCSDK.PluginMetadata>>({});
 
-    const taskName = 'Fetch plugin metadata';
-    const taskStateEvent = this.generateTaskStateEvent(taskName);
-    const emits: Array<() => void> = [taskStateEvent[0]];
+    const taskLog = genTaskLog('Fetch plugin metadata');
+    taskLog('TASK_START', { d: {} });
     return from(
       this.client.get<{
         value: ADCSDK.Plugins;
@@ -214,23 +237,46 @@ export class Fetcher {
         }),
       }),
     ).pipe(
-      tap((resp) => emits.push(() => this.emitDebugLog(resp, taskName))),
+      tap((resp) => {
+        taskLog('AXIOS_DEBUG', {
+          d: resp,
+        });
+      }),
       map((resp) => this.toADC.transformPluginMetadatas(resp?.data?.value)),
-      tap(() => buffer.push([...emits, taskStateEvent[1]])),
+      tap(() => {
+        taskLog('TASK_DONE', { d: {} });
+      }),
     );
   }
 
   public allTask() {
-    const emitBuffer: Array<Array<() => void>> = [];
+    taskMap.clear();
+    taskSubject.subscribe({
+      next: (v) => {
+        if (!taskMap.has(v.name)) {
+          taskMap.set(v.name, [])
+        }
+        taskMap.get(v.name).push(v);
+      }
+    })
     return combineLatest([
-      this.listServices(emitBuffer),
-      this.listConsumers(emitBuffer),
-      this.listSSLs(emitBuffer),
-      this.listGlobalRules(emitBuffer),
-      this.listMetadatas(emitBuffer),
+      this.listServices(),
+      this.listConsumers(),
+      this.listSSLs(),
+      this.listGlobalRules(),
+      this.listMetadatas(),
     ]).pipe(
       takeLast(1),
-      tap(() => emitBuffer.flatMap((emits) => emits).forEach((emit) => emit())),
+      tap(() => {
+        taskMap.forEach((taskSub) => {
+          taskSub.forEach((v) => this.eventEmitter.emit(v.event, v.event === 'AXIOS_DEBUG'? {
+            response: v.info.d,
+            description: v.info.desc
+          } : {
+            name: v.name
+          }));
+        })
+      }),
       map(
         ([services, consumers, ssls, global_rules, plugin_metadata]) =>
           ({
@@ -265,30 +311,5 @@ export class Fetcher {
         params[`labels[${key}]`] = value;
       });
     return params;
-  }
-
-  private emitDebugLog(response: AxiosResponse, description?: string) {
-    this.eventEmitter.emit(ADCSDK.BackendEventType.AXIOS_DEBUG, {
-      response,
-      description,
-    } satisfies ADCSDK.BackendEventAxiosDebug);
-  }
-
-  private emitTaskStateEvent(
-    type:
-      | typeof ADCSDK.BackendEventType.TASK_START
-      | typeof ADCSDK.BackendEventType.TASK_DONE,
-    name: string,
-  ) {
-    this.eventEmitter.emit(type, {
-      name,
-    } satisfies ADCSDK.BackendEventTaskState);
-  }
-
-  private generateTaskStateEvent(name: string) {
-    return [
-      () => this.emitTaskStateEvent(ADCSDK.BackendEventType.TASK_START, name),
-      () => this.emitTaskStateEvent(ADCSDK.BackendEventType.TASK_DONE, name),
-    ];
   }
 }
