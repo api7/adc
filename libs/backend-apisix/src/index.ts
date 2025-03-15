@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { Axios, CreateAxiosDefaults } from 'axios';
 import { Listr, ListrTask } from 'listr2';
+import EventEmitter from 'node:events';
 import { readFileSync } from 'node:fs';
 import {
   Agent as httpAgent,
@@ -10,17 +11,19 @@ import {
   Agent as httpsAgent,
   AgentOptions as httpsAgentOptions,
 } from 'node:https';
+import { Observable } from 'rxjs';
 import semver from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
 import { buildReqAndRespDebugOutput } from './utils';
 
-export class BackendAPISIX implements ADCSDK.Backend {
+export class BackendAPISIX extends EventEmitter implements ADCSDK.Backend {
   private readonly client: Axios;
   private static logScope = ['APISIX'];
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
+    super();
     const keepAlive: httpAgentOptions = {
       keepAlive: true,
       keepAliveMsecs: 60000,
@@ -55,6 +58,9 @@ export class BackendAPISIX implements ADCSDK.Backend {
 
     this.client = axios.create(config);
   }
+  defaultValue: () => Promise<ADCSDK.DefaultValue>;
+  dump: () => Observable<ADCSDK.Configuration>;
+  sync: (events: Array<ADCSDK.Event>) => Observable<ADCSDK.BackendSyncResult>;
 
   public async ping(): Promise<void> {
     await this.client.get(`/apisix/admin/routes`);
@@ -82,7 +88,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
     return [];
   }
 
-  public async dump(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
+  public async dump0(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
     const fetcher = new Fetcher(this.client);
     return new Listr(
       [
@@ -96,7 +102,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
     );
   }
 
-  public async sync(): Promise<Listr> {
+  public async sync0(): Promise<Listr> {
     const operator = new Operator(this.client);
     return new Listr(
       [

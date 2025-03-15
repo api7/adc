@@ -1,18 +1,22 @@
 import { BackendAPI7 } from '@api7/adc-backend-api7';
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
+import { lastValueFrom } from 'rxjs';
 
-import { filterConfiguration, filterResourceType } from '../command/utils';
+import {
+  addBackendEventListener,
+  buildReqAndRespDebugOutput,
+  filterConfiguration,
+  filterResourceType,
+} from '../command/utils';
 
 export interface LoadRemoteConfigurationTaskOptions {
-  backend: ADCSDK.Backend;
   labelSelector?: ADCSDK.BackendOptions['labelSelector'];
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
 }
 
 export const LoadRemoteConfigurationTask = ({
-  backend,
   labelSelector,
   includeResourceType,
   excludeResourceType,
@@ -22,13 +26,20 @@ export const LoadRemoteConfigurationTask = ({
     return task.newListr([
       {
         title: 'Fetch all configuration',
-        task: async () => await backend.dump(),
+        task: async (ctx) => {
+          const cancelListen = addBackendEventListener(ctx.backend, task);
+          ctx.remote = await lastValueFrom(
+            (ctx.backend as ADCSDK.Backend).dump(),
+          );
+          cancelListen();
+          console.log(ctx.remote);
+        },
       },
       {
         title: 'Filter configuration resource type',
         enabled: () =>
           //TODO implement API-level resource filtering on APISIX backend
-          !(backend instanceof BackendAPI7) &&
+          !(ctx.backend instanceof BackendAPI7) &&
           (includeResourceType?.length > 0 || excludeResourceType?.length > 0),
         task: () => {
           ctx.remote = filterResourceType(
