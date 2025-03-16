@@ -153,6 +153,8 @@ describe('Sync and Dump - 2', () => {
           pass_host: 'pass',
         },
       });
+
+      dump.services[1].routes = sortResult(dump.services[1].routes, 'name');
       expect(dump.services[1].routes[0]).toMatchObject({
         uris: ['/postSomething'],
         name: 'route2.2',

@@ -55,7 +55,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      result.services = sortResult(result.services, 'name');
+      result.services = sortResult(result.services, 'id');
       expect(result.services).toHaveLength(2);
       expect(result.services[0]).toMatchObject(service1);
       expect(result.services[1]).toMatchObject(service2);
