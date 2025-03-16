@@ -70,6 +70,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (service1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+      result.services = sortResult(result.services, 'name');
       expect(result.services[0]).toMatchObject(service1);
     });
 
