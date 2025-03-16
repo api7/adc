@@ -5,7 +5,7 @@ import { loadBackend } from '../command/utils';
 
 export const InitializeBackendTask = (
   type: string,
-  opts: Omit<ADCSDK.BackendOptions, 'logger'>,
+  opts: ADCSDK.BackendOptions,
 ): ListrTask => ({
   task: async (ctx) => {
     ctx.backend = loadBackend(type, { ...opts });
