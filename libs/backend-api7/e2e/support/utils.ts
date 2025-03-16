@@ -26,7 +26,7 @@ export const runTask = async (tasks: Listr, ctx = {}) => {
 export const syncEvents = async (
   backend: BackendAPI7,
   events: Array<ADCSDK.Event> = [],
-) => backend.sync(events);
+) => lastValueFrom(backend.sync(events));
 
 export const dumpConfiguration = async (backend: BackendAPI7) =>
   lastValueFrom(backend.dump());

@@ -42,10 +42,11 @@ export class Operator extends baseclass {
   public operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
     const isUpdate = type !== ADCSDK.EventType.DELETE;
-    const path =
+    const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`;
+        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
+    }`;
 
     return from(
       this.client.request({
