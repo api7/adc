@@ -1,7 +1,9 @@
 import { BackendAPI7 } from '@api7/adc-backend-api7';
 import { BackendAPISIX } from '@api7/adc-backend-apisix';
 import * as ADCSDK from '@api7/adc-sdk';
+import axios, { AxiosResponse } from 'axios';
 import chalk from 'chalk';
+import { ListrTaskWrapper } from 'listr2';
 import { isObject, mapValues } from 'lodash';
 import path from 'node:path';
 import pluralize from 'pluralize';
@@ -297,6 +299,69 @@ export const recursiveReplaceEnvVars = (
         : replaceValue(value);
 
   return mapValues(c, recurseReplace) as ADCSDK.Configuration;
+};
+
+export const buildReqAndRespDebugOutput = (
+  resp: AxiosResponse,
+  desc?: string,
+  scope = ['API7'],
+) => {
+  const capitalizeFirstLetter = (str: string) =>
+    str.charAt(0).toUpperCase() + str.slice(1);
+  const config = resp.config;
+
+  // NodeJS will not keep the response header in Xxx-Xxx format, correct it
+  const normalizeHeaderKey = (key: string) =>
+    key.split('-').map(capitalizeFirstLetter).join('-');
+
+  // Transforms HTTP headers to a single line of text formatting
+  const transformHeaders = (headers: object, normalizeKey = false) =>
+    Object.entries(headers).map(
+      ([key, value]) =>
+        `${normalizeKey ? normalizeHeaderKey(key) : key}: ${key !== 'X-API-KEY' ? value : '*****'}\n`,
+    );
+  return JSON.stringify({
+    type: 'debug',
+    messages: [
+      `${desc ?? ''}\n`, //TODO time consumption
+      // request
+      `${config.method.toUpperCase()} ${axios.getUri(config)}\n`,
+      ...transformHeaders(config.headers),
+      config?.data ? `\n${config.data}\n` : '',
+      '\n',
+      // response
+      `${resp.status} ${resp.statusText}\n`,
+      ...transformHeaders(resp.headers, true),
+      `${resp?.data ? `\n${JSON.stringify(resp.data)}` : ''}\n`,
+    ],
+    scope,
+  });
+};
+
+export const addBackendEventListener = (
+  backend: ADCSDK.Backend,
+  task: ListrTaskWrapper<object, any, any>,
+) => {
+  const sub1 = backend.on(
+    ADCSDK.BackendEventType.AXIOS_DEBUG,
+    ({ response, description }) =>
+      (task.output = buildReqAndRespDebugOutput(response, description)),
+  );
+  const sub2 = backend.on(ADCSDK.BackendEventType.TASK_START, ({ name }) => {
+    task.output = JSON.stringify({
+      type: 'ts',
+      messages: [name],
+      scope: ['API7'],
+    });
+  });
+  const sub3 = backend.on(ADCSDK.BackendEventType.TASK_DONE, ({ name }) => {
+    task.output = JSON.stringify({
+      type: 'td',
+      messages: [name],
+      scope: ['API7'],
+    });
+  });
+  return () => (sub1.unsubscribe(), sub2.unsubscribe(), sub3.unsubscribe());
 };
 
 export const configurePluralize = () => {

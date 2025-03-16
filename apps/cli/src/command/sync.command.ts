@@ -1,4 +1,5 @@
 import { Listr } from 'listr2';
+import { lastValueFrom, toArray } from 'rxjs';
 
 import {
   DiffResourceTask,
@@ -7,11 +8,12 @@ import {
   LoadLocalConfigurationTask,
   LoadRemoteConfigurationTask,
 } from '../tasks';
+import { InitializeBackendTask } from '../tasks/init_backend';
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand, NoLintOption } from './helper';
 import { BackendOptions } from './typing';
-import { loadBackend } from './utils';
+import { addBackendEventListener } from './utils';
 
 type SyncOption = BackendOptions & {
   file: Array<string>;
@@ -69,10 +71,9 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     },
   ])
   .handle(async (opts) => {
-    const backend = loadBackend(opts.backend, opts);
-
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
+        InitializeBackendTask(opts.backend, opts),
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,
@@ -82,7 +83,6 @@ export const SyncCommand = new BackendCommand<SyncOption>(
         opts.lint ? LintTask() : { task: () => undefined },
         !opts.remoteStateFile
           ? LoadRemoteConfigurationTask({
-              backend,
               labelSelector: opts.labelSelector,
               includeResourceType: opts.includeResourceType,
               excludeResourceType: opts.excludeResourceType,
@@ -91,14 +91,18 @@ export const SyncCommand = new BackendCommand<SyncOption>(
         DiffResourceTask(false, false),
         {
           title: 'Sync configuration',
-          task: async () => await backend.sync(),
+          task: async (ctx, task) => {
+            const cancel = addBackendEventListener(ctx.backend, task);
+            await lastValueFrom(ctx.backend.sync(ctx.diff).pipe(toArray()));
+            cancel();
+          },
           exitOnError: true,
         },
       ],
       {
         renderer: SignaleRenderer,
         rendererOptions: { verbose: opts.verbose },
-        ctx: { remote: {}, local: {}, diff: [], defaultValue: {} },
+        ctx: { remote: {}, local: {}, diff: [] },
       },
     );
 

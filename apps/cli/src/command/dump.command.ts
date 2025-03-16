@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Scalar, stringify } from 'yaml';
 
 import { LoadRemoteConfigurationTask } from '../tasks';
+import { InitializeBackendTask } from '../tasks/init_backend';
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
@@ -50,11 +51,10 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
     },
   ])
   .handle(async (opts) => {
-    const backend = loadBackend(opts.backend, opts);
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
+        InitializeBackendTask(opts.backend, opts),
         LoadRemoteConfigurationTask({
-          backend,
           labelSelector: opts.labelSelector,
           includeResourceType: opts.includeResourceType,
           excludeResourceType: opts.excludeResourceType,
@@ -101,7 +101,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
       {
         renderer: SignaleRenderer,
         rendererOptions: { verbose: opts.verbose },
-        ctx: { remote: {}, local: {}, diff: [], defaultValue: {} },
+        ctx: { remote: {}, local: {}, diff: [] },
       },
     );
 

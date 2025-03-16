@@ -1,7 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { Axios, CreateAxiosDefaults } from 'axios';
 import { JSONSchema4 } from 'json-schema';
-import { Listr, ListrTask } from 'listr2';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
 import {
@@ -12,22 +11,22 @@ import {
   Agent as httpsAgent,
   AgentOptions as httpsAgentOptions,
 } from 'node:https';
+import { Subject, forkJoin, from, switchMap } from 'rxjs';
 import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
-import { OperateContext, Operator } from './operator';
+import { Operator } from './operator';
 import { ToADC } from './transformer';
-import * as typing from './typing';
-import { buildReqAndRespDebugOutput } from './utils';
 
 export class BackendAPI7 implements ADCSDK.Backend {
   private readonly client: Axios;
-  private readonly gatewayGroup: string;
+  private readonly gatewayGroupName: string;
   private static logScope = ['API7'];
+  private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
-  private version: SemVer;
-  private gatewayGroupId: string;
-  private defaultValue: ADCSDK.DefaultValue;
+  private version?: SemVer;
+  private gatewayGroupId?: string;
+  private innerDefaultValue: ADCSDK.DefaultValue;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     const keepAlive: httpAgentOptions = {
@@ -63,14 +62,15 @@ export class BackendAPI7 implements ADCSDK.Backend {
     if (opts.timeout) config.timeout = opts.timeout;
 
     this.client = axios.create(config);
-    this.gatewayGroup = opts.gatewayGroup;
+    this.gatewayGroupName = opts.gatewayGroup;
   }
 
   public async ping() {
     await this.client.get('/api/gateway_groups');
   }
 
-  public getResourceDefaultValueTask(): ListrTask {
+  public async defaultValue() {
+    if (this.defaultValue) return this.innerDefaultValue;
     const mergeAllOf = (items: Array<JSONSchema4>) => {
       if (items.length < 2) return items[0];
       if (!items.every((item) => item.type === 'object')) return null;
@@ -110,276 +110,136 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
       return defaults;
     };
-    return {
-      enabled: (ctx) => isEmpty(ctx.defaultValue),
-      task: async (ctx, task) => {
-        if (!isEmpty(this.defaultValue)) {
-          ctx.defaultValue = this.defaultValue;
-          return;
-        }
-        const resp = await this.client.get<{
-          value: ADCSDK.DefaultValue['core'];
-        }>('/api/schema/core');
-        task.output = buildReqAndRespDebugOutput(
-          resp,
-          'Get core resoruces schema',
-        );
+    const resp = await this.client.get<{
+      value: ADCSDK.DefaultValue['core'];
+    }>('/api/schema/core');
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: resp, description: 'Get core resoruces schema' },
+    });
 
-        ctx.defaultValue = this.defaultValue = {
-          core: Object.fromEntries(
-            Object.entries(resp.data.value).map(
-              ([type, schema]: [string, JSONSchema4]) => {
-                const transformer = (type: ADCSDK.ResourceType) => {
-                  const toADC = new ToADC();
-                  switch (type) {
-                    case ADCSDK.ResourceType.ROUTE:
-                      return toADC.transformRoute;
-                    case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
-                    case ADCSDK.ResourceType.SERVICE:
-                      return toADC.transformService;
-                    case ADCSDK.ResourceType.SSL:
-                      return toADC.transformSSL;
-                    case ADCSDK.ResourceType.CONSUMER:
-                      return toADC.transformConsumer;
-                    default:
-                      return <T>(res: T): T => res;
-                  }
-                };
-                return [
-                  type,
-                  transformer(type as ADCSDK.ResourceType)(
-                    extractObjectDefault(
-                      schema.allOf ? mergeAllOf(schema.allOf) : schema,
-                    ) ?? {},
-                  ),
-                ];
-              },
-            ),
-          ),
-        };
-      },
-    };
-  }
-
-  private getGatewayGroupIdTask(name: string): ListrTask {
-    return {
-      enabled: (ctx) =>
-        !ctx.gatewayGroupId && !this.opts?.token?.startsWith('a7adm-'),
-      task: async (ctx, task) => {
-        if (this.gatewayGroupId) {
-          ctx.gatewayGroupId = this.gatewayGroupId;
-          return;
-        }
-
-        const resp = await this.client.get<{ list: Array<{ id: string }> }>(
-          '/api/gateway_groups',
-          {
-            params: {
-              search: name,
-            },
+    return (this.innerDefaultValue = {
+      core: Object.fromEntries(
+        Object.entries(resp.data.value).map(
+          ([type, schema]: [string, JSONSchema4]) => {
+            const transformer = (type: ADCSDK.ResourceType) => {
+              const toADC = new ToADC();
+              switch (type) {
+                case ADCSDK.ResourceType.ROUTE:
+                  return toADC.transformRoute;
+                case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
+                case ADCSDK.ResourceType.SERVICE:
+                  return toADC.transformService;
+                case ADCSDK.ResourceType.SSL:
+                  return toADC.transformSSL;
+                case ADCSDK.ResourceType.CONSUMER:
+                  return toADC.transformConsumer;
+                default:
+                  return <T>(res: T): T => res;
+              }
+            };
+            return [
+              type,
+              transformer(type as ADCSDK.ResourceType)(
+                extractObjectDefault(
+                  schema.allOf ? mergeAllOf(schema.allOf) : schema,
+                ) ?? {},
+              ),
+            ];
           },
-        );
-        task.output = buildReqAndRespDebugOutput(
-          resp,
-          `Get id of gateway group "${this.gatewayGroup}"`,
-        );
-
-        const gatewayGroups = resp?.data?.list;
-        if (!gatewayGroups.length) {
-          throw Error(`Gateway group "${this.gatewayGroup}" does not exist`);
-        }
-        ctx.gatewayGroupId = this.gatewayGroupId = gatewayGroups[0].id;
-      },
-    };
+        ),
+      ),
+    } as ADCSDK.DefaultValue);
   }
 
-  private getAPI7VersionTask(): ListrTask {
-    return {
-      enabled: (ctx) => !ctx.api7Version,
-      task: async (ctx, task) => {
-        if (this.version) {
-          ctx.api7Version = this.version;
-          return;
-        }
+  private async getGatewayGroupId() {
+    if (this.gatewayGroupId) return this.gatewayGroupId;
+    if (this.opts?.token?.startsWith('a7adm-')) return undefined;
 
-        const resp = await this.client.get<{ value: string }>('/api/version');
-        task.output = buildReqAndRespDebugOutput(resp, `Get API7 version`);
-
-        if (resp?.data?.value === 'dev') {
-          ctx.api7Version = this.version = semver.coerce('999.999.999');
-          return;
-        }
-        ctx.api7Version = this.version =
-          semver.coerce(resp?.data?.value) || semver.coerce('0.0.0');
-      },
-    };
-  }
-
-  public async dump(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
-    const fetcher = new Fetcher(this.client, this.opts);
-
-    return new Listr<{ remote: ADCSDK.Configuration }>(
-      [
-        this.getAPI7VersionTask(),
-        this.getResourceDefaultValueTask(),
-        this.getGatewayGroupIdTask(this.gatewayGroup),
-        ...(ADCSDK.utils.featureGateEnabled(
-          ADCSDK.utils.featureGate.PARALLEL_BACKEND_REQUEST,
-        )
-          ? [
-              {
-                task: (_, task) =>
-                  task.newListr(fetcher.allTask(), { concurrent: true }),
-              },
-            ]
-          : fetcher.allTask()),
-      ],
+    const resp = await this.client.get<{ list: Array<{ id: string }> }>(
+      '/api/gateway_groups',
       {
-        //@ts-expect-error reorg renderer
-        rendererOptions: { scope: BackendAPI7.logScope },
+        params: {
+          search: this.gatewayGroupName,
+        },
       },
+    );
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: {
+        response: resp,
+        description: `Get id of gateway group "${this.gatewayGroupName}"`,
+      },
+    });
+
+    const gatewayGroups = resp?.data?.list;
+    if (!gatewayGroups?.length)
+      throw Error(`Gateway group "${this.gatewayGroupName}" does not exist`);
+    return (this.gatewayGroupId = gatewayGroups[0].id);
+  }
+
+  private async getVersion() {
+    if (this.version) return this.version;
+
+    const resp = await this.client.get<{ value: string }>('/api/version');
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: resp, description: 'Get API7 version' },
+    });
+
+    return (this.version =
+      resp?.data?.value === 'dev'
+        ? semver.coerce('999.999.999')
+        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0'));
+  }
+
+  public dump() {
+    return forkJoin([
+      from(this.getVersion()),
+      from(this.defaultValue()),
+      from(this.getGatewayGroupId()),
+    ]).pipe<ADCSDK.Configuration>(
+      switchMap(([version, , gatewayGroupId]) => {
+        const fetcher = new Fetcher({
+          client: this.client,
+          version: version,
+          eventSubject: this.subject,
+          backendOpts: this.opts,
+          gatewayGroupName: this.gatewayGroupName,
+          gatewayGroupId: gatewayGroupId,
+        });
+        return fetcher.allTask();
+      }),
     );
   }
 
-  public async sync(): Promise<Listr> {
-    const operator = new Operator(this.client, this.gatewayGroup);
-    return new Listr<OperateContext>(
-      [
-        this.getAPI7VersionTask(),
-        this.getGatewayGroupIdTask(this.gatewayGroup),
-        this.syncPreprocessEventsTask(),
-        ADCSDK.utils.featureGateEnabled(
-          ADCSDK.utils.featureGate.PARALLEL_BACKEND_REQUEST,
-        )
-          ? this.groupSyncTasks(operator)
-          : {
-              task: (ctx, task) =>
-                task.newListr(
-                  ctx.diff.map((event) =>
-                    event.type === ADCSDK.EventType.DELETE
-                      ? operator.deleteResource(event)
-                      : operator.updateResource(event),
-                  ),
-                ),
-            },
-      ],
-      {
-        //@ts-expect-error TODO reorg renderer
-        rendererOptions: { scope: BackendAPI7.logScope },
-      },
+  public sync(
+    events: Array<ADCSDK.Event>,
+    opts: { exitOnFailed: boolean } = { exitOnFailed: true },
+  ) {
+    return forkJoin([
+      from(this.getVersion()),
+      from(this.defaultValue()),
+      from(this.getGatewayGroupId()),
+    ]).pipe(
+      switchMap(([version, , gatewayGroupId]) => {
+        return new Operator({
+          client: this.client,
+          version,
+          eventSubject: this.subject,
+          gatewayGroupId,
+          gatewayGroupName: this.gatewayGroupName,
+        }).sync(events);
+      }),
     );
-
-    [
-      'GET_VER',
-      'GET_GG_ID',
-      ['DELETE#1', 'DELETE#2', 'DELETE#3', 'UPDATE#1', 'UPDATE#2'],
-    ];
   }
 
-  // Preprocess events for sync:
-  // 1. Events that attempt to remove routes but not for the purpose of
-  //    republishing the service will be ignored.
-  // 2. The service will at least be removed from the gateway group, i.e.,
-  //    it will stop processing such traffic.
-  //    Sometimes service templates cannot be removed because it is still
-  ///   referenced by published services on other gateway groups.
-  private syncPreprocessEventsTask(): ListrTask<OperateContext> {
-    return {
-      task: (ctx) => {
-        const isRouteLike = (resourceType: ADCSDK.ResourceType) =>
-          [
-            ADCSDK.ResourceType.ROUTE,
-            ADCSDK.ResourceType.STREAM_ROUTE,
-          ].includes(resourceType);
-        const deletedServiceIds = ctx.diff
-          .filter(
-            (item) =>
-              item.resourceType === ADCSDK.ResourceType.SERVICE &&
-              item.type === ADCSDK.EventType.DELETE,
-          )
-          .map((item) => item.resourceId);
-
-        ctx.needPublishServices = Object.fromEntries<typing.Service | null>(
-          ctx.diff
-            .filter((item) => {
-              // Include creation and update event types of services
-              if (
-                item.resourceType === ADCSDK.ResourceType.SERVICE &&
-                item.type !== ADCSDK.EventType.DELETE
-              )
-                return true;
-
-              // Include subroutes that have changed but the service itself has
-              // not been deleted
-              if (
-                isRouteLike(item.resourceType) &&
-                !deletedServiceIds.includes(item.parentId)
-              )
-                return true;
-
-              return false;
-            })
-            .map((item) => [
-              item.resourceType === ADCSDK.ResourceType.SERVICE
-                ? item.resourceId
-                : item.parentId,
-              null,
-            ]),
-        );
-
-        // Exclude those events we do not need
-        ctx.diff = ctx.diff
-          // Include route non deletion events
-          .filter((item) => {
-            if (!isRouteLike(item.resourceType)) return true;
-            if (
-              isRouteLike(item.resourceType) &&
-              item.type !== ADCSDK.EventType.DELETE
-            )
-              return true;
-
-            // Include routes removed just to change the service and republish it
-            if (
-              isRouteLike(item.resourceType) &&
-              item.type === ADCSDK.EventType.DELETE &&
-              !deletedServiceIds.includes(item.parentId)
-            )
-              return true;
-
-            return false;
-          });
-      },
-    };
-  }
-
-  // Groups tasks so that they are grouped in parallel in order of same
-  // resource type and same operation type.
-  private groupSyncTasks(operator: Operator): ListrTask<OperateContext> {
-    return {
-      task: (ctx, task) => {
-        const groupedEvents = Object.values<Array<ADCSDK.Event>>(
-          ctx.diff.reduce((groups, event) => {
-            const key = `${event.resourceType}.${event.type}`;
-            (groups[key] = groups[key] || []).push(event);
-            return groups;
-          }, {}),
-        );
-
-        return task.newListr(
-          groupedEvents.map((events) => ({
-            task: (_, task) => {
-              return task.newListr(
-                events.map((event) =>
-                  event.type === ADCSDK.EventType.DELETE
-                    ? operator.deleteResource(event)
-                    : operator.updateResource(event),
-                ),
-                { concurrent: true },
-              );
-            },
-          })),
-        );
-      },
-    };
+  public on(
+    eventType: keyof typeof ADCSDK.BackendEventType,
+    cb: (...args: any[]) => void,
+  ) {
+    return this.subject.subscribe(({ type, event }) => {
+      if (eventType === type) cb(event);
+    });
   }
 }

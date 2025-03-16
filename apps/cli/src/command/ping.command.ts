@@ -1,5 +1,9 @@
 import chalk from 'chalk';
+import { Listr, SilentRenderer } from 'listr2';
 
+import { InitializeBackendTask } from '../tasks/init_backend';
+import { SignaleRenderer } from '../utils/listr';
+import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
 import type { BackendOptions } from './typing';
 import { loadBackend } from './utils';
@@ -22,10 +26,17 @@ export const PingCommand = new BackendCommand<PingOptions>(
     },
   ])
   .handle(async (opts) => {
-    const backend = loadBackend(opts.backend, opts);
+    const tasks = new Listr<TaskContext, typeof SilentRenderer>(
+      [
+        InitializeBackendTask(opts.backend, opts),
+        { task: async (ctx) => await ctx.backend.ping() },
+      ],
+      { renderer: SilentRenderer },
+    );
 
     try {
-      await backend.ping();
+      await tasks.run();
+
       console.log(
         chalk.green(`Connected to the "${opts.backend}" backend successfully!`),
       );

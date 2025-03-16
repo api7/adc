@@ -1,4 +1,5 @@
 import { LogEntry, LogEntryOptions, Logger } from '@api7/adc-sdk';
+import axios, { AxiosResponse } from 'axios';
 import {
   ListrRenderer,
   ListrTaskEventType,
@@ -21,7 +22,8 @@ export interface SignaleRendererOptions {
 }
 
 export interface SignaleRendererOutput {
-  type: 'debug';
+  type: 'debug' | 'ts' | 'td';
+  scope?: Array<string>;
   messages: Array<unknown>;
 }
 
@@ -96,16 +98,32 @@ export class SignaleRenderer implements ListrRenderer {
       });
 
       task.on(ListrTaskEventType.OUTPUT, (str) => {
+        if (rendererOptions?.verbose <= 0) return;
         const output = attempt(JSON.parse, str) as SignaleRendererOutput;
         if (isError(output)) return;
         if (!output.type || !output.messages) return;
 
         switch (output.type) {
+          case 'ts': {
+            this.getScopedLogger({
+              ...rendererOptions,
+              scope: output.scope ?? rendererOptions.scope,
+            }).start(output.messages.join(''));
+            break;
+          }
+          case 'td': {
+            this.getScopedLogger({
+              ...rendererOptions,
+              scope: output.scope ?? rendererOptions.scope,
+            }).success(output.messages.join(''));
+            break;
+          }
           case 'debug': {
             if (output?.messages && rendererOptions?.verbose === 2) {
-              this.getScopedLogger(rendererOptions).debug(
-                output.messages.join(''),
-              );
+              this.getScopedLogger({
+                ...rendererOptions,
+                scope: output.scope ?? rendererOptions.scope,
+              }).debug(output.messages.join(''));
             }
             break;
           }
@@ -142,6 +160,39 @@ export class ListrOutputLogger implements Logger {
         Object.entries(kvs)
           .map(([k, v]) => `${k}: ${isObject(v) ? JSON.stringify(v) : v}`)
           .join('\n'),
+      ],
+    } satisfies SignaleRendererOutput);
+  }
+
+  axiosDebug(resp: AxiosResponse, desc?: string): void {
+    const config = resp.config;
+
+    const capitalizeFirstLetter = (str: string) =>
+      str.charAt(0).toUpperCase() + str.slice(1);
+
+    // NodeJS will not keep the response header in Xxx-Xxx format, correct it
+    const normalizeHeaderKey = (key: string) =>
+      key.split('-').map(capitalizeFirstLetter).join('-');
+
+    // Transforms HTTP headers to a single line of text formatting
+    const transformHeaders = (headers: object, normalizeKey = false) =>
+      Object.entries(headers).map(
+        ([key, value]) =>
+          `${normalizeKey ? normalizeHeaderKey(key) : key}: ${key !== 'X-API-KEY' ? value : '*****'}\n`,
+      );
+    this.task.output = JSON.stringify({
+      type: 'debug',
+      messages: [
+        `${desc ?? ''}\n`, //TODO time consumption
+        // request
+        `${config.method.toUpperCase()} ${axios.getUri(config)}\n`,
+        ...transformHeaders(config.headers),
+        config?.data ? `\n${config.data}\n` : '',
+        '\n',
+        // response
+        `${resp.status} ${resp.statusText}\n`,
+        ...transformHeaders(resp.headers, true),
+        `${resp?.data ? `\n${JSON.stringify(resp.data)}` : ''}\n`,
       ],
     } satisfies SignaleRendererOutput);
   }
