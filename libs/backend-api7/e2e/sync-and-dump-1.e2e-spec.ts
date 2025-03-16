@@ -140,6 +140,8 @@ describe('Sync and Dump - 1', () => {
 
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);
+
+      result.services[0].routes = sortResult(result.services[0].routes, 'name');
       expect(result.services[0].routes).toHaveLength(2);
       expect(result.services[0].routes[0]).toMatchObject(route1);
       expect(result.services[0].routes[1]).toMatchObject(route2);
@@ -219,6 +221,11 @@ describe('Sync and Dump - 1', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
       expect(result.services[0]).toMatchObject(service);
+
+      result.services[0].stream_routes = sortResult(
+        result.services[0].stream_routes,
+        'id',
+      );
       expect(result.services[0].stream_routes).toHaveLength(2);
       expect(result.services[0].stream_routes[0]).toMatchObject(route2);
       expect(result.services[0].stream_routes[1]).toMatchObject(route1);
@@ -292,6 +299,8 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
+
+      result.ssls = sortResult(result.ssls, 'id');
       expect(result.ssls).toHaveLength(2);
       expect(result.ssls[0]).toMatchObject(ssl2test);
       expect(result.ssls[1]).toMatchObject(ssl1test);
