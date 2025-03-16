@@ -70,7 +70,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
   }
 
   public async defaultValue() {
-    if (this.defaultValue) return this.innerDefaultValue;
+    if (this.innerDefaultValue) return this.innerDefaultValue;
     const mergeAllOf = (items: Array<JSONSchema4>) => {
       if (items.length < 2) return items[0];
       if (!items.every((item) => item.type === 'object')) return null;
