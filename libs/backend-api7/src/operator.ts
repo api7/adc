@@ -39,7 +39,7 @@ export class Operator extends baseclass {
     this.subject = opts.eventSubject;
   }
 
-  public operate(event: ADCSDK.Event) {
+  private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
     const isUpdate = type !== ADCSDK.EventType.DELETE;
     const path = `/apisix/admin/${
@@ -59,12 +59,6 @@ export class Operator extends baseclass {
           data: this.fromADC(event),
         }),
       }),
-    ).pipe(
-      mergeMap((resp) =>
-        resp?.data?.error_msg
-          ? throwError(() => new Error(resp.data.error_msg))
-          : of(resp),
-      ),
     );
   }
 
@@ -84,20 +78,18 @@ export class Operator extends baseclass {
                   success: true,
                   event,
                   axiosResponse: response,
+                  ...(response?.data?.error_msg && {
+                    success: false,
+                    error: new Error(response.data.error_msg),
+                  }),
                 } satisfies ADCSDK.BackendSyncResult;
               }),
               catchError<
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
-                //TODO error handler
                 if (axios.isAxiosError(error)) {
-                  if (error.response) {
-                    //TODO 有响应的状态码失败
-                  } else {
-                    //TODO 无正常响应
-                  }
-                  //if (opts.exitOnFailed) throw error;
+                  //TODO exitOnFailed if (opts.exitOnFailed) throw error;
                   return of({
                     success: false,
                     event,
@@ -105,6 +97,11 @@ export class Operator extends baseclass {
                     error,
                   } satisfies ADCSDK.BackendSyncResult);
                 }
+                return of({
+                  success: false,
+                  event,
+                  error,
+                } satisfies ADCSDK.BackendSyncResult);
               }),
               tap(() => logger(taskStateEvent('TASK_DONE'))),
             );
