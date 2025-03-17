@@ -1,183 +1,180 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios, AxiosResponse } from 'axios';
-import { ListrTask } from 'listr2';
-import { size, unset } from 'lodash';
-import { SemVer, gte as semVerGTE } from 'semver';
+import axios, { Axios, AxiosError, AxiosResponse } from 'axios';
+import {
+  Observable,
+  ObservableInput,
+  Subject,
+  catchError,
+  concatMap,
+  filter,
+  from,
+  map,
+  mergeMap,
+  of,
+  reduce,
+  switchMap,
+  tap,
+  throwError,
+  toArray,
+} from 'rxjs';
+import { SemVer } from 'semver';
 
+import { baseclass } from './fetcher';
 import { FromADC } from './transformer';
-import * as typing from './typing';
-import { buildReqAndRespDebugOutput, capitalizeFirstLetter } from './utils';
+import { capitalizeFirstLetter } from './utils';
 
-export interface OperateContext {
-  api7Version: SemVer;
-  diff: Array<ADCSDK.Event>;
-  gatewayGroupId: string;
-  needPublishServices: Record<string, typing.Service | null>;
+export interface OperatorOptions {
+  client: Axios;
+  version: SemVer;
+  eventSubject: Subject<ADCSDK.BackendEvent>;
+  gatewayGroupName?: string;
+  gatewayGroupId?: string;
 }
-type OperateTask = ListrTask<OperateContext>;
+export class Operator extends baseclass {
+  private readonly client: Axios;
 
-export class Operator {
-  constructor(
-    private readonly client: Axios,
-    private readonly gatewayGroupName: string,
-  ) {}
-
-  public updateResource(event: ADCSDK.Event): OperateTask {
-    return {
-      title: this.generateTaskName(event),
-      task: async (ctx, task) => {
-        let resp: AxiosResponse<{ error_msg?: string }>;
-        if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
-          // Create published service directly
-          resp = await this.client.put(
-            `/apisix/admin/services/${event.resourceId}`,
-            this.fromADC(event),
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else if (event.resourceType === ADCSDK.ResourceType.ROUTE) {
-          // Create route directly
-          const route = this.fromADC(event);
-          resp = await this.client.put(
-            `/apisix/admin/routes/${event.resourceId}`,
-            this.fromADC(event),
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else if (event.resourceType === ADCSDK.ResourceType.STREAM_ROUTE) {
-          // Create stream route directly
-          resp = await this.client.put(
-            `/apisix/admin/stream_routes/${event.resourceId}`,
-            this.fromADC(event),
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-        ) {
-          resp = await this.client.put(
-            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
-            this.fromADC(event),
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else {
-          resp = await this.client.put(
-            `/apisix/admin/${this.generateResourceTypeInAPI(event.resourceType)}/${event.resourceId}`,
-            this.fromADC(event),
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        }
-
-        if (resp?.data?.error_msg) throw new Error(resp.data.error_msg);
-      },
-    };
+  constructor(private readonly opts: OperatorOptions) {
+    super();
+    this.client = opts.client;
+    this.subject = opts.eventSubject;
   }
 
-  public deleteResource(event: ADCSDK.Event): OperateTask {
-    return {
-      title: this.generateTaskName(event),
-      task: async (ctx, task) => {
-        let resp: AxiosResponse<{ error_msg?: string }>;
-        if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
-          // Remove published service on the gateway group
-          resp = await this.client.delete(
-            `/apisix/admin/services/${event.resourceId}`,
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(
-            resp,
-            `Remove service "${event.resourceName}" on the gateway group ${this.gatewayGroupName}`,
-          );
-        } else if (event.resourceType === ADCSDK.ResourceType.ROUTE) {
-          resp = await this.client.delete(
-            `/apisix/admin/routes/${event.resourceId}`,
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else if (event.resourceType === ADCSDK.ResourceType.STREAM_ROUTE) {
-          resp = await this.client.delete(
-            `/apisix/admin/stream_routes/${event.resourceId}`,
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else if (
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-        ) {
-          resp = await this.client.delete(
-            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        } else {
-          resp = await this.client.delete(
-            `/apisix/admin/${this.generateResourceTypeInAPI(event.resourceType)}/${event.resourceId}`,
-            {
-              params: {
-                gateway_group_id: ctx.gatewayGroupId,
-              },
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-        }
+  public operate(event: ADCSDK.Event) {
+    const { type, resourceType, resourceId, parentId } = event;
+    const isUpdate = type !== ADCSDK.EventType.DELETE;
+    const path = `/apisix/admin/${
+      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ? `consumers/${parentId}/credentials/${resourceId}`
+        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
+    }`;
 
-        if (resp?.data?.error_msg) throw new Error(resp.data.error_msg);
-      },
-    };
+    return from(
+      this.client.request({
+        method: 'DELETE',
+        url: path,
+        params: { gateway_group_id: this.opts.gatewayGroupId },
+        validateStatus: () => true,
+        ...(isUpdate && {
+          method: 'PUT',
+          data: this.fromADC(event),
+        }),
+      }),
+    ).pipe(
+      mergeMap((resp) =>
+        resp?.data?.error_msg
+          ? throwError(() => new Error(resp.data.error_msg))
+          : of(resp),
+      ),
+    );
   }
 
-  private generateTaskName(event: ADCSDK.Event) {
-    return `${capitalizeFirstLetter(
+  public sync(events: Array<ADCSDK.Event>) {
+    return this.syncPreprocessEvents(events).pipe(
+      concatMap((group) =>
+        from(group).pipe(
+          mergeMap((event) => {
+            const taskName = this.generateTaskName(event);
+            const logger = this.getLogger(taskName);
+            const taskStateEvent = this.taskStateEvent(taskName);
+            logger(taskStateEvent('TASK_START'));
+            return from(this.operate(event)).pipe(
+              tap((resp) => logger(this.debugLogEvent(resp))),
+              map<AxiosResponse, ADCSDK.BackendSyncResult>((response) => {
+                return {
+                  success: true,
+                  event,
+                  axiosResponse: response,
+                } satisfies ADCSDK.BackendSyncResult;
+              }),
+              catchError<
+                ADCSDK.BackendSyncResult,
+                ObservableInput<ADCSDK.BackendSyncResult>
+              >((error: Error | AxiosError) => {
+                //TODO error handler
+                if (axios.isAxiosError(error)) {
+                  if (error.response) {
+                    //TODO 有响应的状态码失败
+                  } else {
+                    //TODO 无正常响应
+                  }
+                  //if (opts.exitOnFailed) throw error;
+                  return of({
+                    success: false,
+                    event,
+                    axiosResponse: error.response,
+                    error,
+                  } satisfies ADCSDK.BackendSyncResult);
+                }
+              }),
+              tap(() => logger(taskStateEvent('TASK_DONE'))),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  // Preprocess events for sync:
+  // 1. Events that attempt to remove routes but not for the purpose of
+  //    updating the service will be ignored.
+  // 2. The service will at least be removed from the gateway group, i.e.,
+  //    it will stop processing such traffic.
+  // 3. Divide events into groups by resource type and operation type.
+  private syncPreprocessEvents(events: Array<ADCSDK.Event>) {
+    const isRouteLike = (event: ADCSDK.Event) =>
+      [ADCSDK.ResourceType.ROUTE, ADCSDK.ResourceType.STREAM_ROUTE].includes(
+        event.resourceType,
+      );
+
+    const event$ = from(events);
+    return event$.pipe(
+      // Aggregate services that need to be deleted
+      filter(
+        (event) =>
+          event.resourceType === ADCSDK.ResourceType.SERVICE &&
+          event.type === ADCSDK.EventType.DELETE,
+      ),
+      map((event) => event.resourceId),
+      toArray(),
+      // Switch to a new event pipe for event filtering and grouping.
+      // It will use the deleted service ID that has been aggregated.
+      switchMap((deletedServiceIds) =>
+        event$.pipe(
+          // If an event wants to delete a route, but its parent service
+          // will also be deleted, this operation can be ignored.
+          // The deletion service will cascade the deletion of the route.
+          filter(
+            (event) =>
+              !(
+                isRouteLike(event) &&
+                event.type === ADCSDK.EventType.DELETE &&
+                deletedServiceIds.includes(event.parentId)
+              ),
+          ),
+          // Grouping events by resource type and operation type.
+          // The sequence of events should not be broken in this process,
+          // and the correct behavior of the API will depend on the order
+          // of execution.
+          reduce((groups, event) => {
+            const key = `${event.resourceType}.${event.type}`;
+            (groups[key] = groups[key] || []).push(event);
+            return groups;
+          }, {}),
+          // Strip group name and convert to two-dims arrays
+          // {"service.create": [1], "consumer.create": [2]} => [[1], [2]]
+          mergeMap<
+            Record<string, Array<ADCSDK.Event>>,
+            Observable<Array<ADCSDK.Event>>
+          >((obj) => from(Object.values(obj))),
+        ),
+      ),
+    );
+  }
+
+  private generateTaskName = (event: ADCSDK.Event) =>
+    `${capitalizeFirstLetter(
       event.type,
     )} ${event.resourceType}: "${event.resourceName}"`;
-  }
 
   private generateResourceTypeInAPI(resourceType: ADCSDK.ResourceType) {
     return resourceType !== ADCSDK.ResourceType.PLUGIN_METADATA

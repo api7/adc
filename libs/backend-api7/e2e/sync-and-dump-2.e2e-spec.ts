@@ -153,13 +153,9 @@ describe('Sync and Dump - 2', () => {
           pass_host: 'pass',
         },
       });
+
+      dump.services[1].routes = sortResult(dump.services[1].routes, 'name');
       expect(dump.services[1].routes[0]).toMatchObject({
-        uris: ['/postSomething'],
-        name: 'route2.2',
-        methods: ['POST', 'PUT'],
-        enable_websocket: false,
-      });
-      expect(dump.services[1].routes[1]).toMatchObject({
         uris: ['/getSomething'],
         name: 'route2.1',
         methods: ['GET', 'POST'],
@@ -176,6 +172,12 @@ describe('Sync and Dump - 2', () => {
             time_window: 60,
           },
         },
+      });
+      expect(dump.services[1].routes[1]).toMatchObject({
+        uris: ['/postSomething'],
+        name: 'route2.2',
+        methods: ['POST', 'PUT'],
+        enable_websocket: false,
       });
 
       expect(dump.global_rules.prometheus).toMatchObject({

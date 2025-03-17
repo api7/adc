@@ -1,8 +1,8 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { create, unset } from 'lodash';
+import { unset } from 'lodash';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { gte, lt, lte } from 'semver';
+import { gte, lt } from 'semver';
 
 import { BackendAPI7 } from '../src';
 import {

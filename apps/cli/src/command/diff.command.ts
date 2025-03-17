@@ -10,10 +10,10 @@ import {
   LoadLocalConfigurationTask,
 } from '../tasks';
 import { LoadRemoteConfigurationTask } from '../tasks';
+import { InitializeBackendTask } from '../tasks/init_backend';
 import { SignaleRenderer } from '../utils/listr';
 import { BackendCommand, NoLintOption } from './helper';
 import { BackendOptions } from './typing';
-import { loadBackend } from './utils';
 
 type DiffOptions = BackendOptions & {
   file: Array<string>;
@@ -24,10 +24,12 @@ type DiffOptions = BackendOptions & {
 };
 
 export interface TaskContext {
+  backend?: ADCSDK.Backend;
+
   local?: ADCSDK.Configuration;
   remote?: ADCSDK.Configuration;
   diff?: ADCSDK.Event[];
-  defaultValue?: ADCSDK.DefaultValue;
+  //defaultValue?: ADCSDK.DefaultValue;
 }
 
 export const DiffCommand = new BackendCommand<DiffOptions>(
@@ -59,10 +61,9 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     },
   ])
   .handle(async (opts) => {
-    const backend = loadBackend(opts.backend, opts);
-
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
+        InitializeBackendTask(opts.backend, opts),
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,
@@ -72,7 +73,6 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
         opts.lint ? LintTask() : { task: () => undefined },
         !opts.remoteStateFile
           ? LoadRemoteConfigurationTask({
-              backend,
               labelSelector: opts.labelSelector,
               includeResourceType: opts.includeResourceType,
               excludeResourceType: opts.excludeResourceType,
@@ -90,7 +90,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
       {
         renderer: SignaleRenderer,
         rendererOptions: { verbose: opts.verbose },
-        ctx: { remote: {}, local: {}, diff: [], defaultValue: {} },
+        ctx: { remote: {}, local: {}, diff: [] },
       },
     );
 

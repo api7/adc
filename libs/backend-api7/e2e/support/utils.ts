@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
+import { lastValueFrom } from 'rxjs';
 import * as semver from 'semver';
 
 import { BackendAPI7 } from '../../src';
@@ -25,21 +26,13 @@ export const runTask = async (tasks: Listr, ctx = {}) => {
 export const syncEvents = async (
   backend: BackendAPI7,
   events: Array<ADCSDK.Event> = [],
-) => {
-  return runTask(await backend.sync(), { diff: events });
-};
+) => lastValueFrom(backend.sync(events));
 
-export const dumpConfiguration = async (backend: BackendAPI7) => {
-  const ctx = { remote: {} };
-  await runTask(await backend.dump(), ctx);
-  return ctx.remote;
-};
+export const dumpConfiguration = async (backend: BackendAPI7) =>
+  lastValueFrom(backend.dump());
 
-export const getDefaultValue = async (backend: BackendAPI7) => {
-  const ctx = { defaultValue: {} };
-  await runTask(new Listr(backend.getResourceDefaultValueTask()), ctx);
-  return ctx.defaultValue;
-};
+export const getDefaultValue = async (backend: BackendAPI7) =>
+  backend.defaultValue();
 
 export const createEvent = (
   resourceType: ADCSDK.ResourceType,
