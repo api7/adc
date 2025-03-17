@@ -19,11 +19,21 @@
         "assets": [
           "apps/cli/src/assets"
         ],
-        "webpackConfig": "apps/cli/webpack.config.js"
+        "webpackConfig": "apps/cli/webpack.config.js",
+        "sourceMap": true
       },
       "configurations": {
         "development": {},
-        "production": {}
+        "production": {},
+        "ingress": {
+          "outputFileName": "ingress.js",
+          "fileReplacements": [
+            {
+              "replace": "apps/cli/src/main.ts",
+              "with": "apps/cli/src/main.ingress.ts"
+            }
+          ]
+        }
       }
     },
     "serve": {
