@@ -1,7 +1,11 @@
-import { setupCommands } from './command';
+import { setupCommands, setupIngressCommands } from './command';
 
 async function bootstrap() {
-  await setupCommands().parseAsync(process.argv);
+  await (
+    process.env.ADC_RUNNING_MODE === 'ingress'
+      ? setupIngressCommands()
+      : setupCommands()
+  ).parseAsync(process.argv);
 }
 
 bootstrap();

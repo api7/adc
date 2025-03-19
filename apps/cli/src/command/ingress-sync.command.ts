@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
-import { omit } from 'lodash';
+import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
 
 import {
@@ -108,7 +108,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
               };
               process.stdout.write(JSON.stringify(output));
             } catch (err) {
-              process.stderr.write(err);
+              process.stderr.write(toString(err));
             }
           },
         },
@@ -122,7 +122,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
     try {
       await tasks.run();
     } catch (err) {
-      process.stderr.write(err);
+      process.stderr.write(toString(err));
       process.exit(1);
     }
   });
