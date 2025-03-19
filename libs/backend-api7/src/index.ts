@@ -24,7 +24,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
   private static logScope = ['API7'];
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
-  private version?: SemVer;
+  private _version?: SemVer;
   private gatewayGroupId?: string;
   private innerDefaultValue: ADCSDK.DefaultValue;
 
@@ -67,6 +67,21 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
   public async ping() {
     await this.client.get('/api/gateway_groups');
+  }
+
+  public async version() {
+    if (this._version) return this._version;
+
+    const resp = await this.client.get<{ value: string }>('/api/version');
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: resp, description: 'Get API7 version' },
+    });
+
+    return (this._version =
+      resp?.data?.value === 'dev'
+        ? semver.coerce('999.999.999')
+        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0'));
   }
 
   public async defaultValue() {
@@ -178,24 +193,9 @@ export class BackendAPI7 implements ADCSDK.Backend {
     return (this.gatewayGroupId = gatewayGroups[0].id);
   }
 
-  private async getVersion() {
-    if (this.version) return this.version;
-
-    const resp = await this.client.get<{ value: string }>('/api/version');
-    this.subject.next({
-      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
-      event: { response: resp, description: 'Get API7 version' },
-    });
-
-    return (this.version =
-      resp?.data?.value === 'dev'
-        ? semver.coerce('999.999.999')
-        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0'));
-  }
-
   public dump() {
     return forkJoin([
-      from(this.getVersion()),
+      from(this.version()),
       from(this.defaultValue()),
       from(this.getGatewayGroupId()),
     ]).pipe<ADCSDK.Configuration>(
@@ -218,7 +218,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     opts: { exitOnFailed: boolean } = { exitOnFailed: true },
   ) {
     return forkJoin([
-      from(this.getVersion()),
+      from(this.version()),
       from(this.defaultValue()),
       from(this.getGatewayGroupId()),
     ]).pipe(

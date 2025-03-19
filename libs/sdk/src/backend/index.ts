@@ -1,7 +1,9 @@
 import { AxiosResponse } from 'axios';
 import { Observable, Subscription } from 'rxjs';
+import { SemVer } from 'semver';
 
 import * as ADCSDK from '..';
+import { BackendEventSource } from './utils';
 
 export interface BackendOptions {
   server: string;
@@ -56,6 +58,7 @@ export interface BackendSyncResult {
 export interface Backend {
   ping: () => Promise<void>;
 
+  version: () => Promise<SemVer>;
   defaultValue: () => Promise<ADCSDK.DefaultValue>;
   dump: () => Observable<ADCSDK.Configuration>;
   sync: (events: Array<ADCSDK.Event>) => Observable<BackendSyncResult>;
@@ -78,3 +81,8 @@ export interface Backend {
     cb: (args: ADCSDK.BackendEventTaskState) => void,
   ): Subscription;
 }
+
+export default Backend;
+export const backend = {
+  BackendEventSource,
+};

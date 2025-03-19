@@ -173,6 +173,17 @@ export interface Upstream {
     requests: number;
   };
 }
+
+export interface ListResponse<T> {
+  list: Array<{
+    key: string;
+    value: T;
+    createdIndex: number;
+    modifiedIndex: number;
+  }>;
+  total: number;
+}
+
 export interface Resources {
   [ResourceType.ROUTE]?: Array<Route>;
   [ResourceType.SERVICE]?: Array<Service>;
