@@ -13,6 +13,7 @@ import {
   deleteEvent,
   dumpConfiguration,
   semverCondition,
+  sortResult,
   syncEvents,
   updateEvent,
 } from './support/utils';
@@ -287,9 +288,10 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.consumers).toHaveLength(2);
-      expect(result.consumers[0]).toMatchObject(consumer1);
-      expect(result.consumers[1]).toMatchObject(consumer2);
+      const consumers = sortResult(result.consumers, 'username');
+      expect(consumers).toHaveLength(2);
+      expect(consumers[0]).toMatchObject(consumer1);
+      expect(consumers[1]).toMatchObject(consumer2);
     });
 
     it('Update consumer1', async () => {
@@ -301,7 +303,8 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (consumer1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.consumers[0]).toMatchObject(consumer1);
+      const consumers = sortResult(result.consumers, 'username');
+      expect(consumers[0]).toMatchObject(consumer1);
     });
 
     it('Delete consumer1', async () =>

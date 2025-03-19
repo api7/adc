@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, toArray } from 'rxjs';
 import semver from 'semver';
 
 import { BackendAPISIX } from '../../src';
@@ -15,7 +15,7 @@ export const runTask = async (tasks: Listr, ctx = {}) => {
 export const syncEvents = async (
   backend: BackendAPISIX,
   events: Array<ADCSDK.Event> = [],
-) => lastValueFrom(backend.sync(events));
+) => lastValueFrom(backend.sync(events).pipe(toArray()));
 
 export const dumpConfiguration = async (backend: BackendAPISIX) =>
   lastValueFrom(backend.dump());
@@ -93,6 +93,9 @@ export const overrideEventResourceId = (
   if (parentId) event.parentId = parentId;
   return event;
 };
+
+export const sortResult = <T>(result: Array<T>, field: string) =>
+  structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
 
 type cond = boolean | (() => boolean);
 

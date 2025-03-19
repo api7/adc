@@ -1,15 +1,20 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { Axios, AxiosError, AxiosResponse } from 'axios';
 import {
+  Observable,
   ObservableInput,
   Subject,
   catchError,
   concatMap,
+  filter,
   from,
   map,
   mergeMap,
   of,
+  reduce,
+  switchMap,
   tap,
+  toArray,
 } from 'rxjs';
 import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
 
@@ -53,8 +58,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   }
 
   public sync(events: Array<ADCSDK.Event>) {
-    //TODO preprocess
-    return from([events]).pipe(
+    return this.syncPreprocessEvents(events).pipe(
       concatMap((group) =>
         from(group).pipe(
           mergeMap((event) => {
@@ -127,6 +131,28 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           }),
         ),
       ),
+    );
+  }
+
+  // Preprocess events for sync:
+  // 1. Divide events into groups by resource type and operation type.
+  private syncPreprocessEvents(events: Array<ADCSDK.Event>) {
+    return from(events).pipe(
+      // Grouping events by resource type and operation type.
+      // The sequence of events should not be broken in this process,
+      // and the correct behavior of the API will depend on the order
+      // of execution.
+      reduce((groups, event) => {
+        const key = `${event.resourceType}.${event.type}`;
+        (groups[key] = groups[key] || []).push(event);
+        return groups;
+      }, {}),
+      // Strip group name and convert to two-dims arrays
+      // {"service.create": [1], "consumer.create": [2]} => [[1], [2]]
+      mergeMap<
+        Record<string, Array<ADCSDK.Event>>,
+        Observable<Array<ADCSDK.Event>>
+      >((obj) => from(Object.values(obj))),
     );
   }
 
