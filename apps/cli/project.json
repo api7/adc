@@ -24,16 +24,7 @@
       },
       "configurations": {
         "development": {},
-        "production": {},
-        "ingress": {
-          "outputFileName": "ingress.js",
-          "fileReplacements": [
-            {
-              "replace": "apps/cli/src/main.ts",
-              "with": "apps/cli/src/main.ingress.ts"
-            }
-          ]
-        }
+        "production": {}
       }
     },
     "serve": {
