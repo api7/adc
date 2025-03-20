@@ -1,106 +1,159 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios } from 'axios';
-import { ListrTask } from 'listr2';
-import { SemVer, lt, gte as semVerGTE, lt as semVerLT } from 'semver';
+import axios, { Axios, AxiosError, AxiosResponse } from 'axios';
+import {
+  Observable,
+  ObservableInput,
+  Subject,
+  catchError,
+  concatMap,
+  filter,
+  from,
+  map,
+  mergeMap,
+  of,
+  reduce,
+  switchMap,
+  tap,
+  toArray,
+} from 'rxjs';
+import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
 
 import { FromADC } from './transformer';
-import * as typing from './typing';
-import {
-  buildReqAndRespDebugOutput,
-  capitalizeFirstLetter,
-  resourceTypeToAPIName,
-} from './utils';
+import { capitalizeFirstLetter, resourceTypeToAPIName } from './utils';
 
-export interface OperateContext {
-  diff: Array<ADCSDK.Event>;
-  gatewayGroupId: string;
-  needPublishServices: Record<string, typing.Service | null>;
-
-  apisixVersion: SemVer;
+export interface OperatorOptions {
+  client: Axios;
+  version: SemVer;
+  eventSubject: Subject<ADCSDK.BackendEvent>;
 }
-type OperateTask = ListrTask<OperateContext>;
+export class Operator extends ADCSDK.backend.BackendEventSource {
+  private readonly client: Axios;
 
-export class Operator {
-  constructor(private readonly client: Axios) {}
-
-  public updateResource(event: ADCSDK.Event): OperateTask {
-    return {
-      title: this.generateTaskName(event),
-      skip: (ctx) => {
-        if (
-          lt(ctx.apisixVersion, '3.7.0') &&
-          event.resourceType === ADCSDK.ResourceType.STREAM_ROUTE
-        )
-          return 'The stream routes on versions below 3.7.0 are not supported as they are not supported configured on the service.';
-      },
-      task: async (ctx, task) => {
-        if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL) {
-          if (semVerLT(ctx.apisixVersion, '3.11.0')) return;
-
-          const resp = await this.client.put(
-            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
-            this.fromADC(event, ctx.apisixVersion),
-            {
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-
-          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-        } else {
-          const resp = await this.client.put(
-            `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
-            this.fromADC(event, ctx.apisixVersion),
-            {
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
-
-          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-        }
-      },
-    };
+  constructor(private readonly opts: OperatorOptions) {
+    super();
+    this.client = opts.client;
+    this.subject = opts.eventSubject;
   }
 
-  public deleteResource(event: ADCSDK.Event): OperateTask {
-    return {
-      title: this.generateTaskName(event),
-      task: async (ctx, task) => {
-        if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL) {
-          const resp = await this.client.delete(
-            `/apisix/admin/consumers/${event.parentId}/credentials/${event.resourceId}`,
-            {
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
+  private operate(event: ADCSDK.Event) {
+    const { type, resourceType, resourceId, parentId } = event;
+    const isUpdate = type !== ADCSDK.EventType.DELETE;
+    const path = `/apisix/admin/${
+      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ? `consumers/${parentId}/credentials/${resourceId}`
+        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : resourceTypeToAPIName(resourceType)}/${resourceId}`
+    }`;
 
-          if (resp.status === 404) return;
-          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-          if (resp.data?.deleted <= 0)
-            throw new Error(
-              `Unexpected number of deletions of resources: ${resp.data?.deleted}`,
-            );
-        } else {
-          const resp = await this.client.delete(
-            `/apisix/admin/${resourceTypeToAPIName(event.resourceType)}/${event.resourceId}`,
-            {
-              validateStatus: () => true,
-            },
-          );
-          task.output = buildReqAndRespDebugOutput(resp);
+    return from(
+      this.client.request({
+        method: 'DELETE',
+        url: path,
+        validateStatus: () => true,
+        ...(isUpdate && {
+          method: 'PUT',
+          data: this.fromADC(event, this.opts.version),
+        }),
+      }),
+    );
+  }
 
-          // If the resource does not exist, it is not an error for the delete operation
-          if (resp.status === 404) return;
-          if (resp.data?.error_msg) throw new Error(resp.data.error_msg);
-          if (resp.data?.deleted <= 0)
-            throw new Error(
-              `Unexpected number of deletions of resources: ${resp.data?.deleted}`,
+  public sync(events: Array<ADCSDK.Event>) {
+    return this.syncPreprocessEvents(events).pipe(
+      concatMap((group) =>
+        from(group).pipe(
+          mergeMap((event) => {
+            // Compatibility check
+            if (
+              semVerLT(this.opts.version, '3.7.0') &&
+              event.resourceType === ADCSDK.ResourceType.STREAM_ROUTE
+            )
+              return of({
+                success: false,
+                event,
+                error: new Error(
+                  'The stream routes on versions below 3.7.0 are not supported as they are not supported configured on the service.',
+                ),
+              } as ADCSDK.BackendSyncResult);
+
+            if (
+              semVerLT(this.opts.version, '3.11.0') &&
+              event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+            )
+              return of({
+                success: false,
+                event,
+                error: new Error(
+                  'The consumer credentials are only supported in Apache APISIX version 3.11 and above.',
+                ),
+              } as ADCSDK.BackendSyncResult);
+
+            const taskName = this.generateTaskName(event);
+            const logger = this.getLogger(taskName);
+            const taskStateEvent = this.taskStateEvent(taskName);
+            logger(taskStateEvent('TASK_START'));
+            return from(this.operate(event)).pipe(
+              tap((resp) => logger(this.debugLogEvent(resp))),
+              map<AxiosResponse, ADCSDK.BackendSyncResult>((response) => {
+                if (response.status >= 400)
+                  throw new Error(response.data.error_msg);
+
+                return {
+                  success: true,
+                  event,
+                  axiosResponse: response,
+                  ...(response?.data?.error_msg && {
+                    success: false,
+                    error: new Error(response.data.error_msg),
+                  }),
+                } satisfies ADCSDK.BackendSyncResult;
+              }),
+              catchError<
+                ADCSDK.BackendSyncResult,
+                ObservableInput<ADCSDK.BackendSyncResult>
+              >((error: Error | AxiosError) => {
+                if (axios.isAxiosError(error)) {
+                  //TODO exitOnFailed if (opts.exitOnFailed) throw error;
+                  return of({
+                    success: false,
+                    event,
+                    axiosResponse: error.response,
+                    error,
+                  } satisfies ADCSDK.BackendSyncResult);
+                }
+                return of({
+                  success: false,
+                  event,
+                  error,
+                } satisfies ADCSDK.BackendSyncResult);
+              }),
+              tap(() => logger(taskStateEvent('TASK_DONE'))),
             );
-        }
-      },
-    };
+          }),
+        ),
+      ),
+    );
+  }
+
+  // Preprocess events for sync:
+  // 1. Divide events into groups by resource type and operation type.
+  private syncPreprocessEvents(events: Array<ADCSDK.Event>) {
+    return from(events).pipe(
+      // Grouping events by resource type and operation type.
+      // The sequence of events should not be broken in this process,
+      // and the correct behavior of the API will depend on the order
+      // of execution.
+      reduce((groups, event) => {
+        const key = `${event.resourceType}.${event.type}`;
+        (groups[key] = groups[key] || []).push(event);
+        return groups;
+      }, {}),
+      // Strip group name and convert to two-dims arrays
+      // {"service.create": [1], "consumer.create": [2]} => [[1], [2]]
+      mergeMap<
+        Record<string, Array<ADCSDK.Event>>,
+        Observable<Array<ADCSDK.Event>>
+      >((obj) => from(Object.values(obj))),
+    );
   }
 
   private generateTaskName(event: ADCSDK.Event) {

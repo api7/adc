@@ -4,7 +4,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import axios, { AxiosResponse } from 'axios';
 import chalk from 'chalk';
 import { ListrTaskWrapper } from 'listr2';
-import { isObject, mapValues } from 'lodash';
+import { isObject, mapValues, unset } from 'lodash';
 import path from 'node:path';
 import pluralize from 'pluralize';
 
@@ -252,8 +252,8 @@ export const filterResourceType = (
 
 export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
   const removeMetadata = (obj: object) => {
-    if ('id' in obj) delete obj.id;
-    if ('metadata' in obj) delete obj.metadata;
+    unset(obj, 'id');
+    unset(obj, 'metadata');
   };
   Object.entries(c).forEach(([key, value]) => {
     if (['global_rules', 'plugin_metadata'].includes(key)) return;
@@ -361,7 +361,11 @@ export const addBackendEventListener = (
       scope: ['API7'],
     });
   });
-  return () => (sub1.unsubscribe(), sub2.unsubscribe(), sub3.unsubscribe());
+  return () => {
+    if (sub1.unsubscribe) sub1.unsubscribe();
+    if (sub2.unsubscribe) sub2.unsubscribe();
+    if (sub3.unsubscribe) sub3.unsubscribe();
+  };
 };
 
 export const configurePluralize = () => {

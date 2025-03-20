@@ -10,16 +10,17 @@ import {
   Agent as httpsAgent,
   AgentOptions as httpsAgentOptions,
 } from 'node:https';
-import { Observable, Subscription } from 'rxjs';
-import semver from 'semver';
+import { Observable, Subject, forkJoin, from, switchMap } from 'rxjs';
+import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
-import { buildReqAndRespDebugOutput } from './utils';
 
 export class BackendAPISIX implements ADCSDK.Backend {
   private readonly client: Axios;
-  private static logScope = ['APISIX'];
+  private readonly subject = new Subject<ADCSDK.BackendEvent>();
+
+  private _version?: SemVer;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     const keepAlive: httpAgentOptions = {
@@ -57,75 +58,72 @@ export class BackendAPISIX implements ADCSDK.Backend {
     this.client = axios.create(config);
   }
 
-  on(eventType: unknown, cb: unknown): Subscription {
-    //@ts-expect-errordddd
+  public async defaultValue() {
     return {};
   }
-  defaultValue: () => Promise<ADCSDK.DefaultValue>;
-  dump: () => Observable<ADCSDK.Configuration>;
-  sync: (events: Array<ADCSDK.Event>) => Observable<ADCSDK.BackendSyncResult>;
 
   public async ping(): Promise<void> {
     await this.client.get(`/apisix/admin/routes`);
   }
 
-  private getAPISIXVersionTask(): ListrTask {
-    return {
-      enabled: (ctx) => !ctx.apisixVersion,
-      task: async (ctx, task) => {
-        const resp = await this.client.get<{ value: string }>(
-          '/apisix/admin/routes',
-        );
-        task.output = buildReqAndRespDebugOutput(resp, `Get APISIX version`);
+  public async version() {
+    if (this._version) return this._version;
 
-        ctx.apisixVersion = semver.coerce('0.0.0');
-        if (resp.headers.server) {
-          const version = (resp.headers.server as string).match(/APISIX\/(.*)/);
-          if (version) ctx.apisixVersion = semver.coerce(version[1]);
-        }
-      },
-    };
+    const resp = await this.client.get<{ value: string }>(
+      '/apisix/admin/routes',
+    );
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: resp, description: `Get APISIX version` },
+    });
+
+    this._version = semver.coerce('999.999.999');
+    if (resp.headers.server) {
+      const version = (resp.headers.server as string).match(/APISIX\/(.*)/);
+      if (version) this._version = semver.coerce(version[1]);
+    }
+
+    return this._version;
   }
 
-  public getResourceDefaultValueTask(): Array<ListrTask> {
-    return [];
-  }
-
-  public async dump0(): Promise<Listr<{ remote: ADCSDK.Configuration }>> {
-    const fetcher = new Fetcher(this.client);
-    return new Listr(
-      [
-        this.getAPISIXVersionTask(),
-        ...this.getResourceDefaultValueTask(),
-        ...fetcher.fetch(),
-      ],
-      {
-        rendererOptions: { scope: BackendAPISIX.logScope },
-      },
+  public dump(): Observable<ADCSDK.Configuration> {
+    return forkJoin([
+      from(this.version()),
+      from(this.defaultValue()),
+    ]).pipe<ADCSDK.Configuration>(
+      switchMap(([version]) => {
+        const fetcher = new Fetcher({
+          client: this.client,
+          version: version,
+          eventSubject: this.subject,
+          backendOpts: this.opts,
+        });
+        return fetcher.dump();
+      }),
     );
   }
 
-  public async sync0(): Promise<Listr> {
-    const operator = new Operator(this.client);
-    return new Listr(
-      [
-        this.getAPISIXVersionTask(),
-        ...this.getResourceDefaultValueTask(),
-        {
-          task: (ctx, task) =>
-            task.newListr(
-              ctx.diff.map((event: ADCSDK.Event) =>
-                event.type === ADCSDK.EventType.DELETE
-                  ? operator.deleteResource(event)
-                  : operator.updateResource(event),
-              ),
-            ),
-        },
-      ],
-      {
-        rendererOptions: { scope: BackendAPISIX.logScope },
-      },
+  public sync(
+    events: Array<ADCSDK.Event>,
+  ): Observable<ADCSDK.BackendSyncResult> {
+    return forkJoin([from(this.version()), from(this.defaultValue())]).pipe(
+      switchMap(([version]) => {
+        return new Operator({
+          client: this.client,
+          version,
+          eventSubject: this.subject,
+        }).sync(events);
+      }),
     );
+  }
+
+  public on(
+    eventType: keyof typeof ADCSDK.BackendEventType,
+    cb: (...args: any[]) => void,
+  ) {
+    return this.subject.subscribe(({ type, event }) => {
+      if (eventType === type) cb(event);
+    });
   }
 
   supportValidate?: () => Promise<boolean>;

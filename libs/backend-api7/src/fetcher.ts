@@ -18,53 +18,6 @@ import { SemVer } from 'semver';
 import { ToADC } from './transformer';
 import * as typing from './typing';
 
-export class baseclass {
-  protected subject: Subject<ADCSDK.BackendEvent>;
-  protected _innerSubject: Subject<{
-    name: string;
-    event: ADCSDK.BackendEvent;
-  }> = new Subject();
-  protected _taskEvents: Map<string, Array<ADCSDK.BackendEvent>> = new Map();
-
-  constructor() {
-    this._innerSubject.subscribe({
-      next: ({ name, event }) => {
-        if (!this._taskEvents.has(name)) this._taskEvents.set(name, []);
-        this._taskEvents.get(name).push(event);
-
-        if (event.type === 'TASK_DONE')
-          this._taskEvents
-            .get(name)
-            .forEach((event) => this.subject.next(event));
-      },
-    });
-  }
-
-  protected getLogger = curry((name: string, event: ADCSDK.BackendEvent) => {
-    this._innerSubject.next({ name, event });
-  });
-
-  protected taskStateEvent = curry(
-    (
-      name: string,
-      type:
-        | typeof ADCSDK.BackendEventType.TASK_START
-        | typeof ADCSDK.BackendEventType.TASK_DONE,
-    ): ADCSDK.BackendEvent => ({
-      type,
-      event: { name },
-    }),
-  );
-
-  protected debugLogEvent = (
-    response: AxiosResponse,
-    description?: string,
-  ): ADCSDK.BackendEvent => ({
-    type: ADCSDK.BackendEventType.AXIOS_DEBUG,
-    event: { response, description },
-  });
-}
-
 export interface FetcherOptions {
   client: Axios;
   version: SemVer;
@@ -73,7 +26,7 @@ export interface FetcherOptions {
   gatewayGroupName?: string;
   gatewayGroupId?: string;
 }
-export class Fetcher extends baseclass {
+export class Fetcher extends ADCSDK.backend.BackendEventSource {
   private readonly toADC = new ToADC();
   private readonly client: Axios;
 

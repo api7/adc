@@ -14,12 +14,10 @@ import {
   reduce,
   switchMap,
   tap,
-  throwError,
   toArray,
 } from 'rxjs';
 import { SemVer } from 'semver';
 
-import { baseclass } from './fetcher';
 import { FromADC } from './transformer';
 import { capitalizeFirstLetter } from './utils';
 
@@ -30,7 +28,7 @@ export interface OperatorOptions {
   gatewayGroupName?: string;
   gatewayGroupId?: string;
 }
-export class Operator extends baseclass {
+export class Operator extends ADCSDK.backend.BackendEventSource {
   private readonly client: Axios;
 
   constructor(private readonly opts: OperatorOptions) {
