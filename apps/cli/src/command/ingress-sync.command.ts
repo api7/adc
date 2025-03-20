@@ -47,11 +47,6 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
               excludeResourceType: opts.excludeResourceType,
             })
           : ExperimentalRemoteStateFileTask(opts.remoteStateFile),
-        {
-          task: (ctx) => {
-            ctx.remote = {};
-          },
-        },
         DiffResourceTask(false, false),
         {
           title: 'Sync configuration',
