@@ -170,6 +170,7 @@ describe('Sync and Dump - 1', () => {
       //   Admin API write etcd => etcd push delete event => handle event and take effect
       // before it can be updated, this makes service deletions always tend to fail, so
       // this requires a short pause to wait for APISIX to synchronize.
+      //   https://github.com/apache/apisix/blob/master/apisix/admin/services.lua#L88
       // This seems to require some modification in APISIX to make the process complete
       // faster to increase the success rate of deletions.
       await wait(200);
