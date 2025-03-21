@@ -183,5 +183,11 @@ describe('Miscellaneous', () => {
         errorPattern,
       );
     });
+
+    it('Delete services', async () =>
+      syncEvents(backend, [
+        deleteEvent(ADCSDK.ResourceType.SERVICE, service1Name),
+        deleteEvent(ADCSDK.ResourceType.SERVICE, service2Name),
+      ]));
   });
 });
