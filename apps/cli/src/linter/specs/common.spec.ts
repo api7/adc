@@ -130,6 +130,37 @@ describe('Common Linter', () => {
       } as ADCSDK.Configuration,
       expect: true,
     },
+    {
+      name: 'should automatically handle numeric field parsing (fail)',
+      //@ts-expect-error for test
+      input: {
+        services: [
+          {
+            name: 'name',
+            upstream: {
+              type: 'roundrobin',
+              nodes: [
+                {
+                  host: 'httpbin.org',
+                  port: '443.1', // require an integer but enter a float
+                  weight: 100,
+                },
+              ],
+            },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: false,
+      errors: [
+        {
+          code: 'invalid_type',
+          expected: 'integer',
+          message: 'Expected integer, received float',
+          path: ['services', 0, 'upstream', 'nodes', 0, 'port'],
+          received: 'float',
+        },
+      ],
+    },
   ];
 
   // test cases runner
