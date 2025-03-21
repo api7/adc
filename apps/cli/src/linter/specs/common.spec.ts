@@ -108,6 +108,28 @@ describe('Common Linter', () => {
         },
       ],
     },
+    {
+      name: 'should automatically handle numeric field parsing',
+      //@ts-expect-error for test
+      input: {
+        services: [
+          {
+            name: 'name',
+            upstream: {
+              type: 'roundrobin',
+              nodes: [
+                {
+                  host: 'httpbin.org',
+                  port: '443', // string is automatically parsed as an integer
+                  weight: '100',
+                },
+              ],
+            },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+    },
   ];
 
   // test cases runner
