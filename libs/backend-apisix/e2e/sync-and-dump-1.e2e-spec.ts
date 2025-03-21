@@ -16,6 +16,7 @@ import {
   sortResult,
   syncEvents,
   updateEvent,
+  wait,
 } from './support/utils';
 
 describe('Sync and Dump - 1', () => {
@@ -157,11 +158,15 @@ describe('Sync and Dump - 1', () => {
       expect(result.services[0].routes[0]).toMatchObject(route2);
     });
 
-    it('Delete service', async () =>
-      syncEvents(backend, [
+    it('Delete service', async () => {
+      await syncEvents(backend, [
         deleteEvent(ADCSDK.ResourceType.ROUTE, route2Name, serviceName),
+      ]);
+      await wait(1000);
+      await syncEvents(backend, [
         deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
-      ]));
+      ]);
+    });
 
     it('Dump again (service should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
