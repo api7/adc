@@ -21,12 +21,12 @@ const pluginSchema = z.record(z.string(), z.any());
 const pluginsSchema = z.record(z.string(), pluginSchema);
 const exprSchema = z.array(z.any());
 const timeoutSchema = z.object({
-  connect: z.number().gt(0),
-  send: z.number().gt(0),
-  read: z.number().gt(0),
+  connect: z.coerce.number().gt(0),
+  send: z.coerce.number().gt(0),
+  read: z.coerce.number().gt(0),
 });
 const hostSchema = z.string().min(1);
-const portSchema = z.number().int().min(1).max(65535);
+const portSchema = z.coerce.number().int().min(1).max(65535);
 const secretRefSchema = z.string().regex(/^\$(secret|env):\/\//);
 const certificateSchema = z.union([
   z
@@ -46,23 +46,29 @@ const certificateKeySchema = z.union([
 const upstreamHealthCheckPassiveHealthy = z
   .object({
     http_statuses: z
-      .array(z.number().int().min(200).max(599))
+      .array(z.coerce.number().int().min(200).max(599))
       .min(1)
       .default([200, 302])
       .optional(),
-    successes: z.number().int().min(1).max(254).default(2).optional(),
+    successes: z.coerce.number().int().min(1).max(254).default(2).optional(),
   })
   .strict();
 const upstreamHealthCheckPassiveUnhealthy = z
   .object({
     http_statuses: z
-      .array(z.number().int().min(200).max(599))
+      .array(z.coerce.number().int().min(200).max(599))
       .min(1)
       .default([429, 404, 500, 501, 502, 503, 504, 505])
       .optional(),
-    http_failures: z.number().int().min(1).max(254).default(5).optional(),
-    tcp_failures: z.number().int().min(1).max(254).default(2).optional(),
-    timeouts: z.number().int().min(1).max(254).default(3).optional(),
+    http_failures: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(254)
+      .default(5)
+      .optional(),
+    tcp_failures: z.coerce.number().int().min(1).max(254).default(2).optional(),
+    timeouts: z.coerce.number().int().min(1).max(254).default(3).optional(),
   })
   .strict();
 const upstreamHealthCheckType = z
@@ -84,8 +90,8 @@ const upstreamSchema = z
       .object({
         active: z.object({
           type: upstreamHealthCheckType.optional(),
-          timeout: z.number().default(1).optional(),
-          concurrency: z.number().default(10).optional(),
+          timeout: z.coerce.number().default(1).optional(),
+          concurrency: z.coerce.number().default(10).optional(),
           host: hostSchema.optional(),
           port: portSchema.optional(),
           http_path: z.string().default('/').optional(),
@@ -93,14 +99,14 @@ const upstreamSchema = z
           http_request_headers: z.array(z.string()).min(1).optional(),
           healthy: z
             .object({
-              interval: z.number().int().min(1).default(1),
+              interval: z.coerce.number().int().min(1).default(1),
             })
             .merge(upstreamHealthCheckPassiveHealthy)
             .strict()
             .optional(),
           unhealthy: z
             .object({
-              interval: z.number().int().min(1).default(1),
+              interval: z.coerce.number().int().min(1).default(1),
             })
             .merge(upstreamHealthCheckPassiveUnhealthy)
             .strict()
@@ -128,8 +134,8 @@ const upstreamSchema = z
         z.object({
           host: hostSchema,
           port: portSchema.optional(),
-          weight: z.number().int().min(0),
-          priority: z.number().default(0).optional(),
+          weight: z.coerce.number().int().min(0),
+          priority: z.coerce.number().default(0).optional(),
           metadata: z.record(z.string(), z.any()).optional(),
         }),
       )
@@ -138,8 +144,8 @@ const upstreamSchema = z
       .enum(['grpc', 'grpcs', 'http', 'https', 'tcp', 'tls', 'udp', 'kafka'])
       .default('http')
       .optional(),
-    retries: z.number().int().min(0).max(65535).optional(),
-    retry_timeout: z.number().min(0).optional(),
+    retries: z.coerce.number().int().min(0).max(65535).optional(),
+    retry_timeout: z.coerce.number().min(0).optional(),
     timeout: timeoutSchema.optional(),
     tls: z
       .object({
@@ -158,9 +164,9 @@ const upstreamSchema = z
       .optional(),
     keepalive_pool: z
       .object({
-        size: z.number().int().min(1).default(320),
-        idle_timeout: z.number().min(0).default(60),
-        requests: z.number().int().min(1).default(1000),
+        size: z.coerce.number().int().min(1).default(320),
+        idle_timeout: z.coerce.number().min(0).default(60),
+        requests: z.coerce.number().int().min(1).default(1000),
       })
       .optional(),
     pass_host: z.enum(['pass', 'node', 'rewrite']).default('pass').optional(),
@@ -190,7 +196,7 @@ const routeSchema = z
 
     hosts: z.array(hostSchema).optional(),
     uris: z.array(z.string()).min(1),
-    priority: z.number().int().optional(),
+    priority: z.coerce.number().int().optional(),
     timeout: timeoutSchema.optional(),
     vars: exprSchema.optional(),
     methods: z
@@ -289,7 +295,7 @@ const sslSchema = z
     client: z
       .object({
         ca: certificateSchema,
-        depth: z.number().int().min(0).default(1).optional(),
+        depth: z.coerce.number().int().min(0).default(1).optional(),
         skip_mtls_uri_regex: z.array(z.string()).min(1).optional(),
       })
       .strict()
