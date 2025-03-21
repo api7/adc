@@ -53,7 +53,9 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
           task: async (ctx) => {
             try {
               const results = await lastValueFrom(
-                ctx.backend.sync(ctx.diff).pipe(toArray()),
+                ctx.backend
+                  .sync(ctx.diff, { exitOnFailure: false })
+                  .pipe(toArray()),
               );
 
               const successes = results.filter((result) => result.success);
