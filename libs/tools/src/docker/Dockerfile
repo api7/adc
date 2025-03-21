@@ -1,4 +1,4 @@
-FROM node:bookworm-slim AS builder
+FROM node:lts-bookworm-slim AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -12,7 +12,7 @@ RUN pnpm install nx -g \
   && pnpm install \
   && NODE_ENV=production nx build cli
 
-FROM node:bookworm-slim
+FROM node:lts-bookworm-slim
 
 COPY --from=builder /build/dist/apps/cli/main.js .
 
