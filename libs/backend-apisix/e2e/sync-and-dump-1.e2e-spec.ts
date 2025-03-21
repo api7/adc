@@ -162,7 +162,17 @@ describe('Sync and Dump - 1', () => {
       await syncEvents(backend, [
         deleteEvent(ADCSDK.ResourceType.ROUTE, route2Name, serviceName),
       ]);
-      await wait(1000);
+
+      // Since APISIX uses its in-memory routes configuration to check for referential
+      // relationships when deleting services, when we delete a route and its associated
+      // service at almost the same time, since the in-memory cache update needs to go
+      // through the
+      //   Admin API write etcd => etcd push delete event => handle event and take effect
+      // before it can be updated, this makes service deletions always tend to fail, so
+      // this requires a short pause to wait for APISIX to synchronize.
+      // This seems to require some modification in APISIX to make the process complete
+      // faster to increase the success rate of deletions.
+      await wait(200);
       await syncEvents(backend, [
         deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
       ]);
