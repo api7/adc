@@ -105,6 +105,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
 
   public sync(
     events: Array<ADCSDK.Event>,
+    opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ): Observable<ADCSDK.BackendSyncResult> {
     return forkJoin([from(this.version()), from(this.defaultValue())]).pipe(
       switchMap(([version]) => {
@@ -112,7 +113,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
           client: this.client,
           version,
           eventSubject: this.subject,
-        }).sync(events);
+        }).sync(events, opts);
       }),
     );
   }

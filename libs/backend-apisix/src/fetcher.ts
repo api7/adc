@@ -45,11 +45,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     const logger = this.getLogger(taskName);
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
-    return from(
-      this.client.get<RESP_TYPE>(`/apisix/admin/${apiName}`, {
-        validateStatus: () => true,
-      }),
-    ).pipe(
+    return from(this.client.get<RESP_TYPE>(`/apisix/admin/${apiName}`)).pipe(
       tap((resp) => logger(this.debugLogEvent(resp))),
       map((resp) => resp.data),
       finalize(() => logger(taskStateEvent('TASK_DONE'))),
@@ -88,7 +84,6 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     return from(
       this.client.get<typing.ListResponse<typing.Consumer>>(
         `/apisix/admin/consumers`,
-        { validateStatus: () => true },
       ),
     ).pipe(
       tap((resp) => logger(this.debugLogEvent(resp))),
@@ -170,7 +165,6 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     return from(
       this.client.get<typing.ListResponse<typing.StreamRoute>>(
         `/apisix/admin/stream_routes`,
-        { validateStatus: () => true },
       ),
     ).pipe(
       map((resp) => {

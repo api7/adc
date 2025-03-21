@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { Axios, CreateAxiosDefaults } from 'axios';
+import axios, { Axios, AxiosError, CreateAxiosDefaults } from 'axios';
 import { JSONSchema4 } from 'json-schema';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
@@ -11,7 +11,15 @@ import {
   Agent as httpsAgent,
   AgentOptions as httpsAgentOptions,
 } from 'node:https';
-import { Subject, forkJoin, from, switchMap } from 'rxjs';
+import {
+  ObservableInput,
+  Subject,
+  catchError,
+  forkJoin,
+  from,
+  of,
+  switchMap,
+} from 'rxjs';
 import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
@@ -196,10 +204,10 @@ export class BackendAPI7 implements ADCSDK.Backend {
   public dump() {
     return forkJoin([
       from(this.version()),
-      from(this.defaultValue()),
       from(this.getGatewayGroupId()),
+      from(this.defaultValue()),
     ]).pipe<ADCSDK.Configuration>(
-      switchMap(([version, , gatewayGroupId]) => {
+      switchMap(([version, gatewayGroupId]) => {
         const fetcher = new Fetcher({
           client: this.client,
           version: version,
@@ -208,28 +216,28 @@ export class BackendAPI7 implements ADCSDK.Backend {
           gatewayGroupName: this.gatewayGroupName,
           gatewayGroupId: gatewayGroupId,
         });
-        return fetcher.allTask();
+        return fetcher.dump();
       }),
     );
   }
 
   public sync(
     events: Array<ADCSDK.Event>,
-    opts: { exitOnFailed: boolean } = { exitOnFailed: true },
+    opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ) {
     return forkJoin([
       from(this.version()),
-      from(this.defaultValue()),
       from(this.getGatewayGroupId()),
+      from(this.defaultValue()),
     ]).pipe(
-      switchMap(([version, , gatewayGroupId]) => {
+      switchMap(([version, gatewayGroupId]) => {
         return new Operator({
           client: this.client,
           version,
           eventSubject: this.subject,
           gatewayGroupId,
           gatewayGroupName: this.gatewayGroupName,
-        }).sync(events);
+        }).sync(events, opts);
       }),
     );
   }

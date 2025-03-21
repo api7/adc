@@ -97,6 +97,9 @@ export const overrideEventResourceId = (
 export const sortResult = <T>(result: Array<T>, field: string) =>
   structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
 
+export const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 type cond = boolean | (() => boolean);
 
 export const conditionalDescribe = (cond: cond) =>

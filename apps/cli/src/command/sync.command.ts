@@ -93,7 +93,11 @@ export const SyncCommand = new BackendCommand<SyncOption>(
           title: 'Sync configuration',
           task: async (ctx, task) => {
             const cancel = addBackendEventListener(ctx.backend, task);
-            await lastValueFrom(ctx.backend.sync(ctx.diff).pipe(toArray()));
+            await lastValueFrom(
+              ctx.backend
+                .sync(ctx.diff, { exitOnFailure: true })
+                .pipe(toArray()),
+            );
             cancel();
           },
           exitOnError: true,

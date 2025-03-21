@@ -6,15 +6,12 @@ import {
   Subject,
   catchError,
   concatMap,
-  filter,
   from,
   map,
   mergeMap,
   of,
   reduce,
-  switchMap,
   tap,
-  toArray,
 } from 'rxjs';
 import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
 
@@ -48,7 +45,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       this.client.request({
         method: 'DELETE',
         url: path,
-        validateStatus: () => true,
         ...(isUpdate && {
           method: 'PUT',
           data: this.fromADC(event, this.opts.version),
@@ -57,7 +53,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     );
   }
 
-  public sync(events: Array<ADCSDK.Event>) {
+  public sync(
+    events: Array<ADCSDK.Event>,
+    opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
+  ) {
     return this.syncPreprocessEvents(events).pipe(
       concatMap((group) =>
         from(group).pipe(
@@ -93,37 +92,32 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             logger(taskStateEvent('TASK_START'));
             return from(this.operate(event)).pipe(
               tap((resp) => logger(this.debugLogEvent(resp))),
-              map<AxiosResponse, ADCSDK.BackendSyncResult>((response) => {
-                if (response.status >= 400)
-                  throw new Error(response.data.error_msg);
-
-                return {
-                  success: true,
-                  event,
-                  axiosResponse: response,
-                  ...(response?.data?.error_msg && {
-                    success: false,
-                    error: new Error(response.data.error_msg),
-                  }),
-                } satisfies ADCSDK.BackendSyncResult;
-              }),
+              map<AxiosResponse, ADCSDK.BackendSyncResult>(
+                (response) =>
+                  ({
+                    success: true,
+                    event,
+                    axiosResponse: response,
+                  }) satisfies ADCSDK.BackendSyncResult,
+              ),
               catchError<
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
-                if (axios.isAxiosError(error)) {
-                  //TODO exitOnFailed if (opts.exitOnFailed) throw error;
-                  return of({
-                    success: false,
-                    event,
-                    axiosResponse: error.response,
-                    error,
-                  } satisfies ADCSDK.BackendSyncResult);
-                }
+                if (opts.exitOnFailure)
+                  throw new Error(
+                    `Error: ${axios.isAxiosError(error) && error.response ? error.response.data?.error_msg : error.message}, `,
+                  );
                 return of({
                   success: false,
                   event,
                   error,
+                  ...(axios.isAxiosError(error) && {
+                    axiosResponse: error.response,
+                    ...(error.response?.data?.error_msg && {
+                      error: new Error(error.response.data.error_msg),
+                    }),
+                  }),
                 } satisfies ADCSDK.BackendSyncResult);
               }),
               tap(() => logger(taskStateEvent('TASK_DONE'))),

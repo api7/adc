@@ -141,7 +141,6 @@ const generateToken = async () => {
       expires_at: 0,
       name: randomUUID(),
     },
-    { validateStatus: () => true },
   );
 
   process.env.TOKEN = resp.data.value.token;

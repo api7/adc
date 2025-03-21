@@ -48,6 +48,10 @@ export interface BackendEventAxiosDebug {
   description?: string;
 }
 
+export interface BackendSyncOptions {
+  exitOnFailure?: boolean;
+}
+
 export interface BackendSyncResult {
   success: boolean;
   event: ADCSDK.Event;
@@ -61,7 +65,10 @@ export interface Backend {
   version: () => Promise<SemVer>;
   defaultValue: () => Promise<ADCSDK.DefaultValue>;
   dump: () => Observable<ADCSDK.Configuration>;
-  sync: (events: Array<ADCSDK.Event>) => Observable<BackendSyncResult>;
+  sync: (
+    events: Array<ADCSDK.Event>,
+    opts?: BackendSyncOptions,
+  ) => Observable<BackendSyncResult>;
 
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
