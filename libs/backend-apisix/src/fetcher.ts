@@ -96,6 +96,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
               from(
                 this.client.get<typing.ListResponse<typing.ConsumerCredential>>(
                   `/apisix/admin/consumers/${consumer.username}/credentials`,
+                  { validateStatus: () => true },
                 ),
               ).pipe(
                 tap((resp) =>
