@@ -4,6 +4,7 @@ import { produce } from 'immer';
 import { curry, isEmpty } from 'lodash';
 import {
   Subject,
+  catchError,
   combineLatest,
   from,
   map,
@@ -225,7 +226,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     );
   }
 
-  public allTask() {
+  public dump() {
     return combineLatest([
       this.listServices(),
       this.listConsumers(),
