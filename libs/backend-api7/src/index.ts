@@ -135,16 +135,16 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
     //TODO wait for it to fix in upstream
     if (!resp.data?.value?.upstream)
-      resp.data.value.upstream = (
-        resp.data?.value?.service as any
-      )?.properties?.upstream;
+      resp.data.value.upstream = {
+        ...(resp.data?.value?.service as any)?.properties?.upstream,
+        type: 'object',
+      };
 
     const toADC = new ToADC();
     return (this.innerDefaultValue = {
       core: Object.fromEntries(
         Object.entries(resp.data.value).map(
           ([type, schema]: [ADCSDK.ResourceType, JSONSchema4]) => {
-            console.log(type, schema, !!schema);
             const data =
               extractObjectDefault(
                 schema.allOf ? mergeAllOf(schema.allOf) : schema,
