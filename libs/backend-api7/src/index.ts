@@ -144,6 +144,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
       core: Object.fromEntries(
         Object.entries(resp.data.value).map(
           ([type, schema]: [ADCSDK.ResourceType, JSONSchema4]) => {
+            console.log(type, schema, !!schema);
             const data =
               extractObjectDefault(
                 schema.allOf ? mergeAllOf(schema.allOf) : schema,
