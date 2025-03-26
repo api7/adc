@@ -56,13 +56,16 @@ export interface Service {
   hosts?: Array<string>;
   path_prefix?: string;
   strip_path_prefix?: boolean;
-  upstream: ADCUpstream;
+  upstream: Upstream;
   plugins?: Plugins;
   version?: string;
   service_version_id?: string;
   service_id: string;
   routes?: Array<Route>;
   stream_routes?: Array<StreamRoute>;
+
+  // multiple upstreams for canary release
+  upstreams?: Array<Upstream>;
 }
 export interface ConsumerCredential {
   id?: string;
@@ -105,7 +108,7 @@ export interface Upstream {
   labels?: Labels;
 
   nodes?: Array<Omit<UpstreamNode, 'metadata'>>;
-  scheme?: Extract<UpstreamScheme, 'http' | 'https' | 'grpc' | 'grpcs'>;
+  scheme?: UpstreamScheme;
   type?: UpstreamBalancer;
   hash_on?: string;
   key?: string;

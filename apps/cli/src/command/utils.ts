@@ -265,6 +265,8 @@ export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
             item.routes.forEach((r) => removeMetadata(r));
           if ('stream_routes' in item && Array.isArray(item.stream_routes))
             item.stream_routes.forEach((r) => removeMetadata(r));
+          if ('upstreams' in item && Array.isArray(item.upstreams))
+            item.upstreams.forEach((u) => removeMetadata(u));
         } else if (key === 'consumer_groups') {
           if ('consumers' in item && Array.isArray(item.consumers))
             item.consumers.forEach((c) => removeMetadata(c));

@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import { isNil } from 'lodash';
+import { ZodRawShape, z } from 'zod';
 
 const idSchema = z
   .string()
@@ -74,118 +75,120 @@ const upstreamHealthCheckPassiveUnhealthy = z
 const upstreamHealthCheckType = z
   .enum(['http', 'https', 'tcp'])
   .default('http');
-const upstreamSchema = z
-  .object({
-    name: nameSchema.optional(),
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+const upstreamSchema = (extend?: ZodRawShape) =>
+  z
+    .object({
+      name: nameSchema.optional(),
+      description: descriptionSchema.optional(),
+      labels: labelsSchema.optional(),
 
-    type: z
-      .enum(['roundrobin', 'chash', 'least_conn', 'ewma'])
-      .default('roundrobin')
-      .optional(),
-    hash_on: z.string().optional(),
-    key: z.string().optional(),
-    checks: z
-      .object({
-        active: z.object({
-          type: upstreamHealthCheckType.optional(),
-          timeout: z.coerce.number().default(1).optional(),
-          concurrency: z.coerce.number().default(10).optional(),
-          host: hostSchema.optional(),
-          port: portSchema.optional(),
-          http_path: z.string().default('/').optional(),
-          https_verify_cert: z.boolean().default(true).optional(),
-          http_request_headers: z.array(z.string()).min(1).optional(),
-          healthy: z
-            .object({
-              interval: z.coerce.number().int().min(1).default(1),
-            })
-            .merge(upstreamHealthCheckPassiveHealthy)
-            .strict()
-            .optional(),
-          unhealthy: z
-            .object({
-              interval: z.coerce.number().int().min(1).default(1),
-            })
-            .merge(upstreamHealthCheckPassiveUnhealthy)
-            .strict()
-            .optional(),
-        }),
-        passive: z
-          .object({
+      type: z
+        .enum(['roundrobin', 'chash', 'least_conn', 'ewma'])
+        .default('roundrobin')
+        .optional(),
+      hash_on: z.string().optional(),
+      key: z.string().optional(),
+      checks: z
+        .object({
+          active: z.object({
             type: upstreamHealthCheckType.optional(),
-            healthy: upstreamHealthCheckPassiveHealthy.optional(),
-            unhealthy: upstreamHealthCheckPassiveUnhealthy.optional(),
-          })
-          .optional(),
-      })
-      .refine(
-        (data) =>
-          (data.active && data.passive) || (data.active && !data.passive),
-        {
-          message:
-            'Passive health checks must be enabled at the same time as active health checks',
-        },
-      )
-      .optional(),
-    nodes: z
-      .array(
-        z.object({
-          host: hostSchema,
-          port: portSchema.optional(),
-          weight: z.coerce.number().int().min(0),
-          priority: z.coerce.number().default(0).optional(),
-          metadata: z.record(z.string(), z.any()).optional(),
-        }),
-      )
-      .optional(),
-    scheme: z
-      .enum(['grpc', 'grpcs', 'http', 'https', 'tcp', 'tls', 'udp', 'kafka'])
-      .default('http')
-      .optional(),
-    retries: z.coerce.number().int().min(0).max(65535).optional(),
-    retry_timeout: z.coerce.number().min(0).optional(),
-    timeout: timeoutSchema.optional(),
-    tls: z
-      .object({
-        client_cert: z.string().optional(),
-        client_key: z.string().optional(),
-        client_cert_id: z.string().optional(),
-        verify: z.boolean().optional(),
-      })
-      .strict()
-      .refine(
-        (data) =>
-          (data.client_cert && data.client_key && !data.client_cert_id) ||
-          (data.client_cert_id && !data.client_cert && !data.client_key),
-        'The client_cert and client_key certificate pair or client_cert_id SSL reference ID must be set',
-      )
-      .optional(),
-    keepalive_pool: z
-      .object({
-        size: z.coerce.number().int().min(1).default(320),
-        idle_timeout: z.coerce.number().min(0).default(60),
-        requests: z.coerce.number().int().min(1).default(1000),
-      })
-      .optional(),
-    pass_host: z.enum(['pass', 'node', 'rewrite']).default('pass').optional(),
-    upstream_host: hostSchema.optional(),
+            timeout: z.coerce.number().default(1).optional(),
+            concurrency: z.coerce.number().default(10).optional(),
+            host: hostSchema.optional(),
+            port: portSchema.optional(),
+            http_path: z.string().default('/').optional(),
+            https_verify_cert: z.boolean().default(true).optional(),
+            http_request_headers: z.array(z.string()).min(1).optional(),
+            healthy: z
+              .object({
+                interval: z.coerce.number().int().min(1).default(1),
+              })
+              .merge(upstreamHealthCheckPassiveHealthy)
+              .strict()
+              .optional(),
+            unhealthy: z
+              .object({
+                interval: z.coerce.number().int().min(1).default(1),
+              })
+              .merge(upstreamHealthCheckPassiveUnhealthy)
+              .strict()
+              .optional(),
+          }),
+          passive: z
+            .object({
+              type: upstreamHealthCheckType.optional(),
+              healthy: upstreamHealthCheckPassiveHealthy.optional(),
+              unhealthy: upstreamHealthCheckPassiveUnhealthy.optional(),
+            })
+            .optional(),
+        })
+        .refine(
+          (data) =>
+            (data.active && data.passive) || (data.active && !data.passive),
+          {
+            message:
+              'Passive health checks must be enabled at the same time as active health checks',
+          },
+        )
+        .optional(),
+      nodes: z
+        .array(
+          z.object({
+            host: hostSchema,
+            port: portSchema.optional(),
+            weight: z.coerce.number().int().min(0),
+            priority: z.coerce.number().default(0).optional(),
+            metadata: z.record(z.string(), z.any()).optional(),
+          }),
+        )
+        .optional(),
+      scheme: z
+        .enum(['grpc', 'grpcs', 'http', 'https', 'tcp', 'tls', 'udp', 'kafka'])
+        .default('http')
+        .optional(),
+      retries: z.coerce.number().int().min(0).max(65535).optional(),
+      retry_timeout: z.coerce.number().min(0).optional(),
+      timeout: timeoutSchema.optional(),
+      tls: z
+        .object({
+          client_cert: z.string().optional(),
+          client_key: z.string().optional(),
+          client_cert_id: z.string().optional(),
+          verify: z.boolean().optional(),
+        })
+        .strict()
+        .refine(
+          (data) =>
+            (data.client_cert && data.client_key && !data.client_cert_id) ||
+            (data.client_cert_id && !data.client_cert && !data.client_key),
+          'The client_cert and client_key certificate pair or client_cert_id SSL reference ID must be set',
+        )
+        .optional(),
+      keepalive_pool: z
+        .object({
+          size: z.coerce.number().int().min(1).default(320),
+          idle_timeout: z.coerce.number().min(0).default(60),
+          requests: z.coerce.number().int().min(1).default(1000),
+        })
+        .optional(),
+      pass_host: z.enum(['pass', 'node', 'rewrite']).default('pass').optional(),
+      upstream_host: hostSchema.optional(),
 
-    service_name: z.string().optional(),
-    discovery_type: z.string().optional(),
-    discovery_args: z.record(z.string(), z.any()).optional(),
-  })
-  .strict()
-  .refine(
-    (val) =>
-      (val.nodes && !val.discovery_type && !val.service_name) ||
-      (val.discovery_type && val.service_name && !val.nodes),
-    {
-      message:
-        'Upstream must either explicitly specify nodes or use service discovery and not both',
-    },
-  );
+      service_name: z.string().optional(),
+      discovery_type: z.string().optional(),
+      discovery_args: z.record(z.string(), z.any()).optional(),
+    })
+    .strict()
+    .extend(extend)
+    .refine(
+      (val) =>
+        (val.nodes && !val.discovery_type && !val.service_name) ||
+        (val.discovery_type && val.service_name && !val.nodes),
+      {
+        message:
+          'Upstream must either explicitly specify nodes or use service discovery and not both',
+      },
+    );
 
 const routeSchema = z
   .object({
@@ -246,7 +249,15 @@ const serviceSchema = z
     description: descriptionSchema.optional(),
     labels: labelsSchema.optional(),
 
-    upstream: upstreamSchema.optional(),
+    upstream: upstreamSchema().optional(),
+    upstreams: z
+      .array(
+        upstreamSchema({
+          id: idSchema.optional(),
+          name: z.string(),
+        }),
+      )
+      .optional(),
     plugins: pluginsSchema.optional(),
     path_prefix: z.string().optional(),
     strip_path_prefix: z.boolean().optional(),
@@ -263,15 +274,13 @@ const serviceSchema = z
         'HTTP routes and Stream routes are mutually exclusive and should not exist in the same service',
     },
   )
-  .refine(
-    (val) => {
-      if (!val.path_prefix) return true;
-      return val.path_prefix.startsWith('/');
-    },
-    {
-      message: 'Path prefix must start with "/"',
-    },
-  );
+  .refine((val) => !val.path_prefix || val.path_prefix.startsWith('/'), {
+    message: 'Path prefix must start with "/"',
+  })
+  .refine((val) => !(!isNil(val.upstreams) && isNil(val.upstream)), {
+    message:
+      'The default upstream must be set with "upstream" when multiple upstreams are set via "upstreams"',
+  });
 
 const sslSchema = z
   .object({

@@ -43,7 +43,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
+        : resourceType === ADCSDK.ResourceType.UPSTREAM
+          ? `services/${parentId}/upstreams/${resourceId}`
+          : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
     }`;
 
     return from(
@@ -82,6 +84,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
+                console.log(error);
                 if (opts.exitOnFailure)
                   throw new Error(
                     `Error: ${axios.isAxiosError(error) && error.response ? error.response.data?.error_msg : error.message}, `,
@@ -120,6 +123,11 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
     const event$ = from(events);
     return event$.pipe(
+      tap((event) => {
+        if (event.resourceType === ADCSDK.ResourceType.UPSTREAM) {
+          console.log(event);
+        }
+      }),
       // Aggregate services that need to be deleted
       filter(
         (event) =>
@@ -210,6 +218,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         return fromADC.transformConsumerCredential(
           event.newValue as ADCSDK.ConsumerCredential,
         );
+      case ADCSDK.ResourceType.UPSTREAM:
+        //(event.newValue as ADCSDK.ConsumerCredential).id = event.resourceId;
+        return fromADC.transformUpstream(event.newValue as ADCSDK.Upstream);
     }
   }
 }
