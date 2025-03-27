@@ -17,6 +17,7 @@ import { Fetcher } from './fetcher';
 import { Operator } from './operator';
 
 export class BackendAPISIX implements ADCSDK.Backend {
+  private static logScope = ['APISIX'];
   private readonly client: Axios;
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
@@ -56,6 +57,12 @@ export class BackendAPISIX implements ADCSDK.Backend {
     if (opts.timeout) config.timeout = opts.timeout;
 
     this.client = axios.create(config);
+  }
+
+  public metadata() {
+    return {
+      logScope: BackendAPISIX.logScope,
+    };
   }
 
   public async defaultValue() {
