@@ -133,7 +133,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
       event: { response: resp, description: 'Get core resoruces schema' },
     });
 
-    //TODO wait for it to fix in upstream
+    // Fix upstream schema from 3.5 to 3.7
     if (!resp.data?.value?.upstream && resp.data?.value?.service)
       resp.data.value.upstream = {
         ...(resp.data?.value?.service as any)?.properties?.upstream,
