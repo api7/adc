@@ -122,11 +122,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
     const event$ = from(events);
     return event$.pipe(
-      tap((event) => {
-        if (event.resourceType === ADCSDK.ResourceType.UPSTREAM) {
-          console.log(event);
-        }
-      }),
       // Aggregate services that need to be deleted
       filter(
         (event) =>

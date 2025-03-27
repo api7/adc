@@ -13,7 +13,7 @@ import {
   tap,
   toArray,
 } from 'rxjs';
-import { SemVer } from 'semver';
+import { SemVer, lt as semverLT } from 'semver';
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
@@ -59,6 +59,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
         from(resp.data.list).pipe(
           // fetch upstreams of the service
           mergeMap((service) => {
+            if (semverLT(this.opts.version, '3.5.0')) return of(service);
             return from(
               this.client.get<typing.ListResponse<typing.Upstream>>(
                 `/apisix/admin/services/${service.id}/upstreams`,
