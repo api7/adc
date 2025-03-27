@@ -43,7 +43,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
+        : resourceType === ADCSDK.ResourceType.UPSTREAM
+          ? `services/${parentId}/upstreams/${resourceId}`
+          : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : this.generateResourceTypeInAPI(resourceType)}/${resourceId}`
     }`;
 
     return from(
@@ -210,6 +212,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         return fromADC.transformConsumerCredential(
           event.newValue as ADCSDK.ConsumerCredential,
         );
+      case ADCSDK.ResourceType.UPSTREAM:
+        //(event.newValue as ADCSDK.ConsumerCredential).id = event.resourceId;
+        return fromADC.transformUpstream(event.newValue as ADCSDK.Upstream);
     }
   }
 }

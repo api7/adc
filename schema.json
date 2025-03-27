@@ -379,6 +379,266 @@
             },
             "additionalProperties": false
           },
+          "upstreams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "$ref": "#/properties/services/items/properties/description"
+                },
+                "labels": {
+                  "$ref": "#/properties/services/items/properties/labels"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "roundrobin",
+                    "chash",
+                    "least_conn",
+                    "ewma"
+                  ],
+                  "default": "roundrobin"
+                },
+                "hash_on": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "checks": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/type"
+                        },
+                        "timeout": {
+                          "type": "number",
+                          "default": 1
+                        },
+                        "concurrency": {
+                          "type": "number",
+                          "default": 10
+                        },
+                        "host": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
+                        },
+                        "port": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/port"
+                        },
+                        "http_path": {
+                          "type": "string",
+                          "default": "/"
+                        },
+                        "https_verify_cert": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "http_request_headers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1
+                        },
+                        "healthy": {
+                          "type": "object",
+                          "properties": {
+                            "interval": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "default": 1
+                            },
+                            "http_statuses": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/healthy/properties/http_statuses"
+                            },
+                            "successes": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/healthy/properties/successes"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "unhealthy": {
+                          "type": "object",
+                          "properties": {
+                            "interval": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "default": 1
+                            },
+                            "http_statuses": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/unhealthy/properties/http_statuses"
+                            },
+                            "http_failures": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/unhealthy/properties/http_failures"
+                            },
+                            "tcp_failures": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/unhealthy/properties/tcp_failures"
+                            },
+                            "timeouts": {
+                              "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/unhealthy/properties/timeouts"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "passive": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/type"
+                        },
+                        "healthy": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/passive/properties/healthy"
+                        },
+                        "unhealthy": {
+                          "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/passive/properties/unhealthy"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "active"
+                  ],
+                  "additionalProperties": false
+                },
+                "nodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "host": {
+                        "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
+                      },
+                      "port": {
+                        "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/port"
+                      },
+                      "weight": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "priority": {
+                        "type": "number",
+                        "default": 0
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "host",
+                      "weight"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "scheme": {
+                  "type": "string",
+                  "enum": [
+                    "grpc",
+                    "grpcs",
+                    "http",
+                    "https",
+                    "tcp",
+                    "tls",
+                    "udp",
+                    "kafka"
+                  ],
+                  "default": "http"
+                },
+                "retries": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "retry_timeout": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "timeout": {
+                  "$ref": "#/properties/services/items/properties/upstream/properties/timeout"
+                },
+                "tls": {
+                  "type": "object",
+                  "properties": {
+                    "client_cert": {
+                      "type": "string"
+                    },
+                    "client_key": {
+                      "type": "string"
+                    },
+                    "client_cert_id": {
+                      "type": "string"
+                    },
+                    "verify": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "keepalive_pool": {
+                  "type": "object",
+                  "properties": {
+                    "size": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "default": 320
+                    },
+                    "idle_timeout": {
+                      "type": "number",
+                      "minimum": 0,
+                      "default": 60
+                    },
+                    "requests": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "default": 1000
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "pass_host": {
+                  "type": "string",
+                  "enum": [
+                    "pass",
+                    "node",
+                    "rewrite"
+                  ],
+                  "default": "pass"
+                },
+                "upstream_host": {
+                  "$ref": "#/properties/services/items/properties/upstream/properties/checks/properties/active/properties/host"
+                },
+                "service_name": {
+                  "type": "string"
+                },
+                "discovery_type": {
+                  "type": "string"
+                },
+                "discovery_args": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "id": {
+                  "$ref": "#/properties/services/items/properties/id"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
           "plugins": {
             "type": "object",
             "additionalProperties": {

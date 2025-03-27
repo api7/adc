@@ -1,10 +1,9 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios, AxiosResponse } from 'axios';
+import { Axios } from 'axios';
 import { produce } from 'immer';
-import { curry, isEmpty } from 'lodash';
+import { isEmpty } from 'lodash';
 import {
   Subject,
-  catchError,
   combineLatest,
   from,
   map,
@@ -14,7 +13,7 @@ import {
   tap,
   toArray,
 } from 'rxjs';
-import { SemVer } from 'semver';
+import { SemVer, lt as semverLT } from 'semver';
 
 import { ToADC } from './transformer';
 import * as typing from './typing';
@@ -58,6 +57,34 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       tap((resp) => logger(this.debugLogEvent(resp))),
       mergeMap((resp) =>
         from(resp.data.list).pipe(
+          // fetch upstreams of the service
+          mergeMap((service) => {
+            if (semverLT(this.opts.version, '3.5.0')) return of(service);
+            return from(
+              this.client.get<typing.ListResponse<typing.Upstream>>(
+                `/apisix/admin/services/${service.id}/upstreams`,
+                {
+                  params: { gateway_group_id: this.opts.gatewayGroupId },
+                  validateStatus: () => true,
+                },
+              ),
+            ).pipe(
+              tap((resp) =>
+                logger(
+                  this.debugLogEvent(
+                    resp,
+                    `Get upstreams of service "${service.name}"`,
+                  ),
+                ),
+              ),
+              map((resp) =>
+                produce(service, (draft) => {
+                  draft.upstreams = resp.data.list;
+                }),
+              ),
+            );
+          }),
+          // fetch routes/stream_routes of the service
           mergeMap((service) => {
             const params = {
               gateway_group_id: this.opts.gatewayGroupId,
@@ -78,19 +105,19 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
                 logger(
                   this.debugLogEvent(
                     resp,
-                    `Get ${service.type === 'stream' ? 'stream routes' : 'routes'} in service "${service.name}"`,
+                    `Get ${service.type === 'stream' ? 'stream routes' : 'routes'} of service "${service.name}"`,
                   ),
                 ),
               ),
-              map((resp) => {
-                const routes = resp.data.list;
-                return produce(service, (draft) => {
+              map((resp) =>
+                produce(service, (draft) => {
                   if (service.type === 'stream')
-                    draft.stream_routes = routes as typing.StreamRoute[];
+                    draft.stream_routes = resp.data
+                      .list as typing.StreamRoute[];
                   if (service.type === 'http')
-                    service.routes = routes as typing.Route[];
-                });
-              }),
+                    draft.routes = resp.data.list as typing.Route[];
+                }),
+              ),
             );
           }),
           map((service) => this.toADC.transformService(service)),

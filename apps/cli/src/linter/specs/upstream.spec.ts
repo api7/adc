@@ -117,6 +117,42 @@ describe('Upstream Linter', () => {
       } as ADCSDK.Configuration,
       expect: true,
     },
+    {
+      name: 'should ensure name is required in upstreams, and id is allowed',
+      input: {
+        services: [
+          {
+            name: 'test',
+            upstreams: [
+              {
+                id: 'my-upstream',
+                nodes: [
+                  {
+                    host: '1.1.1.1',
+                    port: 443,
+                    weight: 100,
+                  },
+                ],
+                tls: {
+                  client_cert: '0000',
+                  client_key: '0000',
+                },
+              },
+            ],
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: false,
+      errors: [
+        {
+          code: 'invalid_type',
+          expected: 'string',
+          message: 'Required',
+          path: ['services', 0, 'upstreams', 0, 'name'],
+          received: 'undefined',
+        },
+      ],
+    },
   ];
 
   // test cases runner

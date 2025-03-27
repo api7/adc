@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { Axios, AxiosError, CreateAxiosDefaults } from 'axios';
+import axios, { Axios, CreateAxiosDefaults } from 'axios';
 import { JSONSchema4 } from 'json-schema';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
@@ -11,15 +11,7 @@ import {
   Agent as httpsAgent,
   AgentOptions as httpsAgentOptions,
 } from 'node:https';
-import {
-  ObservableInput,
-  Subject,
-  catchError,
-  forkJoin,
-  from,
-  of,
-  switchMap,
-} from 'rxjs';
+import { Subject, forkJoin, from, switchMap } from 'rxjs';
 import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
@@ -96,7 +88,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     if (this.innerDefaultValue) return this.innerDefaultValue;
     const mergeAllOf = (items: Array<JSONSchema4>) => {
       if (items.length < 2) return items[0];
-      if (!items.every((item) => item.type === 'object')) return null;
+      if (!items.some((item) => item.type === 'object')) return {};
 
       const first = items.shift();
       if (!first.properties) first.properties = {};
@@ -141,34 +133,37 @@ export class BackendAPI7 implements ADCSDK.Backend {
       event: { response: resp, description: 'Get core resoruces schema' },
     });
 
+    // Fix upstream schema from 3.5 to 3.7
+    if (!resp.data?.value?.upstream && resp.data?.value?.service)
+      resp.data.value.upstream = {
+        ...(resp.data?.value?.service as any)?.properties?.upstream,
+        type: 'object',
+      };
+
+    const toADC = new ToADC();
     return (this.innerDefaultValue = {
       core: Object.fromEntries(
         Object.entries(resp.data.value).map(
-          ([type, schema]: [string, JSONSchema4]) => {
-            const transformer = (type: ADCSDK.ResourceType) => {
-              const toADC = new ToADC();
-              switch (type) {
-                case ADCSDK.ResourceType.ROUTE:
-                  return toADC.transformRoute;
-                case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
-                case ADCSDK.ResourceType.SERVICE:
-                  return toADC.transformService;
-                case ADCSDK.ResourceType.SSL:
-                  return toADC.transformSSL;
-                case ADCSDK.ResourceType.CONSUMER:
-                  return toADC.transformConsumer;
-                default:
-                  return <T>(res: T): T => res;
-              }
-            };
-            return [
-              type,
-              transformer(type as ADCSDK.ResourceType)(
-                extractObjectDefault(
-                  schema.allOf ? mergeAllOf(schema.allOf) : schema,
-                ) ?? {},
-              ),
-            ];
+          ([type, schema]: [ADCSDK.ResourceType, JSONSchema4]) => {
+            const data =
+              extractObjectDefault(
+                schema.allOf ? mergeAllOf(schema.allOf) : schema,
+              ) ?? {};
+            switch (type) {
+              case ADCSDK.ResourceType.ROUTE:
+                return [type, toADC.transformRoute(data)];
+              case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
+              case ADCSDK.ResourceType.SERVICE:
+                return [type, toADC.transformService(data)];
+              case ADCSDK.ResourceType.SSL:
+                return [type, toADC.transformSSL(data)];
+              case ADCSDK.ResourceType.CONSUMER:
+                return [type, toADC.transformConsumer(data)];
+              case ADCSDK.ResourceType.UPSTREAM:
+                return [type, toADC.transformUpstream(data)];
+              default:
+                return [type, data];
+            }
           },
         ),
       ),

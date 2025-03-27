@@ -34,6 +34,7 @@ export interface Service {
   labels?: Labels;
 
   upstream?: Upstream;
+  upstreams?: Array<Upstream>;
   plugins?: Plugins;
   path_prefix?: string;
   strip_path_prefix?: boolean;
@@ -250,9 +251,9 @@ export interface Configuration {
   routes?: Array<Route>;
   stream_routes?: Array<StreamRoute>;
   consumer_credentials?: Array<ConsumerCredential>;
+  upstreams?: Array<Upstream>;
   /* consumer_groups?: Array<ConsumerGroup>;
-  plugin_configs?: Array<PluginConfig>;
-  upstreams?: Array<Upstream>; */
+  plugin_configs?: Array<PluginConfig>; */
 }
 
 export type Resource =

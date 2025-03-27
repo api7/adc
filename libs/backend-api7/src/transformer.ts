@@ -49,7 +49,12 @@ export class ToADC {
       name: service.name,
       description: service.desc,
       labels: ToADC.transformLabels(service.labels),
-      upstream: service.upstream,
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
+      upstreams: service.upstreams
+        ?.filter((item) => item.id !== service.id) // ignore default upstream
+        .map((item) => this.transformUpstream(item)),
       plugins: service.plugins,
       path_prefix: service.path_prefix,
       strip_path_prefix: service.strip_path_prefix,
@@ -58,6 +63,31 @@ export class ToADC {
       stream_routes: service.stream_routes?.map((item) =>
         this.transformStreamRoute(item),
       ),
+    });
+  }
+
+  public transformUpstream(upstream: typing.Upstream): ADCSDK.Upstream {
+    return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Upstream>({
+      id: upstream.id,
+      name: upstream.name,
+      description: upstream.desc,
+      labels: ToADC.transformLabels(upstream.labels),
+      type: upstream.type,
+      hash_on: upstream.hash_on,
+      key: upstream.key,
+      checks: upstream.checks,
+      nodes: upstream.nodes,
+      scheme: upstream.scheme,
+      retries: upstream.retries,
+      retry_timeout: upstream.retry_timeout,
+      timeout: upstream.timeout,
+      tls: upstream.tls,
+      keepalive_pool: upstream.keepalive_pool,
+      pass_host: upstream.pass_host,
+      upstream_host: upstream.upstream_host,
+      service_name: upstream.service_name,
+      discovery_type: upstream.discovery_type,
+      discovery_args: upstream.discovery_args,
     });
   }
 
@@ -184,6 +214,31 @@ export class FromADC {
       type: ['tcp', 'udp', 'tls'].includes(service?.upstream?.scheme)
         ? 'stream'
         : 'http',
+    });
+  }
+
+  public transformUpstream(upstream: ADCSDK.Upstream): typing.Upstream {
+    return ADCSDK.utils.recursiveOmitUndefined<typing.Upstream>({
+      id: upstream.id,
+      name: upstream.name,
+      desc: upstream.description,
+      labels: FromADC.transformLabels(upstream.labels),
+      type: upstream.type,
+      hash_on: upstream.hash_on,
+      key: upstream.key,
+      checks: upstream.checks,
+      nodes: upstream.nodes,
+      scheme: upstream.scheme,
+      retries: upstream.retries,
+      retry_timeout: upstream.retry_timeout,
+      timeout: upstream.timeout,
+      tls: upstream.tls,
+      keepalive_pool: upstream.keepalive_pool,
+      pass_host: upstream.pass_host,
+      upstream_host: upstream.upstream_host,
+      service_name: upstream.service_name,
+      discovery_type: upstream.discovery_type,
+      discovery_args: upstream.discovery_args,
     });
   }
 

@@ -35,11 +35,12 @@ export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
                 : resourceType === 'consumer'
                   ? resource.username
                   : resource.name;
+          const field = (error.path.slice(2, error.path.length) ?? []).join(
+            '.',
+          );
           err += `#${idx + 1} ${
             error.message
-          } at ${resourceType}: "${resourceName}", field: "${(
-            error.path.slice(2, error.path.length) ?? []
-          ).join('.')}"\n`;
+          } at ${resourceType}: "${resourceName}"${field ? `, field: "${field}"` : ''}\n`;
         });
       }
 
@@ -47,7 +48,11 @@ export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
         err +=
           'NOTE: There are some unsummarizable errors in the lint results that are presented as "raw error". You can report such unexpected cases.';
 
-      throw new Error(err);
+      const error = new Error(err);
+      error.stack = '';
+      throw error;
     }
+
+    ctx.local = result.data as ADCSDK.Configuration;
   },
 });

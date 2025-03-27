@@ -23,14 +23,14 @@ const order = {
   [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.UPDATE}`]: 15,
 
   [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.CREATE}`]: 16, // SSL may be referenced by upstream mTLS, so it needs to be created in advance
-  [`${ADCSDK.ResourceType.UPSTREAM}.${ADCSDK.EventType.CREATE}`]: 17,
-  [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.CREATE}`]: 18,
-  [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.CREATE}`]: 19,
-  [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.CREATE}`]: 20,
-  [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.CREATE}`]: 21,
-  [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.CREATE}`]: 22,
-  [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.CREATE}`]: 23,
+  [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.CREATE}`]: 17,
+  [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.CREATE}`]: 18,
+  [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.CREATE}`]: 19,
+  [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.CREATE}`]: 20,
+  [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.CREATE}`]: 21,
+  [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.CREATE}`]: 22,
 
+  [`${ADCSDK.ResourceType.UPSTREAM}.${ADCSDK.EventType.CREATE}`]: 23,
   [`${ADCSDK.ResourceType.GLOBAL_RULE}.${ADCSDK.EventType.DELETE}`]: 24,
   [`${ADCSDK.ResourceType.GLOBAL_RULE}.${ADCSDK.EventType.CREATE}`]: 25,
   [`${ADCSDK.ResourceType.GLOBAL_RULE}.${ADCSDK.EventType.UPDATE}`]: 26,
@@ -173,20 +173,16 @@ export class DifferV3 {
         remote?.consumer_credentials?.map((res) => [res.name, res.id, res]) ??
           [],
       ),
-      /* ...differ.diffResource(
+      ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,
         local?.upstreams?.map((res) => [
           res.name,
-          ADCSDK.utils.generateId(res.name),
+          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.upstreams?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
+        remote?.upstreams?.map((res) => [res.name, res.id, res]) ?? [],
       ),
-      ...differ.diffResource(
+      /* ...differ.diffResource(
         ADCSDK.ResourceType.CONSUMER_GROUP,
         local?.consumer_groups?.map((res) => [
           res.name,
@@ -232,7 +228,10 @@ export class DifferV3 {
       );
     });
 
-    differ.logger?.debug({ message: 'Diff result', events }, { showLogEntry });
+    differ.logger?.debug(
+      { message: 'Diff result', transactionId: differ.transactionId, events },
+      { showLogEntry },
+    );
 
     return events;
   }
@@ -345,6 +344,7 @@ export class DifferV3 {
               ? {
                   routes: (remoteItem as ADCSDK.Service).routes,
                   stream_routes: (remoteItem as ADCSDK.Service).stream_routes,
+                  upstreams: (remoteItem as ADCSDK.Service).upstreams,
                 }
               : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
                 ? {
@@ -429,6 +429,7 @@ export class DifferV3 {
               ? {
                   routes: (localItem as ADCSDK.Service).routes,
                   stream_routes: (localItem as ADCSDK.Service).stream_routes,
+                  upstreams: (localItem as ADCSDK.Service).upstreams,
                 }
               : resourceType ===
                   (ADCSDK.ResourceType.CONSUMER_GROUP as ADCSDK.ResourceType)
@@ -447,6 +448,7 @@ export class DifferV3 {
               ? {
                   routes: (remoteItem as ADCSDK.Service).routes,
                   stream_routes: (remoteItem as ADCSDK.Service).stream_routes,
+                  upstreams: (remoteItem as ADCSDK.Service).upstreams,
                 }
               : resourceType ===
                   (ADCSDK.ResourceType.CONSUMER_GROUP as ADCSDK.ResourceType)
@@ -482,7 +484,7 @@ export class DifferV3 {
 
         // Remove nested resources to indeed compare the main resource itself.
         (resourceType === ADCSDK.ResourceType.SERVICE
-          ? ['routes', 'stream_routes']
+          ? ['routes', 'stream_routes', 'upstreams']
           : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
             ? ['consumers']
             : ['credentials']
@@ -608,6 +610,7 @@ export class DifferV3 {
             ? {
                 routes: (localItem as ADCSDK.Service).routes,
                 stream_routes: (localItem as ADCSDK.Service).stream_routes,
+                upstreams: (localItem as ADCSDK.Service).upstreams,
               }
             : resourceType === ADCSDK.ResourceType.CONSUMER_GROUP
               ? {
