@@ -84,7 +84,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
-                console.log(error);
                 if (opts.exitOnFailure)
                   throw new Error(
                     `Error: ${axios.isAxiosError(error) && error.response ? error.response.data?.error_msg : error.message}, `,

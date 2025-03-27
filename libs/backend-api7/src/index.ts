@@ -88,7 +88,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     if (this.innerDefaultValue) return this.innerDefaultValue;
     const mergeAllOf = (items: Array<JSONSchema4>) => {
       if (items.length < 2) return items[0];
-      if (!items.every((item) => item.type === 'object')) return null;
+      if (!items.some((item) => item.type === 'object')) return {};
 
       const first = items.shift();
       if (!first.properties) first.properties = {};
@@ -134,7 +134,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     });
 
     //TODO wait for it to fix in upstream
-    if (!resp.data?.value?.upstream)
+    if (!resp.data?.value?.upstream && resp.data?.value?.service)
       resp.data.value.upstream = {
         ...(resp.data?.value?.service as any)?.properties?.upstream,
         type: 'object',

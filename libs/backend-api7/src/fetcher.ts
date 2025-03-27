@@ -62,7 +62,10 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
             return from(
               this.client.get<typing.ListResponse<typing.Upstream>>(
                 `/apisix/admin/services/${service.id}/upstreams`,
-                { params: { gateway_group_id: this.opts.gatewayGroupId } },
+                {
+                  params: { gateway_group_id: this.opts.gatewayGroupId },
+                  validateStatus: () => true,
+                },
               ),
             ).pipe(
               tap((resp) =>
