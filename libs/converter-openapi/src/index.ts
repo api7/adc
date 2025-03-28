@@ -166,7 +166,7 @@ export class OpenAPIConverter implements ADCSDK.Converter {
 
   private buildDebugOutput(messages: Array<string>) {
     return JSON.stringify({
-      type: 'debug',
+      type: 'DEBUG',
       messages,
     });
   }

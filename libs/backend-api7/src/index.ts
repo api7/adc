@@ -65,6 +65,12 @@ export class BackendAPI7 implements ADCSDK.Backend {
     this.gatewayGroupName = opts.gatewayGroup;
   }
 
+  public metadata() {
+    return {
+      logScope: BackendAPI7.logScope,
+    };
+  }
+
   public async ping() {
     await this.client.get('/api/gateway_groups');
   }

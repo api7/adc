@@ -8,6 +8,7 @@ import { isObject, mapValues, unset } from 'lodash';
 import path from 'node:path';
 import pluralize from 'pluralize';
 
+import { SignaleRendererOutputType } from '../utils/listr';
 import { KVConfiguration } from './typing';
 
 export const loadBackend = (
@@ -306,7 +307,7 @@ export const recursiveReplaceEnvVars = (
 export const buildReqAndRespDebugOutput = (
   resp: AxiosResponse,
   desc?: string,
-  scope = ['API7'],
+  scope = ['APISIX'],
 ) => {
   const capitalizeFirstLetter = (str: string) =>
     str.charAt(0).toUpperCase() + str.slice(1);
@@ -323,7 +324,7 @@ export const buildReqAndRespDebugOutput = (
         `${normalizeKey ? normalizeHeaderKey(key) : key}: ${key !== 'X-API-KEY' ? value : '*****'}\n`,
     );
   return JSON.stringify({
-    type: 'debug',
+    type: SignaleRendererOutputType.DEBUG,
     messages: [
       `${desc ?? ''}\n`, //TODO time consumption
       // request
@@ -344,23 +345,29 @@ export const addBackendEventListener = (
   backend: ADCSDK.Backend,
   task: ListrTaskWrapper<object, any, any>,
 ) => {
+  const metadata = backend.metadata();
+  const logScope = metadata.logScope?.length > 0 ? metadata.logScope : ['ADC'];
   const sub1 = backend.on(
     ADCSDK.BackendEventType.AXIOS_DEBUG,
     ({ response, description }) =>
-      (task.output = buildReqAndRespDebugOutput(response, description)),
+      (task.output = buildReqAndRespDebugOutput(
+        response,
+        description,
+        logScope,
+      )),
   );
   const sub2 = backend.on(ADCSDK.BackendEventType.TASK_START, ({ name }) => {
     task.output = JSON.stringify({
-      type: 'ts',
+      type: SignaleRendererOutputType.LISTR_TASK_START,
       messages: [name],
-      scope: ['API7'],
+      scope: logScope,
     });
   });
   const sub3 = backend.on(ADCSDK.BackendEventType.TASK_DONE, ({ name }) => {
     task.output = JSON.stringify({
-      type: 'td',
+      type: SignaleRendererOutputType.LISTR_TASK_COMPLETE,
       messages: [name],
-      scope: ['API7'],
+      scope: logScope,
     });
   });
   return () => {

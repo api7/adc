@@ -59,7 +59,13 @@ export interface BackendSyncResult {
   error?: Error;
 }
 
+export interface BackendMetadata {
+  logScope: string[];
+}
+
 export interface Backend {
+  metadata: () => BackendMetadata;
+
   ping: () => Promise<void>;
 
   version: () => Promise<SemVer>;
