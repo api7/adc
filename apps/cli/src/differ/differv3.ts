@@ -318,7 +318,7 @@ export class DifferV3 {
 
     const checkedRemoteId: Array<ADCSDK.ResourceId> = [];
     remote.forEach(([remoteName, remoteId, remoteItem]) => {
-      remoteItem = structuredClone(remoteItem); //TODO handle potentially immutable objects systematically
+      remoteItem = cloneDeep(remoteItem); //TODO handle potentially immutable objects systematically
       unset(remoteItem, 'metadata');
       unset(remoteItem, 'id');
 
