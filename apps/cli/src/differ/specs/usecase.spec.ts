@@ -93,8 +93,14 @@ describe('Differ V3 - usecase', () => {
           description: '',
           name: 'HTTPBIN Service',
           routes: [
-            { methods: ['GET'], name: 'Anything', uris: ['/anything'] },
             {
+              id: ADCSDK.utils.generateId('HTTPBIN Service.Anything'),
+              methods: ['GET'],
+              name: 'Anything',
+              uris: ['/anything'],
+            },
+            {
+              id: ADCSDK.utils.generateId('HTTPBIN Service.Generate UUID'),
               name: 'Generate UUID',
               methods: ['GET'],
               uris: ['/uuid'],
