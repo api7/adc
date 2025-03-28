@@ -36,8 +36,6 @@ describe('Service-Upstreams E2E', () => {
           },
         ],
       },
-      path_prefix: '/test',
-      strip_path_prefix: true,
     } satisfies ADCSDK.Service;
     const upstreamND1Name = 'nd-upstream1';
     const upstreamND1 = {
