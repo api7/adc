@@ -48,6 +48,7 @@ export class ToADC {
       hosts: service.hosts,
 
       upstream: service.upstream,
+      upstreams: service.upstreams,
       plugins: service.plugins,
     } as ADCSDK.Service);
   }
@@ -196,10 +197,15 @@ export class ToADC {
             };
           })
       : undefined;
+    const labels = ADCSDK.utils.recursiveOmitUndefined({
+      ...upstream.labels,
+      [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: undefined,
+    });
     return ADCSDK.utils.recursiveOmitUndefined({
+      id: upstream.id,
       name: upstream.name ?? upstream.id,
       description: upstream.desc,
-      labels: upstream.labels,
+      labels: Object.keys(labels).length > 0 ? labels : undefined,
 
       type: upstream.type,
       hash_on: upstream.hash_on,

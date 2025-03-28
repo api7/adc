@@ -239,6 +239,20 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
             this.toADC.transformUpstream(item),
           ]),
         );
+
+        // If upstreams are explicitly specified with associated service, index them separately
+        const upstreamServiceIdMap = resources?.upstream?.reduce<
+          Record<string, ADCSDK.Upstream[]>
+        >((pv, cv) => {
+          const serviceId = cv.labels?.[
+            typing.ADC_UPSTREAM_SERVICE_ID_LABEL
+          ] as string;
+          if (serviceId) {
+            if (!pv[serviceId]) pv[serviceId] = [];
+            pv[serviceId].push(upstreamIdMap[cv.id]);
+          }
+          return pv;
+        }, {});
         return produce(resources, (draft) => {
           draft.route = resources?.[ADCSDK.ResourceType.ROUTE]?.map((route) =>
             produce(route, (routeDraft) => {
@@ -251,6 +265,8 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
               produce(service, (serviceDraft) => {
                 if (service.upstream_id)
                   serviceDraft.upstream = upstreamIdMap[service.upstream_id];
+                if (upstreamServiceIdMap[service.id])
+                  serviceDraft.upstreams = upstreamServiceIdMap[service.id];
               }),
           );
         });

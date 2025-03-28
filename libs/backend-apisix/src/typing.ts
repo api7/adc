@@ -14,6 +14,8 @@ import {
   UpstreamTimeout,
 } from '@api7/adc-sdk';
 
+export const ADC_UPSTREAM_SERVICE_ID_LABEL = '__ADC_UPSTREAM_SERVICE_ID';
+
 export interface Route {
   id: string;
   name?: string;
@@ -58,6 +60,9 @@ export interface Service {
   plugins?: Plugins;
   script?: string;
   enable_websocket?: boolean;
+
+  // internal use only
+  upstreams?: Array<ADCUpstream>;
 }
 export interface ConsumerCredential {
   id?: string;
