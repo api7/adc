@@ -16,6 +16,7 @@ import {
 import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
 
 import { FromADC } from './transformer';
+import * as typing from './typing';
 import { capitalizeFirstLetter, resourceTypeToAPIName } from './utils';
 
 export interface OperatorOptions {
@@ -38,7 +39,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceType === ADCSDK.ResourceType.STREAM_ROUTE ? 'stream_routes' : resourceTypeToAPIName(resourceType)}/${resourceId}`
+        : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
     }`;
 
     return from(
@@ -203,6 +204,17 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         );
         if (event.parentId) route.service_id = event.parentId;
         return route;
+      }
+      case ADCSDK.ResourceType.UPSTREAM: {
+        const upstream = fromADC.transformUpstream(
+          event.newValue as ADCSDK.Upstream,
+        );
+        if (event.parentId)
+          upstream.labels = {
+            ...upstream.labels,
+            [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: event.parentId,
+          };
+        return upstream;
       }
     }
   }

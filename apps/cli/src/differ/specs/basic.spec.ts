@@ -768,7 +768,7 @@ describe('Differ V3 - basic', () => {
           { kind: 'E', lhs: true, path: ['strip_path_prefix'], rhs: false },
         ],
         newValue: service,
-        oldValue: oldService,
+        oldValue: { ...service, strip_path_prefix: true },
         resourceId: ADCSDK.utils.generateId(service.name),
         resourceName: service.name,
         resourceType: ADCSDK.ResourceType.SERVICE,
