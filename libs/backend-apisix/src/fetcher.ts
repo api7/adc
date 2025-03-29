@@ -162,15 +162,22 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
   }
 
   private listStreamRoute() {
+    const taskName = 'Fetch stream_routes';
+    const logger = this.getLogger(taskName);
+    const taskStateEvent = this.taskStateEvent(taskName);
+    logger(taskStateEvent('TASK_START'));
     return from(
       this.client.get<typing.ListResponse<typing.StreamRoute>>(
         `/apisix/admin/stream_routes`,
+        { validateStatus: () => true },
       ),
     ).pipe(
+      tap((resp) => logger(this.debugLogEvent(resp))),
       map((resp) => {
-        if (resp.status === 400) return [] as Array<typing.StreamRoute>;
+        if (resp.status >= 400) return [] as Array<typing.StreamRoute>;
         return resp.data?.list?.map((item) => item.value);
       }),
+      finalize(() => logger(taskStateEvent('TASK_DONE'))),
     );
   }
 
