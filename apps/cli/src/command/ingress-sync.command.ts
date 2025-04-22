@@ -12,16 +12,8 @@ import {
 } from '../tasks';
 import { InitializeBackendTask } from '../tasks/init_backend';
 import { TaskContext } from './diff.command';
-import { BackendCommand } from './helper';
-import { BackendOptions } from './typing';
-
-type SyncOption = BackendOptions & {
-  file: Array<string>;
-  lint: boolean;
-
-  // experimental feature
-  remoteStateFile: string;
-};
+import { BackendCommand, RequestConcurrentOption } from './helper';
+import { SyncOption } from './sync.command';
 
 export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
   .option(
@@ -29,6 +21,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
     'file to synchronize',
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
+  .addOption(RequestConcurrentOption)
   .handle(async (opts) => {
     const tasks = new Listr<TaskContext, typeof SilentRenderer>(
       [
@@ -54,7 +47,10 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
             try {
               const results = await lastValueFrom(
                 ctx.backend
-                  .sync(ctx.diff, { exitOnFailure: false })
+                  .sync(ctx.diff, {
+                    exitOnFailure: false,
+                    concurrent: opts.requestConcurrent,
+                  })
                   .pipe(toArray()),
               );
 

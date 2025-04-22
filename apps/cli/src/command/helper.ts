@@ -33,7 +33,7 @@ export class BaseCommand extends Command {
   }
 
   // Appends the provided examples to description
-  public addExamples(examples: Array<{ title: string, command: string }>) {
+  public addExamples(examples: Array<{ title: string; command: string }>) {
     this.examples.push(...examples);
 
     // Title of each example is a comment which describes the actual command
@@ -105,17 +105,15 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
         .default('apisix'),
     )
       .addOption(
-        new Option(
-          '--server <string>',
-          'HTTP address of the backend',
-        )
+        new Option('--server <string>', 'HTTP address of the backend')
           .env('ADC_SERVER')
           .default('http://localhost:9180'),
       )
       .addOption(
-        new Option('--token <string>', 'token for ADC to connect to the backend').env(
-          'ADC_TOKEN',
-        ),
+        new Option(
+          '--token <string>',
+          'token for ADC to connect to the backend',
+        ).env('ADC_TOKEN'),
       )
       .addOption(
         new Option(
@@ -212,3 +210,14 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
 }
 
 export const NoLintOption = new Option('--no-lint', 'disable lint check');
+export const RequestConcurrentOption = new Option(
+  '--request-concurrent <integer>',
+  'number of concurrent requests to the backend',
+)
+  .default(10, '10')
+  .argParser((val) => {
+    const int = parseInt(val);
+    if (!Number.isInteger(int))
+      throw new InvalidArgumentError('Not an integer');
+    return int;
+  });

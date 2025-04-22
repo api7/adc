@@ -11,13 +11,18 @@ import {
 import { InitializeBackendTask } from '../tasks/init_backend';
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
-import { BackendCommand, NoLintOption } from './helper';
+import {
+  BackendCommand,
+  NoLintOption,
+  RequestConcurrentOption,
+} from './helper';
 import { BackendOptions } from './typing';
 import { addBackendEventListener } from './utils';
 
-type SyncOption = BackendOptions & {
+export type SyncOption = BackendOptions & {
   file: Array<string>;
   lint: boolean;
+  requestConcurrent?: number;
 
   // experimental feature
   remoteStateFile: string;
@@ -34,6 +39,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     (filePath, files: Array<string> = []) => files.concat(filePath),
   )
   .addOption(NoLintOption)
+  .addOption(RequestConcurrentOption)
   .addExamples([
     {
       title: 'Synchronize configuration from a single file',
@@ -95,7 +101,10 @@ export const SyncCommand = new BackendCommand<SyncOption>(
             const cancel = addBackendEventListener(ctx.backend, task);
             await lastValueFrom(
               ctx.backend
-                .sync(ctx.diff, { exitOnFailure: true })
+                .sync(ctx.diff, {
+                  exitOnFailure: true,
+                  concurrent: opts.requestConcurrent,
+                })
                 .pipe(toArray()),
             );
             cancel();

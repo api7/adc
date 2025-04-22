@@ -49,6 +49,7 @@ export interface BackendEventAxiosDebug {
 }
 
 export interface BackendSyncOptions {
+  concurrent?: number;
   exitOnFailure?: boolean;
 }
 
