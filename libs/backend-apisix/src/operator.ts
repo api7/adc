@@ -123,7 +123,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
               }),
               tap(() => logger(taskStateEvent('TASK_DONE'))),
             );
-          }),
+          }, opts.concurrent),
         ),
       ),
     );
