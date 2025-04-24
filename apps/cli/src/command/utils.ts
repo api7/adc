@@ -304,6 +304,44 @@ export const recursiveReplaceEnvVars = (
   return mapValues(c, recurseReplace) as ADCSDK.Configuration;
 };
 
+// Re-sort the configuration to make it in a deterministic order
+export const resortConfiguration = (
+  configuration: ADCSDK.Configuration,
+): ADCSDK.Configuration => {
+  return Object.fromEntries(
+    Object.entries(configuration).map(([key, value]) => {
+      if (['global_rules', 'plugin_metadata'].includes(key))
+        return [
+          key,
+          Object.fromEntries(
+            Object.entries(value).sort(
+              (a, b) => a[0].localeCompare(b[0]), // sort by plugin name
+            ),
+          ),
+        ];
+      return [
+        key,
+        value.sort((a, b) => {
+          // sort nested resources
+          if (key === 'services') {
+            if (a.routes) a.routes.sort((x, y) => x.name.localeCompare(y.name));
+            if (a.stream_routes)
+              a.stream_routes.sort((x, y) => x.name.localeCompare(y.name));
+          }
+          if (key === 'consumers') {
+            if (a.credentials)
+              a.credentials.sort((x, y) => x.name.localeCompare(y.name));
+          }
+          // sort by name or username
+          if (a.name && b.name) return a.name.localeCompare(b.name);
+          if (a.username && b.username)
+            return a.username.localeCompare(b.username);
+        }),
+      ];
+    }),
+  );
+};
+
 export const buildReqAndRespDebugOutput = (
   resp: AxiosResponse,
   desc?: string,
