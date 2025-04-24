@@ -9,7 +9,7 @@ import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
 import type { BackendOptions } from './typing';
-import { loadBackend, recursiveRemoveMetadataField } from './utils';
+import { recursiveRemoveMetadataField, resortConfiguration } from './utils';
 
 type DumpOptions = BackendOptions & {
   output: string;
@@ -69,11 +69,12 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
           task: async (ctx, task) => {
             await writeFile(
               opts.output,
-              stringify(ctx.remote, {
+              stringify(resortConfiguration(ctx.remote), {
                 sortMapEntries: (a, b) => {
                   const nameKey = 'name';
                   const descKey = 'description';
                   const labelKey = 'labels';
+                  const consumerUsernameKey = 'username';
                   const aKey = (a.key as Scalar)?.value;
                   const bKey = (b.key as Scalar)?.value;
 
@@ -81,6 +82,11 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
                   if (aKey && bKey) {
                     if (aKey === nameKey || bKey === nameKey)
                       return aKey === nameKey ? -1 : 1;
+                    if (
+                      aKey === consumerUsernameKey ||
+                      bKey === consumerUsernameKey
+                    )
+                      return aKey === consumerUsernameKey ? -1 : 1;
                     if (aKey === descKey || bKey === descKey)
                       return aKey === descKey ? -1 : 1;
                     if (aKey === labelKey || bKey === labelKey)
@@ -90,7 +96,7 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
                   return a.key > b.key ? 1 : a.key < b.key ? -1 : 0;
                 },
               }),
-              {},
+              { encoding: 'utf8' },
             );
             task.output = `Dump backend configuration to ${path.resolve(
               opts.output,
