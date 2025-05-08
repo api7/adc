@@ -284,14 +284,21 @@ export const recursiveReplaceEnvVars = (
   dataSource = process.env,
 ): ADCSDK.Configuration => {
   const envVarRegex = /\$\{(\w+)\}/g;
+  const escapedVarRegex = /\\\$\{(\w+)\}/g;
+  const placeholder = '__ESCAPED_ENV_VAR_PLACEHOLDER__';
   const replaceValue = (value: unknown): unknown => {
-    if (typeof value === 'string')
-      return value.replace(
-        envVarRegex,
-        (_, envVar) => dataSource?.[envVar] || '',
-      );
+    if (typeof value !== 'string') return value;
 
-    return value;
+    const escaped = value.replace(escapedVarRegex, (_, envVar) => {
+      return `${placeholder}${envVar}${placeholder}`;
+    });
+    const replaced = escaped.replace(envVarRegex, (_, envVar) => {
+      return dataSource?.[envVar] || '';
+    });
+    return replaced.replace(
+      new RegExp(`${placeholder}(\\w+)${placeholder}`, 'g'),
+      (_, envVar) => `\${${envVar}}`,
+    );
   };
 
   const recurseReplace = (value: unknown): unknown =>

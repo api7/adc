@@ -267,6 +267,9 @@ describe('CLI utils', () => {
               },
             ],
           },
+          {
+            name: 'Test escape \\${NAME}',
+          },
         ],
         consumers: [
           {
@@ -321,6 +324,9 @@ describe('CLI utils', () => {
           {
             name: 'Test name',
             routes: [{ name: 'Test name', uris: ['/test/name'] }],
+          },
+          {
+            name: 'Test escape ${NAME}',
           },
         ],
         ssls: [
