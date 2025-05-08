@@ -285,7 +285,7 @@ export const recursiveReplaceEnvVars = (
 ): ADCSDK.Configuration => {
   const envVarRegex = /\$\{(\w+)\}/g;
   const escapedVarRegex = /\\\$\{(\w+)\}/g;
-  const placeholder = '__ESCAPED_ENV__';
+  const placeholder = '__ESCAPED_ENV_VAR_PLACEHOLDER__';
   const replaceValue = (value: unknown): unknown => {
     if (typeof value !== 'string') return value;
 
