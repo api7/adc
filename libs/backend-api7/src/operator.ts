@@ -14,6 +14,7 @@ import {
   reduce,
   switchMap,
   tap,
+  throwError,
   toArray,
 } from 'rxjs';
 import { SemVer } from 'semver';
@@ -84,10 +85,17 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
-                if (opts.exitOnFailure)
-                  throw new Error(
-                    `Error: ${axios.isAxiosError(error) && error.response ? error.response.data?.error_msg : error.message}, `,
-                  );
+                if (opts.exitOnFailure) {
+                  if (axios.isAxiosError(error) && error.response)
+                    return throwError(
+                      () =>
+                        new Error(
+                          error.response?.data?.error_msg ??
+                            JSON.stringify(error.response?.data),
+                        ),
+                    );
+                  return throwError(() => error);
+                }
                 return of({
                   success: false,
                   event,
