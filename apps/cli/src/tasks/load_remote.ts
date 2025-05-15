@@ -30,6 +30,7 @@ export const LoadRemoteConfigurationTask = ({
           ctx.remote = await lastValueFrom(
             (ctx.backend as ADCSDK.Backend).dump(),
           );
+          ctx.remote = structuredClone(ctx.remote); //TODO: refactor this to immer produce
           cancel();
         },
       },
