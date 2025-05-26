@@ -124,10 +124,10 @@ export interface Upstream {
   retry_timeout?: number;
   timeout?: UpstreamTimeout;
   tls?: {
-    client_cert: string;
-    client_key: string;
-    client_cert_id: string;
-    verify: boolean;
+    client_cert?: string;
+    client_key?: string;
+    client_cert_id?: string;
+    verify?: boolean;
   };
   keepalive_pool?: {
     size: number;

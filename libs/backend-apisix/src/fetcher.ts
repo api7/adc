@@ -1,7 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios } from 'axios';
+import { type AxiosInstance } from 'axios';
 import { produce } from 'immer';
-import { ListrTask } from 'listr2';
 import {
   Subject,
   combineLatest,
@@ -23,13 +22,13 @@ import * as typing from './typing';
 import { resourceTypeToAPIName } from './utils';
 
 export interface FetcherOptions {
-  client: Axios;
+  client: AxiosInstance;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
   backendOpts: ADCSDK.BackendOptions;
 }
 export class Fetcher extends ADCSDK.backend.BackendEventSource {
-  private readonly client: Axios;
+  private readonly client: AxiosInstance;
 
   private readonly toADC = new ToADC();
 

@@ -1,5 +1,9 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { Axios, AxiosError, AxiosResponse } from 'axios';
+import axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type AxiosResponse,
+} from 'axios';
 import {
   Observable,
   ObservableInput,
@@ -23,14 +27,14 @@ import { FromADC } from './transformer';
 import { capitalizeFirstLetter } from './utils';
 
 export interface OperatorOptions {
-  client: Axios;
+  client: AxiosInstance;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
   gatewayGroupName?: string;
   gatewayGroupId?: string;
 }
 export class Operator extends ADCSDK.backend.BackendEventSource {
-  private readonly client: Axios;
+  private readonly client: AxiosInstance;
 
   constructor(private readonly opts: OperatorOptions) {
     super();

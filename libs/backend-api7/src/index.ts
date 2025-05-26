@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { Axios, CreateAxiosDefaults } from 'axios';
+import axios, { type AxiosInstance, type CreateAxiosDefaults } from 'axios';
 import { JSONSchema4 } from 'json-schema';
 import { isEmpty, isNil } from 'lodash';
 import { readFileSync } from 'node:fs';
@@ -19,7 +19,7 @@ import { Operator } from './operator';
 import { ToADC } from './transformer';
 
 export class BackendAPI7 implements ADCSDK.Backend {
-  private readonly client: Axios;
+  private readonly client: AxiosInstance;
   private readonly gatewayGroupName: string;
   private static logScope = ['API7'];
   private readonly subject = new Subject<ADCSDK.BackendEvent>();

@@ -1,15 +1,16 @@
 import { BackendAPI7 } from '@api7/adc-backend-api7';
 import { BackendAPISIX } from '@api7/adc-backend-apisix';
+import { BackendAPISIXStandalone } from '@api7/adc-backend-apisix-standalone';
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { AxiosResponse } from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import chalk from 'chalk';
-import { ListrTaskWrapper } from 'listr2';
+import { type ListrTaskWrapper } from 'listr2';
 import { isObject, mapValues, unset } from 'lodash';
 import path from 'node:path';
 import pluralize from 'pluralize';
 
 import { SignaleRendererOutputType } from '../utils/listr';
-import { KVConfiguration } from './typing';
+import { type KVConfiguration } from './typing';
 
 export const loadBackend = (
   type: string,
@@ -18,6 +19,8 @@ export const loadBackend = (
   switch (type) {
     case 'api7ee':
       return new BackendAPI7(opts);
+    case 'apisix-standalone':
+      return new BackendAPISIXStandalone(opts);
     case 'apisix':
     default:
       console.log(chalk.red(`Apache APISIX backend is experimental!`));

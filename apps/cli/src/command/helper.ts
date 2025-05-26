@@ -101,7 +101,7 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
     this.addOption(
       new Option('--backend <backend>', 'type of backend to connect to')
         .env('ADC_BACKEND')
-        .choices(['apisix', 'api7ee'])
+        .choices(['apisix', 'api7ee', 'apisix-standalone'])
         .default('apisix'),
     )
       .addOption(

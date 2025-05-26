@@ -72,8 +72,8 @@ importers:
         specifier: ^2.4.2
         version: 2.4.2
       zod:
-        specifier: ^3.23.8
-        version: 3.23.8
+        specifier: ^3.25.20
+        version: 3.25.20
     devDependencies:
       '@nx/esbuild':
         specifier: 21.1.0
@@ -203,7 +203,7 @@ importers:
         version: 5.98.0(@swc/core@1.5.7(@swc/helpers@0.5.12))(esbuild@0.19.12)
       zod-to-json-schema:
         specifier: ^3.23.0
-        version: 3.23.0(zod@3.23.8)
+        version: 3.23.0(zod@3.25.20)
 
 packages:
 
@@ -5382,8 +5382,8 @@ packages:
     peerDependencies:
       zod: ^3.23.3
 
-  zod@3.23.8:
-    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+  zod@3.25.20:
+    resolution: {integrity: sha512-z03fqpTMDF1G02VLKUMt6vyACE7rNWkh3gpXVHgPTw28NPtDFRGvcpTtPwn2kMKtQ0idtYJUTxchytmnqYswcw==}
 
 snapshots:
 
@@ -11204,8 +11204,8 @@ snapshots:
 
   yocto-queue@1.0.0: {}
 
-  zod-to-json-schema@3.23.0(zod@3.23.8):
+  zod-to-json-schema@3.23.0(zod@3.25.20):
     dependencies:
-      zod: 3.23.8
+      zod: 3.25.20
 
-  zod@3.23.8: {}
+  zod@3.25.20: {}
