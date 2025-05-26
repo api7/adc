@@ -143,10 +143,7 @@ export const toADC = (config: typing.APISIXStandaloneType) =>
                       produce<ADCSDK.ConsumerCredential>(
                         {} as ADCSDK.ConsumerCredential,
                         (draft) => {
-                          draft.id = credential.id.replace(
-                            `${consumer.username}/credentials/`,
-                            '',
-                          );
+                          draft.id = credential.id;
                           draft.name = credential.name;
                           draft.description = credential.desc;
                           draft.labels = credential.labels;

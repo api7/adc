@@ -57,18 +57,22 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       // derive the latest configuration from the old one
       // ensure no unexpected modifications through immutable objects
       tap((event) => {
+        const resourceType =
+          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+            ? ADCSDK.ResourceType.CONSUMER
+            : event.resourceType;
         if (event.type === ADCSDK.EventType.CREATE) {
           newConfig = produce(newConfig, (draft) => {
-            if (!draft[typing.APISIXStandaloneKeyMap[event.resourceType]])
-              draft[typing.APISIXStandaloneKeyMap[event.resourceType]] = [];
-            draft[typing.APISIXStandaloneKeyMap[event.resourceType]].push(
+            if (!draft[typing.APISIXStandaloneKeyMap[resourceType]])
+              draft[typing.APISIXStandaloneKeyMap[resourceType]] = [];
+            draft[typing.APISIXStandaloneKeyMap[resourceType]].push(
               this.fromADC({ ...event, modifiedIndex: 1 }),
             );
           });
         } else if (event.type === ADCSDK.EventType.UPDATE) {
           newConfig = produce(newConfig, (draft) => {
             const resources: Array<any> =
-              draft[typing.APISIXStandaloneKeyMap[event.resourceType]];
+              draft[typing.APISIXStandaloneKeyMap[resourceType]];
             const index = resources.findIndex(
               (item) => item.id === event.resourceId, //TODO: handle parentId
             );
@@ -89,8 +93,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           });
         } else if (event.type === ADCSDK.EventType.DELETE) {
           newConfig = produce(newConfig, (draft) => {
-            draft[typing.APISIXStandaloneKeyMap[event.resourceType]] = draft[
-              typing.APISIXStandaloneKeyMap[event.resourceType]
+            draft[typing.APISIXStandaloneKeyMap[resourceType]] = draft[
+              typing.APISIXStandaloneKeyMap[resourceType]
             ].filter((item) => item.id !== event.resourceId);
           });
         }
@@ -240,7 +244,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.ConsumerCredential;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: `${event.parentId}/credentials/${res.name}`,
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
