@@ -5,7 +5,7 @@ import axios, {
   type AxiosResponse,
 } from 'axios';
 import { produce } from 'immer';
-import { curry, maxBy } from 'lodash';
+import { curry, max, maxBy, unset } from 'lodash';
 import {
   type ObservableInput,
   type Subject,
@@ -31,6 +31,9 @@ export interface OperatorOptions {
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
 }
+
+const NEED_TO_INCREASE_CONF_VERSION = 'NEED_TO_INCREASE_CONF_VERSION';
+
 export class Operator extends ADCSDK.backend.BackendEventSource {
   private readonly client: AxiosInstance;
 
@@ -46,8 +49,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ) {
     const modifiedIndexMap = this.extractModifiedIndex(oldConfig);
-    let newConfig: typing.APISIXStandaloneWithConfVersionType =
-      structuredClone(oldConfig);
+    let newConfig: typing.APISIXStandaloneWithConfVersionType = oldConfig;
 
     const taskName = `Sync configuration`;
     const logger = this.getLogger(taskName);
@@ -61,18 +63,19 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
             ? ADCSDK.ResourceType.CONSUMER
             : event.resourceType;
+        const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
+        const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
         if (event.type === ADCSDK.EventType.CREATE) {
           newConfig = produce(newConfig, (draft) => {
-            if (!draft[typing.APISIXStandaloneKeyMap[resourceType]])
-              draft[typing.APISIXStandaloneKeyMap[resourceType]] = [];
-            draft[typing.APISIXStandaloneKeyMap[resourceType]].push(
+            if (!draft[resourceKey]) draft[resourceKey] = [];
+            draft[resourceKey].push(
               this.fromADC({ ...event, modifiedIndex: 1 }),
             );
+            draft[increaseVersionKey] = true;
           });
         } else if (event.type === ADCSDK.EventType.UPDATE) {
           newConfig = produce(newConfig, (draft) => {
-            const resources: Array<any> =
-              draft[typing.APISIXStandaloneKeyMap[resourceType]];
+            const resources: Array<any> = draft[resourceKey];
             const index = resources.findIndex(
               (item) => item.id === event.resourceId, //TODO: handle parentId
             );
@@ -90,12 +93,14 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 modifiedIndex: newModifiedIndex,
               });
             }
+            draft[increaseVersionKey] = true;
           });
         } else if (event.type === ADCSDK.EventType.DELETE) {
           newConfig = produce(newConfig, (draft) => {
-            draft[typing.APISIXStandaloneKeyMap[resourceType]] = draft[
-              typing.APISIXStandaloneKeyMap[resourceType]
-            ].filter((item) => item.id !== event.resourceId);
+            draft[resourceKey] = draft[resourceKey]?.filter(
+              (item) => item.id !== event.resourceId,
+            );
+            draft[increaseVersionKey] = true;
           });
         }
       }),
@@ -105,15 +110,47 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const resourceTypes = Object.keys(typing.APISIXStandaloneKeyMap);
         resourceTypes.forEach((resourceType) => {
           newConfig = produce(newConfig, (draft) => {
-            draft[
-              `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
-            ] =
+            const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
+            const confVersionKey = `${resourceKey}_conf_version`;
+            const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
+            const oldConfVersion = draft[confVersionKey];
+
+            // Choose the larger of the old conf_version and the largest modifiedIndex to prevent
+            // resource-level conf_version rewinds.
+            draft[confVersionKey] = max([
+              // do not set conf_version if it is already larger than the
+              // maximum modifiedIndex of all resources
+              draft[confVersionKey],
+              // find the maximum modifiedIndex of all resources of this type
               maxBy<{ modifiedIndex: number }>(
                 draft[typing.APISIXStandaloneKeyMap[resourceType]],
                 'modifiedIndex',
-              )?.modifiedIndex ?? 0;
+              )?.modifiedIndex ?? 0,
+            ]);
+
+            // If the conf_version is not updated because the remote conf_version is too large and
+            // exceeds the new modifiedIndex for any resource, a decision is made as to whether
+            // the conf_version should be increased based on the flag used to indicate that it
+            // should be updated.
+            // Example:
+            //   remote: {services_conf_version: 100, services: [{modifiedIndex: 1},{modifiedIndex: 2}]}
+            //   local: {services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
+            //   Then the local will try to choose the larger of 100 and 3, and obviously 100 will be chosen
+            //   That is, for the remote, conf_version is not updated, which is an exception,
+            //   and in any case, conf_version needs to be greater than 100 in order to indicate that the
+            //   cache is flushed.
+            //   When a flag (NEED_INCREASE) exists and conf_version is not incremented, increment it manually.
+            //   i.e., new local should be:
+            //     {services_conf_version: 101, services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
+            if (
+              draft[increaseVersionKey] &&
+              oldConfVersion === draft[confVersionKey]
+            )
+              draft[confVersionKey] += 1;
+            unset(draft, [increaseVersionKey]);
           });
         });
+        console.log('New config: ', JSON.stringify(newConfig)); //TODO: remove
       }),
       switchMap(() =>
         from(this.client.put('/apisix/admin/configs', newConfig)).pipe(
@@ -165,24 +202,24 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       (prefix: string, item: { id: string; modifiedIndex: number }) =>
         modifiedIndexMap.set(`${prefix}.${item.id}`, item.modifiedIndex),
     );
-    oldConfig.services?.forEach(
+    oldConfig?.services?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.SERVICE),
     );
-    oldConfig.routes?.forEach(extractModifiedIndex(ADCSDK.ResourceType.ROUTE));
-    oldConfig.stream_routes?.forEach(
+    oldConfig?.routes?.forEach(extractModifiedIndex(ADCSDK.ResourceType.ROUTE));
+    oldConfig?.stream_routes?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.STREAM_ROUTE),
     );
-    oldConfig.upstreams?.forEach(
+    oldConfig?.upstreams?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.UPSTREAM),
     );
-    oldConfig.ssls?.forEach(extractModifiedIndex(ADCSDK.ResourceType.SSL));
-    oldConfig.consumers?.forEach(
+    oldConfig?.ssls?.forEach(extractModifiedIndex(ADCSDK.ResourceType.SSL));
+    oldConfig?.consumers?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.CONSUMER),
     );
-    oldConfig.global_rules?.forEach(
+    oldConfig?.global_rules?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.GLOBAL_RULE),
     );
-    oldConfig.plugin_metadata?.forEach(
+    oldConfig?.plugin_metadata?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.PLUGIN_METADATA),
     );
     return modifiedIndexMap;
