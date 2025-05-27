@@ -1,5 +1,5 @@
 import { isNil } from 'lodash';
-import { ZodRawShape, z } from 'zod';
+import { type ZodRawShape, z } from 'zod';
 
 const idSchema = z
   .string()

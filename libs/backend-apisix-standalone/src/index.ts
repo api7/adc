@@ -1,26 +1,35 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { type AxiosInstance, CreateAxiosDefaults } from 'axios';
+import axios, { type AxiosInstance, type CreateAxiosDefaults } from 'axios';
 import { readFileSync } from 'node:fs';
 import {
   Agent as httpAgent,
-  AgentOptions as httpAgentOptions,
+  type AgentOptions as httpAgentOptions,
 } from 'node:http';
 import {
   Agent as httpsAgent,
-  AgentOptions as httpsAgentOptions,
+  type AgentOptions as httpsAgentOptions,
 } from 'node:https';
-import { Observable, Subject, forkJoin, from, switchMap } from 'rxjs';
-import semver, { SemVer } from 'semver';
+import {
+  type Observable,
+  Subject,
+  finalize,
+  forkJoin,
+  from,
+  switchMap,
+} from 'rxjs';
+import semver, { type SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
+import type * as typing from './typing';
 
-export class BackendAPISIX implements ADCSDK.Backend {
+export class BackendAPISIXStandalone implements ADCSDK.Backend {
   private static logScope = ['APISIX'];
   private readonly client: AxiosInstance;
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
   private _version?: SemVer;
+  private _dump?: typing.APISIXStandaloneWithConfVersionType;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     const keepAlive: httpAgentOptions = {
@@ -42,6 +51,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
         rejectUnauthorized: !opts?.tlsSkipVerify,
       };
 
+      //TODO: move file reading to ADC CLI
       if (opts?.caCertFile) {
         agentConfig.ca = readFileSync(opts.caCertFile);
       }
@@ -60,7 +70,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
 
   public metadata() {
     return {
-      logScope: BackendAPISIX.logScope,
+      logScope: BackendAPISIXStandalone.logScope,
     };
   }
 
@@ -69,15 +79,13 @@ export class BackendAPISIX implements ADCSDK.Backend {
   }
 
   public async ping(): Promise<void> {
-    await this.client.get(`/apisix/admin/routes`);
+    await this.client.get(`/apisix/admin/configs`);
   }
 
   public async version() {
     if (this._version) return this._version;
 
-    const resp = await this.client.get<{ value: string }>(
-      '/apisix/admin/routes',
-    );
+    const resp = await this.client.head<{ value: string }>('/apisix/admin');
     this.subject.next({
       type: ADCSDK.BackendEventType.AXIOS_DEBUG,
       event: { response: resp, description: `Get APISIX version` },
@@ -93,10 +101,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
   }
 
   public dump(): Observable<ADCSDK.Configuration> {
-    return forkJoin([
-      from(this.version()),
-      from(this.defaultValue()),
-    ]).pipe<ADCSDK.Configuration>(
+    return forkJoin([from(this.version())]).pipe<ADCSDK.Configuration>(
       switchMap(([version]) => {
         const fetcher = new Fetcher({
           client: this.client,
@@ -104,7 +109,11 @@ export class BackendAPISIX implements ADCSDK.Backend {
           eventSubject: this.subject,
           backendOpts: this.opts,
         });
-        return fetcher.dump();
+        return from(fetcher.dump()).pipe(
+          finalize(() => {
+            this._dump = fetcher._dump; // cache the dump for modifiedIndex calculation
+          }),
+        );
       }),
     );
   }
@@ -119,13 +128,14 @@ export class BackendAPISIX implements ADCSDK.Backend {
           client: this.client,
           version,
           eventSubject: this.subject,
-        }).sync(events, opts);
+        }).sync(events, this._dump, opts);
       }),
     );
   }
 
   public on(
     eventType: keyof typeof ADCSDK.BackendEventType,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     cb: (...args: any[]) => void,
   ) {
     return this.subject.subscribe(({ type, event }) => {
@@ -135,4 +145,8 @@ export class BackendAPISIX implements ADCSDK.Backend {
 
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
+
+  public __TEST_ONLY = {
+    GET_LAST_DUMP: () => this._dump,
+  };
 }

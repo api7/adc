@@ -70,10 +70,10 @@ export interface UpstreamTimeout {
   read: number;
 }
 export interface UpstreamClientTLS {
-  client_cert: string;
-  client_key: string;
-  client_cert_id: string;
-  verify: boolean;
+  client_cert?: string;
+  client_key?: string;
+  client_cert_id?: string;
+  verify?: boolean;
 }
 export interface UpstreamKeepalivePool {
   size: number;

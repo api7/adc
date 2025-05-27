@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Axios } from 'axios';
+import { type AxiosInstance } from 'axios';
 import { produce } from 'immer';
 import { isEmpty } from 'lodash';
 import {
@@ -19,7 +19,7 @@ import { ToADC } from './transformer';
 import * as typing from './typing';
 
 export interface FetcherOptions {
-  client: Axios;
+  client: AxiosInstance;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
   backendOpts: ADCSDK.BackendOptions;
@@ -28,7 +28,7 @@ export interface FetcherOptions {
 }
 export class Fetcher extends ADCSDK.backend.BackendEventSource {
   private readonly toADC = new ToADC();
-  private readonly client: Axios;
+  private readonly client: AxiosInstance;
 
   constructor(private readonly opts: FetcherOptions) {
     super();
