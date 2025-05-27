@@ -145,4 +145,8 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
 
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
+
+  public __TEST_ONLY = {
+    GET_LAST_DUMP: () => this._dump,
+  };
 }

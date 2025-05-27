@@ -1,0 +1,15 @@
+services:
+  apisix_http:
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-dev}
+    restart: always
+    volumes:
+      - ./apisix_conf/http.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "19180:9180/tcp"
+      - "19080:9080/tcp"
+    networks:
+      apisix:
+
+networks:
+  apisix:
+    driver: bridge

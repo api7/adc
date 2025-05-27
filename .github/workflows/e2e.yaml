@@ -54,10 +54,10 @@ jobs:
     strategy:
       matrix:
         version:
-          - dev
-    env:
-      BACKEND_APISIX_VERSION: ${{ matrix.version }}
-      BACKEND_APISIX_IMAGE: ${{ matrix.version }} # TODO: debian suffix
+          - 3.13.0
+    #env:
+    #  BACKEND_APISIX_VERSION: ${{ matrix.version }}
+    #  BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
       - uses: actions/checkout@v4
 
