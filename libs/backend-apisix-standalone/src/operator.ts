@@ -69,7 +69,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           newConfig = produce(newConfig, (draft) => {
             if (!draft[resourceKey]) draft[resourceKey] = [];
             draft[resourceKey].push(
-              this.fromADC({ ...event, modifiedIndex: 1 }),
+              this.fromADC({
+                ...event,
+                modifiedIndex: (draft[`${resourceKey}_conf_version`] ?? 0) + 1,
+              }),
             );
             draft[increaseVersionKey] = true;
           });
@@ -77,7 +80,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           newConfig = produce(newConfig, (draft) => {
             const resources: Array<any> = draft[resourceKey];
             const index = resources.findIndex(
-              (item) => item.id === event.resourceId, //TODO: handle parentId
+              (item) => item.id === event.resourceId,
             );
             if (index !== -1) {
               const newModifiedIndex = modifiedIndexMap.has(
@@ -150,7 +153,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             unset(draft, [increaseVersionKey]);
           });
         });
-        console.log('New config: ', JSON.stringify(newConfig)); //TODO: remove
       }),
       switchMap(() =>
         from(this.client.put('/apisix/admin/configs', newConfig)).pipe(
