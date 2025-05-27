@@ -48,7 +48,37 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix:e2e
+  apisix-standalone:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
+    strategy:
+      matrix:
+        version:
+          - dev
+    env:
+      BACKEND_APISIX_VERSION: ${{ matrix.version }}
+      BACKEND_APISIX_IMAGE: ${{ matrix.version }} # TODO: debian suffix
+    steps:
+      - uses: actions/checkout@v4
 
+      # Setup backend environment
+      - name: Setup Apache APISIX
+        working-directory: ./libs/backend-apisix-standalone/e2e/assets
+        run: docker compose up -d; sleep 10
+
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: npx nx run backend-apisix-standalone:e2e
   api7:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
