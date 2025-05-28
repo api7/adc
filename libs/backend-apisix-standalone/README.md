@@ -45,3 +45,9 @@ Their update logic are:
    2. A created resource's modifiedIndex will be incremented from the `conf_version` of the current resource type;
    3. A deleted resource will have the `conf_version` of the current resource type updated.
 4. Recalculates the resource-type level `conf_version`. its rule is: find the maximum value of the old `conf_version` and the `modifiedIndex` in all such resources, and if that value is equal to the old `conf_version`, add one. This means that if there is any resource change (no matter what the operation is), the `conf_version` at the resource-type level will always increase; but the `modifiedIndex` on the resource will only change on the resource that was changed. This minimizes the impact of cache invalidation "noise" on APISIX due to unrelated resource updates.
+
+### Differences in upstream
+
+This backend's upstream converter will not support the configuration of the APISIX health checker or service discovery.
+
+The reason for this is that this backend will primarily be used in an Ingress Controller scenario. In this scenario, the Kubernetes Endpoints mechanism and probes will implement these two capabilities.

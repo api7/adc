@@ -254,7 +254,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       }
       case ADCSDK.ResourceType.SERVICE: {
         type T = typing.APISIXStandaloneType['services'][number];
-        type TU = typing.APISIXStandaloneType['upstreams'][number];
         const res = event.newValue as ADCSDK.Service;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -263,7 +262,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: res.upstream as TU,
+          upstream: this.fromADCUpstream(res.upstream),
           plugins: res.plugins,
         } satisfies T as T;
       }
@@ -336,22 +335,14 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       }
       case ADCSDK.ResourceType.UPSTREAM: {
         type T = typing.APISIXStandaloneType['upstreams'][number];
-        const res = event.newValue as ADCSDK.Upstream;
-        const upstream = {
-          ...res,
+        return {
+          ...this.fromADCUpstream(
+            event.newValue as ADCSDK.Upstream,
+            event.parentId,
+          ),
           modifiedIndex: event.modifiedIndex,
           id: event.resourceId,
-          name: res.name,
-          desc: res.description,
-          labels: this.fromADCLabels(res.labels),
-          nodes: res.nodes ?? [], // fix optional to required convert
         } satisfies T as T;
-        if (event.parentId)
-          upstream.labels = {
-            ...upstream.labels,
-            [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: event.parentId,
-          };
-        return upstream;
       }
       case ADCSDK.ResourceType.STREAM_ROUTE: {
         type T = typing.APISIXStandaloneType['stream_routes'][number];
@@ -379,5 +370,37 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
       return pv;
     }, {});
+  }
+
+  private fromADCUpstream(
+    res: ADCSDK.Upstream,
+    parentId?: string,
+  ): typing.APISIXStandaloneType['upstreams'][number] {
+    type T = ReturnType<typeof this.fromADCUpstream>;
+    const upstream = {
+      modifiedIndex: undefined, // fill in later
+      id: undefined, // fill in later
+      name: res.name,
+      desc: res.description,
+      labels: this.fromADCLabels(res.labels),
+      type: res.type,
+      hash_on: res.hash_on,
+      key: res.key,
+      nodes: res.nodes ?? [], // fix optional to required convert
+      scheme: res.scheme,
+      retries: res.retries,
+      retry_timeout: res.retry_timeout,
+      timeout: res.timeout,
+      tls: res.tls,
+      keepalive_pool: res.keepalive_pool,
+      pass_host: res.pass_host,
+      upstream_host: res.upstream_host,
+    } satisfies T as T;
+    if (parentId)
+      upstream.labels = {
+        ...upstream.labels,
+        [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: parentId,
+      };
+    return upstream;
   }
 }

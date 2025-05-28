@@ -22,6 +22,7 @@ describe('Sync and Dump - 1', () => {
 
   describe('Sync and dump empty service', () => {
     const upstream = {
+      description: 'test upstream',
       scheme: 'https',
       nodes: [
         {
@@ -30,7 +31,7 @@ describe('Sync and Dump - 1', () => {
           weight: 100,
         },
       ],
-    };
+    } as ADCSDK.Upstream;
     const service1Name = 'service1';
     const service1 = {
       name: service1Name,
