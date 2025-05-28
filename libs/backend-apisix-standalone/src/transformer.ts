@@ -19,7 +19,26 @@ export const toADC = (config: typing.APISIXStandaloneType) =>
                 draft.name = service.name;
                 draft.description = service.desc;
                 draft.labels = service.labels;
-                draft.upstream = service.upstream;
+                const upstream = service.upstream;
+                draft.upstream = ADCSDK.utils.recursiveOmitUndefined(
+                  produce({} as ADCSDK.Upstream, (draft) => {
+                    draft.name = upstream.name;
+                    draft.description = upstream.desc;
+                    draft.labels = upstream.labels;
+                    draft.type = upstream.type;
+                    draft.hash_on = upstream.hash_on;
+                    draft.key = upstream.key;
+                    draft.nodes = upstream.nodes;
+                    draft.scheme = upstream.scheme;
+                    draft.retries = upstream.retries;
+                    draft.retry_timeout = upstream.retry_timeout;
+                    draft.timeout = upstream.timeout;
+                    draft.tls = upstream.tls;
+                    draft.keepalive_pool = upstream.keepalive_pool;
+                    draft.pass_host = upstream.pass_host;
+                    draft.upstream_host = upstream.upstream_host;
+                  }),
+                );
                 draft.plugins = service.plugins;
                 draft.hosts = service.hosts;
                 draft.routes = input.routes

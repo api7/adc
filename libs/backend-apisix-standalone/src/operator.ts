@@ -262,7 +262,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: this.fromADCUpstream(event.newValue as ADCSDK.Upstream),
+          upstream: this.fromADCUpstream(res.upstream),
           plugins: res.plugins,
         } satisfies T as T;
       }
