@@ -105,14 +105,6 @@ export const toADC = (config: typing.APISIXStandaloneType) =>
                     }),
                   )
                   .map(ADCSDK.utils.recursiveOmitUndefined);
-
-                // fill in placeholder for path prefix
-                // these properties are not implemented on APISIX, so they must be
-                // populated to cope with the local defaults populated by zod
-                if (draft.routes?.length > 0) {
-                  draft.path_prefix = '/';
-                  draft.strip_path_prefix = true;
-                }
               }),
             )
             .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
