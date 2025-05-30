@@ -46,7 +46,7 @@
     "ts-node": "^10.9.2",
     "typescript": "5.7.3",
     "url-loader": "^4.1.1",
-    "webpack": "5.98.0",
+    "webpack": "5.99.9",
     "zod-to-json-schema": "^3.23.0"
   },
   "dependencies": {
