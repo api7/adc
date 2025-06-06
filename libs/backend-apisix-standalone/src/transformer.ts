@@ -9,11 +9,6 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
     (consumerOrConsumerCredential) => 'name' in consumerOrConsumerCredential,
   );
 
-  type g = Omit<
-    typing.APISIXStandaloneType['upstreams'][number],
-    'id' | 'modifiedIndex'
-  > & { name?: string };
-
   const transformUpstream = (
     upstream: Omit<
       typing.APISIXStandaloneType['upstreams'][number],
