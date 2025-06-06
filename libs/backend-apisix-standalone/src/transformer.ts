@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { produce } from 'immer';
+import { isEmpty } from 'lodash';
 
 import * as typing from './typing';
 
@@ -7,6 +8,39 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
   const consumerCredentials = input.consumers?.filter(
     (consumerOrConsumerCredential) => 'name' in consumerOrConsumerCredential,
   );
+
+  type g = Omit<
+    typing.APISIXStandaloneType['upstreams'][number],
+    'id' | 'modifiedIndex'
+  > & { name?: string };
+
+  const transformUpstream = (
+    upstream: Omit<
+      typing.APISIXStandaloneType['upstreams'][number],
+      'id' | 'name' | 'modifiedIndex'
+    > & { name?: string },
+  ) => {
+    return produce({} as ADCSDK.Upstream, (draft) => {
+      draft.name = upstream.name;
+      draft.description = upstream.desc;
+      draft.labels = upstream.labels;
+      draft.type = upstream.type;
+      draft.hash_on = upstream.hash_on;
+      draft.key = upstream.key;
+      draft.scheme = upstream.scheme;
+      draft.retries = upstream.retries;
+      draft.retry_timeout = upstream.retry_timeout;
+      draft.timeout = upstream.timeout;
+      draft.tls = upstream.tls;
+      draft.keepalive_pool = upstream.keepalive_pool;
+      draft.pass_host = upstream.pass_host;
+      draft.upstream_host = upstream.upstream_host;
+
+      // Empty Lua tables will be encoded as "{}" rather than "[]" by cjson,
+      // so this must be handled separately to prevent unexpected diff results.
+      draft.nodes = !isEmpty(upstream.nodes) ? upstream.nodes : [];
+    });
+  };
   return {
     services:
       input.services
@@ -16,25 +50,8 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
             draft.name = service.name;
             draft.description = service.desc;
             draft.labels = service.labels;
-            const upstream = service.upstream;
             draft.upstream = ADCSDK.utils.recursiveOmitUndefined(
-              produce({} as ADCSDK.Upstream, (draft) => {
-                draft.name = upstream.name;
-                draft.description = upstream.desc;
-                draft.labels = upstream.labels;
-                draft.type = upstream.type;
-                draft.hash_on = upstream.hash_on;
-                draft.key = upstream.key;
-                draft.nodes = upstream.nodes;
-                draft.scheme = upstream.scheme;
-                draft.retries = upstream.retries;
-                draft.retry_timeout = upstream.retry_timeout;
-                draft.timeout = upstream.timeout;
-                draft.tls = upstream.tls;
-                draft.keepalive_pool = upstream.keepalive_pool;
-                draft.pass_host = upstream.pass_host;
-                draft.upstream_host = upstream.upstream_host;
-              }),
+              transformUpstream(service.upstream),
             );
             draft.plugins = service.plugins;
             draft.hosts = service.hosts;
@@ -81,26 +98,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
                   upstream.labels[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
                   service.id,
               )
-              .map((upstream) =>
-                produce({} as ADCSDK.Upstream, (draft) => {
-                  draft.id = upstream.id;
-                  draft.name = upstream.name;
-                  draft.description = upstream.desc;
-                  draft.labels = upstream.labels;
-                  draft.type = upstream.type;
-                  draft.hash_on = upstream.hash_on;
-                  draft.key = upstream.key;
-                  draft.nodes = upstream.nodes;
-                  draft.scheme = upstream.scheme;
-                  draft.retries = upstream.retries;
-                  draft.retry_timeout = upstream.retry_timeout;
-                  draft.timeout = upstream.timeout;
-                  draft.tls = upstream.tls;
-                  draft.keepalive_pool = upstream.keepalive_pool;
-                  draft.pass_host = upstream.pass_host;
-                  draft.upstream_host = upstream.upstream_host;
-                }),
-              )
+              .map(transformUpstream)
               .map(ADCSDK.utils.recursiveOmitUndefined);
           }),
         )
