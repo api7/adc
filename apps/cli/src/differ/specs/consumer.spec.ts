@@ -122,4 +122,65 @@ describe('Differ V3 - consumer', () => {
       },
     ]);
   });
+
+  it('should delete consumer credentials when consumer is deleting', () => {
+    const consumerName = 'jack';
+    const changeme = 'changeme';
+    expect(
+      DifferV3.diff(
+        {
+          consumers: [],
+        },
+        {
+          consumers: [
+            {
+              username: consumerName,
+              credentials: [
+                {
+                  id: ADCSDK.utils.generateId(
+                    `${consumerName}.${ADCSDK.EventType.DELETE}`,
+                  ),
+                  name: ADCSDK.EventType.DELETE,
+                  type: 'jwt-auth',
+                  config: { key: consumerName, secret: changeme },
+                },
+              ],
+            },
+          ],
+        },
+      ),
+    ).toEqual([
+      {
+        oldValue: {
+          credentials: [
+            {
+              config: { key: consumerName, secret: changeme },
+              id: '86a4d8fbeda9c3de3705a7ba087a8ec741cd1c17',
+              name: ADCSDK.EventType.DELETE,
+              type: 'jwt-auth',
+            },
+          ],
+          username: consumerName,
+        },
+        resourceId: consumerName,
+        resourceName: consumerName,
+        resourceType: ADCSDK.ResourceType.CONSUMER,
+        type: ADCSDK.EventType.DELETE,
+      },
+      {
+        oldValue: {
+          config: { key: consumerName, secret: changeme },
+          name: ADCSDK.EventType.DELETE,
+          type: 'jwt-auth',
+        },
+        parentId: consumerName,
+        resourceId: ADCSDK.utils.generateId(
+          `${consumerName}.${ADCSDK.EventType.DELETE}`,
+        ),
+        resourceName: ADCSDK.EventType.DELETE,
+        resourceType: ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
+        type: ADCSDK.EventType.DELETE,
+      },
+    ]);
+  });
 });

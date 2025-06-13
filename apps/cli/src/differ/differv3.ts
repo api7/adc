@@ -351,7 +351,13 @@ export class DifferV3 {
                 ? {
                     consumers: (remoteItem as ADCSDK.ConsumerGroup).consumers,
                   }
-                : {},
+                : resourceType ===
+                    (ADCSDK.ResourceType.CONSUMER as ADCSDK.ResourceType)
+                  ? {
+                      consumer_credentials: (remoteItem as ADCSDK.Consumer)
+                        .credentials,
+                    }
+                  : {},
             this.defaultValue,
             resourceType === ADCSDK.ResourceType.SERVICE
               ? remoteName
