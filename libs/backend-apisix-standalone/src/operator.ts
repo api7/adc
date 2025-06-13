@@ -64,6 +64,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             ? ADCSDK.ResourceType.CONSUMER
             : event.resourceType;
         const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
+        const resourceIdKey =
+          event.resourceType === ADCSDK.ResourceType.CONSUMER
+            ? 'username'
+            : 'id';
         const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
         if (event.type === ADCSDK.EventType.CREATE) {
           newConfig = produce(newConfig, (draft) => {
@@ -80,7 +84,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           newConfig = produce(newConfig, (draft) => {
             const resources: Array<any> = draft[resourceKey];
             const index = resources.findIndex(
-              (item) => item.id === event.resourceId,
+              (item) => item[resourceIdKey] === this.generateIdFromEvent(event),
             );
             if (index !== -1) {
               const newModifiedIndex = modifiedIndexMap.has(
@@ -101,7 +105,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         } else if (event.type === ADCSDK.EventType.DELETE) {
           newConfig = produce(newConfig, (draft) => {
             draft[resourceKey] = draft[resourceKey]?.filter(
-              (item) => item.id !== event.resourceId,
+              (item) => item[resourceIdKey] !== this.generateIdFromEvent(event),
             );
             draft[increaseVersionKey] = true;
           });
@@ -198,6 +202,12 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     );
   }
 
+  private generateIdFromEvent(event: ADCSDK.Event): string {
+    if (event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL)
+      return `${event.parentId}/credentials/${event.resourceId}`;
+    return event.resourceId;
+  }
+
   private extractModifiedIndex(oldConfig: typing.APISIXStandaloneType) {
     const modifiedIndexMap = new Map<string, number>();
     const extractModifiedIndex = curry(
@@ -234,7 +244,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.Route;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
@@ -257,7 +267,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.Service;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
@@ -271,7 +281,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.Consumer;
         return {
           modifiedIndex: event.modifiedIndex,
-          username: event.resourceId,
+          username: this.generateIdFromEvent(event),
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           plugins: res.plugins,
@@ -282,7 +292,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.ConsumerCredential;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: `${event.parentId}/credentials/${res.name}`,
+          id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
@@ -296,7 +306,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.SSL;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           labels: this.fromADCLabels(res.labels),
           type: res.type,
           snis: res.snis,
@@ -319,7 +329,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         type T = typing.APISIXStandaloneType['global_rules'][number];
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           plugins: {
             [event.resourceId]: event.newValue as ADCSDK.GlobalRule,
           },
@@ -329,7 +339,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         type T = typing.APISIXStandaloneType['plugin_metadata'][number];
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           ...event.newValue,
         } satisfies T as T;
       }
@@ -341,7 +351,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             event.parentId,
           ),
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
         } satisfies T as T;
       }
       case ADCSDK.ResourceType.STREAM_ROUTE: {
@@ -349,7 +359,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const res = event.newValue as ADCSDK.StreamRoute;
         return {
           modifiedIndex: event.modifiedIndex,
-          id: event.resourceId,
+          id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
