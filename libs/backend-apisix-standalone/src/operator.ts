@@ -111,6 +111,23 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           });
         }
       }),
+      // filtering of new consumer configurations to ensure
+      // that orphaned credential objects do not exist
+      tap(() => {
+        if (newConfig.consumers) {
+          const consumers = newConfig.consumers
+            .filter((item) => 'username' in item)
+            .map((item) => item.username);
+
+          newConfig = produce(newConfig, (draft) => {
+            draft.consumers = draft.consumers.filter((consumer) => {
+              if ('username' in consumer) return true;
+              const credentialOnwer = consumer.id.split('/')?.[0];
+              return consumers.includes(credentialOnwer); // filter orphan credentials
+            });
+          });
+        }
+      }),
       toArray(), // cumulative and combining events
       // update conf_version for each resource type
       tap(() => {
