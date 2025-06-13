@@ -14,8 +14,8 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
       typing.APISIXStandaloneType['upstreams'][number],
       'id' | 'name' | 'modifiedIndex'
     > & { name?: string },
-  ) => {
-    return produce({} as ADCSDK.Upstream, (draft) => {
+  ) =>
+    produce({} as ADCSDK.Upstream, (draft) => {
       draft.name = upstream.name;
       draft.description = upstream.desc;
       draft.labels = upstream.labels;
@@ -35,7 +35,6 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
       // so this must be handled separately to prevent unexpected diff results.
       draft.nodes = !isEmpty(upstream.nodes) ? upstream.nodes : [];
     });
-  };
   return {
     services:
       input.services
@@ -142,7 +141,10 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
                   produce<ADCSDK.ConsumerCredential>(
                     {} as ADCSDK.ConsumerCredential,
                     (draft) => {
-                      draft.id = credential.id;
+                      draft.id = credential.id.replace(
+                        `${consumer.username}/credentials/`,
+                        '',
+                      );
                       draft.name = credential.name;
                       draft.description = credential.desc;
                       draft.labels = credential.labels;
