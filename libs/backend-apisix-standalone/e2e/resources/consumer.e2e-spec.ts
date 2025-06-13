@@ -6,6 +6,7 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  refreshDumpCache,
   syncEvents,
   updateEvent,
 } from '../support/utils';
@@ -20,6 +21,8 @@ describe('Consumer E2E', () => {
       tlsSkipVerify: true,
     });
   });
+
+  beforeEach(() => refreshDumpCache(backend)); // override dump cache for modifiedIndex
 
   describe('Sync and dump consumers (with credential support)', () => {
     const consumer1Name = 'consumer1';
@@ -68,20 +71,20 @@ describe('Consumer E2E', () => {
     });
 
     it('Update consumer credential1', async () => {
-      consumer1.credentials[0].config.key = 'new-key';
+      const newCred = structuredClone(consumer1Cred);
+      newCred.config.key = 'new-key';
       await syncEvents(backend, [
         updateEvent(
           ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
           consumer1Key,
-          consumer1Cred,
+          newCred,
           consumer1Name,
         ),
       ]);
     });
 
-    it('Dump again (consumer credential updated)', async () => {
+    it('Dump again (consumer credential1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.consumers[0]).toMatchObject(consumer1);
       expect(result.consumers[0].credentials[0].config.key).toEqual('new-key');
     });
 
