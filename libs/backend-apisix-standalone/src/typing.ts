@@ -240,7 +240,7 @@ export const ResourceLevelConfVersion = {
   secrets_conf_version: z.int().optional(),
 };
 
-export const APISIXStandalone = z.strictObject({
+const Resources = {
   [APISIXStandaloneKeyMap[ADCSDK.ResourceType.ROUTE]]: z
     .array(Route)
     .optional(),
@@ -263,13 +263,15 @@ export const APISIXStandalone = z.strictObject({
   [APISIXStandaloneKeyMap[ADCSDK.ResourceType.STREAM_ROUTE]]: z
     .array(StreamRoute)
     .optional(),
-});
+};
 
-export const APISIXStandaloneWithConfVersion = APISIXStandalone.extend(
-  ResourceLevelConfVersion,
-);
-
+export const APISIXStandalone = z.strictObject(Resources);
 export type APISIXStandaloneType = z.infer<typeof APISIXStandalone>;
+
+export const APISIXStandaloneWithConfVersion = z.strictObject({
+  ...Resources,
+  ...ResourceLevelConfVersion,
+});
 export type APISIXStandaloneWithConfVersionType = z.infer<
   typeof APISIXStandaloneWithConfVersion
 >;
