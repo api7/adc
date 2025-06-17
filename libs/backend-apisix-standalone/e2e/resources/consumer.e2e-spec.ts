@@ -86,6 +86,14 @@ describe('Consumer E2E', () => {
     it('Dump again (consumer credential1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.consumers[0].credentials[0].config.key).toEqual('new-key');
+
+      // Access Admin API to check modifiedIndex and conf_version
+      const client = backend.__TEST_ONLY.GET_CLIENT();
+      const resp = await client.get('/apisix/admin/configs');
+      expect(resp.data.consumers_conf_version).toBeGreaterThan(1);
+      resp.data.consumers
+        ?.filter((item) => item.name === 'consumer1-key')
+        .forEach((item) => expect(item.modifiedIndex).toBeGreaterThan(1));
     });
 
     it('Delete consumer credential1', async () =>

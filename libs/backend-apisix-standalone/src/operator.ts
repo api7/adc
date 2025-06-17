@@ -87,12 +87,13 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
               (item) => item[resourceIdKey] === this.generateIdFromEvent(event),
             );
             if (index !== -1) {
+              const eventResourceId = this.generateIdFromEvent(event);
               const newModifiedIndex = modifiedIndexMap.has(
-                `${event.resourceType}.${event.resourceId}`,
+                `${event.resourceType}.${eventResourceId}`,
               )
                 ? (resources[index].modifiedIndex =
                     modifiedIndexMap.get(
-                      `${event.resourceType}.${event.resourceId}`,
+                      `${event.resourceType}.${eventResourceId}`,
                     ) + 1)
                 : 1;
               resources[index] = this.fromADC({
@@ -228,7 +229,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   private extractModifiedIndex(oldConfig: typing.APISIXStandaloneType) {
     const modifiedIndexMap = new Map<string, number>();
     const extractModifiedIndex = curry(
-      (prefix: string, item: { id: string; modifiedIndex: number }) =>
+      (prefix: string, item: { id?: string; modifiedIndex: number }) =>
         modifiedIndexMap.set(`${prefix}.${item.id}`, item.modifiedIndex),
     );
     oldConfig?.services?.forEach(
@@ -242,8 +243,13 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       extractModifiedIndex(ADCSDK.ResourceType.UPSTREAM),
     );
     oldConfig?.ssls?.forEach(extractModifiedIndex(ADCSDK.ResourceType.SSL));
-    oldConfig?.consumers?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.CONSUMER),
+    oldConfig?.consumers?.forEach((item) =>
+      'username' in item
+        ? extractModifiedIndex(ADCSDK.ResourceType.CONSUMER)({
+            id: item.username,
+            modifiedIndex: item.modifiedIndex,
+          })
+        : extractModifiedIndex(ADCSDK.ResourceType.CONSUMER_CREDENTIAL)(item),
     );
     oldConfig?.global_rules?.forEach(
       extractModifiedIndex(ADCSDK.ResourceType.GLOBAL_RULE),
