@@ -3,7 +3,6 @@ import { BackendAPISIX } from '@api7/adc-backend-apisix';
 import { BackendAPISIXStandalone } from '@api7/adc-backend-apisix-standalone';
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { type AxiosResponse } from 'axios';
-import chalk from 'chalk';
 import { type ListrTaskWrapper } from 'listr2';
 import { isObject, mapValues, unset } from 'lodash';
 import path from 'node:path';
@@ -23,7 +22,6 @@ export const loadBackend = (
       return new BackendAPISIXStandalone(opts);
     case 'apisix':
     default:
-      console.log(chalk.red(`Apache APISIX backend is experimental!`));
       return new BackendAPISIX(opts);
   }
 };
