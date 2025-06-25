@@ -2,11 +2,9 @@ import chalk from 'chalk';
 import { Listr, SilentRenderer } from 'listr2';
 
 import { InitializeBackendTask } from '../tasks/init_backend';
-import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
 import type { BackendOptions } from './typing';
-import { loadBackend } from './utils';
 
 type PingOptions = BackendOptions;
 
