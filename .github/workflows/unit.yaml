@@ -23,6 +23,8 @@ jobs:
         run: npx nx run sdk:test
       - name: Run CLI unit tests
         run: npx nx run cli:test
+      - name: Run APISIX Backend unit tests
+        run: npx nx run backend-apisix:test
       - name: Run API7 Backend unit tests
         run: npx nx run backend-api7:test
       - name: Run OpenAPI Converter unit tests

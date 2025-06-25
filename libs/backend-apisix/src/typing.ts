@@ -1,7 +1,6 @@
 import {
   GlobalRule as ADCGlobalRule,
   PluginMetadata as ADCPluginMetadata,
-  Upstream as ADCUpstream,
   Expr,
   Labels,
   Plugins,
@@ -38,7 +37,7 @@ export interface Route {
   script_id?: string;
   plugins?: Plugins;
   plugin_config_id?: string;
-  upstream?: ADCUpstream;
+  upstream?: InlineUpstream;
   upstream_id?: string;
   service_id?: string;
   timeout?: UpstreamTimeout;
@@ -55,14 +54,14 @@ export interface Service {
   labels?: Labels;
 
   hosts?: Array<string>;
-  upstream?: ADCUpstream;
+  upstream?: InlineUpstream;
   upstream_id?: string;
   plugins?: Plugins;
   script?: string;
   enable_websocket?: boolean;
 
   // internal use only
-  upstreams?: Array<ADCUpstream>;
+  upstreams?: Array<InlineUpstream>;
 }
 export interface ConsumerCredential {
   id?: string;
@@ -128,7 +127,7 @@ export interface StreamRoute {
   server_addr?: string;
   server_port?: number;
   sni?: string;
-  upstream?: ADCUpstream;
+  upstream?: InlineUpstream;
   upstream_id?: string;
   service_id?: string;
 
@@ -170,7 +169,7 @@ export interface Upstream {
     client_cert_id?: string;
     client_cert?: string;
     client_key?: string;
-    verify: boolean;
+    verify?: boolean;
   };
   keepalive_pool?: {
     size: number;
@@ -178,6 +177,7 @@ export interface Upstream {
     requests: number;
   };
 }
+export type InlineUpstream = Omit<Upstream, 'id'>;
 
 export interface ListResponse<T> {
   list: Array<{
