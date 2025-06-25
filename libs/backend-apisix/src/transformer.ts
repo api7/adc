@@ -47,7 +47,7 @@ export class ToADC {
 
       hosts: service.hosts,
 
-      upstream: service.upstream,
+      upstream: this.transformUpstream(service.upstream),
       upstreams: service.upstreams,
       plugins: service.plugins,
     } as ADCSDK.Service);
@@ -173,7 +173,9 @@ export class ToADC {
     } as ADCSDK.StreamRoute);
   }
 
-  public transformUpstream(upstream: typing.Upstream): ADCSDK.Upstream {
+  public transformUpstream(
+    upstream: typing.Upstream | typing.InlineUpstream,
+  ): ADCSDK.Upstream {
     const defaultPortMap: Record<string, number> = {
       http: 80,
       https: 443,
@@ -202,8 +204,8 @@ export class ToADC {
       [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: undefined,
     });
     return ADCSDK.utils.recursiveOmitUndefined({
-      id: upstream.id,
-      name: upstream.name ?? upstream.id,
+      ...{ id: 'id' in upstream ? upstream.id : undefined },
+      name: upstream.name,
       description: upstream.desc,
       labels: Object.keys(labels).length > 0 ? labels : undefined,
 
@@ -280,7 +282,7 @@ export class FromADC {
       name: service.name,
       desc: service.description,
       labels: FromADC.transformLabels(service.labels),
-      upstream: service.upstream,
+      upstream: this.transformUpstream(service.upstream),
       plugins: service.plugins,
       hosts: service.hosts,
     });
