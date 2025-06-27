@@ -25,12 +25,6 @@ curl -sL "https://run.api7.ai/adc/install" | sh
 
 Or, you can download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
 
-```bash
-wget https://github.com/api7/adc/releases/download/v0.12.0/adc_0.12.0_linux_amd64.tar.gz
-tar -zxvf adc_0.12.0_linux_amd64.tar.gz
-mv adc /usr/local/bin/adc
-```
-
 Pre-built binaries for `amd64` and `arm64` on Linux, Windows, and macOS are available now.
 
 ## Configure ADC
