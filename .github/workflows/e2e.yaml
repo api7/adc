@@ -26,6 +26,7 @@ jobs:
           - 3.10.0
           - 3.11.0
           - 3.12.0
+          - 3.13.0
     env:
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
@@ -56,6 +57,7 @@ jobs:
     strategy:
       matrix:
         version:
+          - 3.13.0
           - dev # test on latest release
     #env:
     #  BACKEND_APISIX_VERSION: ${{ matrix.version }}
