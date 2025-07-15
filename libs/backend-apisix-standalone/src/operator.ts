@@ -11,6 +11,7 @@ import {
   type Subject,
   catchError,
   from,
+  iif,
   map,
   of,
   switchMap,
@@ -177,44 +178,52 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         });
       }),
       switchMap(() =>
-        from(this.client.put('/apisix/admin/configs', newConfig)).pipe(
-          tap((resp) => logger(this.debugLogEvent(resp))),
-          map<AxiosResponse, ADCSDK.BackendSyncResult>(
-            (response) =>
-              ({
-                success: true,
-                event: {} as ADCSDK.Event, // keep empty
-                axiosResponse: response,
-              }) satisfies ADCSDK.BackendSyncResult,
-          ),
-          catchError<
-            ADCSDK.BackendSyncResult,
-            ObservableInput<ADCSDK.BackendSyncResult>
-          >((error: Error | AxiosError) => {
-            if (opts.exitOnFailure) {
-              if (axios.isAxiosError(error) && error.response)
-                return throwError(
-                  () =>
-                    new Error(
-                      error.response?.data?.error_msg ??
-                        JSON.stringify(error.response?.data),
-                    ),
-                );
-              return throwError(() => error);
-            }
-            return of({
-              success: false,
-              event: {} as ADCSDK.Event, // keep empty,
-              error,
-              ...(axios.isAxiosError(error) && {
-                axiosResponse: error.response,
-                ...(error.response?.data?.error_msg && {
-                  error: new Error(error.response.data.error_msg),
+        iif(
+          () => events.length > 0,
+          from(this.client.put('/apisix/admin/configs', newConfig)).pipe(
+            tap((resp) => logger(this.debugLogEvent(resp))),
+            map<AxiosResponse, ADCSDK.BackendSyncResult>(
+              (response) =>
+                ({
+                  success: true,
+                  event: {} as ADCSDK.Event, // keep empty
+                  axiosResponse: response,
+                }) satisfies ADCSDK.BackendSyncResult,
+            ),
+            catchError<
+              ADCSDK.BackendSyncResult,
+              ObservableInput<ADCSDK.BackendSyncResult>
+            >((error: Error | AxiosError) => {
+              if (opts.exitOnFailure) {
+                if (axios.isAxiosError(error) && error.response)
+                  return throwError(
+                    () =>
+                      new Error(
+                        error.response?.data?.error_msg ??
+                          JSON.stringify(error.response?.data),
+                      ),
+                  );
+                return throwError(() => error);
+              }
+              return of({
+                success: false,
+                event: {} as ADCSDK.Event, // keep empty,
+                error,
+                ...(axios.isAxiosError(error) && {
+                  axiosResponse: error.response,
+                  ...(error.response?.data?.error_msg && {
+                    error: new Error(error.response.data.error_msg),
+                  }),
                 }),
-              }),
-            } satisfies ADCSDK.BackendSyncResult);
-          }),
-          tap(() => logger(taskStateEvent('TASK_DONE'))),
+              } satisfies ADCSDK.BackendSyncResult);
+            }),
+            tap(() => logger(taskStateEvent('TASK_DONE'))),
+          ),
+          of<ADCSDK.BackendSyncResult>({
+            success: true,
+            event: {} as ADCSDK.Event, // keep empty
+            axiosResponse: null,
+          } satisfies ADCSDK.BackendSyncResult),
         ),
       ),
     );
