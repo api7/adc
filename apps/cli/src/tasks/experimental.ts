@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises';
-import YAML from 'yaml';
+import YAML from 'js-yaml';
 
 export const ExperimentalRemoteStateFileTask = (file: string) => ({
   task: async (ctx) => {
@@ -7,6 +7,6 @@ export const ExperimentalRemoteStateFileTask = (file: string) => ({
       (await readFile(file, {
         encoding: 'utf-8',
       })) ?? '';
-    ctx.remote = YAML.parse(fileContent);
+    ctx.remote = YAML.load(fileContent);
   },
 });

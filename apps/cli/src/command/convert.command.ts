@@ -1,12 +1,12 @@
 import { OpenAPIConverter } from '@api7/adc-converter-openapi';
 import * as ADCSDK from '@api7/adc-sdk';
 import OpenAPIParser from '@readme/openapi-parser';
+import { dump } from 'js-yaml';
 import { Listr } from 'listr2';
 import { cloneDeep } from 'lodash';
 import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { OpenAPIV3 } from 'openapi-types';
-import { stringify } from 'yaml';
 
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
@@ -103,7 +103,7 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
           title: 'Write converted OpenAPI file',
           task: (ctx, task) => {
             ctx.local.services = ctx.buffer.flatMap((item) => item.services);
-            const yamlStr = stringify(ctx.local, {});
+            const yamlStr = dump(ctx.local, { noRefs: true, sortKeys: true });
             writeFileSync(opts.output, yamlStr);
             task.title = `Converted OpenAPI file to "${resolve(
               opts.output,

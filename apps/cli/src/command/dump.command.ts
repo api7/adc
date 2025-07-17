@@ -1,7 +1,7 @@
+import { dump } from 'js-yaml';
 import { Listr } from 'listr2';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Scalar, stringify } from 'yaml';
 
 import { LoadRemoteConfigurationTask } from '../tasks';
 import { InitializeBackendTask } from '../tasks/init_backend';
@@ -69,32 +69,9 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
           task: async (ctx, task) => {
             await writeFile(
               opts.output,
-              stringify(resortConfiguration(ctx.remote), {
-                sortMapEntries: (a, b) => {
-                  const nameKey = 'name';
-                  const descKey = 'description';
-                  const labelKey = 'labels';
-                  const consumerUsernameKey = 'username';
-                  const aKey = (a.key as Scalar)?.value;
-                  const bKey = (b.key as Scalar)?.value;
-
-                  // make sure the metadata is always at the top
-                  if (aKey && bKey) {
-                    if (aKey === nameKey || bKey === nameKey)
-                      return aKey === nameKey ? -1 : 1;
-                    if (
-                      aKey === consumerUsernameKey ||
-                      bKey === consumerUsernameKey
-                    )
-                      return aKey === consumerUsernameKey ? -1 : 1;
-                    if (aKey === descKey || bKey === descKey)
-                      return aKey === descKey ? -1 : 1;
-                    if (aKey === labelKey || bKey === labelKey)
-                      return aKey === labelKey ? -1 : 1;
-                  }
-
-                  return a.key > b.key ? 1 : a.key < b.key ? -1 : 0;
-                },
+              dump(resortConfiguration(ctx.remote), {
+                noRefs: true,
+                sortKeys: true,
               }),
               { encoding: 'utf8' },
             );

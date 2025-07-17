@@ -2,9 +2,9 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { globSync } from 'glob';
+import YAML from 'js-yaml';
 import { ListrTask } from 'listr2';
 import path from 'node:path';
-import YAML from 'yaml';
 
 import {
   fillLabels,
@@ -51,7 +51,13 @@ export const LoadLocalConfigurationTask = (
                 const fileContent =
                   (await readFile(filePath, { encoding: 'utf-8' })) ?? '';
 
-                subCtx.configurations[filePath] = YAML.parse(fileContent) ?? {};
+                const ext = path.extname(filePath).toLowerCase();
+                if (ext === '.json') {
+                  subCtx.configurations[filePath] =
+                    JSON.parse(fileContent) ?? {};
+                  return;
+                }
+                subCtx.configurations[filePath] = YAML.load(fileContent) ?? {};
               },
             };
           }),
