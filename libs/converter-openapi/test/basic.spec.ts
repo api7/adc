@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { OpenAPIV3 } from 'openapi-types';
-import { parse } from 'yaml';
+import { load } from 'js-yaml';
 
 import { OpenAPIConverter } from '../src';
 import { loadAsset, runTask } from './utils';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parse = (content: string): any => load(content);
 
 describe('Basic', () => {
   it('case 1 (single path)', async () => {

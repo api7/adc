@@ -1,7 +1,10 @@
-import { parse } from 'yaml';
+import { load } from 'js-yaml';
 
 import { OpenAPIConverter } from '../src';
 import { loadAsset, runTask } from './utils';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parse = (content: string): any => load(content);
 
 describe('Extension', () => {
   it('case 1 (override resource name)', async () => {

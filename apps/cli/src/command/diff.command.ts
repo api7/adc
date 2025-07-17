@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import YAML from 'js-yaml';
 import { Listr } from 'listr2';
-import { readFile, writeFile } from 'node:fs/promises';
-import YAML from 'yaml';
+import { writeFile } from 'node:fs/promises';
 
 import {
   DiffResourceTask,
@@ -82,7 +82,11 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
         {
           title: 'Write detail diff result to file',
           task: async (ctx, task) => {
-            await writeFile('./diff.yaml', YAML.stringify(ctx.diff), {});
+            await writeFile(
+              './diff.yaml',
+              YAML.dump(ctx.diff, { noRefs: true }),
+              { encoding: 'utf-8' },
+            );
             task.output = 'Detail diff result has been wrote to diff.yaml';
           },
         },
