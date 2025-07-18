@@ -1,5 +1,4 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { produce } from 'immer';
 import { isEmpty } from 'lodash';
 
 import * as typing from './typing';
@@ -14,111 +13,102 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
       typing.APISIXStandaloneType['upstreams'][number],
       'id' | 'name' | 'modifiedIndex'
     > & { name?: string },
-  ) =>
-    produce({} as ADCSDK.Upstream, (draft) => {
-      draft.name = upstream.name;
-      draft.description = upstream.desc;
-      draft.labels = upstream.labels;
-      draft.type = upstream.type;
-      draft.hash_on = upstream.hash_on;
-      draft.key = upstream.key;
-      draft.scheme = upstream.scheme;
-      draft.retries = upstream.retries;
-      draft.retry_timeout = upstream.retry_timeout;
-      draft.timeout = upstream.timeout;
-      draft.tls = upstream.tls;
-      draft.keepalive_pool = upstream.keepalive_pool;
-      draft.pass_host = upstream.pass_host;
-      draft.upstream_host = upstream.upstream_host;
+  ) => ({
+    name: upstream.name,
+    description: upstream.desc,
+    labels: upstream.labels,
+    type: upstream.type,
+    hash_on: upstream.hash_on,
+    key: upstream.key,
+    scheme: upstream.scheme,
+    retries: upstream.retries,
+    retry_timeout: upstream.retry_timeout,
+    timeout: upstream.timeout,
+    tls: upstream.tls,
+    keepalive_pool: upstream.keepalive_pool,
+    pass_host: upstream.pass_host,
+    upstream_host: upstream.upstream_host,
 
-      // Empty Lua tables will be encoded as "{}" rather than "[]" by cjson,
-      // so this must be handled separately to prevent unexpected diff results.
-      draft.nodes = !isEmpty(upstream.nodes) ? upstream.nodes : [];
-    });
+    // Empty Lua tables will be encoded as "{}" rather than "[]" by cjson,
+    // so this must be handled separately to prevent unexpected diff results.
+    nodes: !isEmpty(upstream.nodes) ? upstream.nodes : [],
+  });
   return {
     services:
       input.services
-        ?.map((service) =>
-          produce<ADCSDK.Service>({} as ADCSDK.Service, (draft) => {
-            draft.id = service.id;
-            draft.name = service.name;
-            draft.description = service.desc;
-            draft.labels = service.labels;
-            draft.upstream = ADCSDK.utils.recursiveOmitUndefined(
-              transformUpstream(service.upstream),
-            );
-            draft.plugins = service.plugins;
-            draft.hosts = service.hosts;
-            draft.routes = input.routes
-              ?.filter((route) => route.service_id === service.id)
-              .map((route) =>
-                produce({} as ADCSDK.Route, (draft) => {
-                  draft.id = route.id;
-                  draft.name = route.name;
-                  draft.description = route.desc;
-                  draft.labels = route.labels;
-                  draft.uris = route.uris;
-                  draft.hosts = route.hosts;
-                  draft.priority = route.priority;
-                  draft.timeout = route.timeout;
-                  draft.vars = route.vars;
-                  draft.methods = route.methods;
-                  draft.enable_websocket = route.enable_websocket;
-                  draft.remote_addrs = route.remote_addrs;
-                  draft.plugins = route.plugins;
-                  draft.filter_func = route.filter_func;
-                }),
-              )
-              .map(ADCSDK.utils.recursiveOmitUndefined);
-            draft.stream_routes = input.stream_routes
-              ?.filter((route) => route.service_id === service.id)
-              .map((route) =>
-                produce({} as ADCSDK.StreamRoute, (draft) => {
-                  draft.id = route.id;
-                  draft.name = route.name;
-                  draft.description = route.desc;
-                  draft.labels = route.labels;
-                  draft.remote_addr = route.remote_addr;
-                  draft.server_addr = route.server_addr;
-                  draft.server_port = route.server_port;
-                  draft.sni = route.sni;
-                  draft.plugins = route.plugins;
-                }),
-              )
-              .map(ADCSDK.utils.recursiveOmitUndefined);
-            draft.upstreams = input.upstreams
-              ?.filter(
-                (upstream) =>
-                  upstream.labels[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
-                  service.id,
-              )
-              .map(transformUpstream)
-              .map(ADCSDK.utils.recursiveOmitUndefined);
-          }),
-        )
+        ?.map((service) => ({
+          id: service.id,
+          name: service.name,
+          description: service.desc,
+          labels: service.labels,
+          upstream: ADCSDK.utils.recursiveOmitUndefined(
+            transformUpstream(service.upstream),
+          ),
+          plugins: service.plugins,
+          hosts: service.hosts,
+          routes: input.routes
+            ?.filter((route) => route.service_id === service.id)
+            .map((route) => ({
+              id: route.id,
+              name: route.name,
+              description: route.desc,
+              labels: route.labels,
+              uris: route.uris,
+              hosts: route.hosts,
+              priority: route.priority,
+              timeout: route.timeout,
+              vars: route.vars,
+              methods: route.methods,
+              enable_websocket: route.enable_websocket,
+              remote_addrs: route.remote_addrs,
+              plugins: route.plugins,
+              filter_func: route.filter_func,
+            }))
+            .map(ADCSDK.utils.recursiveOmitUndefined),
+          stream_routes: input.stream_routes
+            ?.filter((route) => route.service_id === service.id)
+            .map((route) => ({
+              id: route.id,
+              name: route.name,
+              description: route.desc,
+              labels: route.labels,
+              remote_addr: route.remote_addr,
+              server_addr: route.server_addr,
+              server_port: route.server_port,
+              sni: route.sni,
+              plugins: route.plugins,
+            }))
+            .map(ADCSDK.utils.recursiveOmitUndefined),
+          upstreams: input.upstreams
+            ?.filter(
+              (upstream) =>
+                upstream.labels[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
+                service.id,
+            )
+            .map(transformUpstream)
+            .map(ADCSDK.utils.recursiveOmitUndefined),
+        }))
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     ssls:
       input.ssls
-        ?.map((ssl) =>
-          produce<ADCSDK.SSL>({} as ADCSDK.SSL, (draft) => {
-            draft.id = ssl.id;
-            draft.labels = ssl.labels;
-            draft.type = ssl.type;
-            draft.snis = ssl.snis;
-            draft.certificates = [
-              {
-                certificate: ssl.cert,
-                key: ssl.key,
-              },
-              ...(ssl.certs ?? []).map((cert, idx) => ({
-                certificate: cert,
-                key: ssl.keys[idx],
-              })),
-            ] as Array<ADCSDK.SSLCertificate>;
-            draft.client = ssl.client;
-            draft.ssl_protocols = ssl.ssl_protocols;
-          }),
-        )
+        ?.map((ssl) => ({
+          id: ssl.id,
+          labels: ssl.labels,
+          type: ssl.type,
+          snis: ssl.snis,
+          certificates: [
+            {
+              certificate: ssl.cert,
+              key: ssl.key,
+            },
+            ...(ssl.certs ?? []).map((cert, idx) => ({
+              certificate: cert,
+              key: ssl.keys[idx],
+            })),
+          ] as Array<ADCSDK.SSLCertificate>,
+          client: ssl.client,
+          ssl_protocols: ssl.ssl_protocols,
+        }))
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     consumers:
       input.consumers
@@ -126,38 +116,32 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
           (consumerOrConsumerCredential) =>
             'username' in consumerOrConsumerCredential,
         )
-        .map((consumer) =>
-          produce<ADCSDK.Consumer>({} as ADCSDK.Consumer, (draft) => {
-            draft.username = consumer.username;
-            draft.description = consumer.desc;
-            draft.labels = consumer.labels;
-            draft.plugins = consumer.plugins;
-            draft.credentials = consumerCredentials
-              ?.filter((credential) =>
-                credential.id.startsWith(`${consumer.username}/credentials/`),
-              )
-              .map(
-                (credential) =>
-                  produce<ADCSDK.ConsumerCredential>(
-                    {} as ADCSDK.ConsumerCredential,
-                    (draft) => {
-                      draft.id = credential.id.replace(
-                        `${consumer.username}/credentials/`,
-                        '',
-                      );
-                      draft.name = credential.name;
-                      draft.description = credential.desc;
-                      draft.labels = credential.labels;
-                      const plugin = Object.entries(credential.plugins)[0];
-                      draft.type =
-                        plugin[0] as ADCSDK.ConsumerCredential['type'];
-                      draft.config = plugin[1];
-                    },
-                  ) as ADCSDK.ConsumerCredential,
-              )
-              .map(ADCSDK.utils.recursiveOmitUndefined);
-          }),
-        )
+        .map((consumer) => ({
+          username: consumer.username,
+          description: consumer.desc,
+          labels: consumer.labels,
+          plugins: consumer.plugins,
+          credentials: consumerCredentials
+            ?.filter((credential) =>
+              credential.id.startsWith(`${consumer.username}/credentials/`),
+            )
+            .map((credential) => {
+              const plugin = Object.entries(credential.plugins)[0];
+              return {
+                id: credential.id.replace(
+                  `${consumer.username}/credentials/`,
+                  '',
+                ),
+                name: credential.name,
+                description: credential.desc,
+                labels: credential.labels,
+
+                type: plugin[0] as ADCSDK.ConsumerCredential['type'],
+                config: plugin[1],
+              } as ADCSDK.ConsumerCredential;
+            })
+            .map(ADCSDK.utils.recursiveOmitUndefined),
+        }))
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     global_rules: Object.fromEntries(
       input.global_rules

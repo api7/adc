@@ -4,7 +4,6 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios';
-import { produce } from 'immer';
 import { curry, max, maxBy, unset } from 'lodash';
 import {
   type ObservableInput,
@@ -50,7 +49,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ) {
     const modifiedIndexMap = this.extractModifiedIndex(oldConfig);
-    let newConfig: typing.APISIXStandaloneWithConfVersionType = oldConfig;
+    const newConfig: typing.APISIXStandaloneWithConfVersionType = oldConfig;
 
     const taskName = `Sync configuration`;
     const logger = this.getLogger(taskName);
@@ -71,46 +70,42 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             : 'id';
         const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
         if (event.type === ADCSDK.EventType.CREATE) {
-          newConfig = produce(newConfig, (draft) => {
-            if (!draft[resourceKey]) draft[resourceKey] = [];
-            draft[resourceKey].push(
-              this.fromADC({
-                ...event,
-                modifiedIndex: (draft[`${resourceKey}_conf_version`] ?? 0) + 1,
-              }),
-            );
-            draft[increaseVersionKey] = true;
-          });
+          if (!newConfig[resourceKey]) newConfig[resourceKey] = [];
+          newConfig[resourceKey].push(
+            this.fromADC({
+              ...event,
+              modifiedIndex:
+                (newConfig[`${resourceKey}_conf_version`] ?? 0) + 1,
+            }),
+          );
+          newConfig[increaseVersionKey] = true;
         } else if (event.type === ADCSDK.EventType.UPDATE) {
-          newConfig = produce(newConfig, (draft) => {
-            const resources: Array<any> = draft[resourceKey];
-            const index = resources.findIndex(
-              (item) => item[resourceIdKey] === this.generateIdFromEvent(event),
-            );
-            if (index !== -1) {
-              const eventResourceId = this.generateIdFromEvent(event);
-              const newModifiedIndex = modifiedIndexMap.has(
-                `${event.resourceType}.${eventResourceId}`,
-              )
-                ? (resources[index].modifiedIndex =
-                    modifiedIndexMap.get(
-                      `${event.resourceType}.${eventResourceId}`,
-                    ) + 1)
-                : 1;
-              resources[index] = this.fromADC({
-                ...event,
-                modifiedIndex: newModifiedIndex,
-              });
-            }
-            draft[increaseVersionKey] = true;
-          });
+          const resources: Array<any> = newConfig[resourceKey];
+          const eventGeneratedId = this.generateIdFromEvent(event);
+          const index = resources.findIndex(
+            (item) => item[resourceIdKey] === eventGeneratedId,
+          );
+          if (index !== -1) {
+            const eventResourceId = this.generateIdFromEvent(event);
+            const newModifiedIndex = modifiedIndexMap.has(
+              `${event.resourceType}.${eventResourceId}`,
+            )
+              ? (resources[index].modifiedIndex =
+                  modifiedIndexMap.get(
+                    `${event.resourceType}.${eventResourceId}`,
+                  ) + 1)
+              : 1;
+            resources[index] = this.fromADC({
+              ...event,
+              modifiedIndex: newModifiedIndex,
+            });
+          }
+          newConfig[increaseVersionKey] = true;
         } else if (event.type === ADCSDK.EventType.DELETE) {
-          newConfig = produce(newConfig, (draft) => {
-            draft[resourceKey] = draft[resourceKey]?.filter(
-              (item) => item[resourceIdKey] !== this.generateIdFromEvent(event),
-            );
-            draft[increaseVersionKey] = true;
-          });
+          newConfig[resourceKey] = newConfig[resourceKey]?.filter(
+            (item) => item[resourceIdKey] !== this.generateIdFromEvent(event),
+          );
+          newConfig[increaseVersionKey] = true;
         }
       }),
       // filtering of new consumer configurations to ensure
@@ -121,12 +116,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             .filter((item) => 'username' in item)
             .map((item) => item.username);
 
-          newConfig = produce(newConfig, (draft) => {
-            draft.consumers = draft.consumers.filter((consumer) => {
-              if ('username' in consumer) return true;
-              const credentialOnwer = consumer.id.split('/')?.[0];
-              return consumers.includes(credentialOnwer); // filter orphan credentials
-            });
+          newConfig.consumers = newConfig?.consumers?.filter((consumer) => {
+            if ('username' in consumer) return true;
+            const credentialOwner = consumer.id.split('/')?.[0];
+            return consumers.includes(credentialOwner); // filter orphan credentials
           });
         }
       }),
@@ -135,46 +128,44 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       tap(() => {
         const resourceTypes = Object.keys(typing.APISIXStandaloneKeyMap);
         resourceTypes.forEach((resourceType) => {
-          newConfig = produce(newConfig, (draft) => {
-            const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
-            const confVersionKey = `${resourceKey}_conf_version`;
-            const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
-            const oldConfVersion = draft[confVersionKey];
+          const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
+          const confVersionKey = `${resourceKey}_conf_version`;
+          const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
+          const oldConfVersion = newConfig[confVersionKey];
 
-            // Choose the larger of the old conf_version and the largest modifiedIndex to prevent
-            // resource-level conf_version rewinds.
-            draft[confVersionKey] = max([
-              // do not set conf_version if it is already larger than the
-              // maximum modifiedIndex of all resources
-              draft[confVersionKey],
-              // find the maximum modifiedIndex of all resources of this type
-              maxBy<{ modifiedIndex: number }>(
-                draft[typing.APISIXStandaloneKeyMap[resourceType]],
-                'modifiedIndex',
-              )?.modifiedIndex ?? 0,
-            ]);
+          // Choose the larger of the old conf_version and the largest modifiedIndex to prevent
+          // resource-level conf_version rewinds.
+          newConfig[confVersionKey] = max([
+            // do not set conf_version if it is already larger than the
+            // maximum modifiedIndex of all resources
+            newConfig[confVersionKey],
+            // find the maximum modifiedIndex of all resources of this type
+            maxBy<{ modifiedIndex: number }>(
+              newConfig[typing.APISIXStandaloneKeyMap[resourceType]],
+              'modifiedIndex',
+            )?.modifiedIndex ?? 0,
+          ]);
 
-            // If the conf_version is not updated because the remote conf_version is too large and
-            // exceeds the new modifiedIndex for any resource, a decision is made as to whether
-            // the conf_version should be increased based on the flag used to indicate that it
-            // should be updated.
-            // Example:
-            //   remote: {services_conf_version: 100, services: [{modifiedIndex: 1},{modifiedIndex: 2}]}
-            //   local: {services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
-            //   Then the local will try to choose the larger of 100 and 3, and obviously 100 will be chosen
-            //   That is, for the remote, conf_version is not updated, which is an exception,
-            //   and in any case, conf_version needs to be greater than 100 in order to indicate that the
-            //   cache is flushed.
-            //   When a flag (NEED_INCREASE) exists and conf_version is not incremented, increment it manually.
-            //   i.e., new local should be:
-            //     {services_conf_version: 101, services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
-            if (
-              draft[increaseVersionKey] &&
-              oldConfVersion === draft[confVersionKey]
-            )
-              draft[confVersionKey] += 1;
-            unset(draft, [increaseVersionKey]);
-          });
+          // If the conf_version is not updated because the remote conf_version is too large and
+          // exceeds the new modifiedIndex for any resource, a decision is made as to whether
+          // the conf_version should be increased based on the flag used to indicate that it
+          // should be updated.
+          // Example:
+          //   remote: {services_conf_version: 100, services: [{modifiedIndex: 1},{modifiedIndex: 2}]}
+          //   local: {services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
+          //   Then the local will try to choose the larger of 100 and 3, and obviously 100 will be chosen
+          //   That is, for the remote, conf_version is not updated, which is an exception,
+          //   and in any case, conf_version needs to be greater than 100 in order to indicate that the
+          //   cache is flushed.
+          //   When a flag (NEED_INCREASE) exists and conf_version is not incremented, increment it manually.
+          //   i.e., new local should be:
+          //     {services_conf_version: 101, services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
+          if (
+            newConfig[increaseVersionKey] &&
+            oldConfVersion === newConfig[confVersionKey]
+          )
+            newConfig[confVersionKey] += 1;
+          unset(newConfig, [increaseVersionKey]);
         });
       }),
       switchMap(() =>
