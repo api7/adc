@@ -208,6 +208,50 @@ importers:
         specifier: ^3.23.0
         version: 3.23.0(zod@3.25.20)
 
+  apps/cli:
+    devDependencies:
+      '@api7/adc-backend-api7':
+        specifier: workspace:*
+        version: link:../../libs/backend-api7
+      '@api7/adc-backend-apisix':
+        specifier: workspace:*
+        version: link:../../libs/backend-apisix
+      '@api7/adc-backend-apisix-standalone':
+        specifier: workspace:*
+        version: link:../../libs/backend-apisix-standalone
+      '@api7/adc-converter-openapi':
+        specifier: workspace:*
+        version: link:../../libs/converter-openapi
+      '@api7/adc-sdk':
+        specifier: workspace:*
+        version: link:../../libs/sdk
+
+  libs/backend-api7:
+    devDependencies:
+      '@api7/adc-sdk':
+        specifier: workspace:*
+        version: link:../sdk
+
+  libs/backend-apisix:
+    devDependencies:
+      '@api7/adc-sdk':
+        specifier: workspace:*
+        version: link:../sdk
+
+  libs/backend-apisix-standalone:
+    devDependencies:
+      '@api7/adc-sdk':
+        specifier: workspace:*
+        version: link:../sdk
+
+  libs/converter-openapi:
+    devDependencies:
+      '@api7/adc-sdk':
+        specifier: workspace:*
+        version: link:../sdk
+
+  libs/sdk: {}
+
 packages:
 
   '@adobe/css-tools@4.3.3':

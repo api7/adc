@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@api7/adc-sdk": "workspace:*",
+    "@api7/adc-backend-api7": "workspace:*",
+    "@api7/adc-backend-apisix": "workspace:*",
+    "@api7/adc-backend-apisix-standalone": "workspace:*",
+    "@api7/adc-converter-openapi": "workspace:*"
+  }
+}
