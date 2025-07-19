@@ -3,20 +3,27 @@
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
     "module": "nodenext",
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "target": "es2021",
-    "lib": [
-      "ESNext"
-    ]
+    "lib": ["ESNext"]
   },
-  "exclude": [
-    "jest.config.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ],
-  "include": [
-    "src/**/*.ts"
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../libs/converter-openapi/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/backend-apisix-standalone/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/backend-apisix/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/backend-api7/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/sdk/tsconfig.lib.json"
+    }
   ]
 }
