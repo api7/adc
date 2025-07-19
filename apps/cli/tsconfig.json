@@ -4,6 +4,21 @@
   "include": [],
   "references": [
     {
+      "path": "../../libs/converter-openapi"
+    },
+    {
+      "path": "../../libs/backend-apisix-standalone"
+    },
+    {
+      "path": "../../libs/backend-apisix"
+    },
+    {
+      "path": "../../libs/backend-api7"
+    },
+    {
+      "path": "../../libs/sdk"
+    },
+    {
       "path": "./tsconfig.app.json"
     },
     {
