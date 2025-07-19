@@ -6,7 +6,6 @@
     "types": [
       "node"
     ],
-    "emitDecoratorMetadata": true,
     "target": "es2021",
     "lib": [
       "ESNext"
