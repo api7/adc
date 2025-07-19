@@ -9,6 +9,9 @@ module.exports = composePlugins(
   }),
   (config) => {
     config.devtool = 'inline-source-map';
+    config.output.library = {
+      type: 'module',
+    }
     config.output.devtoolModuleFilenameTemplate = "[absolute-resource-path]";
     config.externals = {
       '*': false
@@ -33,6 +36,7 @@ module.exports = composePlugins(
         },
       })],
     };
+    config.experiments.outputModule = true;
     return config;
   }
 );

@@ -3,7 +3,6 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "moduleResolution": "nodenext",
     "target": "es2015",
     "module": "esnext",
     "lib": [

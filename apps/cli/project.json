@@ -19,7 +19,7 @@
         "assets": [
           "apps/cli/src/assets"
         ],
-        "webpackConfig": "apps/cli/webpack.config.js",
+        "webpackConfig": "apps/cli/webpack.config.cjs",
         "sourceMap": true
       },
       "configurations": {

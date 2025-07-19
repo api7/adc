@@ -1,5 +1,6 @@
 {
   "private": true,
+  "type": "module",
   "devDependencies": {
     "@api7/adc-sdk": "workspace:*",
     "@api7/adc-backend-api7": "workspace:*",
