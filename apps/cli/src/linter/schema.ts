@@ -1,5 +1,5 @@
 import { isNil } from 'lodash';
-import { type ZodRawShape, z } from 'zod';
+import { type ZodRawShape, z } from 'zod/v4';
 
 const idSchema = z
   .string()
@@ -21,7 +21,7 @@ const labelsSchema = z.record(
 const pluginSchema = z.record(z.string(), z.any());
 const pluginsSchema = z.record(z.string(), pluginSchema);
 const exprSchema = z.array(z.any());
-const timeoutSchema = z.object({
+const timeoutSchema = z.strictObject({
   connect: z.coerce.number().gt(0),
   send: z.coerce.number().gt(0),
   read: z.coerce.number().gt(0),
@@ -44,40 +44,30 @@ const certificateKeySchema = z.union([
   secretRefSchema,
 ]);
 
-const upstreamHealthCheckPassiveHealthy = z
-  .object({
-    http_statuses: z
-      .array(z.coerce.number().int().min(200).max(599))
-      .min(1)
-      .default([200, 302])
-      .optional(),
-    successes: z.coerce.number().int().min(1).max(254).default(2).optional(),
-  })
-  .strict();
-const upstreamHealthCheckPassiveUnhealthy = z
-  .object({
-    http_statuses: z
-      .array(z.coerce.number().int().min(200).max(599))
-      .min(1)
-      .default([429, 404, 500, 501, 502, 503, 504, 505])
-      .optional(),
-    http_failures: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(254)
-      .default(5)
-      .optional(),
-    tcp_failures: z.coerce.number().int().min(1).max(254).default(2).optional(),
-    timeouts: z.coerce.number().int().min(1).max(254).default(3).optional(),
-  })
-  .strict();
+const upstreamHealthCheckPassiveHealthy = z.strictObject({
+  http_statuses: z
+    .array(z.coerce.number().int().min(200).max(599))
+    .min(1)
+    .default([200, 302])
+    .optional(),
+  successes: z.coerce.number().int().min(1).max(254).default(2).optional(),
+});
+const upstreamHealthCheckPassiveUnhealthy = z.strictObject({
+  http_statuses: z
+    .array(z.coerce.number().int().min(200).max(599))
+    .min(1)
+    .default([429, 404, 500, 501, 502, 503, 504, 505])
+    .optional(),
+  http_failures: z.coerce.number().int().min(1).max(254).default(5).optional(),
+  tcp_failures: z.coerce.number().int().min(1).max(254).default(2).optional(),
+  timeouts: z.coerce.number().int().min(1).max(254).default(3).optional(),
+});
 const upstreamHealthCheckType = z
   .enum(['http', 'https', 'tcp'])
   .default('http');
 const upstreamSchema = (extend?: ZodRawShape) =>
   z
-    .object({
+    .strictObject({
       name: nameSchema.optional(),
       description: descriptionSchema.optional(),
       labels: labelsSchema.optional(),
@@ -89,8 +79,8 @@ const upstreamSchema = (extend?: ZodRawShape) =>
       hash_on: z.string().optional(),
       key: z.string().optional(),
       checks: z
-        .object({
-          active: z.object({
+        .strictObject({
+          active: z.strictObject({
             type: upstreamHealthCheckType.optional(),
             timeout: z.coerce.number().default(1).optional(),
             concurrency: z.coerce.number().default(10).optional(),
@@ -100,22 +90,20 @@ const upstreamSchema = (extend?: ZodRawShape) =>
             https_verify_cert: z.boolean().default(true).optional(),
             http_request_headers: z.array(z.string()).min(1).optional(),
             healthy: z
-              .object({
+              .strictObject({
+                ...upstreamHealthCheckPassiveHealthy.shape,
                 interval: z.coerce.number().int().min(1).default(1),
               })
-              .merge(upstreamHealthCheckPassiveHealthy)
-              .strict()
               .optional(),
             unhealthy: z
-              .object({
+              .strictObject({
+                ...upstreamHealthCheckPassiveUnhealthy.shape,
                 interval: z.coerce.number().int().min(1).default(1),
               })
-              .merge(upstreamHealthCheckPassiveUnhealthy)
-              .strict()
               .optional(),
           }),
           passive: z
-            .object({
+            .strictObject({
               type: upstreamHealthCheckType.optional(),
               healthy: upstreamHealthCheckPassiveHealthy.optional(),
               unhealthy: upstreamHealthCheckPassiveUnhealthy.optional(),
@@ -133,7 +121,7 @@ const upstreamSchema = (extend?: ZodRawShape) =>
         .optional(),
       nodes: z
         .array(
-          z.object({
+          z.strictObject({
             host: hostSchema,
             port: portSchema.optional(),
             weight: z.coerce.number().int().min(0),
@@ -150,13 +138,12 @@ const upstreamSchema = (extend?: ZodRawShape) =>
       retry_timeout: z.coerce.number().min(0).optional(),
       timeout: timeoutSchema.optional(),
       tls: z
-        .object({
+        .strictObject({
           client_cert: z.string().optional(),
           client_key: z.string().optional(),
           client_cert_id: z.string().optional(),
           verify: z.boolean().optional(),
         })
-        .strict()
         .refine(
           (data) =>
             (data.client_cert && data.client_key && !data.client_cert_id) ||
@@ -165,7 +152,7 @@ const upstreamSchema = (extend?: ZodRawShape) =>
         )
         .optional(),
       keepalive_pool: z
-        .object({
+        .strictObject({
           size: z.coerce.number().int().min(1).default(320),
           idle_timeout: z.coerce.number().min(0).default(60),
           requests: z.coerce.number().int().min(1).default(1000),
@@ -177,73 +164,71 @@ const upstreamSchema = (extend?: ZodRawShape) =>
       service_name: z.string().optional(),
       discovery_type: z.string().optional(),
       discovery_args: z.record(z.string(), z.any()).optional(),
+
+      ...extend,
     })
-    .strict()
-    .extend(extend)
     .refine(
       (val) =>
         (val.nodes && !val.discovery_type && !val.service_name) ||
         (val.discovery_type && val.service_name && !val.nodes),
       {
-        message:
+        error:
           'Upstream must either explicitly specify nodes or use service discovery and not both',
       },
     );
 
-const routeSchema = z
-  .object({
-    id: idSchema.optional(),
-    name: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+const routeSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    hosts: z.array(hostSchema).optional(),
-    uris: z.array(z.string()).min(1),
-    priority: z.coerce.number().int().optional(),
-    timeout: timeoutSchema.optional(),
-    vars: exprSchema.optional(),
-    methods: z
-      .array(
-        z.enum([
-          'GET',
-          'POST',
-          'PUT',
-          'DELETE',
-          'PATCH',
-          'HEAD',
-          'OPTIONS',
-          'CONNECT',
-          'TRACE',
-          'PURGE',
-        ]),
-      )
-      .nonempty()
-      .optional(),
-    enable_websocket: z.boolean().optional(),
-    remote_addrs: z.array(z.string().ip()).optional(),
-    plugins: pluginsSchema.optional(),
-    filter_func: z.string().optional(),
-  })
-  .strict();
+  hosts: z.array(hostSchema).optional(),
+  uris: z.array(z.string()).min(1),
+  priority: z.coerce.number().int().optional(),
+  timeout: timeoutSchema.optional(),
+  vars: exprSchema.optional(),
+  methods: z
+    .array(
+      z.enum([
+        'GET',
+        'POST',
+        'PUT',
+        'DELETE',
+        'PATCH',
+        'HEAD',
+        'OPTIONS',
+        'CONNECT',
+        'TRACE',
+        'PURGE',
+      ]),
+    )
+    .nonempty()
+    .optional(),
+  enable_websocket: z.boolean().optional(),
+  remote_addrs: z
+    .array(z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()]))
+    .optional(),
+  plugins: pluginsSchema.optional(),
+  filter_func: z.string().optional(),
+});
 
-const streamRouteSchema = z
-  .object({
-    id: idSchema.optional(),
-    name: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+const streamRouteSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    plugins: pluginsSchema.optional(),
+  plugins: pluginsSchema.optional(),
 
-    remote_addr: z.string().optional(),
-    server_addr: z.string().optional(),
-    server_port: portSchema.optional(),
-    sni: hostSchema.optional(),
-  })
-  .strict();
+  remote_addr: z.string().optional(),
+  server_addr: z.string().optional(),
+  server_port: portSchema.optional(),
+  sni: hostSchema.optional(),
+});
 
 const serviceSchema = z
-  .object({
+  .strictObject({
     id: idSchema.optional(),
     name: nameSchema,
     description: descriptionSchema.optional(),
@@ -266,7 +251,6 @@ const serviceSchema = z
     routes: z.array(routeSchema).optional(),
     stream_routes: z.array(streamRouteSchema).optional(),
   })
-  .strict()
   .refine(
     (val) => !(Array.isArray(val.routes) && Array.isArray(val.stream_routes)),
     {
@@ -282,91 +266,78 @@ const serviceSchema = z
       'The default upstream must be set with "upstream" when multiple upstreams are set via "upstreams"',
   });
 
-const sslSchema = z
-  .object({
-    id: idSchema.optional(),
-    labels: labelsSchema.optional(),
+const sslSchema = z.strictObject({
+  id: idSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    type: z.enum(['server', 'client']).default('server').optional(),
-    snis: z.array(hostSchema).min(1),
-    certificates: z
-      .array(
-        z
-          .object({
-            certificate: certificateSchema,
-            key: certificateKeySchema,
-          })
-          .strict(),
-      )
-      .refine((val) => val.length > 0, {
-        message: 'SSL must contain at least one certificate',
+  type: z.enum(['server', 'client']).default('server').optional(),
+  snis: z.array(hostSchema).min(1),
+  certificates: z
+    .array(
+      z.strictObject({
+        certificate: certificateSchema,
+        key: certificateKeySchema,
       }),
-    client: z
-      .object({
-        ca: certificateSchema,
-        depth: z.coerce.number().int().min(0).default(1).optional(),
-        skip_mtls_uri_regex: z.array(z.string()).min(1).optional(),
-      })
-      .strict()
-      .optional(),
-    ssl_protocols: z
-      .array(z.enum(['TLSv1.1', 'TLSv1.2', 'TLSv1.3']))
-      .nonempty()
-      .optional(),
-  })
-  .strict();
+    )
+    .refine((val) => val.length > 0, {
+      message: 'SSL must contain at least one certificate',
+    }),
+  client: z
+    .strictObject({
+      ca: certificateSchema,
+      depth: z.coerce.number().int().min(0).default(1).optional(),
+      skip_mtls_uri_regex: z.array(z.string()).min(1).optional(),
+    })
+    .optional(),
+  ssl_protocols: z
+    .array(z.enum(['TLSv1.1', 'TLSv1.2', 'TLSv1.3']))
+    .nonempty()
+    .optional(),
+});
 
-const consumerCredentialSchema = z
-  .object({
-    id: idSchema.optional(),
-    name: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+const consumerCredentialSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    type: z
-      .string()
-      .refine(
-        (type) =>
-          ['key-auth', 'basic-auth', 'jwt-auth', 'hmac-auth'].includes(type),
-        {
-          message:
-            'Consumer credential only supports "key-auth", "basic-auth", "jwt-auth" and "hmac-auth" types',
-        },
-      ),
-    config: pluginSchema,
-  })
-  .strict();
-const consumerSchema = z
-  .object({
-    username: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+  type: z
+    .string()
+    .refine(
+      (type) =>
+        ['key-auth', 'basic-auth', 'jwt-auth', 'hmac-auth'].includes(type),
+      {
+        message:
+          'Consumer credential only supports "key-auth", "basic-auth", "jwt-auth" and "hmac-auth" types',
+      },
+    ),
+  config: pluginSchema,
+});
+const consumerSchema = z.strictObject({
+  username: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    plugins: pluginsSchema.optional(),
-    credentials: z.array(consumerCredentialSchema).optional(),
-  })
-  .strict();
+  plugins: pluginsSchema.optional(),
+  credentials: z.array(consumerCredentialSchema).optional(),
+});
 
-const consumerGroupSchema = z
-  .object({
-    id: idSchema.optional(),
-    name: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+const consumerGroupSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    plugins: pluginsSchema,
+  plugins: pluginsSchema,
 
-    consumers: z.array(consumerSchema).optional(),
-  })
-  .strict();
+  consumers: z.array(consumerSchema).optional(),
+});
 
-export const ConfigurationSchema = z
-  .object({
-    services: z.array(serviceSchema).optional(),
-    ssls: z.array(sslSchema).optional(),
-    consumers: z.array(consumerSchema).optional(),
-    consumer_groups: z.array(consumerGroupSchema).optional(),
-    global_rules: pluginsSchema.optional(),
-    plugin_metadata: pluginsSchema.optional(),
-  })
-  .strict();
+export const ConfigurationSchema = z.strictObject({
+  services: z.array(serviceSchema).optional(),
+  ssls: z.array(sslSchema).optional(),
+  consumers: z.array(consumerSchema).optional(),
+  consumer_groups: z.array(consumerGroupSchema).optional(),
+  global_rules: pluginsSchema.optional(),
+  plugin_metadata: pluginsSchema.optional(),
+});
