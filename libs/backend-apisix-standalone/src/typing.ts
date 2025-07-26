@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 export const ADC_UPSTREAM_SERVICE_ID_LABEL = '__ADC_UPSTREAM_SERVICE_ID';
 
