@@ -18,7 +18,7 @@ const labelsSchema = z.record(
   z.string(),
   z.union([z.string(), z.array(z.string())]),
 );
-const pluginSchema = z.record(z.string(), z.any());
+const pluginSchema = z.looseObject({});
 const pluginsSchema = z.record(z.string(), pluginSchema);
 const exprSchema = z.array(z.any());
 const timeoutSchema = z.strictObject({

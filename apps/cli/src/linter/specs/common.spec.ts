@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { check } from '../';
+import { check } from '..';
 
 describe('Common Linter', () => {
   const cases = [
@@ -33,21 +33,19 @@ describe('Common Linter', () => {
       errors: [
         {
           code: 'too_big',
-          exact: false,
           inclusive: true,
           maximum: 65536,
-          message: 'String must contain at most 65536 character(s)',
+          message: 'Too big: expected string to have <=65536 characters',
+          origin: 'string',
           path: ['services', 0, 'name'],
-          type: 'string',
         },
         {
           code: 'too_big',
-          exact: false,
           inclusive: true,
           maximum: 65536,
-          message: 'String must contain at most 65536 character(s)',
+          message: 'Too big: expected string to have <=65536 characters',
+          origin: 'string',
           path: ['services', 0, 'description'],
-          type: 'string',
         },
       ],
     },
@@ -99,12 +97,11 @@ describe('Common Linter', () => {
       errors: [
         {
           code: 'too_big',
-          exact: false,
           inclusive: true,
           maximum: 256,
-          message: 'String must contain at most 256 character(s)',
+          message: 'Too big: expected string to have <=256 characters',
+          origin: 'string',
           path: ['services', 0, 'id'],
-          type: 'string',
         },
       ],
     },
@@ -154,10 +151,10 @@ describe('Common Linter', () => {
       errors: [
         {
           code: 'invalid_type',
-          expected: 'integer',
-          message: 'Expected integer, received float',
+          expected: 'int',
+          format: 'safeint',
+          message: 'Invalid input: expected int, received number',
           path: ['services', 0, 'upstream', 'nodes', 0, 'port'],
-          received: 'float',
         },
       ],
     },
@@ -169,7 +166,7 @@ describe('Common Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.errors).toEqual(item.errors);
+        expect(result.error.issues).toEqual(item.errors);
       }
     });
   });

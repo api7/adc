@@ -22,22 +22,61 @@ describe('SSL Linter', () => {
       expect: false,
       errors: [
         {
-          code: 'too_small',
-          exact: false,
-          inclusive: true,
-          message: 'String must contain at least 128 character(s)',
-          minimum: 128,
+          code: 'invalid_union',
+          errors: [
+            [
+              {
+                code: 'too_small',
+                inclusive: true,
+                message: 'Too small: expected string to have >=128 characters',
+                minimum: 128,
+                origin: 'string',
+                path: [],
+              },
+            ],
+            [
+              {
+                code: 'invalid_format',
+                format: 'regex',
+                message:
+                  'Invalid string: must match pattern /^\\$(secret|env):\\/\\//',
+                origin: 'string',
+                path: [],
+                pattern: '/^\\$(secret|env):\\/\\//',
+              },
+            ],
+          ],
+          message: 'Must be a certificate string or a secret reference',
           path: ['ssls', 0, 'certificates', 0, 'certificate'],
-          type: 'string',
         },
         {
-          code: 'too_small',
-          exact: false,
-          inclusive: true,
-          message: 'String must contain at least 32 character(s)',
-          minimum: 32,
+          code: 'invalid_union',
+          errors: [
+            [
+              {
+                code: 'too_small',
+                inclusive: true,
+                message: 'Too small: expected string to have >=32 characters',
+                minimum: 32,
+                origin: 'string',
+                path: [],
+              },
+            ],
+            [
+              {
+                code: 'invalid_format',
+                format: 'regex',
+                message:
+                  'Invalid string: must match pattern /^\\$(secret|env):\\/\\//',
+                origin: 'string',
+                path: [],
+                pattern: '/^\\$(secret|env):\\/\\//',
+              },
+            ],
+          ],
+          message:
+            'Must be a certificate private key string or a secret reference',
           path: ['ssls', 0, 'certificates', 0, 'key'],
-          type: 'string',
         },
       ],
     },
@@ -83,7 +122,7 @@ describe('SSL Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.errors).toEqual(item.errors);
+        expect(result.error.issues).toEqual(item.errors);
       }
     });
   });

@@ -45,9 +45,8 @@ describe('Consumer Linter', () => {
         {
           code: 'invalid_type',
           expected: 'object',
-          message: 'Required',
+          message: 'Invalid input: expected object, received undefined',
           path: ['consumers', 0, 'credentials', 0, 'config'],
-          received: 'undefined',
         },
       ],
     },
@@ -86,7 +85,7 @@ describe('Consumer Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.errors).toEqual(item.errors);
+        expect(result.error.issues).toEqual(item.errors);
       }
     });
   });

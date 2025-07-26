@@ -920,9 +920,7 @@
             },
             "additionalProperties": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
+              "properties": {},
               "additionalProperties": {}
             }
           },
@@ -1080,9 +1078,7 @@
                   },
                   "additionalProperties": {
                     "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
+                    "properties": {},
                     "additionalProperties": {}
                   }
                 },
@@ -1143,9 +1139,7 @@
                   },
                   "additionalProperties": {
                     "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
+                    "properties": {},
                     "additionalProperties": {}
                   }
                 },
@@ -1358,9 +1352,7 @@
             },
             "additionalProperties": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
+              "properties": {},
               "additionalProperties": {}
             }
           },
@@ -1408,9 +1400,7 @@
                 },
                 "config": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
+                  "properties": {},
                   "additionalProperties": {}
                 }
               },
@@ -1475,9 +1465,7 @@
             },
             "additionalProperties": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
+              "properties": {},
               "additionalProperties": {}
             }
           },
@@ -1521,9 +1509,7 @@
                   },
                   "additionalProperties": {
                     "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
+                    "properties": {},
                     "additionalProperties": {}
                   }
                 },
@@ -1571,9 +1557,7 @@
                       },
                       "config": {
                         "type": "object",
-                        "propertyNames": {
-                          "type": "string"
-                        },
+                        "properties": {},
                         "additionalProperties": {}
                       }
                     },
@@ -1607,9 +1591,7 @@
       },
       "additionalProperties": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
-        },
+        "properties": {},
         "additionalProperties": {}
       }
     },
@@ -1620,9 +1602,7 @@
       },
       "additionalProperties": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
-        },
+        "properties": {},
         "additionalProperties": {}
       }
     }

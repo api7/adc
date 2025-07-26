@@ -147,9 +147,8 @@ describe('Upstream Linter', () => {
         {
           code: 'invalid_type',
           expected: 'string',
-          message: 'Required',
+          message: 'Invalid input: expected string, received undefined',
           path: ['services', 0, 'upstreams', 0, 'name'],
-          received: 'undefined',
         },
       ],
     },
@@ -161,7 +160,7 @@ describe('Upstream Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.errors).toEqual(item.errors);
+        expect(result.error.issues).toEqual(item.errors);
       }
     });
   });
