@@ -3,7 +3,7 @@ import { Listr } from 'listr2';
 import { isEmpty } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import slugify from 'slugify';
-import { ZodError } from 'zod';
+import { z } from 'zod';
 
 import { ExtKey, parseExtPlugins } from './extension';
 import { parseSeprateService, parseUpstream } from './parser';
@@ -22,22 +22,10 @@ export class OpenAPIConverter implements ADCSDK.Converter {
           const result = schema.safeParse(oas);
 
           if (!result.success) {
-            let err =
-              'Validate OpenAPI document\nThe following errors were found in OpenAPI document:\n';
-
-            if ('error' in result) {
-              (result.error as ZodError).errors.forEach((error, idx) => {
-                err += `#${idx + 1} ${error.message}, field: "${(
-                  error.path ?? []
-                ).join('.')}"\n`;
-                task.output = this.buildDebugOutput([
-                  `#${idx + 1} raw error: `,
-                  JSON.stringify(error),
-                ]);
-              });
-            }
-
-            throw new Error(err);
+            const err = `Validate OpenAPI document\nThe following errors were found in OpenAPI document:\n${z.prettifyError(result.error)}`;
+            const error = new Error(err);
+            error.stack = '';
+            throw error;
           }
         },
       },
