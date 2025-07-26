@@ -29,20 +29,26 @@ const timeoutSchema = z.strictObject({
 const hostSchema = z.string().min(1);
 const portSchema = z.coerce.number().int().min(1).max(65535);
 const secretRefSchema = z.string().regex(/^\$(secret|env):\/\//);
-const certificateSchema = z.union([
-  z
-    .string()
-    .min(128)
-    .max(64 * 1024),
-  secretRefSchema,
-]);
-const certificateKeySchema = z.union([
-  z
-    .string()
-    .min(32)
-    .max(64 * 1024),
-  secretRefSchema,
-]);
+const certificateSchema = z.union(
+  [
+    z
+      .string()
+      .min(128)
+      .max(64 * 1024),
+    secretRefSchema,
+  ],
+  { error: 'Must be a certificate string or a secret reference' },
+);
+const certificateKeySchema = z.union(
+  [
+    z
+      .string()
+      .min(32)
+      .max(64 * 1024),
+    secretRefSchema,
+  ],
+  { error: 'Must be a certificate private key string or a secret reference' },
+);
 
 const upstreamHealthCheckPassiveHealthy = z.strictObject({
   http_statuses: z
@@ -207,7 +213,11 @@ const routeSchema = z.strictObject({
     .optional(),
   enable_websocket: z.boolean().optional(),
   remote_addrs: z
-    .array(z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()]))
+    .array(
+      z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()], {
+        error: 'Must be IP or CIDR, accepts both IPv4 and IPv6',
+      }),
+    )
     .optional(),
   plugins: pluginsSchema.optional(),
   filter_func: z.string().optional(),
@@ -254,15 +264,15 @@ const serviceSchema = z
   .refine(
     (val) => !(Array.isArray(val.routes) && Array.isArray(val.stream_routes)),
     {
-      message:
+      error:
         'HTTP routes and Stream routes are mutually exclusive and should not exist in the same service',
     },
   )
   .refine((val) => !val.path_prefix || val.path_prefix.startsWith('/'), {
-    message: 'Path prefix must start with "/"',
+    error: 'Path prefix must start with "/"',
   })
   .refine((val) => !(!isNil(val.upstreams) && isNil(val.upstream)), {
-    message:
+    error:
       'The default upstream must be set with "upstream" when multiple upstreams are set via "upstreams"',
   });
 
@@ -280,7 +290,7 @@ const sslSchema = z.strictObject({
       }),
     )
     .refine((val) => val.length > 0, {
-      message: 'SSL must contain at least one certificate',
+      error: 'SSL must contain at least one certificate',
     }),
   client: z
     .strictObject({
