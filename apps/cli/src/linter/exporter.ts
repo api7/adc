@@ -5,11 +5,11 @@
  *
  */
 import { writeFileSync } from 'fs';
-import zodToJsonSchema from 'zod-to-json-schema';
+import { z } from 'zod';
 
 import { ConfigurationSchema } from './schema';
 
 writeFileSync(
   'schema.json',
-  JSON.stringify(zodToJsonSchema(ConfigurationSchema), null, 2) + '\n',
+  JSON.stringify(z.toJSONSchema(ConfigurationSchema), null, 2) + '\n',
 );

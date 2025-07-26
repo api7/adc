@@ -39,7 +39,7 @@ describe('Route Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.errors).toEqual(item.errors);
+        expect(result.error.issues).toEqual(item.errors);
       }
     });
   });
