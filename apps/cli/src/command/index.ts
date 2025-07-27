@@ -6,6 +6,7 @@ import { ConvertCommand } from './convert.command';
 import { DevCommand } from './dev.command';
 import { DiffCommand } from './diff.command';
 import { DumpCommand } from './dump.command';
+import { IngressServerCommand } from './ingress-server.command';
 import { IngressSyncCommand } from './ingress-sync.command';
 import { LintCommand } from './lint.command';
 import { PingCommand } from './ping.command';
@@ -73,6 +74,7 @@ export const setupIngressCommands = (): Command => {
   }
 
   program.addCommand(IngressSyncCommand);
+  program.addCommand(IngressServerCommand);
 
   if (process.env.NODE_ENV === 'development') program.addCommand(DevCommand);
 
