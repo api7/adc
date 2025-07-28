@@ -10,6 +10,24 @@ on:
       - main
     types: [opened, synchronize, reopened, labeled]
 jobs:
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build and test ADC CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm install
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: npx nx run cli:e2e
   apisix:
     runs-on: ubuntu-latest
     strategy:
