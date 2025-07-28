@@ -1,10 +1,12 @@
 import express from 'express';
 import type { Express } from 'express';
+import type { Server } from 'node:http';
 
 import { syncHandler } from './sync';
 
 export class ADCServer {
-  private express: Express;
+  private readonly express: Express;
+  private server?: Server;
 
   constructor() {
     this.express = express();
@@ -13,8 +15,13 @@ export class ADCServer {
     this.express.put('/sync', syncHandler);
   }
 
-  public start() {
-    console.log('ADC server is running on: http://127.0.0.1:3000');
-    this.express.listen(3000, '127.0.0.1');
+  public async start() {
+    return new Promise<void>((resolve) => {
+      this.server = this.express.listen(3000, '127.0.0.1', () => resolve());
+    });
+  }
+
+  public TEST_ONLY_getExpress() {
+    return this.express;
   }
 }

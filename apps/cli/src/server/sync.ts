@@ -32,13 +32,13 @@ export const syncHandler: RequestHandler<
       });
   }
 
-  // load remote configuration and diff with local
-  const backend = loadBackend(task.opts.backend, { ...task.opts });
-  const remote = await lastValueFrom(backend.dump());
-  const diff = DifferV3.diff(local, remote, await backend.defaultValue());
-
-  // sync the diff
   try {
+    // load remote configuration and diff with local
+    const backend = loadBackend(task.opts.backend, { ...task.opts });
+    const remote = await lastValueFrom(backend.dump());
+    const diff = DifferV3.diff(local, remote, await backend.defaultValue());
+
+    // sync the diff
     const results = await lastValueFrom(
       backend
         .sync(diff, {
@@ -86,9 +86,9 @@ export const syncHandler: RequestHandler<
         })),
       ],
     };
-    res.status(200).json(output);
+    res.status(202).json(output);
   } catch (err) {
-    res.status(500).send({
+    res.status(500).json({
       message: toString(err),
     });
   }
