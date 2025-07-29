@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import axios from 'axios';
 import { lastValueFrom } from 'rxjs';
 import request from 'supertest';
 
@@ -11,7 +12,7 @@ describe('Server - Basic', () => {
 
   beforeAll(async () => {
     mockedBackend = jestMockBackend();
-    server = new ADCServer();
+    server = new ADCServer({ listen: new URL('http://127.0.1:3000') });
   });
 
   it('test mocked load backend', async () => {
@@ -69,12 +70,33 @@ describe('Server - Basic', () => {
             server: 'http://1.1.1.1:3000',
             token: 'mock',
           },
-          config: config,
+          config,
         },
       });
 
     expect(status).toBe(202);
     expect(body.status).toBe('success');
     await expect(lastValueFrom(mockedBackend.dump())).resolves.toEqual(config);
+  });
+
+  it('test server listen', async () => {
+    const url = new URL(`http://127.0.0.1:48562`);
+    const server = new ADCServer({ listen: url });
+    await server.start();
+
+    const { status, data } = await axios.put(`${url.origin}/sync`, {
+      task: {
+        opts: {
+          backend: 'mock',
+          server: 'http://1.1.1.1:3000',
+          token: 'mock',
+        },
+        config: {},
+      },
+    });
+    expect(status).toBe(202);
+    expect(data.status).toBe('success');
+
+    await server.stop();
   });
 });

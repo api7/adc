@@ -4,11 +4,16 @@ import type { Server } from 'node:http';
 
 import { syncHandler } from './sync';
 
+interface ADCServerOptions {
+  listen: URL;
+}
 export class ADCServer {
   private readonly express: Express;
+  private listen: URL;
   private server?: Server;
 
-  constructor() {
+  constructor(opts: ADCServerOptions) {
+    this.listen = opts.listen;
     this.express = express();
     this.express.disable('x-powered-by');
     this.express.use(express.json({ limit: '100mb' }));
@@ -17,7 +22,21 @@ export class ADCServer {
 
   public async start() {
     return new Promise<void>((resolve) => {
-      this.server = this.express.listen(3000, '127.0.0.1', () => resolve());
+      this.server = this.express.listen(
+        parseInt(this.listen.port),
+        this.listen.hostname,
+        () => resolve(),
+      );
+    });
+  }
+
+  public async stop() {
+    return new Promise<void>((resolve) => {
+      if (this.server) {
+        this.server.close(() => resolve());
+      } else {
+        resolve();
+      }
     });
   }
 
