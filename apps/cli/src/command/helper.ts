@@ -73,9 +73,7 @@ export class BackendCommand<
   public handle(cb: (opts: OPTS, command: Command) => void | Promise<void>) {
     const opts = this.opts<OPTS>();
 
-    if (
-      (has(opts, 'tlsClientCertFile') && !has(opts, 'tlsClientKeyFile')) ||
-      (has(opts, 'tlsClientKeyFile') && !has(opts, 'tlsClientCertFile'))
+    if (!has(opts, 'tlsClientCertFile') || !has(opts, 'tlsClientKeyFile'))
     ) {
       console.log(
         chalk.red(
