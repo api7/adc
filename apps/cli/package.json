@@ -1,10 +1,17 @@
 {
   "private": true,
   "devDependencies": {
-    "@api7/adc-sdk": "workspace:*",
     "@api7/adc-backend-api7": "workspace:*",
     "@api7/adc-backend-apisix": "workspace:*",
     "@api7/adc-backend-apisix-standalone": "workspace:*",
-    "@api7/adc-converter-openapi": "workspace:*"
+    "@api7/adc-converter-openapi": "workspace:*",
+    "@api7/adc-sdk": "workspace:*",
+    "@types/express": "^5.0.3",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "express": "^5.1.0"
   }
 }

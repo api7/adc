@@ -7,7 +7,12 @@ import { resolve } from 'node:path';
 import parseDuration from 'parse-duration';
 import qs from 'qs';
 
-export class BaseCommand extends Command {
+export interface BaseOptions {
+  verbose: boolean;
+}
+export class BaseCommand<
+  OPTS extends BaseOptions = BaseOptions,
+> extends Command {
   private examples: Array<{ title: string; command: string }> = [];
 
   constructor(name: string, summary?: string, description?: string) {
@@ -49,9 +54,16 @@ export class BaseCommand extends Command {
     this.description(`${currDescription}\n\n${exampleHeader}\n${exampleText}`);
     return this;
   }
+
+  public handle(cb: (opts: OPTS, command: Command) => void | Promise<void>) {
+    this.action((_, command: Command) => cb(command.opts<OPTS>(), command));
+    return this;
+  }
 }
 
-export class BackendCommand<OPTS extends object = object> extends BaseCommand {
+export class BackendCommand<
+  OPTS extends BaseOptions = BaseOptions,
+> extends BaseCommand<OPTS> {
   constructor(name: string, summary?: string, description?: string) {
     super(name, summary, description);
 
@@ -59,24 +71,17 @@ export class BackendCommand<OPTS extends object = object> extends BaseCommand {
   }
 
   public handle(cb: (opts: OPTS, command: Command) => void | Promise<void>) {
-    this.action(async (_, command: Command) => {
-      const opts = command.opts<OPTS>();
+    const opts = this.opts<OPTS>();
 
-      if (
-        (has(opts, 'tlsClientCertFile') && !has(opts, 'tlsClientKeyFile')) ||
-        (has(opts, 'tlsClientKeyFile') && !has(opts, 'tlsClientCertFile'))
-      ) {
-        console.log(
-          chalk.red(
-            'TLS client certificate and key must be provided at the same time',
-          ),
-        );
-        return;
-      }
-
-      await cb(opts, command);
-    });
-    return this;
+    if (!has(opts, 'tlsClientCertFile') || !has(opts, 'tlsClientKeyFile')) {
+      console.log(
+        chalk.red(
+          'TLS client certificate and key must be provided at the same time',
+        ),
+      );
+      return this;
+    }
+    return super.handle(cb);
   }
 
   private addBackendOptions() {
