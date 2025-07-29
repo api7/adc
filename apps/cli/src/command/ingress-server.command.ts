@@ -1,3 +1,5 @@
+import commander from 'commander';
+
 import { ADCServer } from '../server';
 import { BaseCommand, BaseOptions } from './helper';
 
@@ -11,7 +13,13 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
   .option<URL>(
     '--listen <listen>',
     'listen address of ADC server, the format is scheme://host:port',
-    (val) => new URL(val),
+    (val) => {
+      try {
+        return new URL(val);
+      } catch (err) {
+        throw new commander.InvalidArgumentError(err);
+      }
+    },
     new URL('http://127.0.0.1:3000'),
   )
   .handle(async ({ listen }) => {
