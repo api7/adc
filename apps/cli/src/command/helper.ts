@@ -73,8 +73,7 @@ export class BackendCommand<
   public handle(cb: (opts: OPTS, command: Command) => void | Promise<void>) {
     const opts = this.opts<OPTS>();
 
-    if (!has(opts, 'tlsClientCertFile') || !has(opts, 'tlsClientKeyFile'))
-    ) {
+    if (!has(opts, 'tlsClientCertFile') || !has(opts, 'tlsClientKeyFile')) {
       console.log(
         chalk.red(
           'TLS client certificate and key must be provided at the same time',
