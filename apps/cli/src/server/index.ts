@@ -30,6 +30,16 @@ export class ADCServer {
     });
   }
 
+  public async stop() {
+    return new Promise<void>((resolve) => {
+      if (this.server) {
+        this.server.close(() => resolve());
+      } else {
+        resolve();
+      }
+    });
+  }
+
   public TEST_ONLY_getExpress() {
     return this.express;
   }
