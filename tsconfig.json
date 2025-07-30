@@ -19,9 +19,6 @@
     },
     {
       "path": "./libs/sdk"
-    },
-    {
-      "path": "./apps/cli-e2e"
     }
   ]
 }
