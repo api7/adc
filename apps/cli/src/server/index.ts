@@ -13,13 +13,10 @@ interface ADCServerOptions {
   tlsCACert?: string;
 }
 export class ADCServer {
-  private readonly opts: ADCServerOptions;
   private readonly express: Express;
-  //private listen: URL;
   private server?: http.Server | https.Server;
 
-  constructor(opts: ADCServerOptions) {
-    this.opts = opts;
+  constructor(private readonly opts: ADCServerOptions) {
     this.express = express();
     this.express.disable('x-powered-by');
     this.express.use(express.json({ limit: '100mb' }));
