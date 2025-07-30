@@ -88,12 +88,6 @@ export class BackendCommand<
   }
 
   private addBackendOptions() {
-    const processCertificateFile = (value: string, err: string) => {
-      const path = resolve(value);
-      if (!existsSync(path)) throw new Error(err);
-      return path;
-    };
-
     const parseResourceTypeFilter = (
       cv: ADCSDK.ResourceType,
       pv: Array<string> = [],
@@ -217,6 +211,11 @@ export class BackendCommand<
   }
 }
 
+export const processCertificateFile = (value: string, err: string) => {
+  const path = resolve(value);
+  if (!existsSync(path)) throw new InvalidArgumentError(err);
+  return path;
+};
 export const NoLintOption = new Option('--no-lint', 'disable lint check');
 export const RequestConcurrentOption = new Option(
   '--request-concurrent <integer>',
