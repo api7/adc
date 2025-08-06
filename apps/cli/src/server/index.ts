@@ -19,6 +19,7 @@ export class ADCServer {
   constructor(private readonly opts: ADCServerOptions) {
     this.express = express();
     this.express.disable('x-powered-by');
+    this.express.disable('etag');
     this.express.use(express.json({ limit: '100mb' }));
     this.express.put('/sync', syncHandler);
   }
