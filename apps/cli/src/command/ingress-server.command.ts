@@ -72,8 +72,8 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
 
     const server = new ADCServer({
       listen,
-      tlsCert: readFileSync(tlsCertFile, 'utf-8'),
-      tlsKey: readFileSync(tlsKeyFile, 'utf-8'),
+      tlsCert: tlsCertFile ? readFileSync(tlsCertFile, 'utf-8') : undefined,
+      tlsKey: tlsKeyFile ? readFileSync(tlsKeyFile, 'utf-8') : undefined,
       tlsCACert: caCertFile ? readFileSync(caCertFile, 'utf-8') : undefined,
     });
     await server.start();
