@@ -268,6 +268,8 @@ describe('Server - Basic', () => {
     );
     expect(status).toEqual(200);
     expect(data).toEqual('OK');
+
+    await server.stop();
   });
 
   it('test status listen (custom port)', async () => {
@@ -282,5 +284,7 @@ describe('Server - Basic', () => {
     );
     expect(status).toEqual(200);
     expect(data).toEqual('OK');
+
+    await server.stop();
   });
 });
