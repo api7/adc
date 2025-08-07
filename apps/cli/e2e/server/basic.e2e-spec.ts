@@ -16,7 +16,10 @@ describe('Server - Basic', () => {
 
   beforeAll(async () => {
     mockedBackend = jestMockBackend();
-    server = new ADCServer({ listen: new URL('http://127.0.1:3000') });
+    server = new ADCServer({
+      listen: new URL('http://127.0.1:3000'),
+      listenStatus: 3001,
+    });
   });
 
   it('test mocked load backend', async () => {
@@ -85,7 +88,7 @@ describe('Server - Basic', () => {
 
   it('test server listen', async () => {
     const url = new URL(`http://127.0.0.1:48562`);
-    const server = new ADCServer({ listen: url });
+    const server = new ADCServer({ listen: url, listenStatus: 3001 });
     await server.start();
 
     const { status, data } = await axios.put(`${url.origin}/sync`, {
@@ -108,6 +111,7 @@ describe('Server - Basic', () => {
     const url = new URL(`https://127.0.0.1:48562`);
     const server = new ADCServer({
       listen: url,
+      listenStatus: 3001,
       tlsCert: readFileSync(
         join(__dirname, '../assets/tls/server.cer'),
         'utf-8',
@@ -145,6 +149,7 @@ describe('Server - Basic', () => {
       readFileSync(join(__dirname, '../assets/tls/', fileName), 'utf-8');
     const server = new ADCServer({
       listen: url,
+      listenStatus: 3001,
       tlsCert: readCert('server.cer'),
       tlsKey: readCert('server.key'),
       tlsCACert: readCert('ca.cer'),
@@ -198,7 +203,7 @@ describe('Server - Basic', () => {
 
   it('test server listen (with UDS)', async () => {
     const url = new URL(`unix:///tmp/adc-test.sock`);
-    const server = new ADCServer({ listen: url });
+    const server = new ADCServer({ listen: url, listenStatus: 3001 });
     await server.start();
 
     const { status, data } = await new Promise<{
@@ -247,6 +252,38 @@ describe('Server - Basic', () => {
     });
     expect(status).toEqual(202);
     expect(data.status).toEqual('success');
+
+    await server.stop();
+  });
+
+  it('test status listen', async () => {
+    const server = new ADCServer({
+      listen: new URL(`http://127.0.0.1:3000`),
+      listenStatus: 3001,
+    });
+    await server.start();
+
+    const { status, data } = await axios.get(
+      `http://127.0.0.1:3001/healthz/ready`,
+    );
+    expect(status).toEqual(200);
+    expect(data).toEqual('OK');
+
+    await server.stop();
+  });
+
+  it('test status listen (custom port)', async () => {
+    const server = new ADCServer({
+      listen: new URL(`http://127.0.0.1:3000`),
+      listenStatus: 30001,
+    });
+    await server.start();
+
+    const { status, data } = await axios.get(
+      `http://127.0.0.1:30001/healthz/ready`,
+    );
+    expect(status).toEqual(200);
+    expect(data).toEqual('OK');
 
     await server.stop();
   });
