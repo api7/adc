@@ -98,6 +98,7 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
       process.on('SIGINT', () => {
         console.log('Stopping, see you next time!');
         server.stop();
+        process.exit(0);
       });
     },
   );

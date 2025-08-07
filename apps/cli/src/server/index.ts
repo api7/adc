@@ -17,6 +17,7 @@ export class ADCServer {
   private readonly express: Express;
   private readonly expressStatus: Express;
   private server?: http.Server | https.Server;
+  private serverStatus?: http.Server;
 
   constructor(private readonly opts: ADCServerOptions) {
     this.express = express();
@@ -65,8 +66,10 @@ export class ADCServer {
             resolve();
           });
         } else {
-          this.server.listen(parseInt(listen.port), listen.hostname, () =>
-            resolve(),
+          this.serverStatus = this.server.listen(
+            parseInt(listen.port),
+            listen.hostname,
+            () => resolve(),
           );
         }
       }),
@@ -77,13 +80,22 @@ export class ADCServer {
   }
 
   public async stop() {
-    return new Promise<void>((resolve) => {
-      if (this.server) {
-        this.server.close(() => resolve());
-      } else {
-        resolve();
-      }
-    });
+    return Promise.all([
+      new Promise<void>((resolve) => {
+        if (this.server) {
+          this.server.close(() => resolve());
+        } else {
+          resolve();
+        }
+      }),
+      new Promise<void>((resolve) => {
+        if (this.serverStatus) {
+          this.serverStatus.close(() => resolve());
+        } else {
+          resolve();
+        }
+      }),
+    ]);
   }
 
   public TEST_ONLY_getExpress() {
