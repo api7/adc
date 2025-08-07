@@ -8,20 +8,27 @@ import { syncHandler } from './sync';
 
 interface ADCServerOptions {
   listen: URL;
+  listenStatus: number;
   tlsCert?: string;
   tlsKey?: string;
   tlsCACert?: string;
 }
 export class ADCServer {
   private readonly express: Express;
+  private readonly expressStatus: Express;
   private server?: http.Server | https.Server;
 
   constructor(private readonly opts: ADCServerOptions) {
     this.express = express();
-    this.express.disable('x-powered-by');
-    this.express.disable('etag');
+    this.expressStatus = express();
+    [this.express, this.expressStatus].forEach(
+      (app) => (app.disable('x-powered-by'), app.disable('etag')),
+    );
     this.express.use(express.json({ limit: '100mb' }));
     this.express.put('/sync', syncHandler);
+    this.expressStatus.get('/healthz/ready', (_, res) =>
+      res.status(200).send('OK'),
+    );
   }
 
   public async start() {
@@ -48,20 +55,25 @@ export class ADCServer {
         this.server = http.createServer(this.express);
         break;
     }
-    return new Promise<void>((resolve) => {
-      const listen = this.opts.listen;
-      if (listen.protocol === 'unix:') {
-        if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
-        this.server.listen(listen.pathname, () => {
-          fs.chmodSync(listen.pathname, 0o660);
-          resolve();
-        });
-      } else {
-        this.server.listen(parseInt(listen.port), listen.hostname, () =>
-          resolve(),
-        );
-      }
-    });
+    return Promise.all([
+      new Promise<void>((resolve) => {
+        const listen = this.opts.listen;
+        if (listen.protocol === 'unix:') {
+          if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
+          this.server.listen(listen.pathname, () => {
+            fs.chmodSync(listen.pathname, 0o660);
+            resolve();
+          });
+        } else {
+          this.server.listen(parseInt(listen.port), listen.hostname, () =>
+            resolve(),
+          );
+        }
+      }),
+      new Promise<void>((resolve) => {
+        this.expressStatus.listen(this.opts.listenStatus, () => resolve());
+      }),
+    ]);
   }
 
   public async stop() {
