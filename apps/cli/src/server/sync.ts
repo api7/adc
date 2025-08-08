@@ -3,7 +3,12 @@ import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
 
-import { loadBackend } from '../command/utils';
+import {
+  fillLabels,
+  filterConfiguration,
+  filterResourceType,
+  loadBackend,
+} from '../command/utils';
 import { DifferV3 } from '../differ/differv3';
 import { check } from '../linter';
 import { SyncInput, type SyncInputType } from './schema';
@@ -13,29 +18,44 @@ export const syncHandler: RequestHandler<
   unknown,
   SyncInputType
 > = async (req, res) => {
-  const parsedInput = SyncInput.safeParse(req.body);
-  if (!parsedInput.success)
-    return res.status(400).json({
-      message: parsedInput.error.message,
-      errors: parsedInput.error.issues,
-    });
-  const { task } = parsedInput.data;
-
-  // load local configuration and validate it
-  const local = task.config as ADCSDK.Configuration;
-  if (task.opts.lint) {
-    const result = check(local);
-    if (!result.success)
-      return res.status(400).json({
-        message: result.error.message,
-        errors: result.error.issues,
-      });
-  }
-
   try {
-    // load remote configuration and diff with local
+    const parsedInput = SyncInput.safeParse(req.body);
+    if (!parsedInput.success)
+      return res.status(400).json({
+        message: parsedInput.error.message,
+        errors: parsedInput.error.issues,
+      });
+    const { task } = parsedInput.data;
+
+    // load local configuration and validate it
+    //TODO: merged with the listr task
+    const local = filterResourceType(
+      task.config,
+      task.opts.includeResourceType,
+      task.opts.excludeResourceType,
+    ) as ADCSDK.Configuration;
+    if (task.opts.lint) {
+      const result = check(local);
+      if (!result.success)
+        return res.status(400).json({
+          message: result.error.message,
+          errors: result.error.issues,
+        });
+    }
+    fillLabels(local, task.opts.labelSelector);
+
+    // load and filter remote configuration
+    //TODO: merged with the listr task
     const backend = loadBackend(task.opts.backend, { ...task.opts });
-    const remote = await lastValueFrom(backend.dump());
+    let remote = await lastValueFrom(backend.dump());
+    remote = filterResourceType(
+      remote,
+      task.opts.includeResourceType,
+      task.opts.excludeResourceType,
+    );
+    [remote] = filterConfiguration(remote, task.opts.labelSelector);
+
+    // diff local and remote configuration
     const diff = DifferV3.diff(local, remote, await backend.defaultValue());
 
     // sync the diff
