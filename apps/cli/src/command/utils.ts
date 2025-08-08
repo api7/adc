@@ -205,14 +205,17 @@ export const fillLabels = (
   configuration: ADCSDK.Configuration,
   rules: Record<string, string>,
 ) => {
-  const assignSelector = (labels: object) => Object.assign(labels ?? {}, rules);
+  const assignSelector = (labels: ADCSDK.Labels) =>
+    rules && Object.keys(rules).length > 0
+      ? Object.assign(labels ?? {}, rules)
+      : labels;
 
   for (const resourceType in configuration) {
     if (['global_rules', 'plugin_metadata'].includes(resourceType)) continue;
 
     (configuration[resourceType] as Array<ADCSDK.Resource>).forEach(
       (resource) => {
-        resource.labels = assignSelector(resource.labels as object);
+        resource.labels = assignSelector(resource.labels as ADCSDK.Labels);
 
         // Process the nested resources
         if (resourceType === 'services') {
@@ -237,17 +240,17 @@ export const fillLabels = (
 };
 
 export const filterResourceType = (
-  config: ADCSDK.Configuration,
-  includes: Array<string>,
-  excludes: Array<string>,
+  config: ADCSDK.Configuration = {},
+  includes?: Array<string>,
+  excludes?: Array<string>,
 ) => {
   const key = (item) =>
     item !== ADCSDK.ResourceType.PLUGIN_METADATA ? item.slice(0, -1) : item;
   return Object.fromEntries(
     Object.entries(config).filter(([resourceType]) => {
       return includes
-        ? includes.includes(key(resourceType))
-        : !excludes.includes(key(resourceType));
+        ? includes?.includes(key(resourceType))
+        : !excludes?.includes(key(resourceType));
     }),
   );
 };

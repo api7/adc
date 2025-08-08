@@ -18,32 +18,32 @@ export const syncHandler: RequestHandler<
   unknown,
   SyncInputType
 > = async (req, res) => {
-  const parsedInput = SyncInput.safeParse(req.body);
-  if (!parsedInput.success)
-    return res.status(400).json({
-      message: parsedInput.error.message,
-      errors: parsedInput.error.issues,
-    });
-  const { task } = parsedInput.data;
-
-  // load local configuration and validate it
-  //TODO: merged with the listr task
-  const local = filterResourceType(
-    task.config,
-    task.opts.includeResourceType,
-    task.opts.excludeResourceType,
-  ) as ADCSDK.Configuration;
-  if (task.opts.lint) {
-    const result = check(local);
-    if (!result.success)
-      return res.status(400).json({
-        message: result.error.message,
-        errors: result.error.issues,
-      });
-  }
-  fillLabels(local, task.opts.labelSelector);
-
   try {
+    const parsedInput = SyncInput.safeParse(req.body);
+    if (!parsedInput.success)
+      return res.status(400).json({
+        message: parsedInput.error.message,
+        errors: parsedInput.error.issues,
+      });
+    const { task } = parsedInput.data;
+
+    // load local configuration and validate it
+    //TODO: merged with the listr task
+    const local = filterResourceType(
+      task.config,
+      task.opts.includeResourceType,
+      task.opts.excludeResourceType,
+    ) as ADCSDK.Configuration;
+    if (task.opts.lint) {
+      const result = check(local);
+      if (!result.success)
+        return res.status(400).json({
+          message: result.error.message,
+          errors: result.error.issues,
+        });
+    }
+    fillLabels(local, task.opts.labelSelector);
+
     // load and filter remote configuration
     //TODO: merged with the listr task
     const backend = loadBackend(task.opts.backend, { ...task.opts });
