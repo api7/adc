@@ -202,8 +202,8 @@ const labelFilter = <T extends ADCSDK.Event['newValue']>(
 };
 
 export const fillLabels = (
-  configuration: ADCSDK.Configuration,
-  rules: Record<string, string>,
+  configuration: ADCSDK.Configuration = {},
+  rules?: Record<string, string>,
 ) => {
   const assignSelector = (labels: ADCSDK.Labels) =>
     rules && Object.keys(rules).length > 0
