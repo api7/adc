@@ -3,7 +3,12 @@ import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
 
-import { loadBackend } from '../command/utils';
+import {
+  fillLabels,
+  filterConfiguration,
+  filterResourceType,
+  loadBackend,
+} from '../command/utils';
 import { DifferV3 } from '../differ/differv3';
 import { check } from '../linter';
 import { SyncInput, type SyncInputType } from './schema';
@@ -22,7 +27,12 @@ export const syncHandler: RequestHandler<
   const { task } = parsedInput.data;
 
   // load local configuration and validate it
-  const local = task.config as ADCSDK.Configuration;
+  //TODO: merged with the listr task
+  const local = filterResourceType(
+    task.config,
+    task.opts.includeResourceType,
+    task.opts.excludeResourceType,
+  ) as ADCSDK.Configuration;
   if (task.opts.lint) {
     const result = check(local);
     if (!result.success)
@@ -31,11 +41,21 @@ export const syncHandler: RequestHandler<
         errors: result.error.issues,
       });
   }
+  fillLabels(local, task.opts.labelSelector);
 
   try {
-    // load remote configuration and diff with local
+    // load and filter remote configuration
+    //TODO: merged with the listr task
     const backend = loadBackend(task.opts.backend, { ...task.opts });
-    const remote = await lastValueFrom(backend.dump());
+    let remote = await lastValueFrom(backend.dump());
+    remote = filterResourceType(
+      remote,
+      task.opts.includeResourceType,
+      task.opts.excludeResourceType,
+    );
+    [remote] = filterConfiguration(remote, task.opts.labelSelector);
+
+    // diff local and remote configuration
     const diff = DifferV3.diff(local, remote, await backend.defaultValue());
 
     // sync the diff

@@ -1,3 +1,4 @@
+import * as ADCSDK from '@api7/adc-sdk';
 import { z } from 'zod';
 
 const SyncTask = z.strictObject({
@@ -6,6 +7,9 @@ const SyncTask = z.strictObject({
     server: z.url().min(1),
     token: z.string().min(1),
     lint: z.boolean().optional().default(true),
+    includeResourceType: z.array(z.enum(ADCSDK.ResourceType)).optional(),
+    excludeResourceType: z.array(z.enum(ADCSDK.ResourceType)).optional(),
+    labelSelector: z.record(z.string(), z.string()).optional(),
   }),
   config: z.looseObject({}),
 });
