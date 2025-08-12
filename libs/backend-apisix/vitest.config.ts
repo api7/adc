@@ -13,5 +13,7 @@ export default defineConfig({
       reportsDirectory: '../coverage/<project-root>',
       provider: 'v8',
     },
+    poolOptions: { forks: { singleFork: true } },
+    retry: 0,
   },
 });
