@@ -1,8 +1,8 @@
+import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
 
 import { TaskContext } from '../command/diff.command';
-import { DifferV3 } from '../differ/differv3';
 import { ListrOutputLogger } from '../utils/listr';
 
 export const DiffResourceTask = (

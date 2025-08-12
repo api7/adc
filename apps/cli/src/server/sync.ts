@@ -9,7 +9,7 @@ import {
   filterResourceType,
   loadBackend,
 } from '../command/utils';
-import { DifferV3 } from '../differ/differv3';
+import { DifferV3 } from '@api7/adc-differ';
 import { check } from '../linter';
 import { SyncInput, type SyncInputType } from './schema';
 
