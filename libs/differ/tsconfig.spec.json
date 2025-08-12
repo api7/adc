@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/jest",
-    "types": ["jest", "node"],
+    "types": [
+      "jest",
+      "node"
+    ],
     "module": "nodenext",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -12,8 +15,7 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "jest.config.ts",
-    "src/**/*.test.ts",
+    "vitest.config.ts",
     "src/**/*.spec.ts",
     "src/**/*.d.ts"
   ],

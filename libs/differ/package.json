@@ -14,12 +14,9 @@
     "name": "differ",
     "targets": {
       "test": {
-        "executor": "@nx/jest:jest",
-        "outputs": [
-          "{projectRoot}/test-output/jest/coverage"
-        ],
+        "executor": "@nx/vite:test",
         "options": {
-          "jestConfig": "libs/differ/jest.config.ts"
+          "configFile": "libs/differ/vitest.config.ts"
         }
       }
     }
