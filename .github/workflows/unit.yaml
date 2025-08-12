@@ -21,6 +21,8 @@ jobs:
       # Run unit tests
       - name: Run SDK unit tests
         run: npx nx run sdk:test
+      - name: Run Differ unit tests
+        run: npx nx run differ:test
       - name: Run CLI unit tests
         run: npx nx run cli:test
       - name: Run APISIX Backend unit tests

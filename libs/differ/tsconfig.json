@@ -4,6 +4,9 @@
   "include": [],
   "references": [
     {
+      "path": "../sdk"
+    },
+    {
       "path": "./tsconfig.lib.json"
     },
     {
