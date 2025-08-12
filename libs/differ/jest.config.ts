@@ -1,10 +1,6 @@
 /* eslint-disable */
 import { readFileSync } from 'fs';
 
-console.log('module.type', require('module').Module);
-console.log('process.execArgv', process.execArgv);
-console.log('process.env.NODE_OPTIONS', process.env.NODE_OPTIONS);
-
 // Reading the SWC compilation config for the spec files
 const swcJestConfig = JSON.parse(
   readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8'),
