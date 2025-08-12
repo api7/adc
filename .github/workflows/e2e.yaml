@@ -12,8 +12,6 @@ on:
 jobs:
   cli:
     runs-on: ubuntu-latest
-    env:
-      NODE_OPTIONS: '--no-experimental-strip-types'
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +48,6 @@ jobs:
     env:
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
-      NODE_OPTIONS: '--no-experimental-strip-types'
     steps:
       - uses: actions/checkout@v4
 
@@ -80,10 +77,9 @@ jobs:
         version:
           - 3.13.0
           - dev # test on latest release
-    env:
-      # BACKEND_APISIX_VERSION: ${{ matrix.version }}
-      # BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
-      NODE_OPTIONS: '--no-experimental-strip-types'
+    #env:
+    #  BACKEND_APISIX_VERSION: ${{ matrix.version }}
+    #  BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +111,6 @@ jobs:
       BACKEND_API7_VERSION: ${{ matrix.version }}
       BACKEND_API7_DOWNLOAD_URL: https://run.api7.ai/api7-ee/api7-ee-v${{ matrix.version }}.tar.gz
       BACKEND_API7_LICENSE: ${{ secrets.BACKEND_API7_LICENSE }}
-      NODE_OPTIONS: '--no-experimental-strip-types'
     steps:
       - uses: actions/checkout@v4
 
