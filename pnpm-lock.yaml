@@ -216,9 +216,6 @@ importers:
 
   apps/cli:
     dependencies:
-      body-parser:
-        specifier: ^2.2.0
-        version: 2.2.0
       express:
         specifier: ^5.1.0
         version: 5.1.0
@@ -235,6 +232,9 @@ importers:
       '@api7/adc-converter-openapi':
         specifier: workspace:*
         version: link:../../libs/converter-openapi
+      '@api7/adc-differ':
+        specifier: workspace:*
+        version: link:../../libs/differ
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../../libs/sdk
