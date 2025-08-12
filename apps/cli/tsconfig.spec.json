@@ -2,10 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "module": "nodenext",
     "types": [
       "jest",
-      "node"
+      "node",
+      "vitest/globals"
     ]
   },
   "include": [
