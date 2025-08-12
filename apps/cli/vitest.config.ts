@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: [isE2E ? 'e2e/**/*.e2e-spec.ts' : 'test/**/*.spec.ts'],
+    include: [isE2E ? 'e2e/**/*.e2e-spec.ts' : '**/*.spec.ts'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../coverage/<project-root>',
