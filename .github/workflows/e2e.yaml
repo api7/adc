@@ -12,6 +12,8 @@ on:
 jobs:
   cli:
     runs-on: ubuntu-latest
+    env:
+      E2E: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -27,8 +29,6 @@ jobs:
 
       # Run E2E tests
       - name: Run E2E tests
-        env:
-          E2E: '1'
         run: npx nx run cli:test
   apisix:
     runs-on: ubuntu-latest
@@ -48,6 +48,7 @@ jobs:
           - 3.12.0
           - 3.13.0
     env:
+      E2E: '1'
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
