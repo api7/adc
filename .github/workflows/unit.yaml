@@ -23,6 +23,9 @@ jobs:
         run: npx nx run sdk:test
       - name: Run Differ unit tests
         run: npx nx run differ:test
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ failure() }}
       - name: Run CLI unit tests
         run: npx nx run cli:test
       - name: Run APISIX Backend unit tests
@@ -31,6 +34,3 @@ jobs:
         run: npx nx run backend-api7:test
       - name: Run OpenAPI Converter unit tests
         run: npx nx run converter-openapi:test
-
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
