@@ -71,7 +71,7 @@ jobs:
 
       # Run E2E tests
       - name: Run E2E tests
-        run: npx nx run backend-apisix:e2e
+        run: npx nx run backend-apisix:test
   apisix-standalone:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
