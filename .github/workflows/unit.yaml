@@ -31,3 +31,6 @@ jobs:
         run: npx nx run backend-api7:test
       - name: Run OpenAPI Converter unit tests
         run: npx nx run converter-openapi:test
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
