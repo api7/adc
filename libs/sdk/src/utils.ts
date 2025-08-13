@@ -7,7 +7,7 @@ const generateId = (name: string): string => {
   return createHash('sha1').update(name).digest('hex');
 };
 
-const recursiveOmitUndefined = <T extends object>(obj0: T) => {
+const recursiveOmitUndefined = <T extends object>(obj0: T): T => {
   const obj = Object.isFrozen(obj0) ? structuredClone(obj0) : obj0;
   return typeof obj === 'object' && !Array.isArray(obj)
     ? (pickBy(

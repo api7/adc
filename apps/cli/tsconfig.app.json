@@ -2,13 +2,21 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "module": "nodenext",
-    "types": ["node"],
-    "target": "es2021",
-    "lib": ["ESNext"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ESNext"
+    ]
   },
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
-  "include": ["src/**/*.ts"],
+  "exclude": [
+    "vitest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts"
+  ],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
     {
       "path": "../../libs/differ/tsconfig.lib.json"

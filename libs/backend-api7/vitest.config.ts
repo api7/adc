@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 const isE2E = process.env.E2E === '1';
 
 export default defineConfig({
-  cacheDir: '../../node_modules/.vitest/libs/backend-apisix',
+  cacheDir: '../../node_modules/.vitest/libs/backend-api7',
   test: {
     globals: true,
     environment: 'node',
@@ -11,10 +11,11 @@ export default defineConfig({
     reporters: ['default'],
     coverage: {
       reportsDirectory: isE2E
-        ? '../../coverage/libs/backend-apisix/e2e'
-        : '../../coverage/libs/backend-apisix',
+        ? '../../coverage/libs/backend-api7/e2e'
+        : '../../coverage/libs/backend-api7',
       provider: 'v8',
     },
     poolOptions: { forks: { singleFork: true } },
+    ...(isE2E ? { globalSetup: 'e2e/support/global-setup.ts' } : {}),
   },
 });
