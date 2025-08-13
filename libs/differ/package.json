@@ -1,6 +1,5 @@
 {
   "name": "@api7/adc-differ",
-  "version": "0.0.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,6 +8,9 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
+  },
+  "devDependencies": {
+    "@api7/adc-sdk": "workspace:*"
   },
   "nx": {
     "name": "differ",
@@ -20,8 +22,5 @@
         }
       }
     }
-  },
-  "devDependencies": {
-    "@api7/adc-sdk": "workspace:*"
   }
 }

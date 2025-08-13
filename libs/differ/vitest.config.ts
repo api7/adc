@@ -1,17 +1,17 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  cacheDir: '../node_modules/.vitest/<project-root>',
+  cacheDir: '../../node_modules/.vitest/libs/differ',
   test: {
     globals: true,
     environment: 'node',
     include: ['**/*.spec.ts'],
     reporters: ['default'],
     coverage: {
-      reportsDirectory: '../coverage/<project-root>',
+      reportsDirectory: '../../coverage/libs/differ',
       provider: 'v8',
     },
-    poolOptions: { forks: { singleFork: true } },
+    poolOptions: { forks: { singleFork: true } }, // runInBand
     retry: 0,
   },
 });
