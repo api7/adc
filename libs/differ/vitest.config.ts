@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.spec.ts'],
+    include: ['**/*.spec.ts'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/libs/differ',
