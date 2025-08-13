@@ -13,6 +13,7 @@
   },
   "nx": {
     "name": "backend-apisix",
+    "projectType": "library",
     "targets": {
       "lint": {
         "executor": "@nx/eslint:lint",
