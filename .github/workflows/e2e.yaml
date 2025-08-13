@@ -79,7 +79,7 @@ jobs:
         version:
           - 3.13.0
           - dev # test on latest release
-    env:
+    #env:
     #  BACKEND_APISIX_VERSION: ${{ matrix.version }}
     #  BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
