@@ -12,14 +12,14 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../sdk/tsconfig.lib.json"
+    }
   ],
-  "references": [],
   "exclude": [
     "vite.config.ts",
     "vite.config.mts",
