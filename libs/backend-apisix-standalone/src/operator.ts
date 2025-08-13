@@ -112,7 +112,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         } else if (event.type === ADCSDK.EventType.UPDATE) {
           const resources: Array<any> = newConfig[resourceKey];
           const eventGeneratedId = this.generateIdFromEvent(event);
-          const index = resources.findIndex(
+          const index = resources?.findIndex(
             (item) => item[resourceIdKey] === eventGeneratedId,
           );
           if (index !== -1) {
@@ -363,7 +363,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: this.fromADCUpstream(res.upstream!, id, true),
+          upstream: this.fromADCUpstream(res.upstream!),
           plugins: res.plugins,
         } satisfies typing.Service as typing.Service;
       }
