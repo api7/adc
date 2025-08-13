@@ -363,7 +363,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: this.fromADCUpstream(res.upstream!),
+          //@ts-expect-error no inline
+          upstream_id: id,
           plugins: res.plugins,
         } satisfies typing.Service as typing.Service;
       }
