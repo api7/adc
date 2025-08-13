@@ -17,7 +17,7 @@ import {
   from,
   switchMap,
 } from 'rxjs';
-import semver, { type SemVer } from 'semver';
+import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
@@ -55,7 +55,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
       if (opts?.caCertFile) {
         agentConfig.ca = readFileSync(opts.caCertFile);
       }
-      if (opts?.tlsClientCertFile) {
+      if (opts?.tlsClientCertFile && opts?.tlsClientKeyFile) {
         agentConfig.cert = readFileSync(opts.tlsClientCertFile);
         agentConfig.key = readFileSync(opts.tlsClientKeyFile);
       }
@@ -91,10 +91,10 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
       event: { response: resp, description: `Get APISIX version` },
     });
 
-    this._version = semver.coerce('999.999.999');
+    this._version = new SemVer('999.999.999');
     if (resp.headers.server) {
       const version = (resp.headers.server as string).match(/APISIX\/(.*)/);
-      if (version) this._version = semver.coerce(version[1]);
+      if (version) this._version = semver.coerce(version[1]) ?? this._version;
     }
 
     return this._version;
@@ -128,7 +128,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
           client: this.client,
           version,
           eventSubject: this.subject,
-        }).sync(events, this._dump, opts);
+        }).sync(events, this._dump!, opts);
       }),
     );
   }
