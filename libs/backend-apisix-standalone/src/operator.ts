@@ -1,3 +1,4 @@
+import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, {
   type AxiosError,
@@ -69,32 +70,91 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             ? 'username'
             : 'id';
         const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
+
+        // separate service inline upstream
+        const upstreamResourceKey =
+          typing.APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM];
+
         if (event.type === ADCSDK.EventType.CREATE) {
+          const modifiedIndex =
+            (newConfig[`${resourceKey}_conf_version`] ?? 0) + 1;
+
+          if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+            if (!newConfig[upstreamResourceKey])
+              newConfig[upstreamResourceKey] = [];
+            const upstream = (
+              event as ADCSDK.Event<ADCSDK.ResourceType.SERVICE>
+            ).newValue?.upstream;
+            if (upstream) {
+              newConfig[upstreamResourceKey].push({
+                ...this.fromADCUpstream(upstream),
+                id: event.resourceId, // use service id as upstream id
+                name: event.resourceName, // use service name as upstream name
+                modifiedIndex,
+              });
+              newConfig[
+                `${upstreamResourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`
+              ] = true;
+
+              // Remove the upstream before transforming the service
+              unset(event.newValue, 'upstream');
+            }
+          }
+
           if (!newConfig[resourceKey]) newConfig[resourceKey] = [];
           newConfig[resourceKey].push(
             this.fromADC({
               ...event,
-              modifiedIndex:
-                (newConfig[`${resourceKey}_conf_version`] ?? 0) + 1,
+              modifiedIndex,
             }),
           );
           newConfig[increaseVersionKey] = true;
         } else if (event.type === ADCSDK.EventType.UPDATE) {
           const resources: Array<any> = newConfig[resourceKey];
           const eventGeneratedId = this.generateIdFromEvent(event);
-          const index = resources.findIndex(
+          const index = resources?.findIndex(
             (item) => item[resourceIdKey] === eventGeneratedId,
           );
           if (index !== -1) {
-            const eventResourceId = this.generateIdFromEvent(event);
             const newModifiedIndex = modifiedIndexMap.has(
-              `${event.resourceType}.${eventResourceId}`,
+              `${event.resourceType}.${eventGeneratedId}`,
             )
               ? (resources[index].modifiedIndex =
                   modifiedIndexMap.get(
-                    `${event.resourceType}.${eventResourceId}`,
+                    `${event.resourceType}.${eventGeneratedId}`,
                   ) + 1)
               : 1;
+
+            if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+              if (!newConfig[upstreamResourceKey])
+                newConfig[upstreamResourceKey] = [];
+              const upstream = (
+                event as ADCSDK.Event<ADCSDK.ResourceType.SERVICE>
+              ).newValue?.upstream;
+              if (upstream) {
+                const resources: Array<typing.Upstream> =
+                  newConfig[upstreamResourceKey];
+                const index = resources.findIndex(
+                  (item) => item.id === eventGeneratedId,
+                );
+
+                if (index !== -1) {
+                  resources[index] = {
+                    ...this.fromADCUpstream(upstream),
+                    id: event.resourceId, // use service id as upstream id
+                    name: event.resourceName, // use service name as upstream name
+                    modifiedIndex: newModifiedIndex,
+                  };
+                  newConfig[
+                    `${upstreamResourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`
+                  ] = true;
+                }
+
+                // Remove the upstream before transforming the service
+                unset(event.newValue, 'upstream');
+              }
+            }
+
             resources[index] = this.fromADC({
               ...event,
               modifiedIndex: newModifiedIndex,
@@ -102,8 +162,18 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           }
           newConfig[increaseVersionKey] = true;
         } else if (event.type === ADCSDK.EventType.DELETE) {
+          const eventGeneratedId = this.generateIdFromEvent(event);
+          if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+            newConfig[upstreamResourceKey] = newConfig[
+              upstreamResourceKey
+            ]?.filter((item) => item.id !== eventGeneratedId);
+            newConfig[
+              `${upstreamResourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`
+            ] = true;
+          }
+
           newConfig[resourceKey] = newConfig[resourceKey]?.filter(
-            (item) => item[resourceIdKey] !== this.generateIdFromEvent(event),
+            (item) => item[resourceIdKey] !== eventGeneratedId,
           );
           newConfig[increaseVersionKey] = true;
         }
@@ -213,7 +283,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           of<ADCSDK.BackendSyncResult>({
             success: true,
             event: {} as ADCSDK.Event, // keep empty
-            axiosResponse: null,
           } satisfies ADCSDK.BackendSyncResult),
         ),
       ),
@@ -263,7 +332,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   private fromADC(event: EventWithModifiedIndex) {
     switch (event.resourceType) {
       case ADCSDK.ResourceType.ROUTE: {
-        type T = typing.APISIXStandaloneType['routes'][number];
         const res = event.newValue as ADCSDK.Route;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -277,30 +345,30 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           remote_addrs: res.remote_addrs,
           vars: res.vars,
           filter_func: res.filter_func,
-          service_id: event.parentId,
+          service_id: event.parentId!,
           enable_websocket: res.enable_websocket,
           plugins: res.plugins,
           priority: res.priority,
           timeout: res.timeout,
           status: 1,
-        } satisfies T as T;
+        } satisfies typing.Route as typing.Route;
       }
       case ADCSDK.ResourceType.SERVICE: {
-        type T = typing.APISIXStandaloneType['services'][number];
         const res = event.newValue as ADCSDK.Service;
+        const id = this.generateIdFromEvent(event);
         return {
           modifiedIndex: event.modifiedIndex,
-          id: this.generateIdFromEvent(event),
+          id,
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: this.fromADCUpstream(res.upstream),
+          //@ts-expect-error no inline
+          upstream_id: id,
           plugins: res.plugins,
-        } satisfies T as T;
+        } satisfies typing.Service as typing.Service;
       }
       case ADCSDK.ResourceType.CONSUMER: {
-        type T = typing.APISIXStandaloneType['consumers'][number];
         const res = event.newValue as ADCSDK.Consumer;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -308,10 +376,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           plugins: res.plugins,
-        } satisfies T as T;
+        } satisfies typing.Consumer as typing.Consumer;
       }
       case ADCSDK.ResourceType.CONSUMER_CREDENTIAL: {
-        type T = typing.APISIXStandaloneType['consumers'][number];
         const res = event.newValue as ADCSDK.ConsumerCredential;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -322,10 +389,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           plugins: {
             [res.type]: res.config,
           },
-        } satisfies T as T;
+        } satisfies typing.ConsumerCredential as typing.ConsumerCredential;
       }
       case ADCSDK.ResourceType.SSL: {
-        type T = typing.APISIXStandaloneType['ssls'][number];
         const res = event.newValue as ADCSDK.SSL;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -346,28 +412,25 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           client: res.client,
           ssl_protocols: res.ssl_protocols,
           status: 1,
-        } satisfies T as T;
+        } satisfies typing.SSL as typing.SSL;
       }
       case ADCSDK.ResourceType.GLOBAL_RULE: {
-        type T = typing.APISIXStandaloneType['global_rules'][number];
         return {
           modifiedIndex: event.modifiedIndex,
           id: this.generateIdFromEvent(event),
           plugins: {
             [event.resourceId]: event.newValue as ADCSDK.GlobalRule,
           },
-        } satisfies T as T;
+        } satisfies typing.GlobalRule as typing.GlobalRule;
       }
       case ADCSDK.ResourceType.PLUGIN_METADATA: {
-        type T = typing.APISIXStandaloneType['plugin_metadata'][number];
         return {
           modifiedIndex: event.modifiedIndex,
           id: this.generateIdFromEvent(event),
           ...event.newValue,
-        } satisfies T as T;
+        } satisfies typing.PluginMetadata as typing.PluginMetadata;
       }
       case ADCSDK.ResourceType.UPSTREAM: {
-        type T = typing.APISIXStandaloneType['upstreams'][number];
         return {
           ...this.fromADCUpstream(
             event.newValue as ADCSDK.Upstream,
@@ -375,10 +438,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           ),
           modifiedIndex: event.modifiedIndex,
           id: this.generateIdFromEvent(event),
-        } satisfies T as T;
+        } satisfies typing.Upstream as typing.Upstream;
       }
       case ADCSDK.ResourceType.STREAM_ROUTE: {
-        type T = typing.APISIXStandaloneType['stream_routes'][number];
         const res = event.newValue as ADCSDK.StreamRoute;
         return {
           modifiedIndex: event.modifiedIndex,
@@ -391,29 +453,34 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           server_addr: res.server_addr,
           server_port: res.server_port,
           sni: res.sni,
-          service_id: event.parentId,
-        } satisfies T as T;
+          service_id: event.parentId!,
+        } satisfies typing.StreamRoute as typing.StreamRoute;
       }
     }
   }
 
-  private fromADCLabels(labels?: ADCSDK.Labels): Record<string, string> {
+  private fromADCLabels(
+    labels?: ADCSDK.Labels,
+  ): Record<string, string> | undefined {
     if (!labels) return undefined;
-    return Object.entries(labels).reduce((pv, [key, value]) => {
-      pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
-      return pv;
-    }, {});
+    return Object.entries(labels).reduce(
+      (pv, [key, value]) => {
+        pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
+        return pv;
+      },
+      {} as Record<string, string>,
+    );
   }
 
   private fromADCUpstream(
     res: ADCSDK.Upstream,
     parentId?: string,
-  ): typing.APISIXStandaloneType['upstreams'][number] {
+  ): typing.Upstream {
     type T = ReturnType<typeof this.fromADCUpstream>;
     const upstream = {
       modifiedIndex: undefined, // fill in later
-      id: undefined, // fill in later
-      name: res.name,
+      id: undefined!, // fill in later
+      name: res.name!,
       desc: res.description,
       labels: this.fromADCLabels(res.labels),
       type: res.type,
