@@ -1,6 +1,5 @@
 import {
   PluginMetadata as ADCPluginMetadata,
-  Upstream as ADCUpstream,
   Expr,
   Labels,
   Plugins,
