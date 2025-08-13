@@ -7,5 +7,38 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     }
+  },
+  "nx": {
+    "name": "sdk",
+    "projectType": "library",
+    "targets": {
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "dist/libs/sdk",
+          "tsConfig": "libs/sdk/tsconfig.lib.json",
+          "packageJson": "libs/sdk/package.json",
+          "main": "libs/sdk/src/index.ts",
+          "assets": [
+            "libs/sdk/*.md"
+          ]
+        }
+      },
+      "lint": {
+        "executor": "@nx/eslint:lint",
+        "outputs": [
+          "{options.outputFile}"
+        ]
+      },
+      "test": {
+        "executor": "@nx/vite:test",
+        "options": {
+          "configFile": "libs/sdk/vitest.config.ts"
+        }
+      }
+    }
   }
 }

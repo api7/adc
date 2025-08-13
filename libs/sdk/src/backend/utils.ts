@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import * as ADCSDK from '..';
 
 export class BackendEventSource {
-  protected subject: Subject<ADCSDK.BackendEvent>;
+  protected subject!: Subject<ADCSDK.BackendEvent>;
   private _innerSubject: Subject<{
     name: string;
     event: ADCSDK.BackendEvent;
@@ -16,12 +16,12 @@ export class BackendEventSource {
     this._innerSubject.subscribe({
       next: ({ name, event }) => {
         if (!this._taskEvents.has(name)) this._taskEvents.set(name, []);
-        this._taskEvents.get(name).push(event);
+        this._taskEvents.get(name)?.push(event);
 
         if (event.type === 'TASK_DONE')
           this._taskEvents
             .get(name)
-            .forEach((event) => this.subject.next(event));
+            ?.forEach((event) => this.subject.next(event));
       },
     });
   }

@@ -10,5 +10,17 @@
   },
   "devDependencies": {
     "@api7/adc-sdk": "workspace:*"
+  },
+  "nx": {
+    "name": "converter-openapi",
+    "projectType": "library",
+    "targets": {
+      "test": {
+        "executor": "@nx/vite:test",
+        "options": {
+          "configFile": "libs/converter-openapi/vitest.config.ts"
+        }
+      }
+    }
   }
 }
