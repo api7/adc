@@ -11,6 +11,9 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../libs/differ/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/converter-openapi/tsconfig.lib.json"
     },
     {

@@ -12,6 +12,8 @@ on:
 jobs:
   cli:
     runs-on: ubuntu-latest
+    env:
+      E2E: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +29,7 @@ jobs:
 
       # Run E2E tests
       - name: Run E2E tests
-        run: npx nx run cli:e2e
+        run: npx nx run cli:test
   apisix:
     runs-on: ubuntu-latest
     strategy:
@@ -46,6 +48,7 @@ jobs:
           - 3.12.0
           - 3.13.0
     env:
+      E2E: '1'
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
     steps:
@@ -68,7 +71,7 @@ jobs:
 
       # Run E2E tests
       - name: Run E2E tests
-        run: npx nx run backend-apisix:e2e
+        run: npx nx run backend-apisix:test
   apisix-standalone:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'

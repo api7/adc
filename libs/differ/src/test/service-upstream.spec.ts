@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3';
+import { DifferV3 } from '../differv3.js';
 
 describe('Differ V3 - service with upstreams', () => {
   it('should be considered unchanged (only upstream)', () => {

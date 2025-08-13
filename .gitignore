@@ -42,3 +42,5 @@ Thumbs.db
 .nx/workspace-data
 .env
 api7-ee
+
+test-output

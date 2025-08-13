@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { diff as objectDiff } from 'deep-diff';
 import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash';
 
-const order = {
+const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.DELETE}`]: 0,
   [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.DELETE}`]: 1,
   [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.DELETE}`]: 2,
@@ -40,6 +40,23 @@ const order = {
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.DELETE}`]: 30,
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.CREATE}`]: 31,
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.UPDATE}`]: 32,
+
+  // Just placeholders, simply to fix ts type errors, they never appear at runtime
+  [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.UPSTREAM}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.GLOBAL_RULE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.PLUGIN_METADATA}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.DELETE}`]: 999,
+  [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.UPDATE}`]: 999,
+  [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.CREATE}`]: 999,
+  [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
 };
 
 const showLogEntry = () =>
@@ -69,7 +86,7 @@ export class DifferV3 {
   ): Array<ADCSDK.Event> {
     const differ = new DifferV3({
       transactionId: randomUUID(),
-      defaultValue,
+      defaultValue: defaultValue ?? {},
       logger,
     });
 
@@ -94,7 +111,7 @@ export class DifferV3 {
           res.id ?? ADCSDK.utils.generateId(res.name),
           res,
         ]) ?? [],
-        remote?.services?.map((res) => [res.name, res.id, res]) ?? [],
+        remote?.services?.map((res) => [res.name, res.id!, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.SSL,
@@ -103,7 +120,7 @@ export class DifferV3 {
           res.id ?? ADCSDK.utils.generateId(res.snis.join(',')),
           res,
         ]) ?? [],
-        remote?.ssls?.map((res) => [res.snis.join(','), res.id, res]) ?? [],
+        remote?.ssls?.map((res) => [res.snis.join(','), res.id!, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.CONSUMER,
@@ -152,7 +169,7 @@ export class DifferV3 {
           res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.routes?.map((res) => [res.name, res.id, res]) ?? [],
+        remote?.routes?.map((res) => [res.name, res.id!, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.STREAM_ROUTE,
@@ -161,7 +178,7 @@ export class DifferV3 {
           res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.stream_routes?.map((res) => [res.name, res.id, res]) ?? [],
+        remote?.stream_routes?.map((res) => [res.name, res.id!, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
@@ -170,44 +187,18 @@ export class DifferV3 {
           res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
           res,
         ]) ?? [],
-        remote?.consumer_credentials?.map((res) => [res.name, res.id, res]) ??
+        remote?.consumer_credentials?.map((res) => [res.name, res.id!, res]) ??
           [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,
         local?.upstreams?.map((res) => [
-          res.name,
-          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name)),
+          res.name!,
+          res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name!)),
           res,
         ]) ?? [],
-        remote?.upstreams?.map((res) => [res.name, res.id, res]) ?? [],
+        remote?.upstreams?.map((res) => [res.name!, res.id!, res]) ?? [],
       ),
-      /* ...differ.diffResource(
-        ADCSDK.ResourceType.CONSUMER_GROUP,
-        local?.consumer_groups?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
-        remote?.consumer_groups?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
-      ),
-      ...differ.diffResource(
-        ADCSDK.ResourceType.PLUGIN_CONFIG,
-        local?.plugin_configs?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
-        remote?.plugin_configs?.map((res) => [
-          res.name,
-          ADCSDK.utils.generateId(res.name),
-          res,
-        ]) ?? [],
-      ), */
     ];
 
     const unwrapedEvents: Array<ADCSDK.Event> = [];
@@ -216,7 +207,7 @@ export class DifferV3 {
     result.forEach((event) => {
       if (event.type !== ADCSDK.EventType.ONLY_SUB_EVENTS)
         unwrapedEvents.push(event);
-      unwrapedEvents.push(...event.subEvents);
+      if (event.subEvents) unwrapedEvents.push(...event.subEvents);
       unset(event, 'subEvents');
     });
 
@@ -236,85 +227,21 @@ export class DifferV3 {
     return events;
   }
 
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.SERVICE,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Service]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Service]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.SSL,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.SSL]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.SSL]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.CONSUMER,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Consumer]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Consumer]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.GLOBAL_RULE,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.GlobalRule]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.GlobalRule]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.PLUGIN_METADATA,
-    local: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.PluginMetadata]
-    >,
-    remote: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.PluginMetadata]
-    >,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.ROUTE,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Route]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Route]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.STREAM_ROUTE,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.StreamRoute]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.StreamRoute]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
-    local: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerCredential]
-    >,
-    remote: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerCredential]
-    >,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.UPSTREAM,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Upstream]>,
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.Upstream]>,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.CONSUMER_GROUP,
-    local: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerGroup]
-    >,
-    remote: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ConsumerGroup]
-    >,
-  ): Array<ADCSDK.Event>;
-  private diffResource(
-    resourceType: ADCSDK.ResourceType.PLUGIN_CONFIG,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.PluginConfig]>,
-    remote: Array<
-      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.PluginConfig]
-    >,
-  ): Array<ADCSDK.Event>;
-  private diffResource<T extends ADCSDK.Resource>(
+  private diffResource<T extends ADCSDK.ResourceType>(
     resourceType: ADCSDK.ResourceType,
-    local: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, T]> = [],
-    remote: Array<[ADCSDK.ResourceName, ADCSDK.ResourceId, T]> = [],
+    local: Array<
+      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ResourceFor<T>]
+    > = [],
+    remote: Array<
+      [ADCSDK.ResourceName, ADCSDK.ResourceId, ADCSDK.ResourceFor<T>]
+    > = [],
   ): Array<ADCSDK.Event> {
     const result: Array<ADCSDK.Event> = [];
 
-    const localIdMap: Record<ADCSDK.ResourceId, T> = Object.fromEntries(
-      local.map((item) => [item[1], item[2]]),
-    );
+    const localIdMap: Record<
+      ADCSDK.ResourceId,
+      ADCSDK.ResourceFor<T>
+    > = Object.fromEntries(local.map((item) => [item[1], item[2]]));
 
     const checkedRemoteId: Array<ADCSDK.ResourceId> = [];
     remote.forEach(([remoteName, remoteId, remoteItem]) => {
@@ -329,7 +256,7 @@ export class DifferV3 {
 
       // Exists remotely but not locally: resource deleted by user
       if (!localItem) {
-        return result.push({
+        result.push({
           resourceType,
           type: ADCSDK.EventType.DELETE,
           resourceId: remoteId,
@@ -365,6 +292,7 @@ export class DifferV3 {
             this.logger,
           ).map(this.postprocessSubEvent(remoteName, remoteId)),
         });
+        return;
       }
 
       // Record the remote IDs that have been checked. It will be used
@@ -501,8 +429,8 @@ export class DifferV3 {
         });
       }
 
-      let outputLocalItem: ADCSDK.Resource = cloneDeep(originalLocalItem);
-      let outputRemoteItem: ADCSDK.Resource = cloneDeep(remoteItem);
+      let outputLocalItem: ADCSDK.ResourceFor<T> = cloneDeep(originalLocalItem);
+      let outputRemoteItem: ADCSDK.ResourceFor<T> = cloneDeep(remoteItem);
 
       // If the resource may contain plugin configurations, perform a
       // diff check on each plugin
@@ -531,7 +459,9 @@ export class DifferV3 {
         // They are characterized by the fact that they do not contain subresources
         // such as route; however, they should be the current resource's containing
         // the plugins field.
-        outputLocalItem = cloneDeep(mergedLocalItem);
+        outputLocalItem = cloneDeep<ADCSDK.ResourceFor<T>>(
+          mergedLocalItem as ADCSDK.ResourceFor<T>,
+        );
         outputRemoteItem = cloneDeep(remoteItem);
 
         // Since plugins will be checked separately, differences in the plugins
@@ -575,7 +505,7 @@ export class DifferV3 {
           !pluginChanged &&
           (!diff || diff.length === 0);
 
-        return result.push({
+        result.push({
           resourceType,
           type: onlySubEvents
             ? ADCSDK.EventType.ONLY_SUB_EVENTS
@@ -721,9 +651,12 @@ export class DifferV3 {
     };
   }
 
-  private mergeDefault(resource: ADCSDK.Resource, defaults: object): object {
+  private mergeDefault<T extends ADCSDK.ResourceType>(
+    resource: ADCSDK.ResourceFor<T>,
+    defaults: object,
+  ): object {
     const defaultsClone = cloneDeep(defaults);
-    const resourceClone = cloneDeep(resource);
+    const resourceClone = cloneDeep(resource) as Record<string, any>;
     const isObjectButNotArray = (val: unknown) =>
       typeof val === 'object' && !Array.isArray(val);
 

@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/cli/src",
   "projectType": "application",
+  "tags": [],
   "targets": {
     "build": {
       "executor": "@nx/webpack:webpack",
@@ -49,23 +50,9 @@
       ]
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{projectRoot}"
-      ],
+      "executor": "@nx/vite:test",
       "options": {
-        "jestConfig": "apps/cli/jest.config.ts"
-      }
-    },
-    "e2e": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{e2eProjectRoot}"
-      ],
-      "options": {
-        "jestConfig": "apps/cli/jest.config.e2e.ts",
-        "passWithNoTests": true,
-        "runInBand": true
+        "configFile": "apps/cli/vitest.config.ts"
       }
     },
     "export-schema": {
@@ -74,6 +61,5 @@
         "command": "ts-node apps/cli/src/linter/exporter.ts"
       }
     }
-  },
-  "tags": []
+  }
 }

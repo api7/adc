@@ -57,11 +57,9 @@ export const mockBackend = (): ADCSDK.Backend => {
 export const jestMockBackend = (mockedBackend?: ADCSDK.Backend) => {
   if (!mockedBackend) mockedBackend = mockBackend();
   const originalLoadBackend = commandUtils.loadBackend;
-  jest
-    .spyOn(commandUtils, 'loadBackend')
-    .mockImplementation((backend, opts) => {
-      if (backend === 'mock') return mockedBackend;
-      return originalLoadBackend(backend, opts);
-    });
+  vi.spyOn(commandUtils, 'loadBackend').mockImplementation((backend, opts) => {
+    if (backend === 'mock') return mockedBackend;
+    return originalLoadBackend(backend, opts);
+  });
   return mockedBackend;
 };

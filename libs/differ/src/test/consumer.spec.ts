@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3';
+import { DifferV3 } from '../differv3.js';
 
 describe('Differ V3 - consumer', () => {
   it('should create/update/delete consumer credentials', () => {

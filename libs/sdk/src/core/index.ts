@@ -1,3 +1,5 @@
+import { ResourceType } from './resource';
+
 export * from './differ';
 export * from './resource';
 
@@ -256,14 +258,26 @@ export interface Configuration {
   plugin_configs?: Array<PluginConfig>; */
 }
 
-export type Resource =
-  | Route
-  | SSL
-  | GlobalRule
-  | PluginConfig
-  | PluginMetadata
-  | Consumer
-  | ConsumerGroup
-  | StreamRoute
-  | Service
-  | Upstream;
+export type ResourceFor<T extends ResourceType> = T extends ResourceType.SERVICE
+  ? Service
+  : T extends ResourceType.SSL
+    ? SSL
+    : T extends ResourceType.CONSUMER
+      ? Consumer
+      : T extends ResourceType.GLOBAL_RULE
+        ? GlobalRule
+        : T extends ResourceType.PLUGIN_METADATA
+          ? PluginMetadata
+          : T extends ResourceType.ROUTE
+            ? Route
+            : T extends ResourceType.STREAM_ROUTE
+              ? StreamRoute
+              : T extends ResourceType.UPSTREAM
+                ? Upstream
+                : T extends ResourceType.CONSUMER_GROUP
+                  ? ConsumerGroup
+                  : T extends ResourceType.PLUGIN_CONFIG
+                    ? PluginConfig
+                    : T extends ResourceType.CONSUMER_CREDENTIAL
+                      ? ConsumerCredential
+                      : never;

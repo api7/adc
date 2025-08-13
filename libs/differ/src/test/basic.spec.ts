@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3';
+import { DifferV3 } from '../differv3.js';
 
 describe('Differ V3 - basic', () => {
   it('should output empty when input is empty', () => {
@@ -730,9 +730,9 @@ describe('Differ V3 - basic', () => {
 
     const oldServices = structuredClone(newServices);
     oldServices[0].id = ADCSDK.utils.generateId('HTTP');
-    oldServices[0].routes[0].id = ADCSDK.utils.generateId('HTTP.HTTP 1');
+    oldServices[0].routes![0].id = ADCSDK.utils.generateId('HTTP.HTTP 1');
     oldServices[1].id = ADCSDK.utils.generateId('Stream');
-    oldServices[1].stream_routes[0].id =
+    oldServices[1].stream_routes![0].id =
       ADCSDK.utils.generateId('Stream.Stream 1');
 
     expect(

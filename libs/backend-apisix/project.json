@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/backend-apisix/src",
   "projectType": "library",
+  "tags": [],
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint",
@@ -11,25 +12,10 @@
       ]
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{projectRoot}"
-      ],
+      "executor": "@nx/vite:test",
       "options": {
-        "jestConfig": "libs/backend-apisix/jest.config.ts"
-      }
-    },
-    "e2e": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{e2eProjectRoot}"
-      ],
-      "options": {
-        "jestConfig": "libs/backend-apisix/jest.config.e2e.ts",
-        "passWithNoTests": true,
-        "runInBand": true
+        "configFile": "libs/backend-apisix/vitest.config.ts"
       }
     }
-  },
-  "tags": []
+  }
 }

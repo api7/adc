@@ -1,0 +1,27 @@
+{
+  "name": "@api7/adc-differ",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "nx": {
+    "name": "differ",
+    "targets": {
+      "test": {
+        "executor": "@nx/vite:test",
+        "options": {
+          "configFile": "libs/differ/vitest.config.ts"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@api7/adc-sdk": "workspace:*"
+  }
+}

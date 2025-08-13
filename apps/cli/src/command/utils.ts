@@ -213,7 +213,7 @@ export const fillLabels = (
   for (const resourceType in configuration) {
     if (['global_rules', 'plugin_metadata'].includes(resourceType)) continue;
 
-    (configuration[resourceType] as Array<ADCSDK.Resource>).forEach(
+    (configuration[resourceType] as Array<ADCSDK.ResourceFor<any>>).forEach(
       (resource) => {
         resource.labels = assignSelector(resource.labels as ADCSDK.Labels);
 

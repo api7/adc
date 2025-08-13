@@ -1,6 +1,6 @@
 import { Diff } from 'deep-diff';
 
-import { Plugin, Resource, ResourceType } from '.';
+import { Plugin, ResourceFor, ResourceType } from '.';
 
 export enum EventType {
   CREATE = 'create',
@@ -11,15 +11,15 @@ export enum EventType {
   ONLY_SUB_EVENTS = 'only_sub_events',
 }
 
-export type Event = {
+export type Event<T extends ResourceType = any> = {
   type: EventType;
   resourceId: string;
   resourceName: string;
   diff?: Array<Diff<unknown>>;
 
   resourceType: ResourceType;
-  oldValue?: Resource;
-  newValue?: Resource;
+  oldValue?: ResourceFor<T>;
+  newValue?: ResourceFor<T>;
 
   // for nested events
   parentId?: string;
