@@ -16,6 +16,6 @@ export default defineConfig({
       provider: 'v8',
     },
     poolOptions: { forks: { singleFork: true } },
-    ...(isE2E ? { globalSetup: '<rootDir>/e2e/support/global-setup.ts' } : {}),
+    ...(isE2E ? { globalSetup: 'e2e/support/global-setup.ts' } : {}),
   },
 });
