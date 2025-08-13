@@ -1,6 +1,8 @@
-import baseConfig from '../../eslint.config.mjs';
+import { config } from 'typescript-eslint';
 
-export default [
+import baseConfig from '../../eslint.config.js';
+
+export default config([
   ...baseConfig,
   {
     files: ['**/*.json'],
@@ -19,4 +21,4 @@ export default [
       parser: await import('jsonc-eslint-parser'),
     },
   },
-];
+]);

@@ -1,6 +1,7 @@
 import nx from '@nx/eslint-plugin';
+import { config } from 'typescript-eslint';
 
-export default [
+export default config([
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
@@ -45,4 +46,4 @@ export default [
     // Override or add rules here
     rules: {},
   },
-];
+]);
