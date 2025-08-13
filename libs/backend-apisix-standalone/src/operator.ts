@@ -502,25 +502,4 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       };
     return upstream;
   }
-
-  private emitInlineUpstreamEvent(
-    event: ADCSDK.Event<ADCSDK.ResourceType.SERVICE>,
-  ): typing.Upstream | undefined {
-    const upstream = event.newValue?.upstream;
-    if (!upstream) return undefined;
-    if (
-      event.type === ADCSDK.EventType.CREATE ||
-      event.type === ADCSDK.EventType.UPDATE
-    ) {
-      // Remove inline upstream
-      unset(event.newValue, 'upstream');
-
-      // Build new separate upstream
-      return {
-        ...this.fromADCUpstream(upstream),
-        id: event.resourceId, // use service id as upstream id
-        name: event.resourceName, // use service name as upstream name
-      };
-    }
-  }
 }
