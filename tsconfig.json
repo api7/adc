@@ -22,6 +22,9 @@
     },
     {
       "path": "./libs/differ"
+    },
+    {
+      "path": "./libs/tstetsetse"
     }
   ]
 }

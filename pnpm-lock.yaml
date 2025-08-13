@@ -150,12 +150,6 @@ importers:
       '@types/signale':
         specifier: ^1.4.7
         version: 1.4.7
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.39.1
-        version: 8.39.1(@typescript-eslint/parser@8.39.1(eslint@9.33.0(jiti@2.4.2))(typescript@5.8.3))(eslint@9.33.0(jiti@2.4.2))(typescript@5.8.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.39.1
-        version: 8.39.1(eslint@9.33.0(jiti@2.4.2))(typescript@5.8.3)
       '@typescript-eslint/utils':
         specifier: ^8.39.1
         version: 8.39.1(eslint@9.33.0(jiti@2.4.2))(typescript@5.8.3)

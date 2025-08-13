@@ -656,7 +656,7 @@ export class DifferV3 {
     defaults: object,
   ): object {
     const defaultsClone = cloneDeep(defaults);
-    const resourceClone = cloneDeep(resource) as Record<string, any>;
+    const resourceClone = cloneDeep(resource) as Record<string, unknown>;
     const isObjectButNotArray = (val: unknown) =>
       typeof val === 'object' && !Array.isArray(val);
 
