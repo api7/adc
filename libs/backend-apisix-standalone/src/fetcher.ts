@@ -1,25 +1,35 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { type AxiosInstance } from 'axios';
-import { type Subject, finalize, from, map, tap } from 'rxjs';
+import {
+  type Subject,
+  finalize,
+  from,
+  map,
+  max,
+  mergeMap,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { type SemVer } from 'semver';
 
+import {
+  ENDPOINT_CONFIG,
+  HEADER_CREDENTIAL,
+  HEADER_LAST_MODIFIED,
+} from './constants';
 import { toADC } from './transformer';
 import type * as typing from './typing';
 
 export interface FetcherOptions {
   client: AxiosInstance;
+  serverTokenMap: typing.ServerTokenMap;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
   backendOpts: ADCSDK.BackendOptions;
 }
 export class Fetcher extends ADCSDK.backend.BackendEventSource {
-  private readonly client: AxiosInstance;
-  public _dump?: typing.APISIXStandaloneWithConfVersionType;
-
-  constructor(opts: FetcherOptions) {
+  constructor(private readonly opts: FetcherOptions) {
     super();
-    this.client = opts.client;
-    this.subject = opts.eventSubject;
   }
 
   public dump() {
@@ -27,14 +37,55 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     const logger = this.getLogger(taskName);
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
-    return from(
-      this.client.get<typing.APISIXStandaloneType>('/apisix/admin/configs'),
-    ).pipe(
-      tap((resp) => logger(this.debugLogEvent(resp))),
-      tap((resp) => {
-        this._dump = resp.data;
+    return from(this.findLatest()).pipe(
+      switchMap((server) =>
+        from(
+          this.opts.client.get<typing.APISIXStandaloneWithConfVersionType>(
+            `${server}${ENDPOINT_CONFIG}`,
+            {
+              headers: {
+                [HEADER_CREDENTIAL]: this.opts.serverTokenMap.get(server),
+              },
+            },
+          ),
+        ).pipe(
+          tap((resp) => logger(this.debugLogEvent(resp))),
+          map(
+            (resp) =>
+              [toADC(resp.data), resp.data] as [
+                ADCSDK.Configuration,
+                typing.APISIXStandaloneWithConfVersionType,
+              ],
+          ),
+          finalize(() => logger(taskStateEvent('TASK_DONE'))),
+        ),
+      ),
+    );
+  }
+
+  // Gets the latest configuration from the `X-Last-Modified` in the response header,
+  // which values the timestamp of when the last update was accepted.
+  private findLatest() {
+    const taskName = `Find server with the latest config`;
+    const logger = this.getLogger(taskName);
+    const taskStateEvent = this.taskStateEvent(taskName);
+    logger(taskStateEvent('TASK_START'));
+    return from(this.opts.serverTokenMap).pipe(
+      mergeMap(([server, token]) => {
+        return from(
+          this.opts.client.head(`${server}${ENDPOINT_CONFIG}`, {
+            headers: { [HEADER_CREDENTIAL]: token },
+          }),
+        ).pipe(
+          tap((resp) => logger(this.debugLogEvent(resp))),
+          map((res) => ({
+            server,
+            timestamp: parseInt(res.headers[HEADER_LAST_MODIFIED] ?? 0),
+          })),
+        );
       }),
-      map((resp) => toADC(resp.data)),
+      max((a, b) => (a.timestamp < b.timestamp ? -1 : 1)),
+      map(({ server }) => server),
       finalize(() => logger(taskStateEvent('TASK_DONE'))),
     );
   }

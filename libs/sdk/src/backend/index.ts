@@ -19,6 +19,8 @@ export interface BackendOptions {
   labelSelector?: Record<string, string>;
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
+
+  cacheKey: string;
 }
 
 export const BackendEventType = {
