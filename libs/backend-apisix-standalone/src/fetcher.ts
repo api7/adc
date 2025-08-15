@@ -35,10 +35,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
   }
 
   public dump() {
-    type result = [
-      ADCSDK.Configuration,
-      typing.APISIXStandaloneWithConfVersionType,
-    ];
+    type result = [ADCSDK.Configuration, typing.APISIXStandalone];
 
     const taskName = `Fetch configuration`;
     const logger = this.getLogger(taskName);
@@ -48,7 +45,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       switchMap((server) => {
         if (!server) return of([{}, {}] as result);
         return from(
-          this.opts.client.get<typing.APISIXStandaloneWithConfVersionType>(
+          this.opts.client.get<typing.APISIXStandalone>(
             `${server}${ENDPOINT_CONFIG}`,
             {
               headers: {

@@ -3,7 +3,7 @@ import { isEmpty } from 'lodash';
 
 import * as typing from './typing';
 
-export const toADC = (input: typing.APISIXStandaloneType) => {
+export const toADC = (input: typing.APISIXStandalone) => {
   const consumerCredentials = input.consumers?.filter(
     (consumerOrConsumerCredential) => 'name' in consumerOrConsumerCredential,
   );

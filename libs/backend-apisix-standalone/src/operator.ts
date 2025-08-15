@@ -33,7 +33,7 @@ export interface OperatorOptions {
   serverTokenMap: typing.ServerTokenMap;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
-  oldRawConfiguration: typing.APISIXStandaloneWithConfVersionType;
+  oldRawConfiguration: typing.APISIXStandalone;
 }
 
 export class Operator extends ADCSDK.backend.BackendEventSource {
@@ -46,7 +46,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     events: Array<ADCSDK.Event>,
     opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ) {
-    const newConfig: typing.APISIXStandaloneWithConfVersionType = cloneDeep(
+    const newConfig = cloneDeep<typing.APISIXStandalone>(
       this.opts.oldRawConfiguration,
     );
     const increaseVersion: Partial<Record<typing.UsedResourceTypes, boolean>> =
@@ -199,7 +199,11 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   }
 
   private fromADC(event: ADCSDK.Event, modifiedIndex: number) {
-    switch (event.resourceType) {
+    switch (
+      event.resourceType as
+        | typing.UsedResourceTypes
+        | ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+    ) {
       case ADCSDK.ResourceType.ROUTE: {
         const res = event.newValue as ADCSDK.Route;
         return {
@@ -303,7 +307,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             event.newValue as ADCSDK.Upstream,
             event.parentId,
           ),
-          //@ts-expect-error inline upstream without modifiedIndex
           modifiedIndex,
           id: this.generateIdFromEvent(event),
         } satisfies typing.Upstream as typing.Upstream;
@@ -345,6 +348,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     parentId?: string,
   ): typing.Upstream {
     const upstream = {
+      modifiedIndex: undefined!,
       id: undefined!, // fill in later
       name: res.name!,
       desc: res.description,

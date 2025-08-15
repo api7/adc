@@ -5,7 +5,4 @@ import * as typing from './typing';
 
 export const version = new Map<string, SemVer>();
 export const config = new Map<string, ADCSDK.Configuration>();
-export const rawConfig = new Map<
-  string,
-  typing.APISIXStandaloneWithConfVersionType
->();
+export const rawConfig = new Map<string, typing.APISIXStandalone>();
