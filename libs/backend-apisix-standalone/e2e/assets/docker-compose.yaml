@@ -1,5 +1,5 @@
 services:
-  apisix_http:
+  apisix_1:
     image: apache/apisix:${BACKEND_APISIX_IMAGE:-dev}
     restart: always
     volumes:
@@ -7,6 +7,26 @@ services:
     ports:
       - "19180:9180/tcp"
       - "19080:9080/tcp"
+    networks:
+      apisix:
+  apisix_2:
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-dev}
+    restart: always
+    volumes:
+      - ./apisix_conf/http.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "29180:9180/tcp"
+      - "29080:9080/tcp"
+    networks:
+      apisix:
+  apisix_3:
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-dev}
+    restart: always
+    volumes:
+      - ./apisix_conf/http.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "39180:9180/tcp"
+      - "39080:9080/tcp"
     networks:
       apisix:
 

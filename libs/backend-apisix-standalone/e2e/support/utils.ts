@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import * as compose from 'docker-compose';
 import { Listr, SilentRenderer } from 'listr2';
 import { lastValueFrom, toArray } from 'rxjs';
 import semver from 'semver';
@@ -112,13 +113,19 @@ export const wait = (ms: number) =>
 
 type cond = boolean | (() => boolean);
 
-export const conditionalDescribe = (cond: cond) =>
-  cond ? describe : describe.skip;
+export const conditionalDescribe = (cond: cond): typeof describe =>
+  cond ? describe : (describe.skip as typeof describe);
 
-export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
+export const conditionalIt = (cond: cond): typeof it =>
+  cond ? it : (it.skip as typeof it);
 
 export const semverCondition = (
   op: (v1: string | semver.SemVer, v2: string | semver.SemVer) => boolean,
   base: string,
   target = semver.coerce(process.env.BACKEND_APISIX_VERSION) ?? '0.0.0',
 ) => op(target, base);
+
+export const restartAPISIX = () =>
+  compose.restartAll({
+    cwd: 'libs/backend-apisix-standalone/e2e/assets',
+  });

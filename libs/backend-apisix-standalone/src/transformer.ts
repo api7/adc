@@ -3,16 +3,15 @@ import { isEmpty } from 'lodash';
 
 import * as typing from './typing';
 
-export const toADC = (input: typing.APISIXStandaloneType) => {
+export const toADC = (input: typing.APISIXStandalone) => {
   const consumerCredentials = input.consumers?.filter(
     (consumerOrConsumerCredential) => 'name' in consumerOrConsumerCredential,
   );
 
   const transformUpstream = (
-    upstream: Omit<
-      typing.APISIXStandaloneType['upstreams'][number],
-      'id' | 'name' | 'modifiedIndex'
-    > & { name?: string },
+    upstream: Omit<typing.Upstream, 'id' | 'name' | 'modifiedIndex'> & {
+      name?: string;
+    },
   ) => ({
     name: upstream.name,
     description: upstream.desc,
@@ -42,7 +41,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
           description: service.desc,
           labels: service.labels,
           upstream: ADCSDK.utils.recursiveOmitUndefined(
-            transformUpstream(service.upstream),
+            transformUpstream(service.upstream!),
           ),
           plugins: service.plugins,
           hosts: service.hosts,
@@ -82,7 +81,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
           upstreams: input.upstreams
             ?.filter(
               (upstream) =>
-                upstream.labels[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
+                upstream.labels![typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
                 service.id,
             )
             .map(transformUpstream)
@@ -95,7 +94,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
           id: ssl.id,
           labels: ssl.labels,
           type: ssl.type,
-          snis: ssl.snis,
+          snis: ssl.snis!,
           certificates: [
             {
               certificate: ssl.cert,
@@ -103,7 +102,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
             },
             ...(ssl.certs ?? []).map((cert, idx) => ({
               certificate: cert,
-              key: ssl.keys[idx],
+              key: ssl.keys![idx],
             })),
           ] as Array<ADCSDK.SSLCertificate>,
           client: ssl.client,
@@ -126,7 +125,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
               credential.id.startsWith(`${consumer.username}/credentials/`),
             )
             .map((credential) => {
-              const plugin = Object.entries(credential.plugins)[0];
+              const plugin = Object.entries(credential.plugins!)[0];
               return {
                 id: credential.id.replace(
                   `${consumer.username}/credentials/`,
@@ -145,7 +144,7 @@ export const toADC = (input: typing.APISIXStandaloneType) => {
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     global_rules: Object.fromEntries(
       input.global_rules
-        ?.map((globalRule) => [globalRule.id, globalRule.plugins[0]])
+        ?.map((globalRule) => [globalRule.id, globalRule.plugins![0]])
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     ),
     plugin_metadata: Object.fromEntries(

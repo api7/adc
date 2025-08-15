@@ -21,120 +21,122 @@ const Plugins = z.record(z.string(), z.record(z.string(), z.unknown()));
 const Status = z.union([z.literal(0), z.literal(1)]);
 const Port = z.int().min(0).max(65535);
 
-export const Route = z
+const RouteSchema = z.strictObject({
+  ...ModifiedIndex,
+  ...Metadata,
+  uris: z.array(z.string()).min(1),
+  hosts: z.array(z.string()).min(1).optional(),
+  methods: z.array(z.string()).optional(),
+  remote_addrs: z.array(z.string()).min(1).optional(),
+  vars: z.array(z.unknown()).optional(),
+  filter_func: z.string().optional(),
+
+  plugins: Plugins.optional(),
+  service_id: Metadata.id,
+
+  timeout: Timeout.optional(),
+  enable_websocket: z.boolean().optional(),
+  priority: z.int().optional(),
+  status: Status.optional(),
+});
+export type Route = z.infer<typeof RouteSchema>;
+
+const UpstreamSchema = z.strictObject({
+  ...ModifiedIndex,
+  ...Metadata,
+  nodes: z.array(
+    z.strictObject({
+      host: z.string(),
+      port: Port,
+      weight: z.int(),
+      priority: z.int().optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    }),
+  ),
+  scheme: z
+    .union([
+      z.literal('http'),
+      z.literal('https'),
+      z.literal('grpc'),
+      z.literal('grpcs'),
+      z.literal('tcp'),
+      z.literal('udp'),
+      z.literal('tls'),
+      z.literal('kafka'),
+    ])
+    .optional(),
+  type: z
+    .union([
+      z.literal('roundrobin'),
+      z.literal('chash'),
+      z.literal('least_conn'),
+      z.literal('ewma'),
+    ])
+    .optional(),
+  hash_on: z.string().optional(),
+  key: z.string().optional(),
+
+  pass_host: z
+    .union([z.literal('pass'), z.literal('node'), z.literal('rewrite')])
+    .optional(),
+  upstream_host: z.string().optional(),
+  retries: z.int().optional(),
+  retry_timeout: z.coerce.number().optional(),
+  timeout: Timeout.optional(),
+  tls: z
+    .strictObject({
+      client_cert_id: z.string().optional(),
+      client_cert: z.string().optional(),
+      client_key: z.string().optional(),
+      verify: z.boolean().optional(),
+    })
+    .optional(),
+  keepalive_pool: z
+    .strictObject({
+      size: z.int(),
+      idle_timeout: z.int(),
+      requests: z.int(),
+    })
+    .optional(),
+
+  // Will not include health checks and service discovery configurations,
+  // which are implemented by other components on the target ecosystem,
+  // such as Kubernetes and Ingress Controller.
+});
+export type Upstream = z.infer<typeof UpstreamSchema>;
+
+const ServiceSchema = z.strictObject({
+  ...ModifiedIndex,
+  ...Metadata,
+  hosts: z.array(z.string()).min(1).optional(),
+  upstream: UpstreamSchema.extend({
+    id: Metadata.id.optional(),
+    name: Metadata.name.optional(),
+  }).optional(),
+  plugins: Plugins.optional(),
+});
+export type Service = z.infer<typeof ServiceSchema>;
+
+const ConsumerSchema = z.strictObject({
+  ...ModifiedIndex,
+  username: z.string(),
+  desc: Metadata.desc,
+  labels: Metadata.labels,
+
+  plugins: Plugins.optional(),
+});
+export type Consumer = z.infer<typeof ConsumerSchema>;
+
+const ConsumerCredentialSchema = z.strictObject({
+  ...ModifiedIndex,
+  ...Metadata,
+  plugins: Plugins.optional(),
+});
+export type ConsumerCredential = z.infer<typeof ConsumerCredentialSchema>;
+
+const SSLSchema = z
   .strictObject({
-    uris: z.array(z.string()).min(1),
-    hosts: z.array(z.string()).min(1).optional(),
-    methods: z.array(z.string()).optional(),
-    remote_addrs: z.array(z.string()).min(1).optional(),
-    vars: z.array(z.unknown()).optional(),
-    filter_func: z.string().optional(),
-
-    plugins: Plugins.optional(),
-    service_id: Metadata.id,
-
-    timeout: Timeout.optional(),
-    enable_websocket: z.boolean().optional(),
-    priority: z.int().optional(),
-    status: Status.optional(),
-  })
-  .extend(Metadata)
-  .extend(ModifiedIndex);
-
-const Upstream = z
-  .strictObject({
-    nodes: z.array(
-      z.strictObject({
-        host: z.string(),
-        port: Port,
-        weight: z.int(),
-        priority: z.int().optional(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
-      }),
-    ),
-    scheme: z
-      .union([
-        z.literal('http'),
-        z.literal('https'),
-        z.literal('grpc'),
-        z.literal('grpcs'),
-        z.literal('tcp'),
-        z.literal('udp'),
-        z.literal('tls'),
-        z.literal('kafka'),
-      ])
-      .optional(),
-    type: z
-      .union([
-        z.literal('roundrobin'),
-        z.literal('chash'),
-        z.literal('least_conn'),
-        z.literal('ewma'),
-      ])
-      .optional(),
-    hash_on: z.string().optional(),
-    key: z.string().optional(),
-
-    pass_host: z
-      .union([z.literal('pass'), z.literal('node'), z.literal('rewrite')])
-      .optional(),
-    upstream_host: z.string().optional(),
-    retries: z.int().optional(),
-    retry_timeout: z.coerce.number().optional(),
-    timeout: Timeout.optional(),
-    tls: z
-      .strictObject({
-        client_cert_id: z.string().optional(),
-        client_cert: z.string().optional(),
-        client_key: z.string().optional(),
-        verify: z.boolean().optional(),
-      })
-      .optional(),
-    keepalive_pool: z
-      .strictObject({
-        size: z.int(),
-        idle_timeout: z.int(),
-        requests: z.int(),
-      })
-      .optional(),
-
-    // Will not include health checks and service discovery configurations,
-    // which are implemented by other components on the target ecosystem,
-    // such as Kubernetes and Ingress Controller.
-  })
-  .extend(Metadata);
-
-const Service = z
-  .strictObject({
-    hosts: z.array(z.string()).min(1).optional(),
-    upstream: Upstream.extend({
-      id: Metadata.id.optional(),
-      name: Metadata.name.optional(),
-    }).optional(),
-    plugins: Plugins.optional(),
-  })
-  .extend(Metadata)
-  .extend(ModifiedIndex);
-
-const Consumer = z
-  .strictObject({
-    username: z.string(),
-    desc: Metadata.desc,
-    labels: Metadata.labels,
-
-    plugins: Plugins.optional(),
-  })
-  .extend(ModifiedIndex);
-
-const ConsumerCredential = z
-  .strictObject({
-    plugins: Plugins.optional(),
-  })
-  .extend(Metadata)
-  .extend(ModifiedIndex);
-
-const SSL = z
-  .strictObject({
+    ...ModifiedIndex,
     id: Metadata.id,
     desc: Metadata.desc,
     labels: Metadata.labels,
@@ -156,50 +158,65 @@ const SSL = z
     status: Status.optional(),
   })
   .extend(ModifiedIndex);
+export type SSL = z.infer<typeof SSLSchema>;
 
-const StreamRoute = z
-  .strictObject({
-    remote_addr: z.string().optional(),
-    server_addr: z.string().optional(),
-    server_port: Port.optional(),
-    sni: z.string().optional(),
-    service_id: Metadata.id,
-    plugins: Plugins.optional(),
-    protocol: z
-      .strictObject({
-        name: z.string(),
-        superior_id: z.string().optional(),
-        conf: z.record(z.string(), z.unknown()).optional(),
-        logger: z
-          .array(
-            z.strictObject({
-              conf: z.record(z.string(), z.unknown()),
-              name: z.string().optional(),
-              filter: z.array(z.unknown()).optional(),
-            }),
-          )
-          .optional(),
-      })
-      .optional(),
-  })
-  .extend(Metadata)
-  .extend(ModifiedIndex);
+const StreamRouteSchema = z.strictObject({
+  ...ModifiedIndex,
+  ...Metadata,
+  remote_addr: z.string().optional(),
+  server_addr: z.string().optional(),
+  server_port: Port.optional(),
+  sni: z.string().optional(),
+  service_id: Metadata.id,
+  plugins: Plugins.optional(),
+  protocol: z
+    .strictObject({
+      name: z.string(),
+      superior_id: z.string().optional(),
+      conf: z.record(z.string(), z.unknown()).optional(),
+      logger: z
+        .array(
+          z.strictObject({
+            conf: z.record(z.string(), z.unknown()),
+            name: z.string().optional(),
+            filter: z.array(z.unknown()).optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+});
+export type StreamRoute = z.infer<typeof StreamRouteSchema>;
 
-const GlobalRule = z
-  .strictObject({
-    id: Metadata.id,
-    plugins: Plugins.optional(),
-  })
-  .extend(ModifiedIndex);
+const GlobalRuleSchema = z.strictObject({
+  ...ModifiedIndex,
+  id: Metadata.id,
+  plugins: Plugins.optional(),
+});
+export type GlobalRule = z.infer<typeof GlobalRuleSchema>;
 
-const PluginMetadata = z
-  .looseObject({
-    id: Metadata.id,
-    // and arbitrary kv pairs
-  })
-  .extend(ModifiedIndex);
+const PluginMetadataSchema = z.looseObject({
+  ...ModifiedIndex,
+  id: Metadata.id,
+  // and arbitrary kv pairs
+});
+export type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
 
-export const APISIXStandaloneKeyMap = {
+export type UsedResourceTypes =
+  | ADCSDK.ResourceType.ROUTE
+  | ADCSDK.ResourceType.SERVICE
+  | ADCSDK.ResourceType.CONSUMER
+  | ADCSDK.ResourceType.SSL
+  | ADCSDK.ResourceType.GLOBAL_RULE
+  | ADCSDK.ResourceType.PLUGIN_METADATA
+  | ADCSDK.ResourceType.UPSTREAM
+  | ADCSDK.ResourceType.STREAM_ROUTE;
+
+export const APISIXStandaloneKeyMap: {
+  [K in UsedResourceTypes]: K extends ADCSDK.ResourceType.PLUGIN_METADATA
+    ? `${K}`
+    : `${K}s`;
+} = {
   [ADCSDK.ResourceType.ROUTE]: 'routes',
   [ADCSDK.ResourceType.SERVICE]: 'services',
   [ADCSDK.ResourceType.CONSUMER]: 'consumers',
@@ -210,68 +227,82 @@ export const APISIXStandaloneKeyMap = {
   [ADCSDK.ResourceType.STREAM_ROUTE]: 'stream_routes',
 } as const;
 
-export const ResourceLevelConfVersion = {
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.ROUTE]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.SERVICE]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.CONSUMER]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.SSL]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.GLOBAL_RULE]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.PLUGIN_METADATA]}_conf_version`]:
-    z.int().optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM]}_conf_version`]: z
-    .int()
-    .optional(),
-  [`${APISIXStandaloneKeyMap[ADCSDK.ResourceType.STREAM_ROUTE]}_conf_version`]:
-    z.int().optional(),
+export const APISIXStandaloneConfVersionKeyMap: {
+  [K in keyof typeof APISIXStandaloneKeyMap]: `${(typeof APISIXStandaloneKeyMap)[K]}_conf_version`;
+} = {
+  [ADCSDK.ResourceType.ROUTE]: 'routes_conf_version',
+  [ADCSDK.ResourceType.SERVICE]: 'services_conf_version',
+  [ADCSDK.ResourceType.CONSUMER]: 'consumers_conf_version',
+  [ADCSDK.ResourceType.SSL]: 'ssls_conf_version',
+  [ADCSDK.ResourceType.GLOBAL_RULE]: 'global_rules_conf_version',
+  [ADCSDK.ResourceType.PLUGIN_METADATA]: 'plugin_metadata_conf_version',
+  [ADCSDK.ResourceType.UPSTREAM]: 'upstreams_conf_version',
+  [ADCSDK.ResourceType.STREAM_ROUTE]: 'stream_routes_conf_version',
+} as const;
 
-  protos_conf_version: z.int().optional(),
-  plugin_configs_conf_version: z.int().optional(),
-  consumer_groups_conf_version: z.int().optional(),
-  secrets_conf_version: z.int().optional(),
-};
+type ResourceFor<T extends UsedResourceTypes> =
+  T extends ADCSDK.ResourceType.ROUTE
+    ? typeof RouteSchema
+    : T extends ADCSDK.ResourceType.SERVICE
+      ? typeof ServiceSchema
+      : T extends ADCSDK.ResourceType.CONSUMER
+        ? z.ZodUnion<
+            readonly [typeof ConsumerSchema, typeof ConsumerCredentialSchema]
+          >
+        : T extends ADCSDK.ResourceType.SSL
+          ? typeof SSLSchema
+          : T extends ADCSDK.ResourceType.GLOBAL_RULE
+            ? typeof GlobalRuleSchema
+            : T extends ADCSDK.ResourceType.PLUGIN_METADATA
+              ? typeof PluginMetadataSchema
+              : T extends ADCSDK.ResourceType.UPSTREAM
+                ? typeof UpstreamSchema
+                : T extends ADCSDK.ResourceType.STREAM_ROUTE
+                  ? typeof StreamRouteSchema
+                  : never;
 
-const Resources = {
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.ROUTE]]: z
-    .array(Route)
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.SERVICE]]: z
-    .array(Service)
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.CONSUMER]]: z
-    .array(z.union([Consumer, ConsumerCredential]))
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.SSL]]: z.array(SSL).optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.GLOBAL_RULE]]: z
-    .array(GlobalRule)
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.PLUGIN_METADATA]]: z
-    .array(PluginMetadata)
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM]]: z
-    .array(Upstream.extend(ModifiedIndex))
-    .optional(),
-  [APISIXStandaloneKeyMap[ADCSDK.ResourceType.STREAM_ROUTE]]: z
-    .array(StreamRoute)
-    .optional(),
-};
-
-export const APISIXStandalone = z.strictObject(Resources);
-export type APISIXStandaloneType = z.infer<typeof APISIXStandalone>;
-
-export const APISIXStandaloneWithConfVersion = z.strictObject({
-  ...Resources,
-  ...ResourceLevelConfVersion,
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const APISIXStandaloneSchema = z.strictObject({
+  ...({
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.ROUTE]]: z
+      .array(RouteSchema)
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.SERVICE]]: z
+      .array(ServiceSchema)
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.CONSUMER]]: z
+      .array(z.union([ConsumerSchema, ConsumerCredentialSchema]))
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.SSL]]: z
+      .array(SSLSchema)
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.GLOBAL_RULE]]: z
+      .array(GlobalRuleSchema)
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.PLUGIN_METADATA]]: z
+      .array(PluginMetadataSchema)
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM]]: z
+      .array(UpstreamSchema.extend(ModifiedIndex))
+      .optional(),
+    [APISIXStandaloneKeyMap[ADCSDK.ResourceType.STREAM_ROUTE]]: z
+      .array(StreamRouteSchema)
+      .optional(),
+  } as {
+    [K in UsedResourceTypes as (typeof APISIXStandaloneKeyMap)[K]]: z.ZodOptional<
+      z.ZodArray<ResourceFor<K>>
+    >;
+  }),
+  ...(Object.fromEntries(
+    Object.values(APISIXStandaloneConfVersionKeyMap).map((k) => [
+      k,
+      z.int().optional(),
+    ]),
+  ) as {
+    [K in (typeof APISIXStandaloneConfVersionKeyMap)[keyof typeof APISIXStandaloneConfVersionKeyMap]]: z.ZodOptional<z.ZodInt>;
+  }),
 });
-export type APISIXStandaloneWithConfVersionType = z.infer<
-  typeof APISIXStandaloneWithConfVersion
->;
+
+export type APISIXStandalone = z.infer<typeof APISIXStandaloneSchema>;
+
+export type ServerTokenMap = Map<string, string>;
