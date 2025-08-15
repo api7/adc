@@ -253,15 +253,24 @@ importers:
 
   libs/backend-apisix:
     devDependencies:
+      '@api7/adc-differ':
+        specifier: workspace:*
+        version: link:../differ
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk
 
   libs/backend-apisix-standalone:
     devDependencies:
+      '@api7/adc-differ':
+        specifier: workspace:*
+        version: link:../differ
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk
+      docker-compose:
+        specifier: ^1.2.0
+        version: 1.2.0
 
   libs/converter-openapi:
     devDependencies:
@@ -3366,6 +3375,10 @@ packages:
   dns-packet@5.6.1:
     resolution: {integrity: sha512-l4gcSouhcgIKRvyy99RNVOgxXiicE+2jZoNmaNmZ6JXiGajBOJAesk1OBlJuM5k2c+eudGdLxDqXuPCKIj6kpw==}
     engines: {node: '>=6'}
+
+  docker-compose@1.2.0:
+    resolution: {integrity: sha512-wIU1eHk3Op7dFgELRdmOYlPYS4gP8HhH1ZmZa13QZF59y0fblzFDFmKPhyc05phCy2hze9OEvNZAsoljrs+72w==}
+    engines: {node: '>= 6.0.0'}
 
   dom-serializer@2.0.0:
     resolution: {integrity: sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==}
@@ -9838,6 +9851,10 @@ snapshots:
   dns-packet@5.6.1:
     dependencies:
       '@leichtgewicht/ip-codec': 2.0.5
+
+  docker-compose@1.2.0:
+    dependencies:
+      yaml: 2.8.0
 
   dom-serializer@2.0.0:
     dependencies:

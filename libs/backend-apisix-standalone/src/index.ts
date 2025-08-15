@@ -33,7 +33,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     const servers = opts.server.split(',');
-    const tokens = opts.server.split(',');
+    const tokens = opts.token.split(',');
     servers.forEach((server, idx) => {
       this.serverTokenMap.set(
         server,

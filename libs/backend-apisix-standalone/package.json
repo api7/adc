@@ -9,7 +9,9 @@
     }
   },
   "devDependencies": {
-    "@api7/adc-sdk": "workspace:*"
+    "@api7/adc-sdk": "workspace:*",
+    "@api7/adc-differ": "workspace:*",
+    "docker-compose": "^1.2.0"
   },
   "nx": {
     "name": "backend-apisix-standalone",

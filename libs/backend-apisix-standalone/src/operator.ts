@@ -37,11 +37,8 @@ export interface OperatorOptions {
 }
 
 export class Operator extends ADCSDK.backend.BackendEventSource {
-  private readonly client: AxiosInstance;
-
   constructor(private readonly opts: OperatorOptions) {
     super();
-    this.client = opts.client;
     this.subject = opts.eventSubject;
   }
 
@@ -133,7 +130,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           from(this.opts.serverTokenMap).pipe(
             mergeMap(([server, token]) =>
               from(
-                this.client.put(`${server}${ENDPOINT_CONFIG}`, newConfig, {
+                this.opts.client.put(`${server}${ENDPOINT_CONFIG}`, newConfig, {
                   headers: {
                     [HEADER_CREDENTIAL]: token,
                     [HEADER_DIGEST]: createHash('sha1')

@@ -7,6 +7,7 @@ import {
   map,
   max,
   mergeMap,
+  of,
   switchMap,
   tap,
 } from 'rxjs';
@@ -30,16 +31,23 @@ export interface FetcherOptions {
 export class Fetcher extends ADCSDK.backend.BackendEventSource {
   constructor(private readonly opts: FetcherOptions) {
     super();
+    this.subject = opts.eventSubject;
   }
 
   public dump() {
+    type result = [
+      ADCSDK.Configuration,
+      typing.APISIXStandaloneWithConfVersionType,
+    ];
+
     const taskName = `Fetch configuration`;
     const logger = this.getLogger(taskName);
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
     return from(this.findLatest()).pipe(
-      switchMap((server) =>
-        from(
+      switchMap((server) => {
+        if (!server) return of([{}, {}] as result);
+        return from(
           this.opts.client.get<typing.APISIXStandaloneWithConfVersionType>(
             `${server}${ENDPOINT_CONFIG}`,
             {
@@ -50,16 +58,10 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
           ),
         ).pipe(
           tap((resp) => logger(this.debugLogEvent(resp))),
-          map(
-            (resp) =>
-              [toADC(resp.data), resp.data] as [
-                ADCSDK.Configuration,
-                typing.APISIXStandaloneWithConfVersionType,
-              ],
-          ),
-          finalize(() => logger(taskStateEvent('TASK_DONE'))),
-        ),
-      ),
+          map((resp) => [toADC(resp.data), resp.data] as result),
+        );
+      }),
+      finalize(() => logger(taskStateEvent('TASK_DONE'))),
     );
   }
 
@@ -85,7 +87,9 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
         );
       }),
       max((a, b) => (a.timestamp < b.timestamp ? -1 : 1)),
-      map(({ server }) => server),
+      map(({ server, timestamp }) => {
+        return timestamp > 0 ? server : undefined;
+      }),
       finalize(() => logger(taskStateEvent('TASK_DONE'))),
     );
   }
