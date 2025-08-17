@@ -1,36 +1,37 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { OpenAPIV3 } from 'openapi-types';
+import { OpenAPIV3_1 } from '@scalar/openapi-types';
 
-import { ExtKey, parseExtPlugins } from './extension';
+import { ExtKey } from './extension';
 
-export const parseUpstream = (
-  service: ADCSDK.Service,
-  oasServers: Array<OpenAPIV3.ServerObject>,
+export const transformUpstream = (
+  oasServers: Array<OpenAPIV3_1.ServerObject>,
   upstreamDefaults?: object,
 ) => {
   const getPort = (protocol: string): number =>
     protocol === 'http:' ? 80 : 443;
-  const defaultProtocol = oasServers[0]
-    ? new URL(oasServers[0].url).protocol
-    : 'https:';
-  let defaultPathPrefix: string;
+  const defaultProtocol =
+    oasServers[0] && oasServers[0].url
+      ? new URL(oasServers[0].url).protocol
+      : 'https:';
+  let defaultPathPrefix: string | undefined = undefined;
   const nodes: Array<ADCSDK.UpstreamNode> = oasServers.map((server, idx) => {
     if (server.variables)
       Object.entries(server.variables).forEach(([name, svar]) => {
-        server.url = server.url.replaceAll(`{${name}}`, svar.default);
+        server.url = server.url!.replaceAll(`{${name}}`, `${svar.default}`);
       });
-
-    const url = new URL(server.url);
-    if (idx === 0) defaultPathPrefix = url.pathname;
-
+    const url = new URL(server.url!);
+    if (idx === 0 && url.pathname !== '/') defaultPathPrefix = url.pathname;
     return {
       host: url.hostname,
       port: url.port ? parseInt(url.port) : getPort(url.protocol),
       weight: 100,
-      ...server[ExtKey.UPSTREAM_NODE_DEFAULTS],
+      ...(server as unknown as Record<string, object>)[
+        ExtKey.UPSTREAM_NODE_DEFAULTS
+      ],
     } as ADCSDK.UpstreamNode;
   });
 
+  const service = {} as ADCSDK.Service;
   if (defaultPathPrefix) service.path_prefix = defaultPathPrefix;
   service.upstream = {
     scheme: defaultProtocol.slice(
@@ -46,36 +47,32 @@ export const parseUpstream = (
     pass_host: 'pass',
     ...upstreamDefaults,
   };
+  return service;
 };
 
 export const parseSeprateService = (
   mainService: ADCSDK.Service,
-  context: OpenAPIV3.PathItemObject | OpenAPIV3.OperationObject,
   name: string,
+  context?: OpenAPIV3_1.PathItemObject | OpenAPIV3_1.OperationObject,
   pathServiceDefaults?: object, // Defaults used for operation level to merge path level
   pathUpstreamDefaults?: object, // Defaults used for operation level to merge path level
 ): ADCSDK.Service | undefined => {
-  let separateService: ADCSDK.Service = undefined;
   if (
-    context[ExtKey.SERVICE_DEFAULTS] ||
-    context[ExtKey.UPSTREAM_DEFAULTS] ||
-    context.servers
+    context &&
+    (context[ExtKey.SERVICE_DEFAULTS] ||
+      context[ExtKey.UPSTREAM_DEFAULTS] ||
+      context.servers)
   ) {
-    separateService = {
+    const separateService = {
       ...structuredClone(mainService), // Inherit all attributes from the main service
       name,
+      ...(context.servers
+        ? transformUpstream(context.servers, context[ExtKey.UPSTREAM_DEFAULTS])
+        : {}),
     };
 
-    // Override upstream of path level
-    if (context.servers)
-      parseUpstream(
-        separateService,
-        context.servers,
-        context[ExtKey.UPSTREAM_DEFAULTS],
-      );
-
     // Override service and upstream defaults of path level
-    separateService = {
+    return {
       ...separateService,
       upstream: {
         ...separateService.upstream,
@@ -84,7 +81,7 @@ export const parseSeprateService = (
       },
       ...(pathServiceDefaults ?? {}),
       ...(context[ExtKey.SERVICE_DEFAULTS] ?? {}),
-    };
+    } as ADCSDK.Service;
   }
-  return separateService;
+  return undefined;
 };

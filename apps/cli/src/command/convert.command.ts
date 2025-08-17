@@ -1,12 +1,13 @@
 import { OpenAPIConverter } from '@api7/adc-converter-openapi';
 import * as ADCSDK from '@api7/adc-sdk';
-import OpenAPIParser from '@readme/openapi-parser';
+import { InvalidArgumentError } from 'commander';
 import { dump } from 'js-yaml';
 import { Listr } from 'listr2';
 import { cloneDeep } from 'lodash';
 import { existsSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { OpenAPIV3 } from 'openapi-types';
+import { lastValueFrom } from 'rxjs';
 
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
@@ -19,7 +20,6 @@ interface ConvertOptions {
 }
 
 type ConvertContext = TaskContext & {
-  oas?: OpenAPIV3.Document;
   buffer?: Array<ADCSDK.Configuration>;
 };
 
@@ -65,32 +65,17 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
           return {
             title: `Convert OpenAPI document "${resolve(filePath)}"`,
             task: async (ctx: ConvertContext) => {
-              // check existance
-              if (!existsSync(filePath)) {
-                const error = new Error(
+              if (!existsSync(filePath))
+                throw new InvalidArgumentError(
                   `File "${resolve(filePath)}" does not exist`,
                 );
-                error.stack = '';
-                throw error;
-              }
 
               try {
-                const oas = (await OpenAPIParser.dereference(
-                  filePath,
-                )) as OpenAPIV3.Document;
-                const task = new OpenAPIConverter().toADC(oas);
-                task.add([
-                  {
-                    task: (subCtx) => {
-                      if (!ctx.buffer) {
-                        ctx.buffer = [cloneDeep(subCtx.local)];
-                      } else {
-                        ctx.buffer.push(cloneDeep(subCtx.local));
-                      }
-                    },
-                  },
-                ]);
-                return task;
+                const content = await readFile(filePath, 'utf-8');
+                const config = await lastValueFrom(
+                  new OpenAPIConverter().toADC(content),
+                );
+                ctx.buffer.push(cloneDeep(config));
               } catch (error) {
                 error.message = error.message.replace('\n', '');
                 error.stack = '';
@@ -114,7 +99,7 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
       {
         renderer: SignaleRenderer,
         rendererOptions: { verbose: opts.verbose },
-        ctx: { local: {} },
+        ctx: { local: {}, buffer: [] },
       },
     );
 

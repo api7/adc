@@ -19,6 +19,9 @@ export const parseExtPlugins = (context: object) => {
       )
       .map(([key, plugin]) => [key.replace(ExtKey.PLUGIN_PREFIX, ''), plugin]),
   );
-  const plugins = { ...context[ExtKey.PLUGINS], ...separatePlugins };
+  const plugins = {
+    ...(context as unknown as Record<string, object>)[ExtKey.PLUGINS],
+    ...separatePlugins,
+  };
   return !isEmpty(plugins) ? plugins : undefined;
 };
