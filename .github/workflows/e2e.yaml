@@ -78,17 +78,24 @@ jobs:
       matrix:
         version:
           - 3.13.0
-          - dev # test on latest release
-    #env:
-    #  BACKEND_APISIX_VERSION: ${{ matrix.version }}
-    #  BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
+          - dev
     steps:
+      - name: Determine APISIX image tag
+        run: |
+          if [ "${{ matrix.version }}" = "dev" ]; then
+            echo "BACKEND_APISIX_VERSION=dev" >> $GITHUB_ENV
+            echo "BACKEND_APISIX_IMAGE=dev" >> $GITHUB_ENV
+          else
+            echo "BACKEND_APISIX_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
+            echo "BACKEND_APISIX_IMAGE=${{ matrix.version }}-ubuntu" >> $GITHUB_ENV
+          fi
+
       - uses: actions/checkout@v4
 
       # Setup backend environment
       - name: Setup Apache APISIX
         working-directory: ./libs/backend-apisix-standalone/e2e/assets
-        run: docker compose up -d; sleep 10
+        run: docker compose up -d; sleep 10; docker ps -a
 
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
