@@ -23,11 +23,13 @@ This is beyond the scope of the ADC, it needs to be implemented by the client it
 
 > Versions not listed below are untested.
 
-| Versions | Supported | Status |
-| -------- | --------- | ------ |
-| 3.13.x   | ✅         | Full   |
+| Versions | Supported | Status      |
+| -------- | --------- | ----------- |
+| 3.13.x   | ✅         | Partial [1] |
 
 The standalone Admin API was added after the `3.12.0` release, so it requires at least `3.13.0` to use.
+
+[1] It does not support cache initialization, and each time the ADC is restarted, the first synchronization will perform a full synchronization. This will flush the router, lrucache, etc. It results in more updates compared to the expected condition, but no errors.
 
 ## Known Issues/Limitations
 
@@ -36,15 +38,7 @@ The standalone Admin API was added after the `3.12.0` release, so it requires at
 The ADC will ignore the resource-type level `conf_version` and resource level `modifiedIndex` obtained from the API when dumping.
 They will not be exported to a YAML file. Updates to conf_version and modifiedIndex will only occur during synchronization.
 
-Their update logic are:
-
-1. Gets the old configuration with `<resources-type>_conf_version` and `modifiedIndex` from API.
-2. Converts the configuration back to ADC format for diff checking. It outputs a set of ADC events containing all modifications to indicate which resource should be created, updated or deleted.
-3. Use events to override old configurations.
-   1. An updated resource will have its modifiedIndex increased;
-   2. A created resource's modifiedIndex will be incremented from the `conf_version` of the current resource type;
-   3. A deleted resource will have the `conf_version` of the current resource type updated.
-4. Recalculates the resource-type level `conf_version`. its rule is: find the maximum value of the old `conf_version` and the `modifiedIndex` in all such resources, and if that value is equal to the old `conf_version`, add one. This means that if there is any resource change (no matter what the operation is), the `conf_version` at the resource-type level will always increase; but the `modifiedIndex` on the resource will only change on the resource that was changed. This minimizes the impact of cache invalidation "noise" on APISIX due to unrelated resource updates.
+Their values will be reset to that moment's timestamp when they are created or updated.
 
 ### Differences in upstream
 
