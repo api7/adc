@@ -7,7 +7,7 @@ import {
   config as configCache,
   rawConfig as rawConfigCache,
 } from '../src/cache';
-import { server, token } from './support/constants';
+import { server, servers, token, tokens } from './support/constants';
 import {
   dumpConfiguration,
   restartAPISIX,
@@ -151,5 +151,103 @@ describe('Cache - Single APISIX', () => {
       validateStatus: () => true,
     });
     expect(res.status).toEqual(401);
+  });
+
+  it('clean cache', () => {
+    configCache.clear();
+    rawConfigCache.clear();
+  });
+});
+
+describe('Cache - Mutliple APISIX (completely new instances)', () => {
+  let backend: BackendAPISIXStandalone;
+
+  const cacheKey = 'default';
+  beforeAll(async () => {
+    await restartAPISIX();
+    backend = new BackendAPISIXStandalone({
+      server: servers,
+      token: tokens,
+      tlsSkipVerify: true,
+      cacheKey,
+    });
+  });
+
+  it('initialize cache', async () => {
+    expect(configCache).toBeDefined();
+    expect(configCache.size).toEqual(0);
+    expect(rawConfigCache).toBeDefined();
+    expect(rawConfigCache.size).toEqual(0);
+
+    await expect(dumpConfiguration(backend)).resolves.not.toThrow();
+
+    expect(configCache.size).toEqual(1);
+    expect(rawConfigCache.size).toEqual(1);
+    // APISIX does not report when it was last updated (it has not yet gotten configured),
+    // so fetcher will automatically populate empty objects as a default.
+    expect(configCache.get(cacheKey)).toEqual({});
+    expect(rawConfigCache.get(cacheKey)).toEqual({});
+  });
+
+  const config = {
+    services: [
+      {
+        name: 'service1',
+        upstream: { nodes: [{ host: '127.0.0.1', port: 9180, weight: 100 }] },
+        routes: [
+          {
+            name: 'route1',
+            uris: ['/apisix/admin/configs'],
+          },
+        ],
+      },
+    ],
+    consumers: [
+      { username: 'jack', plugins: {} },
+      { username: 'jane', plugins: {} },
+    ],
+  } as ADCSDK.Configuration;
+  it('update config', async () => {
+    const oldConfig = await dumpConfiguration(backend);
+    const events = DifferV3.diff(config, oldConfig);
+    expect(events).toHaveLength(1 + 1 + 2); // service * 1 + route * 1 + consumer * 2
+    expect(
+      events
+        .map((item) => item.type)
+        .filter((item) => item === ADCSDK.EventType.CREATE),
+    ).toHaveLength(4);
+
+    return syncEvents(backend, events);
+  });
+
+  it('wait for sync', async () => wait(100));
+
+  it('check routes', async () => {
+    const res1 = await axios.get(
+      'http://127.0.0.1:19080/apisix/admin/configs',
+      {
+        validateStatus: () => true,
+      },
+    );
+    expect(res1.status).toEqual(401);
+    const res2 = await axios.get(
+      'http://127.0.0.1:29080/apisix/admin/configs',
+      {
+        validateStatus: () => true,
+      },
+    );
+    expect(res2.status).toEqual(401);
+    const res3 = await axios.get(
+      'http://127.0.0.1:39080/apisix/admin/configs',
+      {
+        validateStatus: () => true,
+      },
+    );
+    expect(res3.status).toEqual(401);
+  });
+
+  it('clean cache', () => {
+    configCache.clear();
+    rawConfigCache.clear();
   });
 });
