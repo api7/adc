@@ -110,6 +110,9 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix-standalone:test
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
   api7:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
