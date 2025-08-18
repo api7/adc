@@ -10,6 +10,7 @@ const SyncTask = z.strictObject({
     includeResourceType: z.array(z.enum(ADCSDK.ResourceType)).optional(),
     excludeResourceType: z.array(z.enum(ADCSDK.ResourceType)).optional(),
     labelSelector: z.record(z.string(), z.string()).optional(),
+    cacheKey: z.string(),
   }),
   config: z.looseObject({}),
 });
