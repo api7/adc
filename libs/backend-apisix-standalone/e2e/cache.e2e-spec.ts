@@ -144,7 +144,7 @@ describe('Cache - Single APISIX', () => {
     });
   });
 
-  it('wait for sync', () => wait(1000));
+  it('wait for sync', async () => (vi.useRealTimers(), wait(100)));
 
   it('check route', async () => {
     const res = await axios.get('http://127.0.0.1:19080/apisix/admin/configs', {
