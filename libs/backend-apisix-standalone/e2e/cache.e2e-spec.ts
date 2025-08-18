@@ -8,7 +8,12 @@ import {
   rawConfig as rawConfigCache,
 } from '../src/cache';
 import { server, token } from './support/constants';
-import { dumpConfiguration, restartAPISIX, syncEvents } from './support/utils';
+import {
+  dumpConfiguration,
+  restartAPISIX,
+  syncEvents,
+  wait,
+} from './support/utils';
 
 describe('Cache - Single APISIX', () => {
   let backend: BackendAPISIXStandalone;
@@ -138,6 +143,8 @@ describe('Cache - Single APISIX', () => {
       consumers_conf_version: timestamp,
     });
   });
+
+  it('wait for sync', () => wait(1000));
 
   it('check route', async () => {
     const res = await axios.get('http://127.0.0.1:19080/apisix/admin/configs', {
