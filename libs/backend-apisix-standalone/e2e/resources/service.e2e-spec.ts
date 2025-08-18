@@ -6,6 +6,7 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  restartAPISIX,
   syncEvents,
   updateEvent,
 } from '../support/utils';
@@ -13,7 +14,8 @@ import {
 describe('Sync and Dump - 1', () => {
   let backend: BackendAPISIXStandalone;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await restartAPISIX();
     backend = new BackendAPISIXStandalone({
       server: server1,
       token: token1,
@@ -57,8 +59,8 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(2);
-      expect(result.services[0]).toMatchObject(service1);
-      expect(result.services[1]).toMatchObject(service2);
+      expect(result.services![0]).toMatchObject(service1);
+      expect(result.services![1]).toMatchObject(service2);
     });
 
     it('Update service1', async () => {
@@ -70,7 +72,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (service1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services[1]).toMatchObject(service2);
+      expect(result.services![1]).toMatchObject(service2);
     });
 
     it('Delete service1', async () =>
@@ -81,7 +83,7 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (service1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service2);
+      expect(result.services![0]).toMatchObject(service2);
     });
 
     it('Delete service2', async () =>
@@ -134,10 +136,10 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes).toHaveLength(2);
-      expect(result.services[0].routes[0]).toMatchObject(route1);
-      expect(result.services[0].routes[1]).toMatchObject(route2);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].routes).toHaveLength(2);
+      expect(result.services![0].routes![0]).toMatchObject(route1);
+      expect(result.services![0].routes![1]).toMatchObject(route2);
     });
 
     it('Delete route1', async () =>
@@ -148,9 +150,9 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (check remain route2)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes).toHaveLength(1);
-      expect(result.services[0].routes[0]).toMatchObject(route2);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].routes).toHaveLength(1);
+      expect(result.services![0].routes![0]).toMatchObject(route2);
     });
 
     it('Delete service', async () =>
