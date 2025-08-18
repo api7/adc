@@ -125,8 +125,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
           ] = timestamp;
         });
-
-        console.log('newConfig', newConfig);
       }),
       switchMap(() =>
         iif(
