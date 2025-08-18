@@ -83,7 +83,7 @@ jobs:
       - name: Determine APISIX image tag
         run: |
           if [ "${{ matrix.version }}" = "dev" ]; then
-            echo "BACKEND_APISIX_VERSION=dev" >> $GITHUB_ENV
+            echo "BACKEND_APISIX_VERSION=999.999.999" >> $GITHUB_ENV
             echo "BACKEND_APISIX_IMAGE=dev" >> $GITHUB_ENV
           else
             echo "BACKEND_APISIX_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
@@ -110,9 +110,6 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix-standalone:test
-      - name: Setup tmate session
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
   api7:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
