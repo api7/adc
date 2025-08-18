@@ -4,7 +4,7 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios';
-import { cloneDeep, isNil } from 'lodash';
+import { cloneDeep, isNil, unset } from 'lodash';
 import { createHash } from 'node:crypto';
 import {
   type ObservableInput,
@@ -49,6 +49,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const newConfig = cloneDeep<typing.APISIXStandalone>(
       this.opts.oldRawConfiguration,
     );
+    unset(newConfig, 'X-Last-Modified');
+    unset(newConfig, 'X-Digest');
     const increaseVersion: Partial<Record<typing.UsedResourceTypes, boolean>> =
       {};
 
@@ -123,6 +125,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
           ] = timestamp;
         });
+
+        console.log('newConfig', newConfig);
       }),
       switchMap(() =>
         iif(
