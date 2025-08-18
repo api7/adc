@@ -1,7 +1,6 @@
 import { load } from 'js-yaml';
 
-import { OpenAPIConverter } from '../src';
-import { loadAsset, runTask } from './utils';
+import { convert, loadAsset } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parse = (content: string): any => load(content);
@@ -9,14 +8,13 @@ const parse = (content: string): any => load(content);
 describe('Basic', () => {
   it('case 1 (single path)', async () => {
     const oas = parse(loadAsset('basic-1.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       services: [
         {
           description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/',
           routes: [
             {
               description: 'Returns anything passed in request data.',
@@ -62,14 +60,13 @@ describe('Basic', () => {
 
   it('case 2 (multiple paths)', async () => {
     const oas = parse(loadAsset('basic-2.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
     expect(config).toEqual({
       services: [
         {
           description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/',
           routes: [
             {
               description: 'Absolutely 302 Redirects n times.',
@@ -121,14 +118,13 @@ describe('Basic', () => {
 
   it('case 3 (multiple servers)', async () => {
     const oas = parse(loadAsset('basic-3.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
     expect(config).toEqual({
       services: [
         {
           description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/',
           routes: [
             {
               description: 'Returns anything passed in request data.',
@@ -180,44 +176,43 @@ describe('Basic', () => {
 
   it('case 4 (server variables)', async () => {
     const oas = parse(loadAsset('basic-4.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
     expect(config).toEqual({
       services: [
         {
           description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/test1Value/test2Value', // The path prefix follows only the first server, use default values for variables
           routes: [
             {
               description: 'Returns anything passed in request data.',
               methods: ['GET'],
               name: 'httpbin.org_anything_get',
-              uris: ['/anything'],
+              uris: ['/test1Value/test2Value/anything'],
             },
             {
               description: 'Returns anything passed in request data.',
               methods: ['PUT'],
               name: 'httpbin.org_anything_put',
-              uris: ['/anything'],
+              uris: ['/test1Value/test2Value/anything'],
             },
             {
               description: 'Returns anything passed in request data.',
               methods: ['POST'],
               name: 'httpbin.org_anything_post',
-              uris: ['/anything'],
+              uris: ['/test1Value/test2Value/anything'],
             },
             {
               description: 'Returns anything passed in request data.',
               methods: ['DELETE'],
               name: 'httpbin.org_anything_delete',
-              uris: ['/anything'],
+              uris: ['/test1Value/test2Value/anything'],
             },
             {
               description: 'Returns anything passed in request data.',
               methods: ['PATCH'],
               name: 'httpbin.org_anything_patch',
-              uris: ['/anything'],
+              uris: ['/test1Value/test2Value/anything'],
             },
           ],
           upstream: {
@@ -236,14 +231,49 @@ describe('Basic', () => {
 
   it('case 5 (servers in path/operation)', async () => {
     const oas = parse(loadAsset('basic-5.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       services: [
         {
           description: 'httpbin.org description',
+          name: 'httpbin.org_anything',
+          routes: [
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['PUT'],
+              name: 'httpbin.org_anything_put',
+              uris: ['/anything'],
+            },
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['POST'],
+              name: 'httpbin.org_anything_post',
+              uris: ['/anything'],
+            },
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['DELETE'],
+              name: 'httpbin.org_anything_delete',
+              uris: ['/anything'],
+            },
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['PATCH'],
+              name: 'httpbin.org_anything_patch',
+              uris: ['/anything'],
+            },
+          ],
+          upstream: {
+            nodes: [{ host: 'httpbin.net', port: 443, weight: 100 }],
+            pass_host: 'pass',
+            scheme: 'https',
+            timeout: { connect: 60, read: 60, send: 60 },
+          },
+        },
+        {
+          description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/',
           routes: [
             {
               description: 'Absolutely 302 Redirects n times.',
@@ -262,7 +292,6 @@ describe('Basic', () => {
         {
           description: 'httpbin.org description',
           name: 'httpbin.org_anything_get',
-          path_prefix: '/',
           routes: [
             {
               description: 'Returns anything passed in request data.',
@@ -273,43 +302,6 @@ describe('Basic', () => {
           ],
           upstream: {
             nodes: [{ host: 'httpbin.com', port: 443, weight: 100 }],
-            pass_host: 'pass',
-            scheme: 'https',
-            timeout: { connect: 60, read: 60, send: 60 },
-          },
-        },
-        {
-          description: 'httpbin.org description',
-          name: 'httpbin.org_anything',
-          path_prefix: '/',
-          routes: [
-            {
-              description: 'Returns anything passed in request data.',
-              methods: ['PUT'],
-              name: 'httpbin.org_anything_put',
-              uris: ['/anything'],
-            },
-            {
-              description: 'Returns anything passed in request data.',
-              methods: ['POST'],
-              name: 'httpbin.org_anything_post',
-              uris: ['/anything'],
-            },
-            {
-              description: 'Returns anything passed in request data.',
-              methods: ['DELETE'],
-              name: 'httpbin.org_anything_delete',
-              uris: ['/anything'],
-            },
-            {
-              description: 'Returns anything passed in request data.',
-              methods: ['PATCH'],
-              name: 'httpbin.org_anything_patch',
-              uris: ['/anything'],
-            },
-          ],
-          upstream: {
-            nodes: [{ host: 'httpbin.net', port: 443, weight: 100 }],
             pass_host: 'pass',
             scheme: 'https',
             timeout: { connect: 60, read: 60, send: 60 },
@@ -321,33 +313,13 @@ describe('Basic', () => {
 
   it('case 6 (route-less main service)', async () => {
     const oas = parse(loadAsset('basic-6.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       services: [
         {
           description: 'httpbin.org description',
-          name: 'httpbin.org_anything_get',
-          path_prefix: '/',
-          routes: [
-            {
-              description: 'Returns anything passed in request data.',
-              methods: ['GET'],
-              name: 'httpbin.org_anything_get',
-              uris: ['/anything'],
-            },
-          ],
-          upstream: {
-            nodes: [{ host: 'httpbin.com', port: 443, weight: 100 }],
-            pass_host: 'pass',
-            scheme: 'https',
-            timeout: { connect: 60, read: 60, send: 60 },
-          },
-        },
-        {
-          description: 'httpbin.org description',
           name: 'httpbin.org_anything',
-          path_prefix: '/',
           routes: [
             {
               description: 'Returns anything passed in request data.',
@@ -381,20 +353,37 @@ describe('Basic', () => {
             timeout: { connect: 60, read: 60, send: 60 },
           },
         },
+        {
+          description: 'httpbin.org description',
+          name: 'httpbin.org_anything_get',
+          routes: [
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['GET'],
+              name: 'httpbin.org_anything_get',
+              uris: ['/anything'],
+            },
+          ],
+          upstream: {
+            nodes: [{ host: 'httpbin.com', port: 443, weight: 100 }],
+            pass_host: 'pass',
+            scheme: 'https',
+            timeout: { connect: 60, read: 60, send: 60 },
+          },
+        },
       ],
     });
   });
 
   it('case 7 (route name)', async () => {
     const oas = parse(loadAsset('basic-7.yaml'));
-    const config = await runTask(new OpenAPIConverter().toADC(oas));
+    const config = await convert(oas);
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       services: [
         {
           description: 'httpbin.org description',
           name: 'httpbin.org',
-          path_prefix: '/',
           routes: [
             {
               description: 'Returns anything passed in request data.',

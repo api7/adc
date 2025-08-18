@@ -28,21 +28,6 @@
         "production": {}
       }
     },
-    "serve": {
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "options": {
-        "buildTarget": "cli:build"
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "cli:build:development"
-        },
-        "production": {
-          "buildTarget": "cli:build:production"
-        }
-      }
-    },
     "lint": {
       "executor": "@nx/eslint:lint",
       "outputs": [
