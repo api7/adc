@@ -95,18 +95,10 @@ export const overrideEventResourceId = (
   return event;
 };
 
-// This backend needs to use the data from the dump to assist in generating new data for the sync,
-// the cache is in the backend, so just wait for the dump to complete.
-export const refreshDumpCache = (backend: BackendAPISIX) =>
-  lastValueFrom(
-    backend.dump().pipe(
-      toArray(),
-      //tap(() => console.log(backend.__TEST_ONLY.GET_LAST_DUMP())),
-    ),
-  );
-
-export const sortResult = <T>(result: Array<T>, field: string) =>
-  structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
+export const sortResult = <T extends Record<string, string>>(
+  result: Array<T>,
+  field: string,
+) => structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
 
 export const wait = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));

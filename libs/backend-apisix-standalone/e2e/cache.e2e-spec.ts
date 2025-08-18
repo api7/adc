@@ -1,7 +1,6 @@
 import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import axios from 'axios';
-import { lastValueFrom } from 'rxjs';
 
 import { BackendAPISIXStandalone } from '../src';
 import {
@@ -9,15 +8,7 @@ import {
   rawConfig as rawConfigCache,
 } from '../src/cache';
 import { server, token } from './support/constants';
-import {
-  createEvent,
-  deleteEvent,
-  dumpConfiguration,
-  refreshDumpCache,
-  restartAPISIX,
-  syncEvents,
-  updateEvent,
-} from './support/utils';
+import { dumpConfiguration, restartAPISIX, syncEvents } from './support/utils';
 
 describe('Cache - Single APISIX', () => {
   let backend: BackendAPISIXStandalone;
@@ -43,7 +34,7 @@ describe('Cache - Single APISIX', () => {
     expect(rawConfigCache).toBeDefined();
     expect(rawConfigCache.size).toEqual(0);
 
-    await expect(lastValueFrom(backend.dump())).resolves.not.toThrow();
+    await expect(dumpConfiguration(backend)).resolves.not.toThrow();
 
     expect(configCache.size).toEqual(1);
     expect(rawConfigCache.size).toEqual(1);
@@ -59,7 +50,7 @@ describe('Cache - Single APISIX', () => {
     let apiCall = 0;
     const sub = backend.on('AXIOS_DEBUG', () => apiCall++);
 
-    await expect(lastValueFrom(backend.dump())).resolves.not.toThrow();
+    await expect(dumpConfiguration(backend)).resolves.not.toThrow();
     expect(apiCall).toEqual(0);
 
     sub.unsubscribe();
@@ -85,7 +76,7 @@ describe('Cache - Single APISIX', () => {
   } as ADCSDK.Configuration;
   const now = new Date();
   it('update config', async () => {
-    const oldConfig = await lastValueFrom(backend.dump());
+    const oldConfig = await dumpConfiguration(backend);
     const events = DifferV3.diff(config, oldConfig);
     expect(events).toHaveLength(1 + 1 + 2); // service * 1 + route * 1 + consumer * 2
     expect(
