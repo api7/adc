@@ -11,7 +11,7 @@ import {
   switchMap,
   tap,
 } from 'rxjs';
-import { type SemVer } from 'semver';
+import { type SemVer, gt as semverGT } from 'semver';
 
 import {
   ENDPOINT_CONFIG,
@@ -72,7 +72,9 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     return from(this.opts.serverTokenMap).pipe(
       mergeMap(([server, token]) => {
         return from(
-          this.opts.client.head(`${server}${ENDPOINT_CONFIG}`, {
+          (semverGT(this.opts.version, '3.13.0')
+            ? this.opts.client.head
+            : this.opts.client.get)(`${server}${ENDPOINT_CONFIG}`, {
             headers: { [HEADER_CREDENTIAL]: token },
           }),
         ).pipe(
