@@ -120,11 +120,13 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const resourceTypes = Object.keys(
           typing.APISIXStandaloneKeyMap,
         ) as unknown as Array<typing.UsedResourceTypes>;
-        resourceTypes.forEach((resourceType) => {
-          newConfig[
-            `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
-          ] = timestamp;
-        });
+        resourceTypes
+          .filter((item) => increaseVersion[item])
+          .forEach((resourceType) => {
+            newConfig[
+              `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
+            ] = timestamp;
+          });
       }),
       switchMap(() =>
         iif(

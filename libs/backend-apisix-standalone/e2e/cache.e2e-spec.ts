@@ -395,6 +395,11 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
       const rawConfig = rawConfigCache.get(cacheKey);
       expect(rawConfig?.services_conf_version).toEqual(200);
       expect(rawConfig?.routes_conf_version).toEqual(200);
+      expect(rawConfig?.plugin_metadata_conf_version).toBeLessThan(200);
+      expect(rawConfig?.global_rules_conf_version).toBeLessThan(200);
+      expect(rawConfig?.upstreams_conf_version).toBeLessThan(200);
+      expect(rawConfig?.consumers_conf_version).toBeLessThan(200);
+      expect(rawConfig?.ssls_conf_version).toBeLessThan(200);
     },
   );
 });
