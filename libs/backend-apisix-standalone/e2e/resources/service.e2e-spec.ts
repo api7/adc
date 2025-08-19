@@ -1,12 +1,12 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIXStandalone } from '../../src';
-import { server, token } from '../support/constants';
+import { server1, token1 } from '../support/constants';
 import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
-  refreshDumpCache,
+  restartAPISIX,
   syncEvents,
   updateEvent,
 } from '../support/utils';
@@ -14,11 +14,14 @@ import {
 describe('Sync and Dump - 1', () => {
   let backend: BackendAPISIXStandalone;
 
-  beforeAll(() => {
-    backend = new BackendAPISIXStandalone({ server, token });
+  beforeAll(async () => {
+    await restartAPISIX();
+    backend = new BackendAPISIXStandalone({
+      server: server1,
+      token: token1,
+      cacheKey: 'default',
+    });
   });
-
-  beforeEach(() => refreshDumpCache(backend)); // override dump cache for modifiedIndex
 
   describe('Sync and dump empty service', () => {
     const upstream = {
@@ -44,6 +47,9 @@ describe('Sync and Dump - 1', () => {
       upstream: structuredClone(upstream),
     } as ADCSDK.Service;
 
+    it('Initialize cache', () =>
+      expect(dumpConfiguration(backend)).resolves.not.toThrow());
+
     it('Create services', async () =>
       syncEvents(backend, [
         createEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
@@ -53,8 +59,8 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(2);
-      expect(result.services[0]).toMatchObject(service1);
-      expect(result.services[1]).toMatchObject(service2);
+      expect(result.services![0]).toMatchObject(service1);
+      expect(result.services![1]).toMatchObject(service2);
     });
 
     it('Update service1', async () => {
@@ -66,7 +72,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (service1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.services[1]).toMatchObject(service2);
+      expect(result.services![1]).toMatchObject(service2);
     });
 
     it('Delete service1', async () =>
@@ -77,7 +83,7 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (service1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service2);
+      expect(result.services![0]).toMatchObject(service2);
     });
 
     it('Delete service2', async () =>
@@ -130,10 +136,10 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes).toHaveLength(2);
-      expect(result.services[0].routes[0]).toMatchObject(route1);
-      expect(result.services[0].routes[1]).toMatchObject(route2);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].routes).toHaveLength(2);
+      expect(result.services![0].routes![0]).toMatchObject(route1);
+      expect(result.services![0].routes![1]).toMatchObject(route2);
     });
 
     it('Delete route1', async () =>
@@ -144,9 +150,9 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (check remain route2)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes).toHaveLength(1);
-      expect(result.services[0].routes[0]).toMatchObject(route2);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].routes).toHaveLength(1);
+      expect(result.services![0].routes![0]).toMatchObject(route2);
     });
 
     it('Delete service', async () =>

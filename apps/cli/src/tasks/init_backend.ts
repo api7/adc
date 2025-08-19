@@ -8,6 +8,6 @@ export const InitializeBackendTask = (
   opts: ADCSDK.BackendOptions,
 ): ListrTask => ({
   task: async (ctx) => {
-    ctx.backend = loadBackend(type, { ...opts });
+    ctx.backend = loadBackend(type, { ...opts, cacheKey: 'default' });
   },
 });

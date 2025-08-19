@@ -4,7 +4,8 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios';
-import { curry, max, maxBy, unset } from 'lodash';
+import { cloneDeep, isNil, unset } from 'lodash';
+import { createHash } from 'node:crypto';
 import {
   type ObservableInput,
   type Subject,
@@ -12,6 +13,7 @@ import {
   from,
   iif,
   map,
+  mergeMap,
   of,
   switchMap,
   tap,
@@ -20,92 +22,81 @@ import {
 } from 'rxjs';
 import { type SemVer } from 'semver';
 
+import { config as configCache, rawConfig as rawConfigCache } from './cache';
+import { ENDPOINT_CONFIG, HEADER_CREDENTIAL, HEADER_DIGEST } from './constants';
+import { toADC } from './transformer';
 import * as typing from './typing';
 
-type EventWithModifiedIndex = ADCSDK.Event & {
-  modifiedIndex: number;
-};
-
 export interface OperatorOptions {
+  cacheKey: string;
   client: AxiosInstance;
+  serverTokenMap: typing.ServerTokenMap;
   version: SemVer;
   eventSubject: Subject<ADCSDK.BackendEvent>;
+  oldRawConfiguration: typing.APISIXStandalone;
 }
 
-const NEED_TO_INCREASE_CONF_VERSION = 'NEED_TO_INCREASE_CONF_VERSION';
-
 export class Operator extends ADCSDK.backend.BackendEventSource {
-  private readonly client: AxiosInstance;
-
   constructor(private readonly opts: OperatorOptions) {
     super();
-    this.client = opts.client;
     this.subject = opts.eventSubject;
   }
 
   public sync(
     events: Array<ADCSDK.Event>,
-    oldConfig: typing.APISIXStandaloneWithConfVersionType,
     opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ) {
-    const modifiedIndexMap = this.extractModifiedIndex(oldConfig);
-    const newConfig: typing.APISIXStandaloneWithConfVersionType = oldConfig;
+    const newConfig = cloneDeep<typing.APISIXStandalone>(
+      this.opts.oldRawConfiguration,
+    );
+    unset(newConfig, 'X-Last-Modified');
+    unset(newConfig, 'X-Digest');
+    const increaseVersion: Partial<Record<typing.UsedResourceTypes, boolean>> =
+      {};
 
     const taskName = `Sync configuration`;
     const logger = this.getLogger(taskName);
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
+
+    const timestamp = Math.ceil(Date.now() / 1000);
     return from(events).pipe(
-      // derive the latest configuration from the old one
-      // ensure no unexpected modifications through immutable objects
+      // derive the latest configuration from the old config
       tap((event) => {
         const resourceType =
           event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
             ? ADCSDK.ResourceType.CONSUMER
-            : event.resourceType;
+            : (event.resourceType as typing.UsedResourceTypes);
         const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
-        const resourceIdKey =
-          event.resourceType === ADCSDK.ResourceType.CONSUMER
-            ? 'username'
-            : 'id';
-        const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
+
         if (event.type === ADCSDK.EventType.CREATE) {
           if (!newConfig[resourceKey]) newConfig[resourceKey] = [];
-          newConfig[resourceKey].push(
-            this.fromADC({
-              ...event,
-              modifiedIndex:
-                (newConfig[`${resourceKey}_conf_version`] ?? 0) + 1,
-            }),
-          );
-          newConfig[increaseVersionKey] = true;
-        } else if (event.type === ADCSDK.EventType.UPDATE) {
-          const resources: Array<any> = newConfig[resourceKey];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- infer error
+          newConfig[resourceKey].push(this.fromADC(event, timestamp) as any);
+          increaseVersion[resourceType] = true;
+        } else if (
+          event.type === ADCSDK.EventType.UPDATE ||
+          event.type === ADCSDK.EventType.DELETE
+        ) {
+          /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion --
+           * Since this resource should be updated, it must already exist in the old configuration */
+          const resources = newConfig[resourceKey]!;
           const eventGeneratedId = this.generateIdFromEvent(event);
-          const index = resources.findIndex(
-            (item) => item[resourceIdKey] === eventGeneratedId,
+          const index = resources?.findIndex((item) =>
+            'id' in item ? item.id : item.username === eventGeneratedId,
           );
-          if (index !== -1) {
-            const eventResourceId = this.generateIdFromEvent(event);
-            const newModifiedIndex = modifiedIndexMap.has(
-              `${event.resourceType}.${eventResourceId}`,
-            )
-              ? (resources[index].modifiedIndex =
-                  modifiedIndexMap.get(
-                    `${event.resourceType}.${eventResourceId}`,
-                  ) + 1)
-              : 1;
-            resources[index] = this.fromADC({
-              ...event,
-              modifiedIndex: newModifiedIndex,
-            });
+
+          if (!isNil(index) && index !== -1) {
+            if (event.type === ADCSDK.EventType.UPDATE) {
+              resources[index] = this.fromADC(
+                event,
+                timestamp,
+              ) as (typeof resources)[number];
+            } else {
+              resources.splice(index, 1);
+            }
+            increaseVersion[resourceType] = true;
           }
-          newConfig[increaseVersionKey] = true;
-        } else if (event.type === ADCSDK.EventType.DELETE) {
-          newConfig[resourceKey] = newConfig[resourceKey]?.filter(
-            (item) => item[resourceIdKey] !== this.generateIdFromEvent(event),
-          );
-          newConfig[increaseVersionKey] = true;
         }
       }),
       // filtering of new consumer configurations to ensure
@@ -126,94 +117,79 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       toArray(), // cumulative and combining events
       // update conf_version for each resource type
       tap(() => {
-        const resourceTypes = Object.keys(typing.APISIXStandaloneKeyMap);
-        resourceTypes.forEach((resourceType) => {
-          const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
-          const confVersionKey = `${resourceKey}_conf_version`;
-          const increaseVersionKey = `${resourceKey}.${NEED_TO_INCREASE_CONF_VERSION}`;
-          const oldConfVersion = newConfig[confVersionKey];
-
-          // Choose the larger of the old conf_version and the largest modifiedIndex to prevent
-          // resource-level conf_version rewinds.
-          newConfig[confVersionKey] = max([
-            // do not set conf_version if it is already larger than the
-            // maximum modifiedIndex of all resources
-            newConfig[confVersionKey],
-            // find the maximum modifiedIndex of all resources of this type
-            maxBy<{ modifiedIndex: number }>(
-              newConfig[typing.APISIXStandaloneKeyMap[resourceType]],
-              'modifiedIndex',
-            )?.modifiedIndex ?? 0,
-          ]);
-
-          // If the conf_version is not updated because the remote conf_version is too large and
-          // exceeds the new modifiedIndex for any resource, a decision is made as to whether
-          // the conf_version should be increased based on the flag used to indicate that it
-          // should be updated.
-          // Example:
-          //   remote: {services_conf_version: 100, services: [{modifiedIndex: 1},{modifiedIndex: 2}]}
-          //   local: {services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
-          //   Then the local will try to choose the larger of 100 and 3, and obviously 100 will be chosen
-          //   That is, for the remote, conf_version is not updated, which is an exception,
-          //   and in any case, conf_version needs to be greater than 100 in order to indicate that the
-          //   cache is flushed.
-          //   When a flag (NEED_INCREASE) exists and conf_version is not incremented, increment it manually.
-          //   i.e., new local should be:
-          //     {services_conf_version: 101, services: [{modifiedIndex: 1},{modifiedIndex: 3}]}
-          if (
-            newConfig[increaseVersionKey] &&
-            oldConfVersion === newConfig[confVersionKey]
-          )
-            newConfig[confVersionKey] += 1;
-          unset(newConfig, [increaseVersionKey]);
-        });
+        const resourceTypes = Object.keys(
+          typing.APISIXStandaloneKeyMap,
+        ) as unknown as Array<typing.UsedResourceTypes>;
+        resourceTypes
+          .filter((item) => increaseVersion[item])
+          .forEach((resourceType) => {
+            newConfig[
+              `${typing.APISIXStandaloneKeyMap[resourceType]}_conf_version`
+            ] = timestamp;
+          });
       }),
       switchMap(() =>
         iif(
           () => events.length > 0,
-          from(this.client.put('/apisix/admin/configs', newConfig)).pipe(
-            tap((resp) => logger(this.debugLogEvent(resp))),
-            map<AxiosResponse, ADCSDK.BackendSyncResult>(
-              (response) =>
-                ({
-                  success: true,
-                  event: {} as ADCSDK.Event, // keep empty
-                  axiosResponse: response,
-                }) satisfies ADCSDK.BackendSyncResult,
-            ),
-            catchError<
-              ADCSDK.BackendSyncResult,
-              ObservableInput<ADCSDK.BackendSyncResult>
-            >((error: Error | AxiosError) => {
-              if (opts.exitOnFailure) {
-                if (axios.isAxiosError(error) && error.response)
-                  return throwError(
-                    () =>
-                      new Error(
-                        error.response?.data?.error_msg ??
-                          JSON.stringify(error.response?.data),
-                      ),
-                  );
-                return throwError(() => error);
-              }
-              return of({
-                success: false,
-                event: {} as ADCSDK.Event, // keep empty,
-                error,
-                ...(axios.isAxiosError(error) && {
-                  axiosResponse: error.response,
-                  ...(error.response?.data?.error_msg && {
-                    error: new Error(error.response.data.error_msg),
-                  }),
+          from(this.opts.serverTokenMap).pipe(
+            mergeMap(([server, token]) =>
+              from(
+                this.opts.client.put(`${server}${ENDPOINT_CONFIG}`, newConfig, {
+                  headers: {
+                    [HEADER_CREDENTIAL]: token,
+                    [HEADER_DIGEST]: createHash('sha1')
+                      .update(JSON.stringify(newConfig))
+                      .digest('hex'),
+                  },
                 }),
-              } satisfies ADCSDK.BackendSyncResult);
-            }),
-            tap(() => logger(taskStateEvent('TASK_DONE'))),
+              ).pipe(
+                tap((resp) => logger(this.debugLogEvent(resp))),
+                map<AxiosResponse, ADCSDK.BackendSyncResult>(
+                  (response) =>
+                    ({
+                      success: true,
+                      event: {} as ADCSDK.Event, // keep empty
+                      axiosResponse: response,
+                    }) satisfies ADCSDK.BackendSyncResult,
+                ),
+                catchError<
+                  ADCSDK.BackendSyncResult,
+                  ObservableInput<ADCSDK.BackendSyncResult>
+                >((error: Error | AxiosError) => {
+                  if (opts.exitOnFailure) {
+                    if (axios.isAxiosError(error) && error.response)
+                      return throwError(
+                        () =>
+                          new Error(
+                            error.response?.data?.error_msg ??
+                              JSON.stringify(error.response?.data),
+                          ),
+                      );
+                    return throwError(() => error);
+                  }
+                  return of({
+                    success: false,
+                    event: {} as ADCSDK.Event, // keep empty,
+                    error,
+                    ...(axios.isAxiosError(error) && {
+                      axiosResponse: error.response,
+                      ...(error.response?.data?.error_msg && {
+                        error: new Error(error.response.data.error_msg),
+                      }),
+                    }),
+                  } satisfies ADCSDK.BackendSyncResult);
+                }),
+                tap(() => {
+                  configCache.set(this.opts.cacheKey, toADC(newConfig));
+                  rawConfigCache.set(this.opts.cacheKey, newConfig);
+                  logger(taskStateEvent('TASK_DONE'));
+                }),
+              ),
+            ),
           ),
           of<ADCSDK.BackendSyncResult>({
             success: true,
             event: {} as ADCSDK.Event, // keep empty
-            axiosResponse: null,
           } satisfies ADCSDK.BackendSyncResult),
         ),
       ),
@@ -226,47 +202,16 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     return event.resourceId;
   }
 
-  private extractModifiedIndex(oldConfig: typing.APISIXStandaloneType) {
-    const modifiedIndexMap = new Map<string, number>();
-    const extractModifiedIndex = curry(
-      (prefix: string, item: { id?: string; modifiedIndex: number }) =>
-        modifiedIndexMap.set(`${prefix}.${item.id}`, item.modifiedIndex),
-    );
-    oldConfig?.services?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.SERVICE),
-    );
-    oldConfig?.routes?.forEach(extractModifiedIndex(ADCSDK.ResourceType.ROUTE));
-    oldConfig?.stream_routes?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.STREAM_ROUTE),
-    );
-    oldConfig?.upstreams?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.UPSTREAM),
-    );
-    oldConfig?.ssls?.forEach(extractModifiedIndex(ADCSDK.ResourceType.SSL));
-    oldConfig?.consumers?.forEach((item) =>
-      'username' in item
-        ? extractModifiedIndex(ADCSDK.ResourceType.CONSUMER)({
-            id: item.username,
-            modifiedIndex: item.modifiedIndex,
-          })
-        : extractModifiedIndex(ADCSDK.ResourceType.CONSUMER_CREDENTIAL)(item),
-    );
-    oldConfig?.global_rules?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.GLOBAL_RULE),
-    );
-    oldConfig?.plugin_metadata?.forEach(
-      extractModifiedIndex(ADCSDK.ResourceType.PLUGIN_METADATA),
-    );
-    return modifiedIndexMap;
-  }
-
-  private fromADC(event: EventWithModifiedIndex) {
-    switch (event.resourceType) {
+  private fromADC(event: ADCSDK.Event, modifiedIndex: number) {
+    switch (
+      event.resourceType as
+        | typing.UsedResourceTypes
+        | ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+    ) {
       case ADCSDK.ResourceType.ROUTE: {
-        type T = typing.APISIXStandaloneType['routes'][number];
         const res = event.newValue as ADCSDK.Route;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
@@ -277,44 +222,41 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           remote_addrs: res.remote_addrs,
           vars: res.vars,
           filter_func: res.filter_func,
-          service_id: event.parentId,
+          service_id: event.parentId!,
           enable_websocket: res.enable_websocket,
           plugins: res.plugins,
           priority: res.priority,
           timeout: res.timeout,
           status: 1,
-        } satisfies T as T;
+        } satisfies typing.Route as typing.Route;
       }
       case ADCSDK.ResourceType.SERVICE: {
-        type T = typing.APISIXStandaloneType['services'][number];
         const res = event.newValue as ADCSDK.Service;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
-          upstream: this.fromADCUpstream(res.upstream),
+          upstream: this.fromADCUpstream(res.upstream!),
           plugins: res.plugins,
-        } satisfies T as T;
+        } satisfies typing.Service as typing.Service;
       }
       case ADCSDK.ResourceType.CONSUMER: {
-        type T = typing.APISIXStandaloneType['consumers'][number];
         const res = event.newValue as ADCSDK.Consumer;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           username: this.generateIdFromEvent(event),
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
           plugins: res.plugins,
-        } satisfies T as T;
+        } satisfies typing.Consumer as typing.Consumer;
       }
       case ADCSDK.ResourceType.CONSUMER_CREDENTIAL: {
-        type T = typing.APISIXStandaloneType['consumers'][number];
         const res = event.newValue as ADCSDK.ConsumerCredential;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
@@ -322,13 +264,12 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           plugins: {
             [res.type]: res.config,
           },
-        } satisfies T as T;
+        } satisfies typing.ConsumerCredential as typing.ConsumerCredential;
       }
       case ADCSDK.ResourceType.SSL: {
-        type T = typing.APISIXStandaloneType['ssls'][number];
         const res = event.newValue as ADCSDK.SSL;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           labels: this.fromADCLabels(res.labels),
           type: res.type,
@@ -346,42 +287,38 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           client: res.client,
           ssl_protocols: res.ssl_protocols,
           status: 1,
-        } satisfies T as T;
+        } satisfies typing.SSL as typing.SSL;
       }
       case ADCSDK.ResourceType.GLOBAL_RULE: {
-        type T = typing.APISIXStandaloneType['global_rules'][number];
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           plugins: {
             [event.resourceId]: event.newValue as ADCSDK.GlobalRule,
           },
-        } satisfies T as T;
+        } satisfies typing.GlobalRule as typing.GlobalRule;
       }
       case ADCSDK.ResourceType.PLUGIN_METADATA: {
-        type T = typing.APISIXStandaloneType['plugin_metadata'][number];
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           ...event.newValue,
-        } satisfies T as T;
+        } satisfies typing.PluginMetadata as typing.PluginMetadata;
       }
       case ADCSDK.ResourceType.UPSTREAM: {
-        type T = typing.APISIXStandaloneType['upstreams'][number];
         return {
           ...this.fromADCUpstream(
             event.newValue as ADCSDK.Upstream,
             event.parentId,
           ),
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
-        } satisfies T as T;
+        } satisfies typing.Upstream as typing.Upstream;
       }
       case ADCSDK.ResourceType.STREAM_ROUTE: {
-        type T = typing.APISIXStandaloneType['stream_routes'][number];
         const res = event.newValue as ADCSDK.StreamRoute;
         return {
-          modifiedIndex: event.modifiedIndex,
+          modifiedIndex,
           id: this.generateIdFromEvent(event),
           name: res.name,
           desc: res.description,
@@ -391,29 +328,33 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           server_addr: res.server_addr,
           server_port: res.server_port,
           sni: res.sni,
-          service_id: event.parentId,
-        } satisfies T as T;
+          service_id: event.parentId!,
+        } satisfies typing.StreamRoute as typing.StreamRoute;
       }
     }
   }
 
-  private fromADCLabels(labels?: ADCSDK.Labels): Record<string, string> {
+  private fromADCLabels(
+    labels?: ADCSDK.Labels,
+  ): Record<string, string> | undefined {
     if (!labels) return undefined;
-    return Object.entries(labels).reduce((pv, [key, value]) => {
-      pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
-      return pv;
-    }, {});
+    return Object.entries(labels).reduce(
+      (pv, [key, value]) => {
+        pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
+        return pv;
+      },
+      {} as Record<string, string>,
+    );
   }
 
   private fromADCUpstream(
     res: ADCSDK.Upstream,
     parentId?: string,
-  ): typing.APISIXStandaloneType['upstreams'][number] {
-    type T = ReturnType<typeof this.fromADCUpstream>;
+  ): typing.Upstream {
     const upstream = {
-      modifiedIndex: undefined, // fill in later
-      id: undefined, // fill in later
-      name: res.name,
+      modifiedIndex: undefined!,
+      id: undefined!, // fill in later
+      name: res.name!,
       desc: res.description,
       labels: this.fromADCLabels(res.labels),
       type: res.type,
@@ -428,7 +369,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       keepalive_pool: res.keepalive_pool,
       pass_host: res.pass_host,
       upstream_host: res.upstream_host,
-    } satisfies T as T;
+    } satisfies typing.Upstream as typing.Upstream;
     if (parentId)
       upstream.labels = {
         ...upstream.labels,
