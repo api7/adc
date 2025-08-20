@@ -1,3 +1,4 @@
+import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash';
@@ -9,7 +10,6 @@ import {
   filterResourceType,
   loadBackend,
 } from '../command/utils';
-import { DifferV3 } from '@api7/adc-differ';
 import { check } from '../linter';
 import { SyncInput, type SyncInputType } from './schema';
 
@@ -46,7 +46,12 @@ export const syncHandler: RequestHandler<
 
     // load and filter remote configuration
     //TODO: merged with the listr task
-    const backend = loadBackend(task.opts.backend, { ...task.opts });
+    const backend = loadBackend(task.opts.backend, {
+      ...task.opts,
+      server: Array.isArray(task.opts.server)
+        ? task.opts.server.join(',')
+        : task.opts.server,
+    });
     let remote = await lastValueFrom(backend.dump());
     remote = filterResourceType(
       remote,
