@@ -109,10 +109,7 @@ const ServiceSchema = z.strictObject({
   ...ModifiedIndex,
   ...Metadata,
   hosts: z.array(z.string()).min(1).optional(),
-  upstream: UpstreamSchema.extend({
-    id: Metadata.id.optional(),
-    name: Metadata.name.optional(),
-  }).optional(),
+  upstream_id: z.string().optional(),
   plugins: Plugins.optional(),
 });
 export type Service = z.infer<typeof ServiceSchema>;
