@@ -11,6 +11,7 @@ import {
   loadBackend,
 } from '../command/utils';
 import { check } from '../linter';
+import { logger } from './logger';
 import { SyncInput, type SyncInputType } from './schema';
 
 export const syncHandler: RequestHandler<
@@ -52,6 +53,26 @@ export const syncHandler: RequestHandler<
         ? task.opts.server.join(',')
         : task.opts.server,
     });
+
+    backend.on('AXIOS_DEBUG', ({ description, response }) =>
+      logger.log({
+        level: 'debug',
+        message: description,
+        request: {
+          method: response.config.method,
+          url: response.config.url,
+          headers: response.config.headers,
+          data: response.config.data,
+        },
+        response: {
+          status: response.status,
+          headers: response.headers,
+          data: response.data,
+        },
+        requestId: req.requestId,
+      }),
+    );
+
     let remote = await lastValueFrom(backend.dump());
     remote = filterResourceType(
       remote,
@@ -111,8 +132,21 @@ export const syncHandler: RequestHandler<
         })),
       ],
     };
+
+    logger.log({
+      level: 'debug',
+      message: 'sync success',
+      output,
+      requestId: req.requestId,
+    });
     res.status(202).json(output);
   } catch (err) {
+    logger.log({
+      level: 'debug',
+      message: 'sync failed',
+      error: err,
+      requestId: req.requestId,
+    });
     res.status(500).json({
       message: toString(err),
     });

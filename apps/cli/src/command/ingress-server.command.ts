@@ -3,6 +3,7 @@ import commander, { Option } from 'commander';
 import { readFileSync } from 'node:fs';
 
 import { ADCServer } from '../server';
+import { logger } from '../server/logger';
 import { BaseCommand, BaseOptions, processCertificateFile } from './helper';
 
 type IngressServerOptions = {
@@ -92,11 +93,11 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
         tlsCACert: caCertFile ? readFileSync(caCertFile, 'utf-8') : undefined,
       });
       await server.start();
-      console.log(
+      logger.info(
         `ADC server is running on: ${listen.protocol === 'unix:' ? listen.pathname : listen.origin}`,
       );
       process.on('SIGINT', () => {
-        console.log('Stopping, see you next time!');
+        logger.info('Stopping, see you next time!');
         server.stop();
         process.exit(0);
       });
