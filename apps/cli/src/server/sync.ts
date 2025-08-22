@@ -82,7 +82,16 @@ export const syncHandler: RequestHandler<
     [remote] = filterConfiguration(remote, task.opts.labelSelector);
 
     // diff local and remote configuration
-    const diff = DifferV3.diff(local, remote, await backend.defaultValue());
+    const diff = DifferV3.diff(
+      local,
+      remote,
+      await backend.defaultValue(),
+      undefined,
+      {
+        log: (message: string) => logger.log({ level: 'debug', message }),
+        debug: (logEntry) => logger.log({ level: 'debug', ...logEntry }),
+      },
+    );
 
     // sync the diff
     const results = await lastValueFrom(
