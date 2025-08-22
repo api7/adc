@@ -47,7 +47,9 @@ export const mockBackend = (): ADCSDK.Backend => {
         ),
       );
     }
-    on: () => Subscription;
+    public on() {
+      return new Subscription();
+    }
     supportValidate?: () => Promise<boolean>;
     supportStreamRoute?: () => Promise<boolean>;
   }
