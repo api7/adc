@@ -114,7 +114,7 @@ export const conditionalIt = (cond: cond): typeof it =>
 export const semverCondition = (
   op: (v1: string | semver.SemVer, v2: string | semver.SemVer) => boolean,
   base: string,
-  target = semver.coerce(process.env.BACKEND_APISIX_VERSION) ?? '0.0.0',
+  target = semver.coerce(process.env.BACKEND_APISIX_VERSION) ?? '999.999.999',
 ) => op(target, base);
 
 export const restartAPISIX = () =>

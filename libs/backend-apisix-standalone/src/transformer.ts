@@ -40,9 +40,15 @@ export const toADC = (input: typing.APISIXStandalone) => {
           name: service.name,
           description: service.desc,
           labels: service.labels,
-          upstream: ADCSDK.utils.recursiveOmitUndefined(
-            transformUpstream(service.upstream!),
-          ),
+          ...(service.upstream_id && {
+            upstream: ADCSDK.utils.recursiveOmitUndefined(
+              transformUpstream(
+                input.upstreams!.find(
+                  (item) => item.id === service.upstream_id,
+                )!,
+              ),
+            ),
+          }),
           plugins: service.plugins,
           hosts: service.hosts,
           routes: input.routes
@@ -81,7 +87,7 @@ export const toADC = (input: typing.APISIXStandalone) => {
           upstreams: input.upstreams
             ?.filter(
               (upstream) =>
-                upstream.labels![typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
+                upstream.labels?.[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
                 service.id,
             )
             .map(transformUpstream)

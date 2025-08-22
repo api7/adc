@@ -84,7 +84,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
   }
 
   public async ping(): Promise<void> {
-    await this.client.head(`/apisix/admin/configs`);
+    await this.client.head(`/apisix/admin`);
   }
 
   public async version() {

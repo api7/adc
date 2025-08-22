@@ -117,18 +117,25 @@ describe('Cache - Single APISIX', () => {
           id: ADCSDK.utils.generateId('service1'),
           modifiedIndex: timestamp,
           name: 'service1',
-          upstream: {
-            nodes: [
-              {
-                host: '127.0.0.1',
-                port: 9180,
-                weight: 100,
-              },
-            ],
-          },
+          upstream_id: ADCSDK.utils.generateId('service1'),
         },
       ],
       services_conf_version: timestamp,
+      upstreams: [
+        {
+          id: ADCSDK.utils.generateId('service1'),
+          name: 'service1',
+          modifiedIndex: timestamp,
+          nodes: [
+            {
+              host: '127.0.0.1',
+              port: 9180,
+              weight: 100,
+            },
+          ],
+        },
+      ],
+      upstreams_conf_version: timestamp,
       routes: [
         {
           id: ADCSDK.utils.generateId('service1.route1'),
@@ -395,9 +402,10 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
       const rawConfig = rawConfigCache.get(cacheKey);
       expect(rawConfig?.services_conf_version).toEqual(200);
       expect(rawConfig?.routes_conf_version).toEqual(200);
+      expect(rawConfig?.upstreams_conf_version).toEqual(200); // inline upstream caused conf version increase
+
       expect(rawConfig?.plugin_metadata_conf_version).toBeLessThan(200);
       expect(rawConfig?.global_rules_conf_version).toBeLessThan(200);
-      expect(rawConfig?.upstreams_conf_version).toBeLessThan(200);
       expect(rawConfig?.consumers_conf_version).toBeLessThan(200);
       expect(rawConfig?.ssls_conf_version).toBeLessThan(200);
     },

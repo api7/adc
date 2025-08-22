@@ -1,3 +1,4 @@
+import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIXStandalone } from '../../src';
@@ -51,10 +52,10 @@ describe('Sync and Dump - 1', () => {
       expect(dumpConfiguration(backend)).resolves.not.toThrow());
 
     it('Create services', async () =>
-      syncEvents(backend, [
-        createEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
-        createEvent(ADCSDK.ResourceType.SERVICE, service2Name, service2),
-      ]));
+      syncEvents(
+        backend,
+        DifferV3.diff({ services: [service1, service2] }, {}),
+      ));
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
@@ -64,10 +65,15 @@ describe('Sync and Dump - 1', () => {
     });
 
     it('Update service1', async () => {
-      service1.description = 'desc';
-      await syncEvents(backend, [
-        updateEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
-      ]);
+      const newService = structuredClone(service1);
+      newService.description = 'desc';
+      await syncEvents(
+        backend,
+        DifferV3.diff(
+          { services: [newService, service2] },
+          await dumpConfiguration(backend),
+        ),
+      );
     });
 
     it('Dump again (service1 updated)', async () => {
