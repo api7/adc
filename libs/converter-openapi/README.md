@@ -48,7 +48,7 @@ A library for implementing the OpenAPI specification and ADC profile conversion.
     <tr>
       <td rowspan="3">x-adc-plugins</td>
       <td>Root Level</td>
-      <td>Add plugis field to the specified level. It is an object that contains one or more plugins.</td>
+      <td>Add plugins field to the specified level. It is an object that contains one or more plugins.</td>
     </tr>
     <tr>
       <td>Path Level</td>
@@ -133,7 +133,7 @@ servers:
 
 > They can be set at all three main levels, root, path, and operation.
 
-#### Set both `x-adc-plugins` and `x-adc-plugin-[plugin-name]` in same level
+#### Set both `x-adc-plugins` and `x-adc-plugin-[plugin-name]` at the same level
 
 1. For plugins with non-same names, their configurations will be merged.
 
