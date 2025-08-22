@@ -60,7 +60,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
 
-    const timestamp = Math.ceil(Date.now() / 1000);
+    const timestamp = Date.now();
     return from(events).pipe(
       // derive the latest configuration from the old config
       tap((event) => {

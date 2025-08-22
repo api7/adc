@@ -110,7 +110,7 @@ describe('Cache - Single APISIX', () => {
   it('check if the cache is updated', async () => {
     expect(configCache.get(cacheKey)).toMatchObject(config);
 
-    const timestamp = Math.ceil(now.getTime() / 1000);
+    const timestamp = now.getTime();
     expect(rawConfigCache.get(cacheKey)).toMatchObject({
       services: [
         {
@@ -310,7 +310,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(100 * 1000);
+    vi.setSystemTime(100);
 
     return syncEvents(
       new BackendAPISIXStandalone({
@@ -350,7 +350,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(200 * 1000);
+    vi.setSystemTime(200);
 
     return syncEvents(
       new BackendAPISIXStandalone({

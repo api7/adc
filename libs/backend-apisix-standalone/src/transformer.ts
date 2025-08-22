@@ -41,13 +41,14 @@ export const toADC = (input: typing.APISIXStandalone) => {
           description: service.desc,
           labels: service.labels,
           ...(service.upstream_id && {
-            upstream: ADCSDK.utils.recursiveOmitUndefined(
-              transformUpstream(
+            upstream: ADCSDK.utils.recursiveOmitUndefined({
+              ...transformUpstream(
                 input.upstreams!.find(
                   (item) => item.id === service.upstream_id,
                 )!,
               ),
-            ),
+              name: undefined,
+            }),
           }),
           plugins: service.plugins,
           hosts: service.hosts,
