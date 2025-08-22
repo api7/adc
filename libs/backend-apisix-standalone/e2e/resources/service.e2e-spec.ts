@@ -9,10 +9,9 @@ import {
   dumpConfiguration,
   restartAPISIX,
   syncEvents,
-  updateEvent,
 } from '../support/utils';
 
-describe('Sync and Dump - 1', () => {
+describe('Service E2E', () => {
   let backend: BackendAPISIXStandalone;
 
   beforeAll(async () => {
