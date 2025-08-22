@@ -88,8 +88,10 @@ export const syncHandler: RequestHandler<
       await backend.defaultValue(),
       undefined,
       {
-        log: (message: string) => logger.log({ level: 'debug', message }),
-        debug: (logEntry) => logger.log({ level: 'debug', ...logEntry }),
+        log: (message: string) =>
+          logger.log({ level: 'debug', message, requestId: req.requestId }),
+        debug: (logEntry) =>
+          logger.log({ level: 'debug', ...logEntry, requestId: req.requestId }),
       },
     );
 
