@@ -110,7 +110,7 @@ describe('Cache - Single APISIX', () => {
   it('check if the cache is updated', async () => {
     expect(configCache.get(cacheKey)).toMatchObject(config);
 
-    const timestamp = Math.ceil(now.getTime() / 1000);
+    const timestamp = now.getTime();
     expect(rawConfigCache.get(cacheKey)).toMatchObject({
       services: [
         {
