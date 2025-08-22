@@ -310,7 +310,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(100 * 1000);
+    vi.setSystemTime(100);
 
     return syncEvents(
       new BackendAPISIXStandalone({
@@ -350,7 +350,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(200 * 1000);
+    vi.setSystemTime(200);
 
     return syncEvents(
       new BackendAPISIXStandalone({
