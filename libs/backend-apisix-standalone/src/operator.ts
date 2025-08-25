@@ -63,113 +63,9 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const timestamp = Date.now();
     return from(events).pipe(
       // derive the latest configuration from the old config
-      tap((event) => {
-        const resourceType =
-          event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-            ? ADCSDK.ResourceType.CONSUMER
-            : (event.resourceType as typing.UsedResourceTypes);
-        const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
-        const upstreamResourceKey =
-          typing.APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM];
-
-        if (event.type === ADCSDK.EventType.CREATE) {
-          if (!newConfig[resourceKey]) newConfig[resourceKey] = [];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- infer error
-          newConfig[resourceKey].push(this.fromADC(event, timestamp) as any);
-          increaseVersion[resourceType] = true;
-
-          // Emit inline upstream
-          if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
-            if (!newConfig[upstreamResourceKey])
-              newConfig[upstreamResourceKey] = [];
-            newConfig[upstreamResourceKey].push({
-              ...this.fromADCUpstream(
-                (event.newValue as ADCSDK.Service).upstream!,
-              ),
-              id: event.resourceId,
-              modifiedIndex: timestamp,
-              name: event.resourceName,
-            });
-            increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
-          }
-        } else if (
-          event.type === ADCSDK.EventType.UPDATE ||
-          event.type === ADCSDK.EventType.DELETE
-        ) {
-          if (!newConfig[resourceKey]) newConfig[resourceKey] = [];
-          const resources = newConfig[resourceKey];
-          const eventGeneratedId = this.generateIdFromEvent(event);
-          const index = resources?.findIndex((item) =>
-            'id' in item ? item.id : item.username === eventGeneratedId,
-          );
-
-          if (!isNil(index) && index !== -1) {
-            if (event.type === ADCSDK.EventType.UPDATE) {
-              resources[index] = this.fromADC(
-                event,
-                timestamp,
-              ) as (typeof resources)[number];
-            } else {
-              resources.splice(index, 1);
-            }
-            increaseVersion[resourceType] = true;
-          }
-
-          // Emit inline upstream
-          if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
-            if (event.type === ADCSDK.EventType.UPDATE) {
-              const baseUpstream = {
-                id: event.resourceId,
-                name: event.resourceName,
-              };
-              const newUpstream = (event.newValue as ADCSDK.Service)?.upstream;
-              const oldUpstream = (event.oldValue as ADCSDK.Service)?.upstream;
-              const events = DifferV3.diff(
-                {
-                  ...(newUpstream && {
-                    upstreams: [Object.assign(baseUpstream, newUpstream)],
-                  }),
-                },
-                {
-                  ...(oldUpstream && {
-                    upstreams: [Object.assign(baseUpstream, oldUpstream)],
-                  }),
-                },
-              );
-              if (events.length > 0) {
-                if (!newConfig[upstreamResourceKey])
-                  newConfig[upstreamResourceKey] = [];
-                const resources = newConfig[upstreamResourceKey];
-                const index = resources?.findIndex(
-                  (item) => item.id === eventGeneratedId,
-                );
-                if (!isNil(index) && index != -1) {
-                  resources[index] = {
-                    ...this.fromADCUpstream(
-                      (event.newValue as ADCSDK.Service).upstream!,
-                    ),
-                    id: event.resourceId,
-                    modifiedIndex: timestamp,
-                    name: event.resourceName,
-                  };
-                  increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
-                }
-              }
-            } else {
-              if (!newConfig[upstreamResourceKey])
-                newConfig[upstreamResourceKey] = [];
-              const resources = newConfig[upstreamResourceKey];
-              const index = resources?.findIndex(
-                (item) => item.id === eventGeneratedId,
-              );
-              if (!isNil(index) && index != -1) {
-                resources.splice(index, 1);
-                increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
-              }
-            }
-          }
-        }
-      }),
+      tap((event) =>
+        this.applyEvent(newConfig, increaseVersion, timestamp, event),
+      ),
       // filtering of new consumer configurations to ensure
       // that orphaned credential objects do not exist
       tap(() => {
@@ -265,6 +161,124 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         ),
       ),
     );
+  }
+
+  private applyEvent(
+    config: typing.APISIXStandalone,
+    increaseVersion: Partial<Record<typing.UsedResourceTypes, boolean>>,
+    timestamp: number,
+    event: ADCSDK.Event,
+  ) {
+    const resourceType =
+      event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ? ADCSDK.ResourceType.CONSUMER
+        : (event.resourceType as typing.UsedResourceTypes);
+    const resourceKey = typing.APISIXStandaloneKeyMap[resourceType];
+
+    if (event.resourceType === ADCSDK.ResourceType.SERVICE)
+      this.applyEventForServiceInlinedUpstream(
+        config,
+        increaseVersion,
+        timestamp,
+        event,
+      );
+
+    if (event.type === ADCSDK.EventType.CREATE) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- infer error
+      (config[resourceKey] ||= []).push(this.fromADC(event, timestamp) as any);
+      increaseVersion[resourceType] = true;
+    } else if (event.type === ADCSDK.EventType.UPDATE) {
+      // Only update the service when the service itself is modified, to avoid service
+      // conf version (modifiedIndex) changes caused by changes to its inline upstream.
+      if (
+        event.resourceType === ADCSDK.ResourceType.SERVICE &&
+        (event.diff || []).filter((item) => item.path?.[0] !== 'upstream')
+          .length <= 0
+      )
+        return;
+
+      config[resourceKey] ||= [];
+      const resources = config[resourceKey];
+      const index = resources.findIndex(
+        (item) =>
+          ('id' in item ? item.id : item.username) ===
+          this.generateIdFromEvent(event),
+      );
+      if (index !== -1) {
+        resources[index] = this.fromADC(
+          event,
+          timestamp,
+        ) as (typeof resources)[number];
+        increaseVersion[resourceType] = true;
+      }
+    } else {
+      // If the resource does not exist, there is no need to delete it.
+      if (!config[resourceKey]) return;
+
+      const resources = config[resourceKey];
+      const index = resources.findIndex(
+        (item) =>
+          ('id' in item ? item.id : item.username) ===
+          this.generateIdFromEvent(event),
+      );
+      if (index !== -1) {
+        resources.splice(index, 1);
+        increaseVersion[resourceType] = true;
+      }
+    }
+  }
+
+  private applyEventForServiceInlinedUpstream(
+    config: typing.APISIXStandalone,
+    increaseVersion: Partial<Record<typing.UsedResourceTypes, boolean>>,
+    timestamp: number,
+    event: ADCSDK.Event,
+  ) {
+    if (event.resourceType !== ADCSDK.ResourceType.SERVICE) return;
+
+    const upstreamResourceKey =
+      typing.APISIXStandaloneKeyMap[ADCSDK.ResourceType.UPSTREAM];
+
+    if (event.type === ADCSDK.EventType.CREATE) {
+      (config[upstreamResourceKey] ||= []).push({
+        ...this.fromADCUpstream(
+          (event.newValue as ADCSDK.Service).upstream as ADCSDK.Upstream,
+        ),
+        id: event.resourceId,
+        modifiedIndex: timestamp,
+        name: event.resourceName,
+      });
+      increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
+    } else if (event.type === ADCSDK.EventType.UPDATE) {
+      if (
+        (event.diff || []).filter((item) => item.path?.[0] === 'upstream')
+          .length <= 0
+      )
+        return;
+
+      config[upstreamResourceKey] ||= [];
+      const resources = config[upstreamResourceKey];
+      const index = resources.findIndex((item) => item.id === event.resourceId);
+      if (index != -1) {
+        resources[index] = {
+          ...this.fromADCUpstream(
+            (event.newValue as ADCSDK.Service).upstream as ADCSDK.Upstream,
+          ),
+          id: event.resourceId,
+          modifiedIndex: timestamp,
+          name: event.resourceName,
+        };
+        increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
+      }
+    } else if (event.type === ADCSDK.EventType.DELETE) {
+      config[upstreamResourceKey] ||= [];
+      const resources = config[upstreamResourceKey];
+      const index = resources.findIndex((item) => item.id === event.resourceId);
+      if (index != -1) {
+        resources.splice(index, 1);
+        increaseVersion[ADCSDK.ResourceType.UPSTREAM] = true;
+      }
+    }
   }
 
   private generateIdFromEvent(event: ADCSDK.Event): string {
