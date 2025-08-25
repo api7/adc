@@ -108,9 +108,40 @@ describe('Service E2E - inline upstream', () => {
     expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
   });
 
-  it('Delete service', async () => {
+  it('Update inlined upstream agent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(300);
+
+    const newConfig = structuredClone(config);
+    newConfig.services[0].upstream.nodes = [];
+
+    const events = DifferV3.diff(newConfig, await dumpConfiguration(backend));
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toEqual(ADCSDK.EventType.UPDATE);
+    expect(events[0].resourceType).toEqual(ADCSDK.ResourceType.SERVICE);
+    expect(events[0].diff?.[0].path?.[0]).toEqual('upstream');
+
+    return syncEvents(backend, events);
+  });
+
+  it('Check configuration', () => {
+    const rawConfig = rawConfigCache.get(cacheKey);
+    expect(rawConfig?.upstreams?.[0].modifiedIndex).toEqual(300);
+    expect(rawConfig?.upstreams?.[0].nodes).toHaveLength(0);
+    expect(rawConfig?.services?.[0].modifiedIndex).toEqual(100);
+    expect(rawConfig?.upstreams_conf_version).toEqual(300);
+    expect(rawConfig?.services_conf_version).toEqual(100);
+    expect(rawConfig?.consumers_conf_version).toBeUndefined();
+    expect(rawConfig?.global_rules_conf_version).toBeUndefined();
+    expect(rawConfig?.plugin_metadata_conf_version).toBeUndefined();
+    expect(rawConfig?.routes_conf_version).toBeUndefined();
+    expect(rawConfig?.ssls_conf_version).toBeUndefined();
+    expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
+  });
+
+  it('Delete service', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(400);
 
     const events = DifferV3.diff({}, await dumpConfiguration(backend));
     expect(events).toHaveLength(1);
@@ -124,7 +155,7 @@ describe('Service E2E - inline upstream', () => {
     const rawConfig = rawConfigCache.get(cacheKey);
     expect(rawConfig?.upstreams).toHaveLength(0);
     expect(rawConfig?.services).toHaveLength(0);
-    expect(rawConfig?.upstreams_conf_version).toEqual(300);
-    expect(rawConfig?.services_conf_version).toEqual(300);
+    expect(rawConfig?.upstreams_conf_version).toEqual(400);
+    expect(rawConfig?.services_conf_version).toEqual(400);
   });
 });
