@@ -11,7 +11,6 @@ import {
   type Subject,
   catchError,
   from,
-  iif,
   map,
   mergeMap,
   of,
@@ -95,68 +94,61 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           });
       }),
       switchMap(() =>
-        iif(
-          () => events.length > 0,
-          from(this.opts.serverTokenMap).pipe(
-            mergeMap(([server, token]) =>
-              from(
-                this.opts.client.put(`${server}${ENDPOINT_CONFIG}`, newConfig, {
-                  headers: {
-                    [HEADER_CREDENTIAL]: token,
-                    [HEADER_DIGEST]: createHash('sha1')
-                      .update(JSON.stringify(newConfig))
-                      .digest('hex'),
-                  },
-                }),
-              ).pipe(
-                tap((resp) => logger(this.debugLogEvent(resp))),
-                map<AxiosResponse, ADCSDK.BackendSyncResult>(
-                  (response) =>
-                    ({
-                      success: true,
-                      event: {} as ADCSDK.Event, // keep empty
-                      axiosResponse: response,
-                    }) satisfies ADCSDK.BackendSyncResult,
-                ),
-                catchError<
-                  ADCSDK.BackendSyncResult,
-                  ObservableInput<ADCSDK.BackendSyncResult>
-                >((error: Error | AxiosError) => {
-                  if (opts.exitOnFailure) {
-                    if (axios.isAxiosError(error) && error.response)
-                      return throwError(
-                        () =>
-                          new Error(
-                            error.response?.data?.error_msg ??
-                              JSON.stringify(error.response?.data),
-                          ),
-                      );
-                    return throwError(() => error);
-                  }
-                  return of({
-                    success: false,
-                    event: {} as ADCSDK.Event, // keep empty,
-                    error,
-                    ...(axios.isAxiosError(error) && {
-                      axiosResponse: error.response,
-                      ...(error.response?.data?.error_msg && {
-                        error: new Error(error.response.data.error_msg),
-                      }),
-                    }),
-                  } satisfies ADCSDK.BackendSyncResult);
-                }),
-                tap(() => {
-                  configCache.set(this.opts.cacheKey, toADC(newConfig));
-                  rawConfigCache.set(this.opts.cacheKey, newConfig);
-                  logger(taskStateEvent('TASK_DONE'));
-                }),
+        from(this.opts.serverTokenMap).pipe(
+          mergeMap(([server, token]) =>
+            from(
+              this.opts.client.put(`${server}${ENDPOINT_CONFIG}`, newConfig, {
+                headers: {
+                  [HEADER_CREDENTIAL]: token,
+                  [HEADER_DIGEST]: createHash('sha1')
+                    .update(JSON.stringify(newConfig))
+                    .digest('hex'),
+                },
+              }),
+            ).pipe(
+              tap((resp) => logger(this.debugLogEvent(resp))),
+              map<AxiosResponse, ADCSDK.BackendSyncResult>(
+                (response) =>
+                  ({
+                    success: true,
+                    event: {} as ADCSDK.Event, // keep empty
+                    axiosResponse: response,
+                  }) satisfies ADCSDK.BackendSyncResult,
               ),
+              catchError<
+                ADCSDK.BackendSyncResult,
+                ObservableInput<ADCSDK.BackendSyncResult>
+              >((error: Error | AxiosError) => {
+                if (opts.exitOnFailure) {
+                  if (axios.isAxiosError(error) && error.response)
+                    return throwError(
+                      () =>
+                        new Error(
+                          error.response?.data?.error_msg ??
+                            JSON.stringify(error.response?.data),
+                        ),
+                    );
+                  return throwError(() => error);
+                }
+                return of({
+                  success: false,
+                  event: {} as ADCSDK.Event, // keep empty,
+                  error,
+                  ...(axios.isAxiosError(error) && {
+                    axiosResponse: error.response,
+                    ...(error.response?.data?.error_msg && {
+                      error: new Error(error.response.data.error_msg),
+                    }),
+                  }),
+                } satisfies ADCSDK.BackendSyncResult);
+              }),
+              tap(() => {
+                configCache.set(this.opts.cacheKey, toADC(newConfig));
+                rawConfigCache.set(this.opts.cacheKey, newConfig);
+                logger(taskStateEvent('TASK_DONE'));
+              }),
             ),
           ),
-          of<ADCSDK.BackendSyncResult>({
-            success: true,
-            event: {} as ADCSDK.Event, // keep empty
-          } satisfies ADCSDK.BackendSyncResult),
         ),
       ),
     );
