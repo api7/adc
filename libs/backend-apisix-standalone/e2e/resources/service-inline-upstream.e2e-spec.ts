@@ -108,7 +108,7 @@ describe('Service E2E - inline upstream', () => {
     expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
   });
 
-  it('Update inlined upstream agent', async () => {
+  it('Update inlined upstream again', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(300);
 
