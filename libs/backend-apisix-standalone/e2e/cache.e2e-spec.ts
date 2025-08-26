@@ -11,6 +11,7 @@ import {
 import {
   server1,
   server2,
+  server3,
   servers,
   token1,
   token2,
@@ -104,7 +105,10 @@ describe('Cache - Single APISIX', () => {
 
     vi.setSystemTime(now);
 
-    return syncEvents(backend, events);
+    const result = await syncEvents(backend, events);
+    expect(result[0].server).toEqual(server1);
+
+    return result;
   });
 
   it('check if the cache is updated', async () => {
@@ -235,7 +239,14 @@ describe('Cache - Multiple APISIX (completely new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(4);
 
-    return syncEvents(backend, events);
+    const result = await syncEvents(backend, events);
+    result.forEach((item) => {
+      expect([server1, server2, server3].includes(`${item.server}`)).toEqual(
+        true,
+      );
+    });
+
+    return result;
   });
 
   it('wait for sync', async () => wait(100));
