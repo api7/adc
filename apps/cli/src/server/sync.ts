@@ -119,7 +119,8 @@ export const syncHandler: RequestHandler<
       success_count: successes.length,
       failed_count: faileds.length,
       success: [
-        ...successes.map(({ event, axiosResponse }) => ({
+        ...successes.map(({ event, axiosResponse, server }) => ({
+          server,
           event: simplifyEvent(event),
           synced_at: new Date(
             axiosResponse?.headers?.date ?? new Date(),
@@ -127,7 +128,8 @@ export const syncHandler: RequestHandler<
         })),
       ],
       failed: [
-        ...faileds.map(({ event, error, axiosResponse }) => ({
+        ...faileds.map(({ event, error, axiosResponse, server }) => ({
+          server,
           event: simplifyEvent(event),
           failed_at: new Date(
             axiosResponse?.headers?.date ?? new Date(),

@@ -10,7 +10,7 @@ import {
   type AgentOptions as httpsAgentOptions,
 } from 'node:https';
 import { type Observable, Subject, from, map, of, switchMap } from 'rxjs';
-import semver, { SemVer } from 'semver';
+import semver, { SemVer, eq as semverEQ } from 'semver';
 
 import {
   config as configCache,
@@ -100,7 +100,8 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
       event: { response: resp, description: `Get APISIX version` },
     });
 
-    let version = new SemVer('999.999.999');
+    const mockVersion = '999.999.999';
+    let version = new SemVer(mockVersion);
     if (resp.headers.server) {
       const parsedVersion = (resp.headers.server as string).match(
         /APISIX\/(.*)/,
@@ -108,7 +109,10 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
       if (parsedVersion) version = semver.coerce(parsedVersion[1]) ?? version;
     }
 
-    versionCache.set(this.opts.cacheKey, version);
+    // Only cache it when the actual value is obtained
+    if (!semverEQ(version, mockVersion))
+      versionCache.set(this.opts.cacheKey, version);
+
     return version;
   }
 
