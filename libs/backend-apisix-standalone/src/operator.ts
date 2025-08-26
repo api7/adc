@@ -113,6 +113,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                     success: true,
                     event: {} as ADCSDK.Event, // keep empty
                     axiosResponse: response,
+                    server,
                   }) satisfies ADCSDK.BackendSyncResult,
               ),
               catchError<
@@ -140,6 +141,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                       error: new Error(error.response.data.error_msg),
                     }),
                   }),
+                  server,
                 } satisfies ADCSDK.BackendSyncResult);
               }),
               tap(() => {

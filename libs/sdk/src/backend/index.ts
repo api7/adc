@@ -60,6 +60,7 @@ export interface BackendSyncResult {
   event: ADCSDK.Event;
   axiosResponse?: AxiosResponse;
   error?: Error;
+  server?: string;
 }
 
 export interface BackendMetadata {

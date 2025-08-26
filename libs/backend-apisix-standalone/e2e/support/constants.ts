@@ -4,6 +4,9 @@ export const token1 = 'edd1c9f034335f136f87ad84b625c8f1';
 export const server2 = 'http://localhost:29180';
 export const token2 = 'edd1c9f034335f136f87ad84b625c8f1';
 
+export const server3 = 'http://localhost:39180';
+export const token3 = 'edd1c9f034335f136f87ad84b625c8f1';
+
 export const servers =
   'http://localhost:19180,http://localhost:29180,http://localhost:39180';
 export const tokens =
