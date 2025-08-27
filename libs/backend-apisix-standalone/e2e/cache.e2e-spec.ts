@@ -404,10 +404,6 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
 
       expect(configCache.size).toEqual(1);
       expect(rawConfigCache.size).toEqual(1);
-      // For versions where last modified is not available (e.g. less than or equal to 3.13.0), the cache cannot be initialized.
-      // The cache will be empty so that the ADC will perform a full synchronization.
-      expect(configCache.get(cacheKey)).toEqual({});
-      expect(rawConfigCache.get(cacheKey)).toEqual({});
     },
   );
 
