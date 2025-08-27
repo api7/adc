@@ -18,7 +18,7 @@
     "@svgr/webpack": "^8.1.0",
     "@swc-node/register": "1.9.2",
     "@swc/core": "1.13.5",
-    "@swc/helpers": "0.5.12",
+    "@swc/helpers": "0.5.17",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/deep-diff": "^1.0.5",
     "@types/js-yaml": "^4.0.9",
