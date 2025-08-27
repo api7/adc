@@ -58,8 +58,16 @@ describe('Cache - Single APISIX', () => {
     expect(rawConfigCache.size).toEqual(1);
     // APISIX does not report when it was last updated (it has not yet gotten configured),
     // so fetcher will automatically populate empty objects as a default.
-    expect(configCache.get(cacheKey)).toEqual({});
-    expect(rawConfigCache.get(cacheKey)).toEqual({});
+    expect(configCache.get(cacheKey)).toMatchObject({
+      services: [],
+      ssls: [],
+      consumers: [],
+      global_rules: {},
+      plugin_metadata: {},
+    });
+    Object.values(
+      rawConfigCache.get(cacheKey) as Record<string, unknown>,
+    ).forEach((item) => expect(item).toEqual(0));
   });
 
   it('dump again (should use cache)', async () => {
@@ -207,8 +215,16 @@ describe('Cache - Multiple APISIX (completely new instances)', () => {
     expect(rawConfigCache.size).toEqual(1);
     // APISIX does not report when it was last updated (it has not yet gotten configured),
     // so fetcher will automatically populate empty objects as a default.
-    expect(configCache.get(cacheKey)).toEqual({});
-    expect(rawConfigCache.get(cacheKey)).toEqual({});
+    expect(configCache.get(cacheKey)).toMatchObject({
+      services: [],
+      ssls: [],
+      consumers: [],
+      global_rules: {},
+      plugin_metadata: {},
+    });
+    Object.values(
+      rawConfigCache.get(cacheKey) as Record<string, unknown>,
+    ).forEach((item) => expect(item).toEqual(0));
   });
 
   const config = {
@@ -388,10 +404,6 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
 
       expect(configCache.size).toEqual(1);
       expect(rawConfigCache.size).toEqual(1);
-      // For versions where last modified is not available (e.g. less than or equal to 3.13.0), the cache cannot be initialized.
-      // The cache will be empty so that the ADC will perform a full synchronization.
-      expect(configCache.get(cacheKey)).toEqual({});
-      expect(rawConfigCache.get(cacheKey)).toEqual({});
     },
   );
 

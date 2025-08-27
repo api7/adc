@@ -66,12 +66,11 @@ describe('Service E2E - inline upstream', () => {
     expect(rawConfig?.upstreams?.[0].modifiedIndex).toEqual(100);
     expect(rawConfig?.services_conf_version).toEqual(100);
     expect(rawConfig?.upstreams_conf_version).toEqual(100);
-    expect(rawConfig?.consumers_conf_version).toBeUndefined();
-    expect(rawConfig?.global_rules_conf_version).toBeUndefined();
-    expect(rawConfig?.plugin_metadata_conf_version).toBeUndefined();
-    expect(rawConfig?.routes_conf_version).toBeUndefined();
-    expect(rawConfig?.ssls_conf_version).toBeUndefined();
-    expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
+    expect(rawConfig?.consumers_conf_version).toEqual(0);
+    expect(rawConfig?.global_rules_conf_version).toEqual(0);
+    expect(rawConfig?.plugin_metadata_conf_version).toEqual(0);
+    expect(rawConfig?.routes_conf_version).toEqual(0);
+    expect(rawConfig?.ssls_conf_version).toEqual(0);
 
     const config = configCache.get(cacheKey);
     expect(config?.services).not.toBeUndefined();
@@ -100,12 +99,11 @@ describe('Service E2E - inline upstream', () => {
     expect(rawConfig?.services?.[0].modifiedIndex).toEqual(100);
     expect(rawConfig?.upstreams_conf_version).toEqual(200);
     expect(rawConfig?.services_conf_version).toEqual(100);
-    expect(rawConfig?.consumers_conf_version).toBeUndefined();
-    expect(rawConfig?.global_rules_conf_version).toBeUndefined();
-    expect(rawConfig?.plugin_metadata_conf_version).toBeUndefined();
-    expect(rawConfig?.routes_conf_version).toBeUndefined();
-    expect(rawConfig?.ssls_conf_version).toBeUndefined();
-    expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
+    expect(rawConfig?.consumers_conf_version).toEqual(0);
+    expect(rawConfig?.global_rules_conf_version).toEqual(0);
+    expect(rawConfig?.plugin_metadata_conf_version).toEqual(0);
+    expect(rawConfig?.routes_conf_version).toEqual(0);
+    expect(rawConfig?.ssls_conf_version).toEqual(0);
   });
 
   it('Update inlined upstream again', async () => {
@@ -131,12 +129,11 @@ describe('Service E2E - inline upstream', () => {
     expect(rawConfig?.services?.[0].modifiedIndex).toEqual(100);
     expect(rawConfig?.upstreams_conf_version).toEqual(300);
     expect(rawConfig?.services_conf_version).toEqual(100);
-    expect(rawConfig?.consumers_conf_version).toBeUndefined();
-    expect(rawConfig?.global_rules_conf_version).toBeUndefined();
-    expect(rawConfig?.plugin_metadata_conf_version).toBeUndefined();
-    expect(rawConfig?.routes_conf_version).toBeUndefined();
-    expect(rawConfig?.ssls_conf_version).toBeUndefined();
-    expect(rawConfig?.stream_routes_conf_version).toBeUndefined();
+    expect(rawConfig?.consumers_conf_version).toEqual(0);
+    expect(rawConfig?.global_rules_conf_version).toEqual(0);
+    expect(rawConfig?.plugin_metadata_conf_version).toEqual(0);
+    expect(rawConfig?.routes_conf_version).toEqual(0);
+    expect(rawConfig?.ssls_conf_version).toEqual(0);
   });
 
   it('Delete service', async () => {

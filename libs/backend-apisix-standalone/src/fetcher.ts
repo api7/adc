@@ -7,7 +7,6 @@ import {
   map,
   max,
   mergeMap,
-  of,
   switchMap,
   tap,
 } from 'rxjs';
@@ -43,18 +42,22 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     logger(taskStateEvent('TASK_START'));
     return from(this.findLatest()).pipe(
       switchMap((server) => {
-        if (!server) return of([{}, {}] as result);
+        if (!server) server = this.opts.serverTokenMap.keys().next().value;
         return from(
           this.opts.client.get<typing.APISIXStandalone>(
             `${server}${ENDPOINT_CONFIG}`,
             {
               headers: {
-                [HEADER_CREDENTIAL]: this.opts.serverTokenMap.get(server),
+                [HEADER_CREDENTIAL]: this.opts.serverTokenMap.get(
+                  server as string,
+                ),
               },
             },
           ),
         ).pipe(
-          tap((resp) => logger(this.debugLogEvent(resp))),
+          tap((resp) =>
+            logger(this.debugLogEvent(resp, 'Initialize configuration cache')),
+          ),
           map((resp) => [toADC(resp.data), resp.data] as result),
         );
       }),
@@ -78,7 +81,9 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
             headers: { [HEADER_CREDENTIAL]: token },
           }),
         ).pipe(
-          tap((resp) => logger(this.debugLogEvent(resp))),
+          tap((resp) =>
+            logger(this.debugLogEvent(resp, 'Get latest updated instance')),
+          ),
           map((res) => ({
             server,
             timestamp: parseInt(res.headers[HEADER_LAST_MODIFIED] ?? 0),
