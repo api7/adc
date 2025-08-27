@@ -7,7 +7,6 @@ import {
   map,
   max,
   mergeMap,
-  of,
   switchMap,
   tap,
 } from 'rxjs';
