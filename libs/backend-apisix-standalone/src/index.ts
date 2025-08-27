@@ -170,7 +170,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
           serverTokenMap: this.serverTokenMap,
           version,
           eventSubject: this.subject,
-          oldRawConfiguration: rawConfigCache.get(this.opts.cacheKey)!,
+          oldRawConfiguration: rawConfigCache.get(this.opts.cacheKey) ?? {},
         }).sync(events, opts);
       }),
     );
