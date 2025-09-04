@@ -448,6 +448,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       keepalive_pool: res.keepalive_pool,
       pass_host: res.pass_host,
       upstream_host: res.upstream_host,
+      checks: res.checks,
+      discovery_type: res.discovery_type,
+      service_name: res.service_name,
+      discovery_args: res.discovery_args,
     } satisfies typing.Upstream as typing.Upstream;
     if (parentId)
       upstream.labels = {

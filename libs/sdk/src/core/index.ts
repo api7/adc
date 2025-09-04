@@ -83,35 +83,35 @@ export interface UpstreamKeepalivePool {
   requests: number;
 }
 export interface UpstreamHealthCheck {
-  active: UpstreamHealthCheckActive;
-  passive: UpstreamHealthCheckPassive;
+  active?: UpstreamHealthCheckActive;
+  passive?: UpstreamHealthCheckPassive;
 }
 export interface UpstreamHealthCheckActive {
   type?: 'http' | 'https' | 'tcp';
   timeout?: number;
   concurrency?: number;
-  host: string;
-  port: number;
-  http_path: string;
-  https_verify_cert: boolean;
-  http_request_headers: Array<string>;
-  healthy: UpstreamHealthCheckActiveHealthy;
-  unhealthy: UpstreamHealthCheckActiveUnhealthy;
+  host?: string;
+  port?: number;
+  http_path?: string;
+  https_verify_cert?: boolean;
+  http_request_headers?: Array<string>;
+  healthy?: UpstreamHealthCheckActiveHealthy;
+  unhealthy?: UpstreamHealthCheckActiveUnhealthy;
 }
 export interface UpstreamHealthCheckPassive {
-  type: string;
-  healthy: UpstreamHealthCheckPassiveHealthy;
-  unhealthy: UpstreamHealthCheckPassiveUnhealthy;
+  type?: 'http' | 'https' | 'tcp';
+  healthy?: UpstreamHealthCheckPassiveHealthy;
+  unhealthy?: UpstreamHealthCheckPassiveUnhealthy;
 }
 export interface UpstreamHealthCheckPassiveHealthy {
-  http_statuses: Array<number>;
-  successes: number;
+  http_statuses?: Array<number>;
+  successes?: number;
 }
 export interface UpstreamHealthCheckPassiveUnhealthy {
-  http_statuses: Array<number>;
-  http_failures: number;
-  tcp_failures: number;
-  timeouts: number;
+  http_statuses?: Array<number>;
+  http_failures?: number;
+  tcp_failures?: number;
+  timeouts?: number;
 }
 
 export type UpstreamHealthCheckActiveHealthy = {
