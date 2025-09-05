@@ -31,6 +31,11 @@ export const toADC = (input: typing.APISIXStandalone) => {
     // Empty Lua tables will be encoded as "{}" rather than "[]" by cjson,
     // so this must be handled separately to prevent unexpected diff results.
     nodes: !isEmpty(upstream.nodes) ? upstream.nodes : [],
+
+    checks: upstream.checks,
+    discovery_type: upstream.discovery_type,
+    service_name: upstream.service_name,
+    discovery_args: upstream.discovery_args,
   });
   return {
     services:

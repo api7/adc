@@ -41,6 +41,27 @@ const RouteSchema = z.strictObject({
 });
 export type Route = z.infer<typeof RouteSchema>;
 
+const upstreamHealthCheckPassiveHealthy = z.strictObject({
+  http_statuses: z
+    .array(z.coerce.number().int().min(200).max(599))
+    .min(1)
+    .default([200, 302])
+    .optional(),
+  successes: z.coerce.number().int().min(1).max(254).default(2).optional(),
+});
+const upstreamHealthCheckPassiveUnhealthy = z.strictObject({
+  http_statuses: z
+    .array(z.coerce.number().int().min(200).max(599))
+    .min(1)
+    .default([429, 404, 500, 501, 502, 503, 504, 505])
+    .optional(),
+  http_failures: z.coerce.number().int().min(1).max(254).default(5).optional(),
+  tcp_failures: z.coerce.number().int().min(1).max(254).default(2).optional(),
+  timeouts: z.coerce.number().int().min(1).max(254).default(3).optional(),
+});
+const upstreamHealthCheckType = z
+  .union([z.literal('http'), z.literal('https'), z.literal('tcp')])
+  .default('http');
 const UpstreamSchema = z.strictObject({
   ...ModifiedIndex,
   ...Metadata,
@@ -99,9 +120,44 @@ const UpstreamSchema = z.strictObject({
     })
     .optional(),
 
-  // Will not include health checks and service discovery configurations,
-  // which are implemented by other components on the target ecosystem,
-  // such as Kubernetes and Ingress Controller.
+  checks: z
+    .strictObject({
+      active: z
+        .strictObject({
+          type: upstreamHealthCheckType.optional(),
+          timeout: z.coerce.number().default(1).optional(),
+          concurrency: z.coerce.number().default(10).optional(),
+          host: z.string().min(1).optional(),
+          port: z.coerce.number().int().min(1).max(65535).optional(),
+          http_path: z.string().default('/').optional(),
+          https_verify_cert: z.boolean().default(true).optional(),
+          http_request_headers: z.array(z.string()).min(1).optional(),
+          healthy: z
+            .strictObject({
+              ...upstreamHealthCheckPassiveHealthy.shape,
+              interval: z.coerce.number().int().min(1).default(1),
+            })
+            .optional(),
+          unhealthy: z
+            .strictObject({
+              ...upstreamHealthCheckPassiveUnhealthy.shape,
+              interval: z.coerce.number().int().min(1).default(1),
+            })
+            .optional(),
+        })
+        .optional(),
+      passive: z
+        .strictObject({
+          type: upstreamHealthCheckType.optional(),
+          healthy: upstreamHealthCheckPassiveHealthy.optional(),
+          unhealthy: upstreamHealthCheckPassiveUnhealthy.optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  discovery_type: z.string().optional(),
+  service_name: z.string().optional(),
+  discovery_args: z.record(z.string(), z.any()).optional(),
 });
 export type Upstream = z.infer<typeof UpstreamSchema>;
 

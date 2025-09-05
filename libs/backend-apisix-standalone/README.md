@@ -39,9 +39,3 @@ The ADC will ignore the resource-type level `conf_version` and resource level `m
 They will not be exported to a YAML file. Updates to conf_version and modifiedIndex will only occur during synchronization.
 
 Their values will be reset to that moment's timestamp when they are created or updated.
-
-### Differences in upstream
-
-This backend's upstream converter will not support the configuration of the APISIX health checker or service discovery.
-
-The reason for this is that this backend will primarily be used in an Ingress Controller scenario. In this scenario, the Kubernetes Endpoints mechanism and probes will implement these two capabilities.
