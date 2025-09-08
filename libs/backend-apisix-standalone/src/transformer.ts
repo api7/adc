@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { isEmpty } from 'lodash';
+import { cloneDeep, isEmpty, unset } from 'lodash';
 
 import * as typing from './typing';
 
@@ -12,7 +12,7 @@ export const toADC = (input: typing.APISIXStandalone) => {
     upstream: Omit<typing.Upstream, 'id' | 'name' | 'modifiedIndex'> & {
       name?: string;
     },
-  ) => ({
+  ): ADCSDK.Upstream => ({
     name: upstream.name,
     description: upstream.desc,
     labels: upstream.labels,
@@ -96,7 +96,16 @@ export const toADC = (input: typing.APISIXStandalone) => {
                 upstream.labels?.[typing.ADC_UPSTREAM_SERVICE_ID_LABEL] ===
                 service.id,
             )
-            .map(transformUpstream)
+            .map((upstream) => {
+              const up = transformUpstream(
+                cloneDeep(upstream),
+              ) as ADCSDK.Upstream & {
+                id: string;
+              };
+              up.id = upstream.id;
+              unset(up, `labels.${typing.ADC_UPSTREAM_SERVICE_ID_LABEL}`);
+              return up;
+            })
             .map(ADCSDK.utils.recursiveOmitUndefined),
         }))
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
