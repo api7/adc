@@ -1,16 +1,15 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
+import { unset } from 'lodash';
 import { gte } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import {
   conditionalDescribe,
-  createEvent,
-  deleteEvent,
   dumpConfiguration,
   semverCondition,
   sortResult,
   syncEvents,
-  updateEvent,
 } from '../support/utils';
 
 conditionalDescribe(semverCondition(gte, '3.5.0'))(
@@ -20,30 +19,15 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
 
     beforeAll(() => {
       backend = new BackendAPI7({
-        server: process.env.SERVER,
-        token: process.env.TOKEN,
+        server: process.env.SERVER!,
+        token: process.env.TOKEN!,
         tlsSkipVerify: true,
         gatewayGroup: process.env.GATEWAY_GROUP,
+        cacheKey: 'e2e-service-upstream',
       });
     });
 
     describe('Service multiple upstreams', () => {
-      const serviceName = 'test';
-      const service = {
-        name: serviceName,
-        upstream: {
-          type: 'roundrobin',
-          nodes: [
-            {
-              host: 'httpbin.org',
-              port: 443,
-              weight: 100,
-            },
-          ],
-        },
-        path_prefix: '/test',
-        strip_path_prefix: true,
-      } satisfies ADCSDK.Service;
       const upstreamND1Name = 'nd-upstream1';
       const upstreamND1 = {
         name: upstreamND1Name,
@@ -70,31 +54,42 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
           },
         ],
       } satisfies ADCSDK.Upstream;
+      const serviceName = 'test';
+      const service = {
+        name: serviceName,
+        upstream: {
+          type: 'roundrobin',
+          nodes: [
+            {
+              host: 'httpbin.org',
+              port: 443,
+              weight: 100,
+            },
+          ],
+        },
+        path_prefix: '/test',
+        strip_path_prefix: true,
+        upstreams: [upstreamND1, upstreamND2],
+      } satisfies ADCSDK.Service;
 
       it('Create service and upstreams', async () =>
-        syncEvents(backend, [
-          createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
-          createEvent(
-            ADCSDK.ResourceType.UPSTREAM,
-            upstreamND1Name,
-            upstreamND1,
-            serviceName,
+        syncEvents(
+          backend,
+          Differ.diff(
+            { services: [service] },
+            await dumpConfiguration(backend),
           ),
-          createEvent(
-            ADCSDK.ResourceType.UPSTREAM,
-            upstreamND2Name,
-            upstreamND2,
-            serviceName,
-          ),
-        ]));
+        ));
 
       it('Dump', async () => {
         const result = await dumpConfiguration(backend);
         expect(result.services).toHaveLength(1);
-        expect(result.services[0]).toMatchObject(service);
-        expect(result.services[0].upstreams).toHaveLength(2);
+        const testService = service;
+        unset(testService, 'upstreams');
+        expect(result.services![0]).toMatchObject(testService);
+        expect(result.services![0].upstreams).toHaveLength(2);
 
-        const upstreams = sortResult(result.services[0].upstreams, 'name');
+        const upstreams = sortResult(result.services![0].upstreams!, 'name');
         expect(upstreams[0]).toMatchObject(upstreamND1);
         expect(upstreams[1]).toMatchObject(upstreamND2);
       });
@@ -104,43 +99,55 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
         retry_timeout: 100,
       } as ADCSDK.Upstream;
       it('Update service non-default upstream 1', async () =>
-        syncEvents(backend, [
-          updateEvent(
-            ADCSDK.ResourceType.UPSTREAM,
-            upstreamND1Name,
-            newUpstreamND1,
-            serviceName,
+        syncEvents(
+          backend,
+          Differ.diff(
+            {
+              services: [
+                {
+                  ...service,
+                  upstreams: [newUpstreamND1, upstreamND2],
+                },
+              ],
+            },
+            await dumpConfiguration(backend),
           ),
-        ]));
+        ));
 
       it('Dump (updated non-default upstream 1)', async () => {
         const result = await dumpConfiguration(backend);
         expect(result.services).toHaveLength(1);
 
-        const upstreams = sortResult(result.services[0].upstreams, 'name');
+        const upstreams = sortResult(result.services![0].upstreams!, 'name');
         expect(upstreams[0]).toMatchObject(newUpstreamND1);
       });
 
-      it('Delete non-default upstream 2', async () =>
-        syncEvents(backend, [
-          deleteEvent(
-            ADCSDK.ResourceType.UPSTREAM,
-            upstreamND2Name,
-            serviceName,
+      it('Delete non-default upstream 2', async () => {
+        await syncEvents(
+          backend,
+          Differ.diff(
+            {
+              services: [
+                {
+                  ...service,
+                  upstreams: [newUpstreamND1],
+                },
+              ],
+            },
+            await dumpConfiguration(backend),
           ),
-        ]));
+        );
+      });
 
       it('Dump (non-default upstream 2 should not exist)', async () => {
         const result = await dumpConfiguration(backend);
         expect(result.services).toHaveLength(1);
-        expect(result.services[0].upstreams).toHaveLength(1);
-        expect(result.services[0].upstreams[0]).toMatchObject(newUpstreamND1);
+        expect(result.services![0].upstreams).toHaveLength(1);
+        expect(result.services![0].upstreams![0]).toMatchObject(newUpstreamND1);
       });
 
       it('Delete', async () =>
-        syncEvents(backend, [
-          deleteEvent(ADCSDK.ResourceType.SERVICE, serviceName),
-        ]));
+        syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend))));
 
       it('Dump again (service should not exist)', async () => {
         const result = await dumpConfiguration(backend);
