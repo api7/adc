@@ -238,6 +238,9 @@ importers:
 
   libs/backend-api7:
     devDependencies:
+      '@api7/adc-differ':
+        specifier: workspace:*
+        version: link:../differ
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk

@@ -9,7 +9,8 @@
     }
   },
   "devDependencies": {
-    "@api7/adc-sdk": "workspace:*"
+    "@api7/adc-sdk": "workspace:*",
+    "@api7/adc-differ": "workspace:*"
   },
   "nx": {
     "name": "backend-api7",
