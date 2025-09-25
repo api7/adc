@@ -1,5 +1,6 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
+import { unset } from 'lodash';
 import { gte } from 'semver';
 
 import { BackendAPI7 } from '../../src';
@@ -83,7 +84,9 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
       it('Dump', async () => {
         const result = await dumpConfiguration(backend);
         expect(result.services).toHaveLength(1);
-        expect(result.services![0]).toMatchObject(service);
+        const testService = service;
+        unset(testService, 'upstreams');
+        expect(result.services![0]).toMatchObject(testService);
         expect(result.services![0].upstreams).toHaveLength(2);
 
         const upstreams = sortResult(result.services![0].upstreams!, 'name');
