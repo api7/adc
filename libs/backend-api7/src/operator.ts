@@ -11,6 +11,7 @@ import {
   catchError,
   concatMap,
   filter,
+  forkJoin,
   from,
   map,
   mergeMap,
@@ -133,39 +134,83 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       );
 
     const event$ = from(events);
-    return event$.pipe(
+    return forkJoin({
       // Aggregate services that need to be deleted
-      filter(
-        (event) =>
-          event.resourceType === ADCSDK.ResourceType.SERVICE &&
-          event.type === ADCSDK.EventType.DELETE,
+      deletedServiceIds: event$.pipe(
+        filter(
+          (event) =>
+            event.resourceType === ADCSDK.ResourceType.SERVICE &&
+            event.type === ADCSDK.EventType.DELETE,
+        ),
+        map((event) => event.resourceId),
+        toArray(),
       ),
-      map((event) => event.resourceId),
-      toArray(),
+      // Aggregate consumers that need to be deleted
+      deletedConsumerIds: event$.pipe(
+        filter(
+          (event) =>
+            event.resourceType === ADCSDK.ResourceType.CONSUMER &&
+            event.type === ADCSDK.EventType.DELETE,
+        ),
+        map((event) => event.resourceId),
+        toArray(),
+      ),
+    }).pipe(
       // Switch to a new event pipe for event filtering and grouping.
       // It will use the deleted service ID that has been aggregated.
-      switchMap((deletedServiceIds) =>
+      switchMap(({ deletedServiceIds, deletedConsumerIds }) =>
         event$.pipe(
-          // If an event wants to delete a route, but its parent service
-          // will also be deleted, this operation can be ignored.
-          // The deletion service will cascade the deletion of the route.
           filter(
             (event) =>
+              // If an event wants to delete a route, but its parent service
+              // will also be deleted, this operation can be ignored.
+              // The deletion service will cascade the deletion of the route.
               !(
                 isRouteLike(event) &&
                 event.type === ADCSDK.EventType.DELETE &&
+                event.parentId &&
                 deletedServiceIds.includes(event.parentId)
+              ) &&
+              // If an event wants to delete an upstream, but its parent service
+              // will also be deleted, this operation can be ignored.
+              // The deletion service will cascade the deletion of the upstream.
+              // This does not affect inline upstream processing, which is always
+              // handled on the server side.
+              !(
+                event.resourceType === ADCSDK.ResourceType.UPSTREAM &&
+                event.type === ADCSDK.EventType.DELETE &&
+                event.parentId &&
+                deletedServiceIds.includes(event.parentId)
+              ),
+          ),
+          // If an event wants to delete a consumer credential, but its parent
+          // consumer will also be deleted, this operation can be ignored.
+          // The deletion consumer will cascade the deletion of the credential.
+          filter(
+            (event) =>
+              !(
+                event.resourceType ===
+                  ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+                event.type === ADCSDK.EventType.DELETE &&
+                event.parentId &&
+                deletedConsumerIds.includes(event.parentId)
               ),
           ),
           // Grouping events by resource type and operation type.
           // The sequence of events should not be broken in this process,
           // and the correct behavior of the API will depend on the order
           // of execution.
-          reduce((groups, event) => {
-            const key = `${event.resourceType}.${event.type}`;
-            (groups[key] = groups[key] || []).push(event);
-            return groups;
-          }, {}),
+          reduce(
+            (groups, event) => {
+              const key = `${event.resourceType}.${event.type}` as const;
+              (groups[key] ??= []).push(event);
+              return groups;
+            },
+            {} as Record<
+              `${ADCSDK.ResourceType}.${ADCSDK.EventType}`,
+              Array<ADCSDK.Event>
+            >,
+          ),
           // Strip group name and convert to two-dims arrays
           // {"service.create": [1], "consumer.create": [2]} => [[1], [2]]
           mergeMap<
@@ -208,13 +253,13 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         (event.newValue as ADCSDK.Route).id = event.resourceId;
         return fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
-          event.parentId,
+          event.parentId!,
         );
       case ADCSDK.ResourceType.STREAM_ROUTE:
         (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         return fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
-          event.parentId,
+          event.parentId!,
         );
       case ADCSDK.ResourceType.SSL:
         (event.newValue as ADCSDK.SSL).id = event.resourceId;
@@ -225,7 +270,6 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           event.newValue as ADCSDK.ConsumerCredential,
         );
       case ADCSDK.ResourceType.UPSTREAM:
-        //(event.newValue as ADCSDK.ConsumerCredential).id = event.resourceId;
         return fromADC.transformUpstream(event.newValue as ADCSDK.Upstream);
     }
   }
