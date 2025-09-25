@@ -75,10 +75,8 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
         syncEvents(
           backend,
           Differ.diff(
-            {
-              services: [service],
-            },
-            {},
+            { services: [service] },
+            await dumpConfiguration(backend),
           ),
         ));
 
