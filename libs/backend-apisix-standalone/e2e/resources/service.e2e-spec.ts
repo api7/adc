@@ -1,7 +1,9 @@
-import { DifferV3 } from '@api7/adc-differ';
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIXStandalone } from '../../src';
+import { rawConfig as rawConfigCache } from '../../src/cache';
 import { server1, token1 } from '../support/constants';
 import {
   createEvent,
@@ -11,6 +13,7 @@ import {
   syncEvents,
 } from '../support/utils';
 
+const cacheKey = 'default';
 describe('Service E2E', () => {
   let backend: BackendAPISIXStandalone;
 
@@ -19,7 +22,7 @@ describe('Service E2E', () => {
     backend = new BackendAPISIXStandalone({
       server: server1,
       token: token1,
-      cacheKey: 'default',
+      cacheKey,
     });
   });
 
@@ -51,10 +54,7 @@ describe('Service E2E', () => {
       expect(dumpConfiguration(backend)).resolves.not.toThrow());
 
     it('Create services', async () =>
-      syncEvents(
-        backend,
-        DifferV3.diff({ services: [service1, service2] }, {}),
-      ));
+      syncEvents(backend, Differ.diff({ services: [service1, service2] }, {})));
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
@@ -68,7 +68,7 @@ describe('Service E2E', () => {
       newService.description = 'desc';
       await syncEvents(
         backend,
-        DifferV3.diff(
+        Differ.diff(
           { services: [newService, service2] },
           await dumpConfiguration(backend),
         ),
@@ -170,5 +170,37 @@ describe('Service E2E', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(0);
     });
+  });
+
+  describe('Sync service with upstream service discovery', () => {
+    const registryName = 'consul';
+    const serviceName = 'svc-upstream-sd';
+    const service: ADCSDK.Service = {
+      name: serviceName,
+      upstream: {
+        type: 'roundrobin',
+        discovery_type: registryName,
+        service_name: serviceName,
+      },
+    };
+
+    it('Create service', async () =>
+      syncEvents(
+        backend,
+        Differ.diff({ services: [service] }, await dumpConfiguration(backend)),
+      ));
+
+    it('Check raw cache', async () => {
+      const rawCache = rawConfigCache.get(cacheKey);
+      expect(rawCache!.upstreams).toHaveLength(1);
+
+      const upstream = rawCache!.upstreams![0];
+      expect(upstream.nodes).toBeUndefined();
+      expect(upstream.discovery_type).toBe(registryName);
+      expect(upstream.service_name).toBe(serviceName);
+    });
+
+    it('Delete service', async () =>
+      syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend))));
   });
 });
