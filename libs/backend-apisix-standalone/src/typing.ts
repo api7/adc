@@ -26,7 +26,22 @@ const RouteSchema = z.strictObject({
   ...Metadata,
   uris: z.array(z.string()).min(1),
   hosts: z.array(z.string()).min(1).optional(),
-  methods: z.array(z.string()).optional(),
+  methods: z
+    .array(
+      z.enum([
+        'GET',
+        'POST',
+        'PUT',
+        'DELETE',
+        'PATCH',
+        'HEAD',
+        'OPTIONS',
+        'CONNECT',
+        'TRACE',
+        'PURGE',
+      ]),
+    )
+    .optional(),
   remote_addrs: z.array(z.string()).min(1).optional(),
   vars: z.array(z.unknown()).optional(),
   filter_func: z.string().optional(),
@@ -65,15 +80,17 @@ const upstreamHealthCheckType = z
 const UpstreamSchema = z.strictObject({
   ...ModifiedIndex,
   ...Metadata,
-  nodes: z.array(
-    z.strictObject({
-      host: z.string(),
-      port: Port,
-      weight: z.int(),
-      priority: z.int().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    }),
-  ),
+  nodes: z
+    .array(
+      z.strictObject({
+        host: z.string(),
+        port: Port,
+        weight: z.int(),
+        priority: z.int().optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .optional(),
   scheme: z
     .union([
       z.literal('http'),

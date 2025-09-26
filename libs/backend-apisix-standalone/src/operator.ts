@@ -439,7 +439,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       type: res.type,
       hash_on: res.hash_on,
       key: res.key,
-      nodes: res.nodes ?? [], // fix optional to required convert
+      nodes: res.nodes,
       scheme: res.scheme,
       retries: res.retries,
       retry_timeout: res.retry_timeout,
