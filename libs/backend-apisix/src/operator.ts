@@ -37,21 +37,52 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
     const isUpdate = type !== ADCSDK.EventType.DELETE;
-    const path = `/apisix/admin/${
-      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-        ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
-    }`;
+    const path = `/apisix/admin/${resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+      ? `consumers/${parentId}/credentials/${resourceId}`
+      : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
+      }`;
+
+    if (!isUpdate) {
+      return from(this.client.request({ url: path, method: 'DELETE' }));
+    }
+
+    const data = this.fromADC(event, this.opts.version);
+
+    // Handle service with upstream: create upstream first, then service
+    if (resourceType === ADCSDK.ResourceType.SERVICE && (data as typing.Service).upstream) {
+      return this.createServiceWithUpstream(event, data as typing.Service, path);
+    }
+
+    return from(this.client.request({ url: path, method: 'PUT', data }));
+  }
+
+  private createServiceWithUpstream(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
+    const upstreamData: typing.Upstream = {
+      ...data.upstream,
+      id: event.resourceId,
+      name: event.resourceName,
+    };
+
+    const serviceData = {
+      ...data,
+      upstream: undefined,
+      upstream_id: event.resourceId,
+    };
 
     return from(
       this.client.request({
-        method: 'DELETE',
-        url: path,
-        ...(isUpdate && {
-          method: 'PUT',
-          data: this.fromADC(event, this.opts.version),
-        }),
+        url: `/apisix/admin/upstreams/${event.resourceId}`,
+        method: 'PUT',
+        data: upstreamData,
       }),
+    ).pipe(
+      concatMap(() =>
+        this.client.request({
+          url: servicePath,
+          method: 'PUT',
+          data: serviceData,
+        }),
+      ),
     );
   }
 
@@ -112,7 +143,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                       () =>
                         new Error(
                           error.response?.data?.error_msg ??
-                            JSON.stringify(error.response?.data),
+                          JSON.stringify(error.response?.data),
                         ),
                     );
                   return throwError(() => error);
