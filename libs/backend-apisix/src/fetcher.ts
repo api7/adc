@@ -20,6 +20,7 @@ import { SemVer, gte as semVerGTE } from 'semver';
 import { ToADC } from './transformer';
 import * as typing from './typing';
 import { resourceTypeToAPIName } from './utils';
+import { unset } from 'lodash';
 
 export interface FetcherOptions {
   client: AxiosInstance;
@@ -271,6 +272,8 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
               produce(service, (serviceDraft) => {
                 if (service.upstream_id)
                   serviceDraft.upstream = upstreamIdMap[service.upstream_id];
+                unset(serviceDraft, 'upstream.id');
+                unset(serviceDraft, 'upstream.name');
                 if (upstreamServiceIdMap[service.id])
                   serviceDraft.upstreams = upstreamServiceIdMap[service.id];
               }),
