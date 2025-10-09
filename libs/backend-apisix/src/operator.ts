@@ -36,27 +36,42 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
-    const isUpdate = type !== ADCSDK.EventType.DELETE;
     const path = `/apisix/admin/${resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
       ? `consumers/${parentId}/credentials/${resourceId}`
       : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
       }`;
 
-    if (!isUpdate) {
+    // Handle deletion
+    if (type === ADCSDK.EventType.DELETE) {
+      // Delete service with upstream: delete service first, then upstream
+      if (resourceType === ADCSDK.ResourceType.SERVICE && event.oldValue && (event.oldValue as ADCSDK.Service).upstream) {
+        return this.deleteServiceWithUpstream(event, path);
+      }
       return from(this.client.request({ url: path, method: 'DELETE' }));
     }
 
     const data = this.fromADC(event, this.opts.version);
 
-    // Handle service with upstream: create upstream first, then service
-    if (resourceType === ADCSDK.ResourceType.SERVICE && (data as typing.Service).upstream) {
-      return this.createServiceWithUpstream(event, data as typing.Service, path);
+    // Handle service with upstream changes
+    if (resourceType === ADCSDK.ResourceType.SERVICE) {
+      const oldUpstream = event.oldValue ? (event.oldValue as ADCSDK.Service).upstream : undefined;
+      const newUpstream = (event.newValue as ADCSDK.Service).upstream;
+
+      // oldValue has upstream, newValue doesn't -> delete upstream
+      if (oldUpstream && !newUpstream) {
+        return this.deleteUpstreamThenUpdateService(event, data as typing.Service, path);
+      }
+
+      // newValue has upstream -> create/update upstream
+      if (newUpstream) {
+        return this.upsertServiceWithUpstream(event, data as typing.Service, path);
+      }
     }
 
     return from(this.client.request({ url: path, method: 'PUT', data }));
   }
 
-  private createServiceWithUpstream(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
+  private upsertServiceWithUpstream(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
     const upstreamData: typing.Upstream = {
       ...data.upstream,
       id: event.resourceId,
@@ -69,6 +84,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       upstream_id: event.resourceId,
     };
 
+    // Create/Update upstream first, then service
     return from(
       this.client.request({
         url: `/apisix/admin/upstreams/${event.resourceId}`,
@@ -81,6 +97,41 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           url: servicePath,
           method: 'PUT',
           data: serviceData,
+        }),
+      ),
+    );
+  }
+
+  private deleteServiceWithUpstream(event: ADCSDK.Event, servicePath: string) {
+    // Delete service first, then upstream
+    return from(
+      this.client.request({
+        url: servicePath,
+        method: 'DELETE',
+      }),
+    ).pipe(
+      concatMap(() =>
+        this.client.request({
+          url: `/apisix/admin/upstreams/${event.resourceId}`,
+          method: 'DELETE',
+        }),
+      ),
+    );
+  }
+
+  private deleteUpstreamThenUpdateService(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
+    // Update service first (remove upstream reference), then delete upstream
+    return from(
+      this.client.request({
+        url: servicePath,
+        method: 'PUT',
+        data,
+      }),
+    ).pipe(
+      concatMap(() =>
+        this.client.request({
+          url: `/apisix/admin/upstreams/${event.resourceId}`,
+          method: 'DELETE',
         }),
       ),
     );
