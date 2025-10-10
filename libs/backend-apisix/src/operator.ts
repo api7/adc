@@ -6,11 +6,13 @@ import {
   Subject,
   catchError,
   concatMap,
+  delay,
   from,
   map,
   mergeMap,
   of,
   reduce,
+  retry,
   tap,
   throwError,
 } from 'rxjs';
@@ -102,25 +104,47 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     );
   }
 
+  private deleteUpstreamWithRetry(upstreamId: string) {
+    // Delete upstream with retry on race condition
+    return from(
+      this.client.request({
+        url: `/apisix/admin/upstreams/${upstreamId}`,
+        method: 'DELETE',
+      }),
+    ).pipe(
+      retry({
+        count: 3,
+        delay: (error: Error | AxiosError, retryCount: number) => {
+          // Only retry if upstream deletion fails due to "still using" race condition
+          if (
+            axios.isAxiosError(error) &&
+            error.response?.data?.error_msg?.includes('is still using it')
+          ) {
+            // Exponential backoff: 100ms, 200ms, 400ms
+            const delayMs = 100 * Math.pow(2, retryCount - 1);
+            return of(null).pipe(delay(delayMs));
+          }
+          // Don't retry other errors
+          return throwError(() => error);
+        },
+      }),
+    );
+  }
+
   private deleteServiceWithUpstream(event: ADCSDK.Event, servicePath: string) {
-    // Delete service first, then upstream
+    // Delete service first, then upstream with retry
     return from(
       this.client.request({
         url: servicePath,
         method: 'DELETE',
       }),
     ).pipe(
-      concatMap(() =>
-        this.client.request({
-          url: `/apisix/admin/upstreams/${event.resourceId}`,
-          method: 'DELETE',
-        }),
-      ),
+      concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)),
     );
   }
 
   private deleteUpstreamThenUpdateService(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
-    // Update service first (remove upstream reference), then delete upstream
+    // Update service first (remove upstream reference), then delete upstream with retry
     return from(
       this.client.request({
         url: servicePath,
@@ -128,12 +152,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         data,
       }),
     ).pipe(
-      concatMap(() =>
-        this.client.request({
-          url: `/apisix/admin/upstreams/${event.resourceId}`,
-          method: 'DELETE',
-        }),
-      ),
+      concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)),
     );
   }
 
