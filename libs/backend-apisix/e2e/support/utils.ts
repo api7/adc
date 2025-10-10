@@ -34,14 +34,14 @@ export const createEvent = (
   resourceName,
   resourceId:
     resourceType === ADCSDK.ResourceType.CONSUMER ||
-    resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
-    resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
+      resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
+      resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
       ? resourceName
       : resourceType === ADCSDK.ResourceType.SSL
         ? ADCSDK.utils.generateId((resource as ADCSDK.SSL).snis.join(','))
         : ADCSDK.utils.generateId(
-            parentName ? `${parentName}.${resourceName}` : resourceName,
-          ),
+          parentName ? `${parentName}.${resourceName}` : resourceName,
+        ),
   newValue: resource,
   parentId: parentName
     ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
@@ -55,13 +55,9 @@ export const updateEvent = (
   resourceName: string,
   resource: object,
   parentName?: string,
-  oldValue?: object,
 ): ADCSDK.Event => {
   const event = createEvent(resourceType, resourceName, resource, parentName);
   event.type = ADCSDK.EventType.UPDATE;
-  if (oldValue) {
-    event.oldValue = oldValue;
-  }
   return event;
 };
 
@@ -69,25 +65,23 @@ export const deleteEvent = (
   resourceType: ADCSDK.ResourceType,
   resourceName: string,
   parentName?: string,
-  oldValue?: object,
 ): ADCSDK.Event => ({
   type: ADCSDK.EventType.DELETE,
   resourceType,
   resourceName,
   resourceId:
     resourceType === ADCSDK.ResourceType.CONSUMER ||
-    resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
-    resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
+      resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
+      resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
       ? resourceName
       : ADCSDK.utils.generateId(
-          parentName ? `${parentName}.${resourceName}` : resourceName,
-        ),
+        parentName ? `${parentName}.${resourceName}` : resourceName,
+      ),
   parentId: parentName
     ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
       ? parentName
       : ADCSDK.utils.generateId(parentName)
     : undefined,
-  oldValue,
 });
 
 export const overrideEventResourceId = (

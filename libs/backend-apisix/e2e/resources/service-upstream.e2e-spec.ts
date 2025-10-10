@@ -1,3 +1,4 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../../src';
@@ -39,9 +40,7 @@ describe('Service-Upstreams E2E', () => {
     } satisfies ADCSDK.Service;
 
     it('Create service with inline upstream', async () =>
-      syncEvents(backend, [
-        createEvent(ADCSDK.ResourceType.SERVICE, serviceName, service),
-      ]));
+      syncEvents(backend, Differ.diff({ services: [service] }, {})));
 
     it('Dump (inline upstream should exist)', async () => {
       const result = await dumpConfiguration(backend);
@@ -81,9 +80,10 @@ describe('Service-Upstreams E2E', () => {
       },
     } satisfies ADCSDK.Service;
     it('Update service inline upstream', async () =>
-      syncEvents(backend, [
-        updateEvent(ADCSDK.ResourceType.SERVICE, serviceName, updatedService),
-      ]));
+      syncEvents(
+        backend,
+        Differ.diff({ services: [updatedService] }, await dumpConfiguration(backend)),
+      ));
 
     it('Dump (inline upstream should be updated)', async () => {
       const result = await dumpConfiguration(backend);
@@ -101,15 +101,13 @@ describe('Service-Upstreams E2E', () => {
       hosts: ['test.example.com'],
     } satisfies ADCSDK.Service;
     it('Update service to remove inline upstream', async () =>
-      syncEvents(backend, [
-        updateEvent(
-          ADCSDK.ResourceType.SERVICE,
-          serviceName,
-          serviceWithoutUpstream,
-          undefined,
-          updatedService, // oldValue with upstream
+      syncEvents(
+        backend,
+        Differ.diff(
+          { services: [serviceWithoutUpstream] },
+          await dumpConfiguration(backend),
         ),
-      ]));
+      ));
 
     it('Dump (inline upstream should be removed)', async () => {
       const result = await dumpConfiguration(backend);
@@ -134,13 +132,13 @@ describe('Service-Upstreams E2E', () => {
       },
     } satisfies ADCSDK.Service;
     it('Re-add inline upstream for deletion test', async () =>
-      syncEvents(backend, [
-        updateEvent(
-          ADCSDK.ResourceType.SERVICE,
-          serviceName,
-          serviceForDeletion,
+      syncEvents(
+        backend,
+        Differ.diff(
+          { services: [serviceForDeletion] },
+          await dumpConfiguration(backend),
         ),
-      ]));
+      ));
 
     it('Dump (inline upstream should exist again)', async () => {
       const result = await dumpConfiguration(backend);
@@ -150,14 +148,7 @@ describe('Service-Upstreams E2E', () => {
     });
 
     it('Delete service with inline upstream', async () =>
-      syncEvents(backend, [
-        deleteEvent(
-          ADCSDK.ResourceType.SERVICE,
-          serviceName,
-          undefined,
-          serviceForDeletion, // oldValue with upstream
-        ),
-      ]));
+      syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend))));
 
     it('Dump again (service should not exist)', async () => {
       const result = await dumpConfiguration(backend);
