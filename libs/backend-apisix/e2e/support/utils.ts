@@ -55,9 +55,13 @@ export const updateEvent = (
   resourceName: string,
   resource: object,
   parentName?: string,
+  oldValue?: object,
 ): ADCSDK.Event => {
   const event = createEvent(resourceType, resourceName, resource, parentName);
   event.type = ADCSDK.EventType.UPDATE;
+  if (oldValue) {
+    event.oldValue = oldValue;
+  }
   return event;
 };
 
@@ -65,6 +69,7 @@ export const deleteEvent = (
   resourceType: ADCSDK.ResourceType,
   resourceName: string,
   parentName?: string,
+  oldValue?: object,
 ): ADCSDK.Event => ({
   type: ADCSDK.EventType.DELETE,
   resourceType,
@@ -82,6 +87,7 @@ export const deleteEvent = (
       ? parentName
       : ADCSDK.utils.generateId(parentName)
     : undefined,
+  oldValue,
 });
 
 export const overrideEventResourceId = (
