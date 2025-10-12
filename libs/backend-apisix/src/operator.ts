@@ -38,6 +38,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
+    const isUpdate = type !== ADCSDK.EventType.DELETE;
     const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
@@ -49,14 +50,16 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       return this.operateService(event, path);
     }
 
-    // Handle deletion for non-service resources
-    if (type === ADCSDK.EventType.DELETE) {
-      return from(this.client.request({ url: path, method: 'DELETE' }));
-    }
-
-    // Handle create/update for non-service resources
-    const data = this.fromADC(event, this.opts.version);
-    return from(this.client.request({ url: path, method: 'PUT', data }));
+    return from(
+      this.client.request({
+        method: 'DELETE',
+        url: path,
+        ...(isUpdate && {
+          method: 'PUT',
+          data: this.fromADC(event, this.opts.version),
+        }),
+      }),
+    );
   }
 
   private operateService(event: ADCSDK.Event, servicePath: string) {
