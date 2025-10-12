@@ -44,48 +44,56 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
     }`;
 
-    // Handle deletion
+    // Handle service operations separately
+    if (resourceType === ADCSDK.ResourceType.SERVICE) {
+      return this.operateService(event, path);
+    }
+
+    // Handle deletion for non-service resources
     if (type === ADCSDK.EventType.DELETE) {
-      // Delete service with upstream: delete service first, then upstream
-      if (
-        resourceType === ADCSDK.ResourceType.SERVICE &&
-        event.oldValue &&
-        (event.oldValue as ADCSDK.Service).upstream
-      ) {
-        return this.deleteServiceWithUpstream(event, path);
-      }
       return from(this.client.request({ url: path, method: 'DELETE' }));
     }
 
+    // Handle create/update for non-service resources
     const data = this.fromADC(event, this.opts.version);
+    return from(this.client.request({ url: path, method: 'PUT', data }));
+  }
 
-    // Handle service with upstream changes
-    if (resourceType === ADCSDK.ResourceType.SERVICE) {
-      const oldUpstream = event.oldValue
-        ? (event.oldValue as ADCSDK.Service).upstream
-        : undefined;
-      const newUpstream = (event.newValue as ADCSDK.Service).upstream;
+  private operateService(event: ADCSDK.Event, servicePath: string) {
+    const { type } = event;
 
-      // oldValue has upstream, newValue doesn't -> delete upstream
-      if (oldUpstream && !newUpstream) {
-        return this.deleteUpstreamThenUpdateService(
-          event,
-          data as typing.Service,
-          path,
-        );
+    // Handle service deletion
+    if (type === ADCSDK.EventType.DELETE) {
+      // Delete service with upstream: delete service first, then upstream
+      if (event.oldValue && (event.oldValue as ADCSDK.Service).upstream) {
+        return this.deleteServiceWithUpstream(event, servicePath);
       }
-
-      // newValue has upstream -> create/update upstream
-      if (newUpstream) {
-        return this.upsertServiceWithUpstream(
-          event,
-          data as typing.Service,
-          path,
-        );
-      }
+      return from(this.client.request({ url: servicePath, method: 'DELETE' }));
     }
 
-    return from(this.client.request({ url: path, method: 'PUT', data }));
+    // Handle service create/update
+    const data = this.fromADC(event, this.opts.version) as typing.Service;
+    const oldUpstream = event.oldValue
+      ? (event.oldValue as ADCSDK.Service).upstream
+      : undefined;
+    const newUpstream = (event.newValue as ADCSDK.Service).upstream;
+
+    // oldValue has upstream, newValue doesn't -> delete upstream
+    if (oldUpstream && !newUpstream) {
+      return this.deleteUpstreamThenUpdateService(event, data, servicePath);
+    }
+
+    // newValue has upstream -> create/update upstream
+    if (newUpstream) {
+      return this.upsertServiceWithUpstream(event, data, servicePath);
+    }
+
+    // Service without upstream
+    return from(this.client.request({ url: servicePath, method: 'PUT', data }));
+  }
+
+  private getUpstreamUrl(upstreamId: string) {
+    return `/apisix/admin/upstreams/${upstreamId}`;
   }
 
   private upsertServiceWithUpstream(
@@ -93,57 +101,44 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     data: typing.Service,
     servicePath: string,
   ) {
-    const upstreamData: typing.Upstream = {
-      ...data.upstream,
-      id: event.resourceId,
-      name: event.resourceName,
-    };
-
-    const serviceData = {
-      ...data,
-      upstream: undefined,
-      upstream_id: event.resourceId,
-    };
-
     // Create/Update upstream first, then service
     return from(
       this.client.request({
-        url: `/apisix/admin/upstreams/${event.resourceId}`,
+        url: this.getUpstreamUrl(event.resourceId),
         method: 'PUT',
-        data: upstreamData,
+        data: {
+          ...data.upstream,
+          id: event.resourceId,
+          name: event.resourceName,
+        },
       }),
     ).pipe(
       concatMap(() =>
         this.client.request({
           url: servicePath,
           method: 'PUT',
-          data: serviceData,
+          data: { ...data, upstream: undefined, upstream_id: event.resourceId },
         }),
       ),
     );
   }
 
   private deleteUpstreamWithRetry(upstreamId: string) {
-    // Delete upstream with retry on race condition
     return from(
       this.client.request({
-        url: `/apisix/admin/upstreams/${upstreamId}`,
+        url: this.getUpstreamUrl(upstreamId),
         method: 'DELETE',
       }),
     ).pipe(
       retry({
         count: 3,
         delay: (error: Error | AxiosError, retryCount: number) => {
-          // Only retry if upstream deletion fails due to "still using" race condition
           if (
             axios.isAxiosError(error) &&
             error.response?.data?.error_msg?.includes('is still using it')
           ) {
-            // Exponential backoff: 100ms, 200ms, 400ms
-            const delayMs = 100 * Math.pow(2, retryCount - 1);
-            return of(null).pipe(delay(delayMs));
+            return of(null).pipe(delay(100 * Math.pow(2, retryCount - 1)));
           }
-          // Don't retry other errors
           return throwError(() => error);
         },
       }),
@@ -151,13 +146,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   }
 
   private deleteServiceWithUpstream(event: ADCSDK.Event, servicePath: string) {
-    // Delete service first, then upstream with retry
-    return from(
-      this.client.request({
-        url: servicePath,
-        method: 'DELETE',
-      }),
-    ).pipe(concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)));
+    return this.executeServiceOpThenDeleteUpstream(
+      { url: servicePath, method: 'DELETE' },
+      event.resourceId,
+    );
   }
 
   private deleteUpstreamThenUpdateService(
@@ -165,14 +157,23 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     data: typing.Service,
     servicePath: string,
   ) {
-    // Update service first (remove upstream reference), then delete upstream with retry
-    return from(
-      this.client.request({
-        url: servicePath,
-        method: 'PUT',
-        data,
-      }),
-    ).pipe(concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)));
+    return this.executeServiceOpThenDeleteUpstream(
+      { url: servicePath, method: 'PUT', data },
+      event.resourceId,
+    );
+  }
+
+  private executeServiceOpThenDeleteUpstream(
+    serviceRequest: {
+      url: string;
+      method: 'DELETE' | 'PUT';
+      data?: typing.Service;
+    },
+    upstreamId: string,
+  ) {
+    return from(this.client.request(serviceRequest)).pipe(
+      concatMap(() => this.deleteUpstreamWithRetry(upstreamId)),
+    );
   }
 
   public sync(
