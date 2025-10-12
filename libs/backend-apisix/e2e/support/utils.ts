@@ -34,14 +34,14 @@ export const createEvent = (
   resourceName,
   resourceId:
     resourceType === ADCSDK.ResourceType.CONSUMER ||
-      resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
-      resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
+    resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
+    resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
       ? resourceName
       : resourceType === ADCSDK.ResourceType.SSL
         ? ADCSDK.utils.generateId((resource as ADCSDK.SSL).snis.join(','))
         : ADCSDK.utils.generateId(
-          parentName ? `${parentName}.${resourceName}` : resourceName,
-        ),
+            parentName ? `${parentName}.${resourceName}` : resourceName,
+          ),
   newValue: resource,
   parentId: parentName
     ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
@@ -71,12 +71,12 @@ export const deleteEvent = (
   resourceName,
   resourceId:
     resourceType === ADCSDK.ResourceType.CONSUMER ||
-      resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
-      resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
+    resourceType === ADCSDK.ResourceType.GLOBAL_RULE ||
+    resourceType === ADCSDK.ResourceType.PLUGIN_METADATA
       ? resourceName
       : ADCSDK.utils.generateId(
-        parentName ? `${parentName}.${resourceName}` : resourceName,
-      ),
+          parentName ? `${parentName}.${resourceName}` : resourceName,
+        ),
   parentId: parentName
     ? resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
       ? parentName

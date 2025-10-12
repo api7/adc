@@ -82,7 +82,10 @@ describe('Service-Upstreams E2E', () => {
     it('Update service inline upstream', async () =>
       syncEvents(
         backend,
-        Differ.diff({ services: [updatedService] }, await dumpConfiguration(backend)),
+        Differ.diff(
+          { services: [updatedService] },
+          await dumpConfiguration(backend),
+        ),
       ));
 
     it('Dump (inline upstream should be updated)', async () => {

@@ -38,15 +38,20 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
-    const path = `/apisix/admin/${resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-      ? `consumers/${parentId}/credentials/${resourceId}`
-      : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
-      }`;
+    const path = `/apisix/admin/${
+      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+        ? `consumers/${parentId}/credentials/${resourceId}`
+        : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
+    }`;
 
     // Handle deletion
     if (type === ADCSDK.EventType.DELETE) {
       // Delete service with upstream: delete service first, then upstream
-      if (resourceType === ADCSDK.ResourceType.SERVICE && event.oldValue && (event.oldValue as ADCSDK.Service).upstream) {
+      if (
+        resourceType === ADCSDK.ResourceType.SERVICE &&
+        event.oldValue &&
+        (event.oldValue as ADCSDK.Service).upstream
+      ) {
         return this.deleteServiceWithUpstream(event, path);
       }
       return from(this.client.request({ url: path, method: 'DELETE' }));
@@ -56,24 +61,38 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
     // Handle service with upstream changes
     if (resourceType === ADCSDK.ResourceType.SERVICE) {
-      const oldUpstream = event.oldValue ? (event.oldValue as ADCSDK.Service).upstream : undefined;
+      const oldUpstream = event.oldValue
+        ? (event.oldValue as ADCSDK.Service).upstream
+        : undefined;
       const newUpstream = (event.newValue as ADCSDK.Service).upstream;
 
       // oldValue has upstream, newValue doesn't -> delete upstream
       if (oldUpstream && !newUpstream) {
-        return this.deleteUpstreamThenUpdateService(event, data as typing.Service, path);
+        return this.deleteUpstreamThenUpdateService(
+          event,
+          data as typing.Service,
+          path,
+        );
       }
 
       // newValue has upstream -> create/update upstream
       if (newUpstream) {
-        return this.upsertServiceWithUpstream(event, data as typing.Service, path);
+        return this.upsertServiceWithUpstream(
+          event,
+          data as typing.Service,
+          path,
+        );
       }
     }
 
     return from(this.client.request({ url: path, method: 'PUT', data }));
   }
 
-  private upsertServiceWithUpstream(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
+  private upsertServiceWithUpstream(
+    event: ADCSDK.Event,
+    data: typing.Service,
+    servicePath: string,
+  ) {
     const upstreamData: typing.Upstream = {
       ...data.upstream,
       id: event.resourceId,
@@ -138,12 +157,14 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         url: servicePath,
         method: 'DELETE',
       }),
-    ).pipe(
-      concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)),
-    );
+    ).pipe(concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)));
   }
 
-  private deleteUpstreamThenUpdateService(event: ADCSDK.Event, data: typing.Service, servicePath: string) {
+  private deleteUpstreamThenUpdateService(
+    event: ADCSDK.Event,
+    data: typing.Service,
+    servicePath: string,
+  ) {
     // Update service first (remove upstream reference), then delete upstream with retry
     return from(
       this.client.request({
@@ -151,9 +172,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         method: 'PUT',
         data,
       }),
-    ).pipe(
-      concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)),
-    );
+    ).pipe(concatMap(() => this.deleteUpstreamWithRetry(event.resourceId)));
   }
 
   public sync(
@@ -213,7 +232,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                       () =>
                         new Error(
                           error.response?.data?.error_msg ??
-                          JSON.stringify(error.response?.data),
+                            JSON.stringify(error.response?.data),
                         ),
                     );
                   return throwError(() => error);
