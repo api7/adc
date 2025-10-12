@@ -6,11 +6,13 @@ import {
   Subject,
   catchError,
   concatMap,
+  delay,
   from,
   map,
   mergeMap,
   of,
   reduce,
+  retry,
   tap,
   throwError,
 } from 'rxjs';
@@ -43,6 +45,11 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
     }`;
 
+    // Handle service operations separately
+    if (resourceType === ADCSDK.ResourceType.SERVICE) {
+      return this.operateService(event, path);
+    }
+
     return from(
       this.client.request({
         method: 'DELETE',
@@ -52,6 +59,123 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           data: this.fromADC(event, this.opts.version),
         }),
       }),
+    );
+  }
+
+  private operateService(event: ADCSDK.Event, servicePath: string) {
+    const { type } = event;
+
+    // Handle service deletion
+    if (type === ADCSDK.EventType.DELETE) {
+      // Delete service with upstream: delete service first, then upstream
+      if (event.oldValue && (event.oldValue as ADCSDK.Service).upstream) {
+        return this.deleteServiceWithUpstream(event, servicePath);
+      }
+      return from(this.client.request({ url: servicePath, method: 'DELETE' }));
+    }
+
+    // Handle service create/update
+    const data = this.fromADC(event, this.opts.version) as typing.Service;
+    const oldUpstream = event.oldValue
+      ? (event.oldValue as ADCSDK.Service).upstream
+      : undefined;
+    const newUpstream = (event.newValue as ADCSDK.Service).upstream;
+
+    // oldValue has upstream, newValue doesn't -> delete upstream
+    if (oldUpstream && !newUpstream) {
+      return this.deleteUpstreamThenUpdateService(event, data, servicePath);
+    }
+
+    // newValue has upstream -> create/update upstream
+    if (newUpstream) {
+      return this.upsertServiceWithUpstream(event, data, servicePath);
+    }
+
+    // Service without upstream
+    return from(this.client.request({ url: servicePath, method: 'PUT', data }));
+  }
+
+  private getUpstreamUrl(upstreamId: string) {
+    return `/apisix/admin/upstreams/${upstreamId}`;
+  }
+
+  private upsertServiceWithUpstream(
+    event: ADCSDK.Event,
+    data: typing.Service,
+    servicePath: string,
+  ) {
+    // Create/Update upstream first, then service
+    return from(
+      this.client.request({
+        url: this.getUpstreamUrl(event.resourceId),
+        method: 'PUT',
+        data: {
+          ...data.upstream,
+          id: event.resourceId,
+          name: event.resourceName,
+        },
+      }),
+    ).pipe(
+      concatMap(() =>
+        this.client.request({
+          url: servicePath,
+          method: 'PUT',
+          data: { ...data, upstream: undefined, upstream_id: event.resourceId },
+        }),
+      ),
+    );
+  }
+
+  private deleteUpstreamWithRetry(upstreamId: string) {
+    return from(
+      this.client.request({
+        url: this.getUpstreamUrl(upstreamId),
+        method: 'DELETE',
+      }),
+    ).pipe(
+      retry({
+        count: 3,
+        delay: (error: Error | AxiosError, retryCount: number) => {
+          if (
+            axios.isAxiosError(error) &&
+            error.response?.data?.error_msg?.includes('is still using it')
+          ) {
+            return of(null).pipe(delay(100 * Math.pow(2, retryCount - 1)));
+          }
+          return throwError(() => error);
+        },
+      }),
+    );
+  }
+
+  private deleteServiceWithUpstream(event: ADCSDK.Event, servicePath: string) {
+    return this.executeServiceOpThenDeleteUpstream(
+      { url: servicePath, method: 'DELETE' },
+      event.resourceId,
+    );
+  }
+
+  private deleteUpstreamThenUpdateService(
+    event: ADCSDK.Event,
+    data: typing.Service,
+    servicePath: string,
+  ) {
+    return this.executeServiceOpThenDeleteUpstream(
+      { url: servicePath, method: 'PUT', data },
+      event.resourceId,
+    );
+  }
+
+  private executeServiceOpThenDeleteUpstream(
+    serviceRequest: {
+      url: string;
+      method: 'DELETE' | 'PUT';
+      data?: typing.Service;
+    },
+    upstreamId: string,
+  ) {
+    return from(this.client.request(serviceRequest)).pipe(
+      concatMap(() => this.deleteUpstreamWithRetry(upstreamId)),
     );
   }
 

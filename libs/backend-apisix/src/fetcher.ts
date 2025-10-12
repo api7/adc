@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { type AxiosInstance } from 'axios';
 import { produce } from 'immer';
+import { unset } from 'lodash';
 import {
   Subject,
   combineLatest,
@@ -271,6 +272,8 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
               produce(service, (serviceDraft) => {
                 if (service.upstream_id)
                   serviceDraft.upstream = upstreamIdMap[service.upstream_id];
+                unset(serviceDraft, 'upstream.id');
+                unset(serviceDraft, 'upstream.name');
                 if (upstreamServiceIdMap[service.id])
                   serviceDraft.upstreams = upstreamServiceIdMap[service.id];
               }),

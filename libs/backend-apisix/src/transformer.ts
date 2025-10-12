@@ -47,7 +47,9 @@ export class ToADC {
 
       hosts: service.hosts,
 
-      upstream: this.transformUpstream(service.upstream),
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
       upstreams: service.upstreams,
       plugins: service.plugins,
     } as ADCSDK.Service);
@@ -282,7 +284,9 @@ export class FromADC {
       name: service.name,
       desc: service.description,
       labels: FromADC.transformLabels(service.labels),
-      upstream: this.transformUpstream(service.upstream),
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
       plugins: service.plugins,
       hosts: service.hosts,
     });
