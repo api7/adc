@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { Agent } from 'node:https';
 import * as semver from 'semver';
 
@@ -31,22 +32,41 @@ httpClient.interceptors.request.use(
 
 const setupAPI7 = async () => {
   return new Promise<void>((resolve, reject) => {
-    const ls = spawn(
+    const download = spawn(
       'sh',
       [
         '-c',
-        `curl -O ${process.env.BACKEND_API7_DOWNLOAD_URL} && tar xf api7-ee-*.tar.gz && cd api7-ee && bash run.sh start`,
+        `curl -O ${process.env.BACKEND_API7_DOWNLOAD_URL} && tar xf api7-ee-*.tar.gz`,
       ],
       { cwd: `/tmp` },
     );
 
-    console.log('\nSetup API7 Instance\n');
-
-    ls.stdout.on('data', function (data) {
+    download.stdout.on('data', function (data) {
       console.log('stdout: ' + data.toString());
     });
 
-    ls.stderr.on('data', function (data) {
+    download.stderr.on('data', function (data) {
+      console.log('stderr: ' + data.toString());
+    });
+
+    const dockerComposePath = `/tmp/api7-ee/docker-compose.yaml`;
+    const dockerCompose = readFileSync(dockerComposePath, 'utf-8').replaceAll(
+      ': bitnami/',
+      ': bitnamilegacy/',
+    );
+    writeFileSync(dockerComposePath, dockerCompose, 'utf-8');
+
+    const setup = spawn('sh', ['-c', `cd api7-ee && bash run.sh start`], {
+      cwd: `/tmp`,
+    });
+
+    console.log('\nSetup API7 Instance\n');
+
+    setup.stdout.on('data', function (data) {
+      console.log('stdout: ' + data.toString());
+    });
+
+    setup.stderr.on('data', function (data) {
       console.log('stderr: ' + data.toString());
     });
 
