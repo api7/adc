@@ -119,16 +119,18 @@ export const toADC = (input: typing.APISIXStandalone) => {
           id: ssl.id,
           labels: ssl.labels,
           type: ssl.type,
-          snis: ssl.snis!,
+          snis: ssl.snis,
           certificates: [
             {
               certificate: ssl.cert,
               key: ssl.key,
             },
-            ...(ssl.certs ?? []).map((cert, idx) => ({
-              certificate: cert,
-              key: ssl.keys![idx],
-            })),
+            ...(ssl.certs && ssl.keys
+              ? ssl.certs.map((cert, idx) => ({
+                  certificate: cert,
+                  key: ssl.keys?.[idx],
+                }))
+              : []),
           ] as Array<ADCSDK.SSLCertificate>,
           client: ssl.client,
           ssl_protocols: ssl.ssl_protocols,

@@ -212,7 +212,7 @@ const SSLSchema = z
     labels: Metadata.labels,
 
     type: z.union([z.literal('server'), z.literal('client')]).optional(),
-    snis: z.array(z.string()).min(1).optional(),
+    snis: z.array(z.string()).min(1),
     cert: z.string(),
     key: z.string(),
     certs: z.array(z.string()).optional(),
@@ -224,7 +224,9 @@ const SSLSchema = z
         skip_mtls_uri_regex: z.array(z.string()).optional(),
       })
       .optional(),
-    ssl_protocols: z.array(z.string()).optional(),
+    ssl_protocols: z
+      .array(z.enum(['TLSv1.1', 'TLSv1.2', 'TLSv1.3']))
+      .optional(),
     status: Status.optional(),
   })
   .extend(ModifiedIndex);
