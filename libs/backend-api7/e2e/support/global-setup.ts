@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Agent } from 'node:https';
@@ -32,7 +32,7 @@ httpClient.interceptors.request.use(
 
 const setupAPI7 = async () => {
   return new Promise<void>((resolve, reject) => {
-    const download = spawn(
+    const download = spawnSync(
       'sh',
       [
         '-c',
@@ -41,13 +41,8 @@ const setupAPI7 = async () => {
       { cwd: `/tmp` },
     );
 
-    download.stdout.on('data', function (data) {
-      console.log('stdout: ' + data.toString());
-    });
-
-    download.stderr.on('data', function (data) {
-      console.log('stderr: ' + data.toString());
-    });
+    console.log('stdout: ' + download.stdout.toString('utf-8'));
+    console.log('stderr: ' + download.stderr.toString('utf-8'));
 
     const dockerComposePath = `/tmp/api7-ee/docker-compose.yaml`;
     const dockerCompose = readFileSync(dockerComposePath, 'utf-8').replaceAll(
@@ -70,7 +65,7 @@ const setupAPI7 = async () => {
       console.log('stderr: ' + data.toString());
     });
 
-    ls.on('exit', function (code) {
+    setup.on('exit', function (code) {
       if (code)
         reject(`child process exited with non-zero code: ${code?.toString()}`);
 
