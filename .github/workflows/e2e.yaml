@@ -10,7 +10,7 @@ on:
       - main
     types: [opened, synchronize, reopened, labeled]
 env:
-  E2E: '1'
+  E2E: "1"
 jobs:
   cli:
     runs-on: ubuntu-latest
@@ -20,7 +20,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -61,7 +61,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -100,7 +100,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -126,7 +126,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v4
       - name: Install dependencies
         run: pnpm install
