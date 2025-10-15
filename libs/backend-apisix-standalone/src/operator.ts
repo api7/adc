@@ -120,6 +120,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 ADCSDK.BackendSyncResult,
                 ObservableInput<ADCSDK.BackendSyncResult>
               >((error: Error | AxiosError) => {
+                // Log the error response when error
+                if (axios.isAxiosError(error) && error.response)
+                  logger(this.debugLogEvent(error.response));
+
                 if (opts.exitOnFailure) {
                   if (axios.isAxiosError(error) && error.response)
                     return throwError(
@@ -144,9 +148,11 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                   server,
                 } satisfies ADCSDK.BackendSyncResult);
               }),
-              tap(() => {
-                configCache.set(this.opts.cacheKey, toADC(newConfig));
-                rawConfigCache.set(this.opts.cacheKey, newConfig);
+              tap((res) => {
+                if (res.success) {
+                  configCache.set(this.opts.cacheKey, toADC(newConfig));
+                  rawConfigCache.set(this.opts.cacheKey, newConfig);
+                }
                 logger(taskStateEvent('TASK_DONE'));
               }),
             ),
