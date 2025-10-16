@@ -185,6 +185,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
       {
         params: {
           search: this.gatewayGroupName,
+          name: this.gatewayGroupName,
         },
       },
     );
