@@ -27,7 +27,7 @@ jobs:
           pnpm install
           NODE_ENV=production npx nx build cli
           node --experimental-sea-config apps/cli/node-sea.json
-          npx tsx apps/cli/scripts/download-node.ts
+          npx ts-node apps/cli/scripts/download-node.ts
           npx postject ./node-binary/linux-amd64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
           npx postject ./node-binary/linux-arm64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
           npx postject ./node-binary/win-x64.exe NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
@@ -74,7 +74,7 @@ jobs:
           pnpm install
           NODE_ENV=production npx nx build cli
           node --experimental-sea-config apps/cli/node-sea.json
-          npx tsx apps/cli/scripts/download-node.ts
+          npx ts-node apps/cli/scripts/download-node.ts
           codesign --remove-signature ./node-binary/darwin-arm64
           codesign --remove-signature ./node-binary/darwin-x64
           npx postject ./node-binary/darwin-arm64 NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA
