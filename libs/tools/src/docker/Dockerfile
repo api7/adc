@@ -2,6 +2,7 @@ FROM node:lts-bookworm-slim AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV NX_DAEMON="false"
 RUN corepack enable
 
 WORKDIR /build
