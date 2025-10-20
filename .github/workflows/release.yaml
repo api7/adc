@@ -12,9 +12,9 @@ jobs:
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
+          node-version: "22.17.0"
       - uses: pnpm/action-setup@v4
       - name: Build ADC
         env:
@@ -62,11 +62,11 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: "22.17.0"
       - uses: pnpm/action-setup@v2
       - name: Build ADC
         env:
-          NODE_VERSION: 22.20.0
+          NODE_VERSION: 22.17.0
         run: |
           pnpm install
           NODE_ENV=production npx nx build cli
