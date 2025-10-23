@@ -44,6 +44,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
     const keepAlive: httpAgentOptions = {
       keepAlive: true,
       keepAliveMsecs: 60000,
+      maxSockets: 10, // per host
     };
     const config: CreateAxiosDefaults = {
       headers: { 'Content-Type': 'application/json' },
