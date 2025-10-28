@@ -278,18 +278,27 @@ export class FromADC {
     });
   }
 
-  public transformService(service: ADCSDK.Service): typing.Service {
-    return ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
-      id: service.id,
-      name: service.name,
-      desc: service.description,
-      labels: FromADC.transformLabels(service.labels),
-      upstream: service.upstream
-        ? this.transformUpstream(service.upstream)
+  public transformService(
+    service: ADCSDK.Service,
+  ): [typing.Service, typing.Upstream | undefined] {
+    return [
+      ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
+        id: service.id,
+        name: service.name,
+        desc: service.description,
+        labels: FromADC.transformLabels(service.labels),
+        upstream_id: service.id,
+        plugins: service.plugins,
+        hosts: service.hosts,
+      }),
+      service.upstream
+        ? ({
+            ...this.transformUpstream(service.upstream),
+            id: service.id,
+            name: service.name,
+          } as typing.Upstream)
         : undefined,
-      plugins: service.plugins,
-      hosts: service.hosts,
-    });
+    ];
   }
 
   public transformConsumer(consumer: ADCSDK.Consumer): typing.Consumer {

@@ -7,7 +7,6 @@ import {
   catchError,
   concatMap,
   defer,
-  delay,
   from,
   map,
   mergeMap,
@@ -42,9 +41,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const isUpdate = type !== ADCSDK.EventType.DELETE;
     const PATH_PREFIX = '/apisix/admin';
     const paths = [
-      `${PATH_PREFIX}/${resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-        ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
+      `${PATH_PREFIX}/${
+        resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+          ? `consumers/${parentId}/credentials/${resourceId}`
+          : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
       }`,
     ];
 
@@ -58,34 +58,21 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const operateWithRetry = (op: () => Promise<AxiosResponse>) =>
       defer(op).pipe(retry({ count: 3, delay: 100 }));
     return from(paths).pipe(
-      map(
-        (path) => () => {
-          let data = undefined;
-          if (isUpdate) {
-            data = this.fromADC(event, this.opts.version);
-            if (event.resourceType === ADCSDK.ResourceType.SERVICE && path.includes('/upstreams')) {
-              data = {
-                id: event.resourceId,
-                name: event.resourceName,
-                ...(data as typing.Service).upstream,
-              };
-            }
-
-            if (event.resourceType === ADCSDK.ResourceType.SERVICE && path.includes('/services')) {
-              data = { ...data, upstream: undefined, upstream_id: event.resourceId };
-            }
-          }
-
-          return this.client.request({
-            method: 'DELETE',
-            url: path,
-            ...(isUpdate && {
-              method: 'PUT',
-              data,
-            }),
-          });
-        }
-      ),
+      map((path) => () => {
+        const data = this.fromADC(event, this.opts.version);
+        return this.client.request({
+          method: 'DELETE',
+          url: path,
+          ...(isUpdate && {
+            method: 'PUT',
+            data:
+              event.resourceType === ADCSDK.ResourceType.SERVICE &&
+              path.includes('/upstreams')
+                ? (data as typing.Service).upstream
+                : data,
+          }),
+        });
+      }),
       concatMap(operateWithRetry),
     );
   }
@@ -147,7 +134,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                       () =>
                         new Error(
                           error.response?.data?.error_msg ??
-                          JSON.stringify(error.response?.data),
+                            JSON.stringify(error.response?.data),
                         ),
                     );
                   return throwError(() => error);
@@ -232,9 +219,16 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         if (event.parentId) route.service_id = event.parentId;
         return route;
       }
-      case ADCSDK.ResourceType.SERVICE:
+      case ADCSDK.ResourceType.SERVICE: {
         (event.newValue as ADCSDK.Service).id = event.resourceId;
-        return fromADC.transformService(event.newValue as ADCSDK.Service);
+        const [service, upstream] = fromADC.transformService(
+          event.newValue as ADCSDK.Service,
+        );
+        return {
+          ...service,
+          ...(upstream && { upstream: upstream }),
+        };
+      }
       case ADCSDK.ResourceType.SSL:
         (event.newValue as ADCSDK.SSL).id = event.resourceId;
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);
