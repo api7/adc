@@ -58,21 +58,22 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const operateWithRetry = (op: () => Promise<AxiosResponse>) =>
       defer(op).pipe(retry({ count: 3, delay: 100 }));
     return from(paths).pipe(
-      map((path) => () => {
-        const data = this.fromADC(event, this.opts.version);
-        return this.client.request({
-          method: 'DELETE',
-          url: path,
-          ...(isUpdate && {
-            method: 'PUT',
-            data:
-              event.resourceType === ADCSDK.ResourceType.SERVICE &&
-              path.includes('/upstreams')
-                ? (data as typing.Service).upstream
-                : data,
+      map(
+        (path) => () =>
+          this.client.request({
+            method: 'DELETE',
+            url: path,
+            ...(isUpdate && {
+              method: 'PUT',
+              data:
+                event.resourceType === ADCSDK.ResourceType.SERVICE &&
+                path.includes('/upstreams')
+                  ? (this.fromADC(event, this.opts.version) as typing.Service)
+                      .upstream
+                  : this.fromADC(event, this.opts.version),
+            }),
           }),
-        });
-      }),
+      ),
       concatMap(operateWithRetry),
     );
   }
@@ -214,7 +215,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         (event.newValue as ADCSDK.Route).id = event.resourceId;
         const route = fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
-          event.parentId,
+          event.parentId!,
         );
         if (event.parentId) route.service_id = event.parentId;
         return route;
