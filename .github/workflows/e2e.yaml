@@ -10,7 +10,7 @@ on:
       - main
     types: [opened, synchronize, reopened, labeled]
 env:
-  E2E: '1'
+  E2E: "1"
 jobs:
   cli:
     runs-on: ubuntu-latest
@@ -20,7 +20,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -47,6 +47,7 @@ jobs:
           - 3.11.0
           - 3.12.0
           - 3.13.0
+          - 3.14.0
     env:
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
@@ -61,7 +62,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -78,6 +79,7 @@ jobs:
       matrix:
         version:
           - 3.13.0
+          - 3.14.0
           - dev
     steps:
       - name: Determine APISIX image tag
@@ -100,7 +102,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -115,7 +117,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
       matrix:
-        version: [3.5.5, 3.6.1, 3.7.8, 3.8.10]
+        version: [3.5.5, 3.6.1, 3.7.8, 3.8.15]
     env:
       BACKEND_API7_VERSION: ${{ matrix.version }}
       BACKEND_API7_DOWNLOAD_URL: https://run.api7.ai/api7-ee/api7-ee-v${{ matrix.version }}.tar.gz
@@ -126,7 +128,7 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: "lts/*"
       - uses: pnpm/action-setup@v4
       - name: Install dependencies
         run: pnpm install

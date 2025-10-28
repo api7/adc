@@ -26,6 +26,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
     const keepAlive: httpAgentOptions = {
       keepAlive: true,
       keepAliveMsecs: 60000,
+      maxSockets: 256, // per host
     };
     const config: CreateAxiosDefaults = {
       baseURL: `${opts.server}`,

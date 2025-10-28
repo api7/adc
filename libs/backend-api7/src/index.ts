@@ -32,6 +32,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
     const keepAlive: httpAgentOptions = {
       keepAlive: true,
       keepAliveMsecs: 60000,
+      maxSockets: 256, // per host
     };
     const config: CreateAxiosDefaults = {
       baseURL: `${opts.server}`,
@@ -185,6 +186,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
       {
         params: {
           search: this.gatewayGroupName,
+          name: this.gatewayGroupName,
         },
       },
     );

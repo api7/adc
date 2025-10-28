@@ -148,7 +148,7 @@ export const syncHandler: RequestHandler<
 
     logger.log({
       level: 'debug',
-      message: 'sync success',
+      message: 'sync finished',
       output,
       requestId: req.requestId,
     });
