@@ -6,6 +6,7 @@ import {
   Subject,
   catchError,
   concatMap,
+  defer,
   delay,
   from,
   map,
@@ -39,143 +40,53 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
     const isUpdate = type !== ADCSDK.EventType.DELETE;
-    const path = `/apisix/admin/${
-      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+    const PATH_PREFIX = '/apisix/admin';
+    const paths = [
+      `${PATH_PREFIX}/${resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
         ? `consumers/${parentId}/credentials/${resourceId}`
         : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
-    }`;
+      }`,
+    ];
 
-    // Handle service operations separately
-    if (resourceType === ADCSDK.ResourceType.SERVICE) {
-      return this.operateService(event, path);
+    if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+      const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
+      if (event.type === ADCSDK.EventType.DELETE)
+        paths.push(path); // services will be deleted before upstreams
+      else paths.unshift(path); // services will be created/updated after upstreams
     }
 
-    return from(
-      this.client.request({
-        method: 'DELETE',
-        url: path,
-        ...(isUpdate && {
-          method: 'PUT',
-          data: this.fromADC(event, this.opts.version),
-        }),
-      }),
-    );
-  }
+    const operateWithRetry = (op: () => Promise<AxiosResponse>) =>
+      defer(op).pipe(retry({ count: 3, delay: 100 }));
+    return from(paths).pipe(
+      map(
+        (path) => () => {
+          let data = undefined;
+          if (isUpdate) {
+            data = this.fromADC(event, this.opts.version);
+            if (event.resourceType === ADCSDK.ResourceType.SERVICE && path.includes('/upstreams')) {
+              data = {
+                id: event.resourceId,
+                name: event.resourceName,
+                ...(data as typing.Service).upstream,
+              };
+            }
 
-  private operateService(event: ADCSDK.Event, servicePath: string) {
-    const { type } = event;
-
-    // Handle service deletion
-    if (type === ADCSDK.EventType.DELETE) {
-      // Delete service with upstream: delete service first, then upstream
-      if (event.oldValue && (event.oldValue as ADCSDK.Service).upstream) {
-        return this.deleteServiceWithUpstream(event, servicePath);
-      }
-      return from(this.client.request({ url: servicePath, method: 'DELETE' }));
-    }
-
-    // Handle service create/update
-    const data = this.fromADC(event, this.opts.version) as typing.Service;
-    const oldUpstream = event.oldValue
-      ? (event.oldValue as ADCSDK.Service).upstream
-      : undefined;
-    const newUpstream = (event.newValue as ADCSDK.Service).upstream;
-
-    // oldValue has upstream, newValue doesn't -> delete upstream
-    if (oldUpstream && !newUpstream) {
-      return this.deleteUpstreamThenUpdateService(event, data, servicePath);
-    }
-
-    // newValue has upstream -> create/update upstream
-    if (newUpstream) {
-      return this.upsertServiceWithUpstream(event, data, servicePath);
-    }
-
-    // Service without upstream
-    return from(this.client.request({ url: servicePath, method: 'PUT', data }));
-  }
-
-  private getUpstreamUrl(upstreamId: string) {
-    return `/apisix/admin/upstreams/${upstreamId}`;
-  }
-
-  private upsertServiceWithUpstream(
-    event: ADCSDK.Event,
-    data: typing.Service,
-    servicePath: string,
-  ) {
-    // Create/Update upstream first, then service
-    return from(
-      this.client.request({
-        url: this.getUpstreamUrl(event.resourceId),
-        method: 'PUT',
-        data: {
-          ...data.upstream,
-          id: event.resourceId,
-          name: event.resourceName,
-        },
-      }),
-    ).pipe(
-      concatMap(() =>
-        this.client.request({
-          url: servicePath,
-          method: 'PUT',
-          data: { ...data, upstream: undefined, upstream_id: event.resourceId },
-        }),
-      ),
-    );
-  }
-
-  private deleteUpstreamWithRetry(upstreamId: string) {
-    return from(
-      this.client.request({
-        url: this.getUpstreamUrl(upstreamId),
-        method: 'DELETE',
-      }),
-    ).pipe(
-      retry({
-        count: 3,
-        delay: (error: Error | AxiosError, retryCount: number) => {
-          if (
-            axios.isAxiosError(error) &&
-            error.response?.data?.error_msg?.includes('is still using it')
-          ) {
-            return of(null).pipe(delay(100 * Math.pow(2, retryCount - 1)));
+            if (event.resourceType === ADCSDK.ResourceType.SERVICE && path.includes('/services')) {
+              data = { ...data, upstream: undefined, upstream_id: event.resourceId };
+            }
           }
-          return throwError(() => error);
-        },
-      }),
-    );
-  }
 
-  private deleteServiceWithUpstream(event: ADCSDK.Event, servicePath: string) {
-    return this.executeServiceOpThenDeleteUpstream(
-      { url: servicePath, method: 'DELETE' },
-      event.resourceId,
-    );
-  }
-
-  private deleteUpstreamThenUpdateService(
-    event: ADCSDK.Event,
-    data: typing.Service,
-    servicePath: string,
-  ) {
-    return this.executeServiceOpThenDeleteUpstream(
-      { url: servicePath, method: 'PUT', data },
-      event.resourceId,
-    );
-  }
-
-  private executeServiceOpThenDeleteUpstream(
-    serviceRequest: {
-      url: string;
-      method: 'DELETE' | 'PUT';
-      data?: typing.Service;
-    },
-    upstreamId: string,
-  ) {
-    return from(this.client.request(serviceRequest)).pipe(
-      concatMap(() => this.deleteUpstreamWithRetry(upstreamId)),
+          return this.client.request({
+            method: 'DELETE',
+            url: path,
+            ...(isUpdate && {
+              method: 'PUT',
+              data,
+            }),
+          });
+        }
+      ),
+      concatMap(operateWithRetry),
     );
   }
 
@@ -236,7 +147,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                       () =>
                         new Error(
                           error.response?.data?.error_msg ??
-                            JSON.stringify(error.response?.data),
+                          JSON.stringify(error.response?.data),
                         ),
                     );
                   return throwError(() => error);

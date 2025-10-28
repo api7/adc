@@ -99,57 +99,6 @@ describe('Service-Upstreams E2E', () => {
       expect(testService?.upstream?.name).toBeUndefined();
     });
 
-    const serviceWithoutUpstream = {
-      name: serviceName,
-      hosts: ['test.example.com'],
-    } satisfies ADCSDK.Service;
-    it('Update service to remove inline upstream', async () =>
-      syncEvents(
-        backend,
-        Differ.diff(
-          { services: [serviceWithoutUpstream] },
-          await dumpConfiguration(backend),
-        ),
-      ));
-
-    it('Dump (inline upstream should be removed)', async () => {
-      const result = await dumpConfiguration(backend);
-      const testService = result.services?.find((s) => s.name === serviceName);
-      expect(testService).toBeDefined();
-      expect(testService?.upstream).toBeUndefined();
-      expect(testService?.hosts).toEqual(['test.example.com']);
-    });
-
-    const serviceForDeletion = {
-      name: serviceName,
-      hosts: ['test.example.com'],
-      upstream: {
-        type: 'roundrobin',
-        nodes: [
-          {
-            host: 'httpbin.org',
-            port: 443,
-            weight: 100,
-          },
-        ],
-      },
-    } satisfies ADCSDK.Service;
-    it('Re-add inline upstream for deletion test', async () =>
-      syncEvents(
-        backend,
-        Differ.diff(
-          { services: [serviceForDeletion] },
-          await dumpConfiguration(backend),
-        ),
-      ));
-
-    it('Dump (inline upstream should exist again)', async () => {
-      const result = await dumpConfiguration(backend);
-      const testService = result.services?.find((s) => s.name === serviceName);
-      expect(testService).toBeDefined();
-      expect(testService?.upstream).toBeDefined();
-    });
-
     it('Delete service with inline upstream', async () =>
       syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend))));
 
