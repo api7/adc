@@ -6,11 +6,13 @@ import {
   Subject,
   catchError,
   concatMap,
+  defer,
   from,
   map,
   mergeMap,
   of,
   reduce,
+  retry,
   tap,
   throwError,
 } from 'rxjs';
@@ -37,21 +39,42 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
     const isUpdate = type !== ADCSDK.EventType.DELETE;
-    const path = `/apisix/admin/${
-      resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
-        ? `consumers/${parentId}/credentials/${resourceId}`
-        : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
-    }`;
+    const PATH_PREFIX = '/apisix/admin';
+    const paths = [
+      `${PATH_PREFIX}/${
+        resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
+          ? `consumers/${parentId}/credentials/${resourceId}`
+          : `${resourceTypeToAPIName(resourceType)}/${resourceId}`
+      }`,
+    ];
 
-    return from(
-      this.client.request({
-        method: 'DELETE',
-        url: path,
-        ...(isUpdate && {
-          method: 'PUT',
-          data: this.fromADC(event, this.opts.version),
-        }),
-      }),
+    if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+      const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
+      if (event.type === ADCSDK.EventType.DELETE)
+        paths.push(path); // services will be deleted before upstreams
+      else paths.unshift(path); // services will be created/updated after upstreams
+    }
+
+    const operateWithRetry = (op: () => Promise<AxiosResponse>) =>
+      defer(op).pipe(retry({ count: 3, delay: 100 }));
+    return from(paths).pipe(
+      map(
+        (path) => () =>
+          this.client.request({
+            method: 'DELETE',
+            url: path,
+            ...(isUpdate && {
+              method: 'PUT',
+              data:
+                event.resourceType === ADCSDK.ResourceType.SERVICE &&
+                path.includes('/upstreams')
+                  ? (this.fromADC(event, this.opts.version) as typing.Service)
+                      .upstream
+                  : this.fromADC(event, this.opts.version),
+            }),
+          }),
+      ),
+      concatMap(operateWithRetry),
     );
   }
 
@@ -192,14 +215,21 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         (event.newValue as ADCSDK.Route).id = event.resourceId;
         const route = fromADC.transformRoute(
           event.newValue as ADCSDK.Route,
-          event.parentId,
+          event.parentId!,
         );
         if (event.parentId) route.service_id = event.parentId;
         return route;
       }
-      case ADCSDK.ResourceType.SERVICE:
+      case ADCSDK.ResourceType.SERVICE: {
         (event.newValue as ADCSDK.Service).id = event.resourceId;
-        return fromADC.transformService(event.newValue as ADCSDK.Service);
+        const [service, upstream] = fromADC.transformService(
+          event.newValue as ADCSDK.Service,
+        );
+        return {
+          ...service,
+          ...(upstream && { upstream: upstream }),
+        };
+      }
       case ADCSDK.ResourceType.SSL:
         (event.newValue as ADCSDK.SSL).id = event.resourceId;
         return fromADC.transformSSL(event.newValue as ADCSDK.SSL);

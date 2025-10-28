@@ -47,7 +47,9 @@ export class ToADC {
 
       hosts: service.hosts,
 
-      upstream: this.transformUpstream(service.upstream),
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
       upstreams: service.upstreams,
       plugins: service.plugins,
     } as ADCSDK.Service);
@@ -276,16 +278,27 @@ export class FromADC {
     });
   }
 
-  public transformService(service: ADCSDK.Service): typing.Service {
-    return ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
-      id: service.id,
-      name: service.name,
-      desc: service.description,
-      labels: FromADC.transformLabels(service.labels),
-      upstream: this.transformUpstream(service.upstream),
-      plugins: service.plugins,
-      hosts: service.hosts,
-    });
+  public transformService(
+    service: ADCSDK.Service,
+  ): [typing.Service, typing.Upstream | undefined] {
+    return [
+      ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
+        id: service.id,
+        name: service.name,
+        desc: service.description,
+        labels: FromADC.transformLabels(service.labels),
+        upstream_id: service.id,
+        plugins: service.plugins,
+        hosts: service.hosts,
+      }),
+      service.upstream
+        ? ({
+            ...this.transformUpstream(service.upstream),
+            id: service.id,
+            name: service.name,
+          } as typing.Upstream)
+        : undefined,
+    ];
   }
 
   public transformConsumer(consumer: ADCSDK.Consumer): typing.Consumer {

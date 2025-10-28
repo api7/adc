@@ -1,3 +1,4 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../../src';
@@ -19,6 +20,92 @@ describe('Service-Upstreams E2E', () => {
       server,
       token,
       tlsSkipVerify: true,
+    });
+  });
+
+  describe('Service inline upstream', () => {
+    const serviceName = 'test-inline-upstream';
+    const service = {
+      name: serviceName,
+      upstream: {
+        type: 'roundrobin',
+        nodes: [
+          {
+            host: 'httpbin.org',
+            port: 443,
+            weight: 100,
+          },
+        ],
+      },
+    } satisfies ADCSDK.Service;
+
+    it('Create service with inline upstream', async () =>
+      syncEvents(backend, Differ.diff({ services: [service] }, {})));
+
+    it('Dump (inline upstream should exist)', async () => {
+      const result = await dumpConfiguration(backend);
+      const testService = result.services?.find((s) => s.name === serviceName);
+      expect(testService).toBeDefined();
+      expect(testService?.upstream).toMatchObject({
+        type: 'roundrobin',
+        nodes: [
+          {
+            host: 'httpbin.org',
+            port: 443,
+            weight: 100,
+          },
+        ],
+      });
+      // Verify that inline upstream has no id and name
+      expect(testService?.upstream?.id).toBeUndefined();
+      expect(testService?.upstream?.name).toBeUndefined();
+    });
+
+    const updatedService = {
+      name: serviceName,
+      upstream: {
+        type: 'roundrobin',
+        nodes: [
+          {
+            host: 'httpbin.org',
+            port: 443,
+            weight: 50,
+          },
+          {
+            host: 'example.com',
+            port: 80,
+            weight: 50,
+          },
+        ],
+      },
+    } satisfies ADCSDK.Service;
+    it('Update service inline upstream', async () =>
+      syncEvents(
+        backend,
+        Differ.diff(
+          { services: [updatedService] },
+          await dumpConfiguration(backend),
+        ),
+      ));
+
+    it('Dump (inline upstream should be updated)', async () => {
+      const result = await dumpConfiguration(backend);
+      const testService = result.services?.find((s) => s.name === serviceName);
+      expect(testService).toBeDefined();
+      expect(testService?.upstream?.nodes).toHaveLength(2);
+      expect(testService?.upstream).toMatchObject(updatedService.upstream);
+      // Verify that inline upstream still has no id and name
+      expect(testService?.upstream?.id).toBeUndefined();
+      expect(testService?.upstream?.name).toBeUndefined();
+    });
+
+    it('Delete service with inline upstream', async () =>
+      syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend))));
+
+    it('Dump again (service should not exist)', async () => {
+      const result = await dumpConfiguration(backend);
+      const testService = result.services?.find((s) => s.name === serviceName);
+      expect(testService).toBeUndefined();
     });
   });
 
