@@ -118,7 +118,7 @@ jobs:
     strategy:
       matrix:
         # version: [3.5.5, 3.6.1, 3.7.8, 3.8.15]
-        version: [3.7.8]
+        version: [3.6.1]
     env:
       BACKEND_API7_VERSION: ${{ matrix.version }}
       BACKEND_API7_DOWNLOAD_URL: https://run.api7.ai/api7-ee/api7-ee-v${{ matrix.version }}.tar.gz
