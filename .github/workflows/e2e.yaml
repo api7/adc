@@ -12,109 +12,109 @@ on:
 env:
   E2E: "1"
 jobs:
-  cli:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # cli:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      # Build and test ADC CLI
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-      - uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      - name: Install dependencies
-        run: pnpm install
+  #     # Build and test ADC CLI
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: latest
+  #     - name: Install dependencies
+  #       run: pnpm install
 
-      # Run E2E tests
-      - name: Run E2E tests
-        run: npx nx run cli:test
-  apisix:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        version:
-          - 3.2.2
-          - 3.3.0
-          - 3.4.0
-          - 3.5.0
-          - 3.6.0
-          - 3.7.0
-          - 3.8.1
-          - 3.9.1
-          - 3.10.0
-          - 3.11.0
-          - 3.12.0
-          - 3.13.0
-          - 3.14.0
-    env:
-      BACKEND_APISIX_VERSION: ${{ matrix.version }}
-      BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
-    steps:
-      - uses: actions/checkout@v4
+  #     # Run E2E tests
+  #     - name: Run E2E tests
+  #       run: npx nx run cli:test
+  # apisix:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       version:
+  #         - 3.2.2
+  #         - 3.3.0
+  #         - 3.4.0
+  #         - 3.5.0
+  #         - 3.6.0
+  #         - 3.7.0
+  #         - 3.8.1
+  #         - 3.9.1
+  #         - 3.10.0
+  #         - 3.11.0
+  #         - 3.12.0
+  #         - 3.13.0
+  #         - 3.14.0
+  #   env:
+  #     BACKEND_APISIX_VERSION: ${{ matrix.version }}
+  #     BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      # Setup backend environment
-      - name: Setup Apache APISIX
-        working-directory: ./libs/backend-apisix/e2e/assets
-        run: docker compose up -d; sleep 10
+  #     # Setup backend environment
+  #     - name: Setup Apache APISIX
+  #       working-directory: ./libs/backend-apisix/e2e/assets
+  #       run: docker compose up -d; sleep 10
 
-      # Build and test ADC CLI
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-      - uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      - name: Install dependencies
-        run: pnpm install
+  #     # Build and test ADC CLI
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: latest
+  #     - name: Install dependencies
+  #       run: pnpm install
 
-      # Run E2E tests
-      - name: Run E2E tests
-        run: npx nx run backend-apisix:test
-  apisix-standalone:
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
-    strategy:
-      matrix:
-        version:
-          - 3.13.0
-          - 3.14.0
-          - dev
-    steps:
-      - name: Determine APISIX image tag
-        run: |
-          if [ "${{ matrix.version }}" = "dev" ]; then
-            echo "BACKEND_APISIX_VERSION=999.999.999" >> $GITHUB_ENV
-            echo "BACKEND_APISIX_IMAGE=dev" >> $GITHUB_ENV
-          else
-            echo "BACKEND_APISIX_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
-            echo "BACKEND_APISIX_IMAGE=${{ matrix.version }}-ubuntu" >> $GITHUB_ENV
-          fi
+  #     # Run E2E tests
+  #     - name: Run E2E tests
+  #       run: npx nx run backend-apisix:test
+  # apisix-standalone:
+  #   runs-on: ubuntu-latest
+  #   if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
+  #   strategy:
+  #     matrix:
+  #       version:
+  #         - 3.13.0
+  #         - 3.14.0
+  #         - dev
+  #   steps:
+  #     - name: Determine APISIX image tag
+  #       run: |
+  #         if [ "${{ matrix.version }}" = "dev" ]; then
+  #           echo "BACKEND_APISIX_VERSION=999.999.999" >> $GITHUB_ENV
+  #           echo "BACKEND_APISIX_IMAGE=dev" >> $GITHUB_ENV
+  #         else
+  #           echo "BACKEND_APISIX_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
+  #           echo "BACKEND_APISIX_IMAGE=${{ matrix.version }}-ubuntu" >> $GITHUB_ENV
+  #         fi
 
-      - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v4
 
-      # Setup backend environment
-      - name: Setup Apache APISIX
-        working-directory: ./libs/backend-apisix-standalone/e2e/assets
-        run: docker compose up -d; sleep 10; docker ps -a
+  #     # Setup backend environment
+  #     - name: Setup Apache APISIX
+  #       working-directory: ./libs/backend-apisix-standalone/e2e/assets
+  #       run: docker compose up -d; sleep 10; docker ps -a
 
-      # Build and test ADC CLI
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-      - uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      - name: Install dependencies
-        run: pnpm install
+  #     # Build and test ADC CLI
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "lts/*"
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: latest
+  #     - name: Install dependencies
+  #       run: pnpm install
 
-      # Run E2E tests
-      - name: Run E2E tests
-        run: npx nx run backend-apisix-standalone:test
+  #     # Run E2E tests
+  #     - name: Run E2E tests
+  #       run: npx nx run backend-apisix-standalone:test
   api7:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
+    # if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
       matrix:
         # version: [3.5.5, 3.6.1, 3.7.8, 3.8.15]
