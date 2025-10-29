@@ -114,7 +114,6 @@ jobs:
         run: npx nx run backend-apisix-standalone:test
   api7:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
       matrix:
@@ -137,7 +136,3 @@ jobs:
       # Run API7 E2E tests
       - name: Run E2E tests
         run: npx nx run backend-api7:test
-
-      - name: Setup tmate session
-        if: failure()
-        uses: mxschmitt/action-tmate@v3
