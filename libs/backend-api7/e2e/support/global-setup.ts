@@ -9,6 +9,7 @@ const httpClient = axios.create({
   baseURL: 'https://localhost:7443',
   withCredentials: true,
   httpsAgent: new Agent({
+    keepAlive: false,
     rejectUnauthorized: false,
   }),
 });
