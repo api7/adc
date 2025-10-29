@@ -139,5 +139,5 @@ jobs:
         run: npx nx run backend-api7:test
 
       - name: Setup tmate session
-        if: always()
+        if: failure()
         uses: mxschmitt/action-tmate@v3
