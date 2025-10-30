@@ -125,7 +125,7 @@ describe('Upstream Linter', () => {
             name: 'test',
             upstreams: [
               {
-                id: 'my-upstream',
+                name: 'my-upstream',
                 nodes: [
                   {
                     host: '1.1.1.1',
@@ -141,7 +141,7 @@ describe('Upstream Linter', () => {
             ],
           },
         ],
-      } as ADCSDK.Configuration,
+      } as unknown as ADCSDK.Configuration,
       expect: false,
       errors: [
         {

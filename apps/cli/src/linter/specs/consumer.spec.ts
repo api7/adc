@@ -52,7 +52,6 @@ describe('Consumer Linter', () => {
     },
     {
       name: 'should check consumer credentials (unsupported type)',
-      //@ts-expect-error for test
       input: {
         consumers: [
           {
