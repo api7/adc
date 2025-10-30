@@ -125,7 +125,7 @@ describe('Upstream Linter', () => {
             name: 'test',
             upstreams: [
               {
-                name: 'my-upstream',
+                id: 'my-upstream',
                 nodes: [
                   {
                     host: '1.1.1.1',
