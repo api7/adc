@@ -8,7 +8,7 @@ import parseDuration from 'parse-duration';
 import qs from 'qs';
 
 export interface BaseOptions {
-  verbose: boolean;
+  verbose: number;
 }
 export class BaseCommand<
   OPTS extends BaseOptions = BaseOptions,

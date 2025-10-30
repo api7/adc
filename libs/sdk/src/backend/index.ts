@@ -20,7 +20,7 @@ export interface BackendOptions {
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
 
-  cacheKey: string;
+  cacheKey?: string;
 }
 
 export const BackendEventType = {

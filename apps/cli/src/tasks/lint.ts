@@ -1,6 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
-import pluralize from 'pluralize';
 import { z } from 'zod';
 
 import { check } from '../linter';

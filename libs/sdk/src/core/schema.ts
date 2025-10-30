@@ -373,6 +373,8 @@ export const ConfigurationSchema = z.strictObject({
   consumer_groups: z.array(consumerGroupSchema).optional(),
   global_rules: globalRuleSchema.optional(),
   plugin_metadata: pluginMetadataSchema.optional(),
+  routes: z.array(routeSchema).optional(),
+  stream_routes: z.array(streamRouteSchema).optional(),
 });
 export type Configuration = z.infer<typeof ConfigurationSchema>;
 
