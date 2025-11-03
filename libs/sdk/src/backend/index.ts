@@ -1,4 +1,6 @@
 import { AxiosResponse } from 'axios';
+import { Agent as httpAgent } from 'http';
+import { Agent as httpsAgent } from 'https';
 import { Observable, Subscription } from 'rxjs';
 import { SemVer } from 'semver';
 
@@ -21,6 +23,8 @@ export interface BackendOptions {
   excludeResourceType?: Array<ADCSDK.ResourceType>;
 
   cacheKey: string;
+  httpAgent: httpAgent;
+  httpsAgent: httpsAgent;
 }
 
 export const BackendEventType = {

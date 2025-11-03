@@ -1,5 +1,6 @@
 import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
+import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
@@ -13,6 +14,25 @@ import {
 import { check } from '../linter';
 import { logger } from './logger';
 import { SyncInput, type SyncInputType } from './schema';
+
+// create connection pool
+const keepAlive: HttpOptions = {
+  keepAlive: true,
+  maxSockets: 256, // per host
+  maxFreeSockets: 16, // per host free
+  freeSocketTimeout: 60000,
+};
+const httpAgent = new HttpAgent(keepAlive);
+
+//TODO: dynamic rejectUnauthorized and support mTLS
+const httpsAgent = new HttpsAgent({
+  rejectUnauthorized: true,
+  ...keepAlive,
+});
+const httpsInsecureAgent = new HttpsAgent({
+  rejectUnauthorized: true,
+  ...keepAlive,
+});
 
 export const syncHandler: RequestHandler<
   unknown,
@@ -46,12 +66,13 @@ export const syncHandler: RequestHandler<
     fillLabels(local, task.opts.labelSelector);
 
     // load and filter remote configuration
-    //TODO: merged with the listr task
     const backend = loadBackend(task.opts.backend, {
       ...task.opts,
       server: Array.isArray(task.opts.server)
         ? task.opts.server.join(',')
         : task.opts.server,
+      httpAgent,
+      httpsAgent: task.opts.tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
     });
 
     backend.on('AXIOS_DEBUG', ({ description, response }) =>
