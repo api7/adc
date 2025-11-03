@@ -1,3 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { globalAgent as httpAgent } from 'node:http';
+import {
+  Agent as httpsAgent,
+  globalAgent as httpsGlobalAgent,
+} from 'node:https';
 import { join } from 'path';
 
 import { BackendAPISIX } from '../src';
@@ -8,6 +14,9 @@ describe('Ping', () => {
     const backend = new BackendAPISIX({
       server,
       token,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: httpsGlobalAgent,
     });
     await backend.ping();
   });
@@ -16,6 +25,17 @@ describe('Ping', () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
       token,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: new httpsAgent({
+        cert: readFileSync(
+          join(__dirname, 'assets/apisix_conf/mtls/client.cer'),
+        ),
+        key: readFileSync(
+          join(__dirname, 'assets/apisix_conf/mtls/client.key'),
+        ),
+        ca: readFileSync(join(__dirname, 'assets/apisix_conf/mtls/ca.cer')),
+      }),
       tlsClientCertFile: join(__dirname, 'assets/apisix_conf/mtls/client.cer'),
       tlsClientKeyFile: join(__dirname, 'assets/apisix_conf/mtls/client.key'),
       caCertFile: join(__dirname, 'assets/apisix_conf/mtls/ca.cer'),
@@ -27,6 +47,9 @@ describe('Ping', () => {
     const backend = new BackendAPISIX({
       server: 'http://0.0.0.0',
       token: '',
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: httpsGlobalAgent,
     });
     await expect(backend.ping()).rejects.toThrow(
       'connect ECONNREFUSED 0.0.0.0:80',
@@ -37,6 +60,9 @@ describe('Ping', () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
       token,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: httpsGlobalAgent,
     });
     await expect(backend.ping()).rejects.toThrow(
       'unable to verify the first certificate',
@@ -47,6 +73,11 @@ describe('Ping', () => {
     const backend = new BackendAPISIX({
       server: 'https://localhost:29180',
       token,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: new httpsAgent({
+        ca: readFileSync(join(__dirname, 'assets/apisix_conf/mtls/ca.cer')),
+      }),
       caCertFile: join(__dirname, 'assets/apisix_conf/mtls/ca.cer'),
     });
 

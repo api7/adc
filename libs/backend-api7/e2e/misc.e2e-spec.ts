@@ -1,11 +1,13 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { toString } from 'lodash';
+import { globalAgent as httpAgent } from 'node:http';
 
 import { BackendAPI7 } from '../src';
 import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  generateHTTPSAgent,
   overrideEventResourceId,
   syncEvents,
 } from './support/utils';
@@ -15,10 +17,13 @@ describe('Miscellaneous', () => {
 
   beforeAll(() => {
     backend = new BackendAPI7({
-      server: process.env.SERVER,
-      token: process.env.TOKEN,
+      server: process.env.SERVER!,
+      token: process.env.TOKEN!,
       tlsSkipVerify: true,
       gatewayGroup: process.env.GATEWAY_GROUP,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: generateHTTPSAgent(),
     });
   });
 

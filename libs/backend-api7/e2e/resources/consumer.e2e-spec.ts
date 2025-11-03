@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { globalAgent as httpAgent } from 'node:http';
 import { gte, lt } from 'semver';
 
 import { BackendAPI7 } from '../../src';
@@ -7,6 +8,7 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  generateHTTPSAgent,
   syncEvents,
   updateEvent,
 } from '../support/utils';
@@ -16,10 +18,13 @@ describe('Consumer E2E', () => {
 
   beforeAll(() => {
     backend = new BackendAPI7({
-      server: process.env.SERVER,
-      token: process.env.TOKEN,
+      server: process.env.SERVER!,
+      token: process.env.TOKEN!,
       tlsSkipVerify: true,
       gatewayGroup: process.env.GATEWAY_GROUP,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: generateHTTPSAgent(),
     });
   });
 

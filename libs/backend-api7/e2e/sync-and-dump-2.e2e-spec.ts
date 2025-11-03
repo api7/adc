@@ -1,19 +1,28 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { readFileSync } from 'node:fs';
+import { globalAgent as httpAgent } from 'node:http';
 import { join } from 'node:path';
 
 import { BackendAPI7 } from '../src';
-import { dumpConfiguration, sortResult, syncEvents } from './support/utils';
+import {
+  dumpConfiguration,
+  generateHTTPSAgent,
+  sortResult,
+  syncEvents,
+} from './support/utils';
 
 describe('Sync and Dump - 2', () => {
   let backend: BackendAPI7;
 
   beforeAll(() => {
     backend = new BackendAPI7({
-      server: process.env.SERVER,
-      token: process.env.TOKEN,
+      server: process.env.SERVER!,
+      token: process.env.TOKEN!,
       tlsSkipVerify: true,
       gatewayGroup: process.env.GATEWAY_GROUP,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: generateHTTPSAgent(),
     });
   });
 
