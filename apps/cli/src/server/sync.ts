@@ -30,7 +30,7 @@ const httpsAgent = new HttpsAgent({
   ...keepAlive,
 });
 const httpsInsecureAgent = new HttpsAgent({
-  rejectUnauthorized: true,
+  rejectUnauthorized: false,
   ...keepAlive,
 });
 
