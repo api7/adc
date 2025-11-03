@@ -24,7 +24,18 @@ export interface Route {
 
   // matcher
   paths: Array<string>;
-  methods?: Array<string>;
+  methods?: Array<
+    | 'GET'
+    | 'POST'
+    | 'PUT'
+    | 'DELETE'
+    | 'PATCH'
+    | 'HEAD'
+    | 'OPTIONS'
+    | 'TRACE'
+    | 'CONNECT'
+    | 'PURGE'
+  >;
   vars: Expr;
 
   // misc

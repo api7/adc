@@ -30,6 +30,9 @@ const timeoutSchema = z.strictObject({
   send: z.coerce.number().gt(0),
   read: z.coerce.number().gt(0),
 });
+export type UpstreamHealthCheck = NonNullable<
+  z.infer<ReturnType<typeof upstreamSchema>>['checks']
+>;
 export type UpstreamTimeout = z.infer<typeof timeoutSchema>;
 const hostSchema = z.string().min(1);
 const portSchema = z.coerce.number().int().min(1).max(65535);

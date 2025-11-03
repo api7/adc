@@ -29,6 +29,7 @@ export type {
   UpstreamNode,
   UpstreamTimeout,
   Upstream,
+  UpstreamHealthCheck,
   SSLCertificate,
   SSL,
   GlobalRule,

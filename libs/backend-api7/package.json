@@ -9,8 +9,9 @@
     }
   },
   "devDependencies": {
+    "@api7/adc-differ": "workspace:*",
     "@api7/adc-sdk": "workspace:*",
-    "@api7/adc-differ": "workspace:*"
+    "@types/jest": "^30.0.0"
   },
   "nx": {
     "name": "backend-api7",

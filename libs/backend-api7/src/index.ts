@@ -17,16 +17,17 @@ import semver, { SemVer } from 'semver';
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
 import { ToADC } from './transformer';
+import * as typing from './typing';
 
 export class BackendAPI7 implements ADCSDK.Backend {
   private readonly client: AxiosInstance;
-  private readonly gatewayGroupName: string;
+  private readonly gatewayGroupName?: string;
   private static logScope = ['API7'];
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
   private _version?: SemVer;
   private gatewayGroupId?: string;
-  private innerDefaultValue: ADCSDK.DefaultValue;
+  private innerDefaultValue?: ADCSDK.DefaultValue;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     const keepAlive: httpAgentOptions = {
@@ -54,7 +55,9 @@ export class BackendAPI7 implements ADCSDK.Backend {
       }
       if (opts?.tlsClientCertFile) {
         agentConfig.cert = readFileSync(opts.tlsClientCertFile);
-        agentConfig.key = readFileSync(opts.tlsClientKeyFile);
+        if (opts?.tlsClientKeyFile) {
+          agentConfig.key = readFileSync(opts.tlsClientKeyFile);
+        }
       }
 
       config.httpsAgent = new httpsAgent(agentConfig);
@@ -87,8 +90,8 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
     return (this._version =
       resp?.data?.value === 'dev'
-        ? semver.coerce('999.999.999')
-        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0'));
+        ? semver.coerce('999.999.999')!
+        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0')!);
   }
 
   public async defaultValue() {
@@ -97,16 +100,19 @@ export class BackendAPI7 implements ADCSDK.Backend {
       if (items.length < 2) return items[0];
       if (!items.some((item) => item.type === 'object')) return {};
 
-      const first = items.shift();
-      if (!first.properties) first.properties = {};
-      return items.reduce((pv, cv) => {
+      const first = items.shift() || {};
+      if (!first?.properties) first.properties = {};
+      return items.reduce((pv = {}, cv) => {
         Object.entries(cv?.properties ?? {}).forEach(([key, val]) => {
+          if (!pv.properties) pv.properties = {};
           pv.properties[key] = val;
         });
         return pv;
       }, first);
     };
-    const extractObjectDefault = (obj: JSONSchema4) => {
+    const extractObjectDefault = (
+      obj: JSONSchema4,
+    ): Record<string, any> | null => {
       if (obj.type !== 'object') return null;
       if (!obj.properties) return null;
 
@@ -118,7 +124,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
             // For array nested object (e.g. service.upstream.nodes)
             if (field.type === 'array' && !Array.isArray(field.items)) {
-              if (field.items.type === 'object')
+              if (field?.items?.type === 'object')
                 return [key, [extractObjectDefault(field.items)]];
             }
 
@@ -150,29 +156,31 @@ export class BackendAPI7 implements ADCSDK.Backend {
     const toADC = new ToADC();
     return (this.innerDefaultValue = {
       core: Object.fromEntries(
-        Object.entries(resp.data.value).map(
-          ([type, schema]: [ADCSDK.ResourceType, JSONSchema4]) => {
-            const data =
-              extractObjectDefault(
-                schema.allOf ? mergeAllOf(schema.allOf) : schema,
-              ) ?? {};
-            switch (type) {
-              case ADCSDK.ResourceType.ROUTE:
-                return [type, toADC.transformRoute(data)];
-              case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
-              case ADCSDK.ResourceType.SERVICE:
-                return [type, toADC.transformService(data)];
-              case ADCSDK.ResourceType.SSL:
-                return [type, toADC.transformSSL(data)];
-              case ADCSDK.ResourceType.CONSUMER:
-                return [type, toADC.transformConsumer(data)];
-              case ADCSDK.ResourceType.UPSTREAM:
-                return [type, toADC.transformUpstream(data)];
-              default:
-                return [type, data];
-            }
-          },
-        ),
+        (
+          Object.entries(resp.data.value || {}) as Array<
+            [ADCSDK.ResourceType, JSONSchema4]
+          >
+        ).map(([type, schema]) => {
+          const data =
+            extractObjectDefault(
+              schema.allOf ? mergeAllOf(schema.allOf) : schema,
+            ) ?? {};
+          switch (type) {
+            case ADCSDK.ResourceType.ROUTE:
+              return [type, toADC.transformRoute(data as typing.Route)];
+            case ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE:
+            case ADCSDK.ResourceType.SERVICE:
+              return [type, toADC.transformService(data as typing.Service)];
+            case ADCSDK.ResourceType.SSL:
+              return [type, toADC.transformSSL(data as typing.SSL)];
+            case ADCSDK.ResourceType.CONSUMER:
+              return [type, toADC.transformConsumer(data as typing.Consumer)];
+            case ADCSDK.ResourceType.UPSTREAM:
+              return [type, toADC.transformUpstream(data as typing.Upstream)];
+            default:
+              return [type, data];
+          }
+        }),
       ),
     } as ADCSDK.DefaultValue);
   }
