@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {},
   "files": [],
-  "include": [],
+  "include": [
+    "src",
+    "e2e"
+  ],
   "references": [
     {
       "path": "../sdk"

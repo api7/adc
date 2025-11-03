@@ -57,6 +57,7 @@ describe('Service-Upstreams E2E', () => {
         ],
       });
       // Verify that inline upstream has no id and name
+      // @ts-expect-error ignore
       expect(testService?.upstream?.id).toBeUndefined();
       expect(testService?.upstream?.name).toBeUndefined();
     });
@@ -95,6 +96,7 @@ describe('Service-Upstreams E2E', () => {
       expect(testService?.upstream?.nodes).toHaveLength(2);
       expect(testService?.upstream).toMatchObject(updatedService.upstream);
       // Verify that inline upstream still has no id and name
+      // @ts-expect-error ignore
       expect(testService?.upstream?.id).toBeUndefined();
       expect(testService?.upstream?.name).toBeUndefined();
     });

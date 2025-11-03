@@ -168,7 +168,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       // The sequence of events should not be broken in this process,
       // and the correct behavior of the API will depend on the order
       // of execution.
-      reduce((groups, event) => {
+      reduce((groups: Record<string, Array<ADCSDK.Event>>, event) => {
         const key = `${event.resourceType}.${event.type}`;
         (groups[key] = groups[key] || []).push(event);
         return groups;
@@ -237,7 +237,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
         const route = fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
-          event.parentId,
+          event.parentId!,
           semVerGTE(version, '3.8.0'),
         );
         if (event.parentId) route.service_id = event.parentId;

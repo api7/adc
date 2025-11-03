@@ -194,10 +194,10 @@ export interface Resources {
   [ResourceType.SERVICE]?: Array<Service>;
   [ResourceType.CONSUMER]?: Array<Consumer>;
   [ResourceType.SSL]?: Array<SSL>;
-  [ResourceType.GLOBAL_RULE]?: Record<string, GlobalRule>;
+  [ResourceType.GLOBAL_RULE]?: GlobalRule;
   [ResourceType.PLUGIN_CONFIG]?: Array<PluginConfig>;
   [ResourceType.CONSUMER_GROUP]?: Array<ConsumerGroup>;
-  [ResourceType.PLUGIN_METADATA]?: Record<string, PluginMetadata>;
+  [ResourceType.PLUGIN_METADATA]?: PluginMetadata;
   [ResourceType.STREAM_ROUTE]?: Array<StreamRoute>;
   [ResourceType.UPSTREAM]?: Array<Upstream>;
 }
