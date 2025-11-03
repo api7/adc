@@ -2,6 +2,7 @@ import { globalAgent as httpAgent } from 'node:http';
 import { globalAgent as httpsAgent } from 'node:https';
 
 import { BackendAPI7 } from '../src';
+import { generateHTTPSAgent } from './support/utils';
 
 describe('Ping', () => {
   it('should success', async () => {
@@ -11,7 +12,7 @@ describe('Ping', () => {
       tlsSkipVerify: true,
       cacheKey: 'default',
       httpAgent,
-      httpsAgent,
+      httpsAgent: generateHTTPSAgent(),
     });
     await backend.ping();
   });
