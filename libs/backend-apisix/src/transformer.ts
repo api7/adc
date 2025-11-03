@@ -5,14 +5,12 @@ import * as typing from './typing';
 
 export class ToADC {
   private static transformLabels(labels?: ADCSDK.Labels): ADCSDK.Labels {
-    if (!labels) return undefined;
+    if (!labels) return {};
     const filteredLabels = filter(
       labels,
       (val, key) => key !== '__ADC_NAME',
     ) as unknown as ADCSDK.Labels;
-    return Object.values(filteredLabels).length > 0
-      ? filteredLabels
-      : undefined;
+    return Object.values(filteredLabels).length > 0 ? filteredLabels : {};
   }
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
@@ -75,7 +73,7 @@ export class ToADC {
 
   public transformConsumerCredential(
     credential: typing.ConsumerCredential,
-  ): ADCSDK.ConsumerCredential {
+  ): ADCSDK.ConsumerCredential | undefined {
     if (!credential.plugins || Object.keys(credential.plugins).length <= 0)
       return;
 
@@ -90,19 +88,19 @@ export class ToADC {
       description: credential.desc,
       labels: credential.labels,
       type: pluginName as ADCSDK.ConsumerCredential['type'],
-      config,
+      config: config as ADCSDK.ConsumerCredential['config'],
     });
   }
 
   public transformSSL(ssl: typing.SSL): ADCSDK.SSL {
     const certificates: Array<ADCSDK.SSLCertificate> = [
       {
-        certificate: ssl.cert,
-        key: ssl.key,
+        certificate: ssl.cert!,
+        key: ssl.key!,
       },
       ...(ssl.certs?.map<ADCSDK.SSLCertificate>((cert, idx) => ({
         certificate: cert,
-        key: ssl.keys[idx],
+        key: ssl.keys![idx]!,
       })) ?? []),
     ];
 
@@ -111,7 +109,7 @@ export class ToADC {
       labels: ssl.labels,
 
       type: ssl.type,
-      snis: ssl.sni ? [ssl.sni] : ssl.snis,
+      snis: ssl.sni ? [ssl.sni] : ssl.snis ?? [],
       certificates: certificates,
       client: ssl.client
         ? {
@@ -120,7 +118,7 @@ export class ToADC {
             skip_mtls_uri_regex: ssl.client.skip_mtls_uri_regex,
           }
         : undefined,
-      ssl_protocols: ssl.ssl_protocols,
+      ssl_protocols: ssl.ssl_protocols as ('TLSv1.1' | 'TLSv1.2' | 'TLSv1.3')[],
     });
   }
 
@@ -137,11 +135,13 @@ export class ToADC {
         plugins: consumerGroup.plugins,
 
         consumers: consumers
-          .filter(
-            (consumer) =>
-              consumer.group_id && consumer.group_id === consumerGroup.id,
-          )
-          .map((consumer) => this.transformConsumer(consumer, true)),
+          ? consumers
+              .filter(
+                (consumer) =>
+                  consumer.group_id && consumer.group_id === consumerGroup.id,
+              )
+              .map((consumer) => this.transformConsumer(consumer, true))
+          : undefined,
       });
 
     unset(adcConsumerGroup, 'labels.ADC_NAME');
@@ -187,24 +187,28 @@ export class ToADC {
     const nodes = upstream.nodes
       ? Array.isArray(upstream.nodes)
         ? upstream.nodes
-        : Object.keys(upstream.nodes).map<ADCSDK.UpstreamNode>((node) => {
+        : Object.entries(
+            upstream.nodes as Record<string, number>,
+          ).map<ADCSDK.UpstreamNode>(([node, weight]) => {
             const hostport = node.split(':');
             return {
               host: hostport[0],
               port:
                 hostport.length === 2
                   ? parseInt(hostport[1])
-                  : defaultPortMap[upstream.scheme]
-                    ? defaultPortMap[upstream.scheme]
+                  : defaultPortMap[upstream.scheme!]
+                    ? defaultPortMap[upstream.scheme!]
                     : 80,
-              weight: upstream.nodes[node],
+              weight: weight,
             };
           })
       : undefined;
-    const labels = ADCSDK.utils.recursiveOmitUndefined({
-      ...upstream.labels,
-      [typing.ADC_UPSTREAM_SERVICE_ID_LABEL]: undefined,
-    });
+    const labels: Record<string, string | string[]> = {
+      ...(upstream.labels ?? {}),
+    };
+    delete (labels as Record<string, unknown>)[
+      typing.ADC_UPSTREAM_SERVICE_ID_LABEL
+    ];
     return ADCSDK.utils.recursiveOmitUndefined({
       ...{ id: 'id' in upstream ? upstream.id : undefined },
       name: upstream.name,
@@ -249,16 +253,19 @@ export class FromADC {
   private static transformLabels(
     labels?: ADCSDK.Labels,
   ): Record<string, string> {
-    if (!labels) return undefined;
-    return Object.entries(labels).reduce((pv, [key, value]) => {
-      pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
-      return pv;
-    }, {});
+    if (!labels) return {};
+    return Object.entries(labels).reduce<Record<string, string>>(
+      (pv, [key, value]) => {
+        pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
+        return pv;
+      },
+      {} as Record<string, string>,
+    );
   }
 
   public transformRoute(route: ADCSDK.Route, parentId: string): typing.Route {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
-      id: route.id,
+      id: route.id!,
       name: route.name,
       desc: route.description,
       labels: FromADC.transformLabels(route.labels),
@@ -283,7 +290,7 @@ export class FromADC {
   ): [typing.Service, typing.Upstream | undefined] {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.Service>({
-        id: service.id,
+        id: service.id!,
         name: service.name,
         desc: service.description,
         labels: FromADC.transformLabels(service.labels),
@@ -326,7 +333,7 @@ export class FromADC {
 
   public transformSSL(ssl: ADCSDK.SSL): typing.SSL {
     return ADCSDK.utils.recursiveOmitUndefined<typing.SSL>({
-      id: ssl.id,
+      id: ssl.id!,
       labels: FromADC.transformLabels(ssl.labels),
       status: 1,
       type: ssl.type,
@@ -352,20 +359,18 @@ export class FromADC {
     consumerGroup: ADCSDK.ConsumerGroup,
   ): [typing.ConsumerGroup, Array<typing.Consumer>] {
     const consumerGroupId = ADCSDK.utils.generateId(consumerGroup.name);
-    const consumers: Array<typing.Consumer> = consumerGroup.consumers
-      ?.map(this.transformConsumer)
+    const consumers: Array<typing.Consumer> = (consumerGroup.consumers ?? [])
+      .map((c) => this.transformConsumer(c))
       .map((consumer) => ({ ...consumer, group_id: consumerGroupId }));
 
     return [
-      ADCSDK.utils.recursiveOmitUndefined({
+      ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
-        id: undefined,
+        id: consumerGroupId,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),
           ADC_NAME: consumerGroup.name,
         },
-        name: undefined,
-        consumers: undefined,
       }),
       consumers,
     ];
@@ -377,8 +382,7 @@ export class FromADC {
     return Object.entries(globalRules).reduce<Array<typing.GlobalRule>>(
       (pv, [key, value]) => {
         pv.push(
-          ADCSDK.utils.recursiveOmitUndefined({
-            id: undefined,
+          ADCSDK.utils.recursiveOmitUndefined<typing.GlobalRule>({
             plugins: {
               [key]: value as ADCSDK.Plugin,
             },
@@ -396,7 +400,7 @@ export class FromADC {
     return Object.entries(pluginMetadatas).reduce<Array<typing.PluginMetadata>>(
       (pv, [key, value]) => {
         pv.push(
-          ADCSDK.utils.recursiveOmitUndefined({
+          ADCSDK.utils.recursiveOmitUndefined<typing.PluginMetadata>({
             id: undefined,
             ...value,
             __plugin_name: key,
@@ -429,13 +433,18 @@ export class FromADC {
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
       service_id: parentId,
-    } as typing.StreamRoute);
+    } as unknown as typing.StreamRoute);
   }
 
-  public transformUpstream(upstream: ADCSDK.Upstream): typing.Upstream {
-    return ADCSDK.utils.recursiveOmitUndefined({
-      ...upstream,
-      id: undefined,
+  public transformUpstream(
+    upstream: ADCSDK.Upstream,
+  ): Omit<typing.Upstream, 'id'> {
+    const { id: _omit, ...rest } = upstream as { id?: string } & Omit<
+      ADCSDK.Upstream,
+      'id'
+    >;
+    return ADCSDK.utils.recursiveOmitUndefined<Omit<typing.Upstream, 'id'>>({
+      ...rest,
       labels: FromADC.transformLabels(upstream.labels),
     });
   }
