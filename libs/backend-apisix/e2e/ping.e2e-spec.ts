@@ -76,9 +76,7 @@ describe('Ping', () => {
       cacheKey: 'default',
       httpAgent,
       httpsAgent: new httpsAgent({
-        cert: readFileSync(
-          join(__dirname, 'assets/apisix_conf/mtls/client.cer'),
-        ),
+        ca: readFileSync(join(__dirname, 'assets/apisix_conf/mtls/ca.cer')),
       }),
       caCertFile: join(__dirname, 'assets/apisix_conf/mtls/ca.cer'),
     });
