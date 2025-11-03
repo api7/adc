@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { unset } from 'lodash';
 import { readFileSync } from 'node:fs';
+import { globalAgent as httpAgent } from 'node:http';
 import { join } from 'node:path';
 import { gte, lt } from 'semver';
 
@@ -10,16 +11,20 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  generateHTTPSAgent,
   semverCondition,
   syncEvents,
 } from './support/utils';
 
 describe('Label Selector', () => {
   const commonBackendOpts = {
-    server: process.env.SERVER,
-    token: process.env.TOKEN,
+    server: process.env.SERVER!,
+    token: process.env.TOKEN!,
     tlsSkipVerify: true,
     gatewayGroup: process.env.GATEWAY_GROUP,
+    cacheKey: 'default',
+    httpAgent,
+    httpsAgent: generateHTTPSAgent(),
   };
   let backend: BackendAPI7;
 
