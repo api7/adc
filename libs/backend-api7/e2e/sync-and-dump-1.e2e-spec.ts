@@ -1,6 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { unset } from 'lodash';
 import { readFileSync } from 'node:fs';
+import { globalAgent as httpAgent } from 'node:http';
 import { join } from 'node:path';
 
 import { BackendAPI7 } from '../src';
@@ -8,6 +9,7 @@ import {
   createEvent,
   deleteEvent,
   dumpConfiguration,
+  generateHTTPSAgent,
   sortResult,
   syncEvents,
   updateEvent,
@@ -18,10 +20,13 @@ describe('Sync and Dump - 1', () => {
 
   beforeAll(() => {
     backend = new BackendAPI7({
-      server: process.env.SERVER,
-      token: process.env.TOKEN,
+      server: process.env.SERVER!,
+      token: process.env.TOKEN!,
       tlsSkipVerify: true,
       gatewayGroup: process.env.GATEWAY_GROUP,
+      cacheKey: 'default',
+      httpAgent,
+      httpsAgent: generateHTTPSAgent(),
     });
   });
 

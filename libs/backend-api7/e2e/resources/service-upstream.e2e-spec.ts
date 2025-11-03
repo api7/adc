@@ -1,12 +1,14 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { unset } from 'lodash';
+import { globalAgent as httpAgent } from 'node:http';
 import { gte } from 'semver';
 
 import { BackendAPI7 } from '../../src';
 import {
   conditionalDescribe,
   dumpConfiguration,
+  generateHTTPSAgent,
   semverCondition,
   sortResult,
   syncEvents,
@@ -24,6 +26,8 @@ conditionalDescribe(semverCondition(gte, '3.5.0'))(
         tlsSkipVerify: true,
         gatewayGroup: process.env.GATEWAY_GROUP,
         cacheKey: 'e2e-service-upstream',
+        httpAgent,
+        httpsAgent: generateHTTPSAgent(),
       });
     });
 

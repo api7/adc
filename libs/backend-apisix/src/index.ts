@@ -1,14 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import axios, { type AxiosInstance, CreateAxiosDefaults } from 'axios';
-import { readFileSync } from 'node:fs';
-import {
-  Agent as httpAgent,
-  AgentOptions as httpAgentOptions,
-} from 'node:http';
-import {
-  Agent as httpsAgent,
-  AgentOptions as httpsAgentOptions,
-} from 'node:https';
+import axios, { type AxiosInstance } from 'axios';
 import { Observable, Subject, forkJoin, from, switchMap } from 'rxjs';
 import semver, { SemVer } from 'semver';
 
@@ -23,42 +14,16 @@ export class BackendAPISIX implements ADCSDK.Backend {
   private _version?: SemVer;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
-    const keepAlive: httpAgentOptions = {
-      keepAlive: true,
-      keepAliveMsecs: 60000,
-      maxSockets: 256, // per host
-    };
-    const config: CreateAxiosDefaults = {
+    this.client = axios.create({
       baseURL: `${opts.server}`,
       headers: {
         'Content-Type': 'application/json',
         'X-API-KEY': opts.token,
       },
-      httpAgent: new httpAgent(keepAlive),
-    };
-
-    if (opts.server.startsWith('https')) {
-      const agentConfig: httpsAgentOptions = {
-        ...keepAlive,
-        rejectUnauthorized: !opts?.tlsSkipVerify,
-      };
-
-      if (opts?.caCertFile) {
-        agentConfig.ca = readFileSync(opts.caCertFile);
-      }
-      if (opts?.tlsClientCertFile) {
-        agentConfig.cert = readFileSync(opts.tlsClientCertFile);
-        if (opts?.tlsClientKeyFile) {
-          agentConfig.key = readFileSync(opts.tlsClientKeyFile);
-        }
-      }
-
-      config.httpsAgent = new httpsAgent(agentConfig);
-    }
-
-    if (opts.timeout) config.timeout = opts.timeout;
-
-    this.client = axios.create(config);
+      httpAgent: opts.httpAgent,
+      httpsAgent: opts.httpsAgent,
+      ...(opts.timeout ? { timeout: opts.timeout } : {}),
+    });
   }
 
   public metadata() {

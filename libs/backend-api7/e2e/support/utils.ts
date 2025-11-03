@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
+import { Agent as httpsAgent } from 'node:https';
 import { lastValueFrom, toArray } from 'rxjs';
 import * as semver from 'semver';
 
@@ -108,6 +109,12 @@ export const overrideEventResourceId = (
 
 export const sortResult = <T>(result: Array<T>, field: string) =>
   structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
+
+export const generateHTTPSAgent = () => {
+  return new httpsAgent({
+    rejectUnauthorized: false,
+  });
+};
 
 type cond = boolean | (() => boolean);
 
