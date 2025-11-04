@@ -110,7 +110,7 @@ export class ToADC {
       description: credential.desc,
       labels: credential.labels,
       type: pluginName as ADCSDK.ConsumerCredential['type'],
-      config,
+      config: config as ADCSDK.ConsumerCredential['config'],
     });
   }
 
