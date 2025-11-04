@@ -12,8 +12,7 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node"],
-    "skipLibCheck": true
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "references": [
