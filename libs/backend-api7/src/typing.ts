@@ -106,6 +106,7 @@ export interface SSL {
     depth: number;
   };
   snis?: string[];
+  status?: number;
 }
 export interface GlobalRule {
   plugins: Plugins;

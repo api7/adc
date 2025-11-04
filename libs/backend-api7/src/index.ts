@@ -67,7 +67,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
       const first = items.shift() || {};
       if (!first?.properties) first.properties = {};
-      return items.reduce((pv = {}, cv) => {
+      return items.reduce((pv, cv) => {
         Object.entries(cv?.properties ?? {}).forEach(([key, val]) => {
           if (!pv.properties) pv.properties = {};
           pv.properties[key] = val;

@@ -364,7 +364,7 @@ export class FromADC {
   ): [typing.ConsumerGroup, Array<typing.Consumer>] {
     const consumerGroupId = ADCSDK.utils.generateId(consumerGroup.name);
     const consumers: Array<typing.Consumer> = (consumerGroup.consumers ?? [])
-      .map((c) => this.transformConsumer(c))
+      .map(this.transformConsumer)
       .map((consumer) => ({ ...consumer, group_id: consumerGroupId }));
 
     return [

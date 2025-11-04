@@ -139,21 +139,12 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       map(({ list }) =>
         // [{ 'key-auth': {}, 'basic-auth': {} }, { 'real-ip': {} }] =>
         //  { 'key-auth': {}, 'basic-auth': {}, 'real-ip': {} }
-        {
-          console.log('list', list);
-
-          const returnData = Object.fromEntries(
-            list.flatMap((item) => Object.entries(item.value?.plugins ?? [])),
-          );
-
-          console.log('listGlobalRules returnData', returnData);
-
-          return returnData;
-        },
+        Object.fromEntries(
+          list.flatMap((item) => Object.entries(item.value?.plugins ?? [])),
+        ),
       ),
     );
   }
-
   private listPluginMetadata() {
     return this._list<
       typing.ListResponse<Record<string, typing.PluginMetadata>>

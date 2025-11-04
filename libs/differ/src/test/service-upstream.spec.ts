@@ -143,6 +143,7 @@ describe('Differ V3 - service with upstreams', () => {
           services: [
             {
               ...structuredClone(service),
+              // @ts-expect-error testing purposes
               upstreams: [{ id: upstream2Name, name: upstream2Name }],
             },
           ],
@@ -190,6 +191,7 @@ describe('Differ V3 - service with upstreams', () => {
               ...structuredClone(service),
               upstreams: [
                 {
+                  // @ts-expect-error testing purposes
                   id: ADCSDK.utils.generateId(`${serviceName}.${upstreamName}`),
                   name: upstreamName,
                   nodes: [{ host: '1.1.1.1', port: 80, weight: 1 }],

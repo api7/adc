@@ -269,8 +269,8 @@ export class FromADC {
     return ADCSDK.utils.recursiveOmitUndefined<typing.SSL>({
       id: ssl.id,
       labels: FromADC.transformLabels(ssl.labels),
+      status: 1,
       type: ssl.type ?? 'server',
-
       snis: ssl.snis,
       cert: ssl.certificates[0].certificate,
       key: ssl.certificates[0].key,
