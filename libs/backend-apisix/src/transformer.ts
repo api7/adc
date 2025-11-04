@@ -404,8 +404,8 @@ export class FromADC {
     return Object.entries(pluginMetadatas).reduce<Array<typing.PluginMetadata>>(
       (pv, [key, value]) => {
         pv.push(
-          ADCSDK.utils.recursiveOmitUndefined<typing.PluginMetadata>({
-            id: undefined,
+          ADCSDK.utils.recursiveOmitUndefined<Record<string, any>>({
+            id: undefined ,
             ...value,
             __plugin_name: key,
           }),
