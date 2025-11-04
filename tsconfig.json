@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "files": [],
   "compilerOptions": {
-    "lib": ["esnext", "dom", "webworker"],
+    "lib": ["esnext"],
   },
   "references": [
     {
