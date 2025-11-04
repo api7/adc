@@ -1,5 +1,4 @@
 import { LogEntry, LogEntryOptions, Logger } from '@api7/adc-sdk';
-import axios, { AxiosResponse } from 'axios';
 import {
   ListrRenderer,
   ListrTaskEventType,
@@ -64,8 +63,9 @@ export class SignaleRenderer implements ListrRenderer {
     if (err) {
       this.getScopedLogger().fatal(err);
     } else {
-      this.options.verbose > 0 &&
+      if (this.options.verbose > 0) {
         this.getScopedLogger().star('All is well, see you next time!');
+      }
     }
   }
 
@@ -84,22 +84,26 @@ export class SignaleRenderer implements ListrRenderer {
         if (!task.hasTitle()) return;
 
         if (state === ListrTaskState.STARTED) {
-          rendererOptions?.verbose > 0 &&
+          if (rendererOptions?.verbose > 0) {
             this.getScopedLogger(rendererOptions).start(task.title);
+          }
         }
         if (state === ListrTaskState.COMPLETED) {
-          rendererOptions?.verbose > 0 &&
+          if (rendererOptions?.verbose > 0) {
             this.getScopedLogger(rendererOptions).success(task.title);
+          }
         }
         if (state === ListrTaskState.SKIPPED) {
-          rendererOptions?.verbose > 0 &&
+          if (rendererOptions?.verbose > 0) {
             this.getScopedLogger(rendererOptions).info(
               `${task.title} is skipped${task.message.skip ? `: ${task.message.skip}` : ''}`,
             );
+          }
         }
         if (state === ListrTaskState.FAILED) {
-          rendererOptions?.verbose > 0 &&
+          if (rendererOptions?.verbose > 0) {
             this.getScopedLogger(rendererOptions).error(task.title);
+          }
         }
       });
 

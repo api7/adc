@@ -1,9 +1,5 @@
-import * as ADCSDK from '@api7/adc-sdk';
-import { Listr, ListrTask } from 'listr2';
-import pluralize from 'pluralize';
-import { ZodError } from 'zod';
+import { Listr } from 'listr2';
 
-import { check } from '../linter';
 import { LintTask, LoadLocalConfigurationTask } from '../tasks';
 import { SignaleRenderer } from '../utils/listr';
 import { BaseCommand } from './helper';
