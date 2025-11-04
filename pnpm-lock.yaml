@@ -207,9 +207,6 @@ importers:
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../../libs/sdk
-      '@nx/webpack':
-        specifier: 21.6.4
-        version: 21.6.4(@babel/traverse@7.28.0)(@swc-node/register@1.9.2(@swc/core@1.13.5(@swc/helpers@0.5.17))(@swc/types@0.1.24)(typescript@5.9.3))(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)(nx@21.6.4(@swc-node/register@1.9.2(@swc/core@1.13.5(@swc/helpers@0.5.17))(@swc/types@0.1.24)(typescript@5.9.3))(@swc/core@1.13.5(@swc/helpers@0.5.17)))(typescript@5.9.3)
       agentkeepalive:
         specifier: ^4.6.0
         version: 4.6.0
@@ -252,27 +249,12 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.1
-      semver:
-        specifier: ^7.6.3
-        version: 7.7.2
       signale:
         specifier: ^1.4.0
         version: 1.4.0
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21
-      supertest:
-        specifier: 7.1.4
-        version: 7.1.4
-      terser-webpack-plugin:
-        specifier: ^5.3.14
-        version: 5.3.14(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)(webpack@5.101.3(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9))
-      vitest:
-        specifier: 3.0.0
-        version: 3.0.0(@types/node@22.16.5)(@vitest/ui@3.2.4(vitest@3.0.0))(jiti@2.4.2)(less@4.1.3)(sass-embedded@1.86.0)(sass@1.86.0)(terser@5.39.1)(yaml@2.8.0)
-      webpack:
-        specifier: 5.101.3
-        version: 5.101.3(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)
       winston:
         specifier: ^3.17.0
         version: 3.17.0
@@ -295,12 +277,27 @@ importers:
       '@api7/adc-differ':
         specifier: workspace:*
         version: link:../../libs/differ
+      '@nx/webpack':
+        specifier: 21.6.4
+        version: 21.6.4(@babel/traverse@7.28.0)(@swc-node/register@1.9.2(@swc/core@1.13.5(@swc/helpers@0.5.17))(@swc/types@0.1.24)(typescript@5.9.3))(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)(nx@21.6.4(@swc-node/register@1.9.2(@swc/core@1.13.5(@swc/helpers@0.5.17))(@swc/types@0.1.24)(typescript@5.9.3))(@swc/core@1.13.5(@swc/helpers@0.5.17)))(typescript@5.9.3)
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.3
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
+      supertest:
+        specifier: ^7.1.4
+        version: 7.1.4
+      terser-webpack-plugin:
+        specifier: ^5.3.14
+        version: 5.3.14(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)(webpack@5.101.3(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9))
+      vitest:
+        specifier: 3.0.0
+        version: 3.0.0(@types/node@22.16.5)(@vitest/ui@3.2.4(vitest@3.0.0))(jiti@2.4.2)(less@4.1.3)(sass-embedded@1.86.0)(sass@1.86.0)(terser@5.39.1)(yaml@2.8.0)
+      webpack:
+        specifier: 5.101.3
+        version: 5.101.3(@swc/core@1.13.5(@swc/helpers@0.5.17))(esbuild@0.25.9)
 
   libs/backend-api7:
     devDependencies:
