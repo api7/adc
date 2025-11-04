@@ -1,4 +1,6 @@
 name: Typecheck
+permissions:
+  contents: read
 on:
   push:
     branches:
