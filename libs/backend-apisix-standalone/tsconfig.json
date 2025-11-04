@@ -7,6 +7,9 @@
       "path": "../sdk"
     },
     {
+      "path": "../differ"
+    },
+    {
       "path": "./tsconfig.lib.json"
     },
     {

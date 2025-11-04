@@ -210,6 +210,7 @@ describe('CLI utils', () => {
             {
               name: 'TestRoute',
               uris: ['/test'],
+              // @ts-expect-error for test purpose
               metadata: { id: 'test_route' },
             },
           ],
@@ -220,6 +221,7 @@ describe('CLI utils', () => {
           stream_routes: [
             {
               name: 'TestStreamRoute',
+              // @ts-expect-error for test purpose
               metadata: { id: 'test_stream_route' },
             },
           ],
@@ -229,6 +231,7 @@ describe('CLI utils', () => {
         {
           snis: ['test'],
           certificates: [],
+          // @ts-expect-error for test purpose
           metadata: { id: 'test_ssl' },
         },
       ],

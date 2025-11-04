@@ -18,6 +18,9 @@
   "references": [
     {
       "path": "../sdk/tsconfig.lib.json"
+    },
+    {
+      "path": "../differ/tsconfig.lib.json"
     }
   ],
   "exclude": [
@@ -32,6 +35,7 @@
     "src/**/*.test.js",
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
-    "src/**/*.spec.jsx"
+    "src/**/*.spec.jsx",
+    "e2e/**/*.ts"
   ]
 }

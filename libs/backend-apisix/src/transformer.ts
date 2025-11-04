@@ -353,7 +353,7 @@ export class FromADC {
               .map((certificate) => certificate.key),
           }
         : {}),
-      client: ssl.client,
+      client: ssl.client as typing.SSL['client'],
     });
   }
 

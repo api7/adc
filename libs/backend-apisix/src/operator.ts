@@ -254,6 +254,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           };
         return upstream;
       }
+      default:
+        throw new Error(`Unsupported resource type: ${event.resourceType}`);
     }
   }
 }

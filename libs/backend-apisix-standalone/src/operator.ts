@@ -369,7 +369,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 keys: res.certificates.slice(1).map((cert) => cert.key),
               }
             : {}),
-          client: res.client,
+          client: res.client as typing.SSL['client'],
           ssl_protocols: res.ssl_protocols,
           status: 1,
         } satisfies typing.SSL as typing.SSL;

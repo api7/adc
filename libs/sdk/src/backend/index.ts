@@ -22,7 +22,7 @@ export interface BackendOptions {
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
 
-  cacheKey: string;
+  cacheKey?: string;
   httpAgent?: httpAgent;
   httpsAgent?: httpsAgent;
 }

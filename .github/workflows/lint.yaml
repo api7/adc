@@ -18,5 +18,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Run TypeScript Type Check
+        run: npx nx run-many --target=typecheck --all --skip-nx-cache
+
       - name: Run Lint Check
         run: npx nx run-many --target=lint --all --skip-nx-cache
