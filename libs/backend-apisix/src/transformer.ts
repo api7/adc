@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { filter, isEmpty, unset } from 'lodash';
+import { filter, isEmpty, unset, omit } from 'lodash';
 
 import * as typing from './typing';
 
@@ -207,12 +207,10 @@ export class ToADC {
             };
           })
       : undefined;
-    const labels: Record<string, string | string[]> = {
-      ...(upstream.labels ?? {}),
-    };
-    delete (labels as Record<string, unknown>)[
-      typing.ADC_UPSTREAM_SERVICE_ID_LABEL
-    ];
+    const labels: Record<string, string | string[]> = omit(
+      upstream.labels ?? {},
+      typing.ADC_UPSTREAM_SERVICE_ID_LABEL,
+    );
     return ADCSDK.utils.recursiveOmitUndefined({
       ...{ id: 'id' in upstream ? upstream.id : undefined },
       name: upstream.name,
@@ -443,12 +441,8 @@ export class FromADC {
   public transformUpstream(
     upstream: ADCSDK.Upstream,
   ): Omit<typing.Upstream, 'id'> {
-    const { id: _omit, ...rest } = upstream as { id?: string } & Omit<
-      ADCSDK.Upstream,
-      'id'
-    >;
-    return ADCSDK.utils.recursiveOmitUndefined<Omit<typing.Upstream, 'id'>>({
-      ...rest,
+   return ADCSDK.utils.recursiveOmitUndefined<Omit<typing.Upstream, 'id'>>({
+      ...omit(upstream, 'id'),
       labels: FromADC.transformLabels(upstream.labels),
     });
   }

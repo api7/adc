@@ -65,8 +65,8 @@ export class BackendAPI7 implements ADCSDK.Backend {
       if (items.length < 2) return items[0];
       if (!items.some((item) => item.type === 'object')) return {};
 
-      const first = items.shift() || {};
-      if (!first?.properties) first.properties = {};
+      const first: JSONSchema4 = items.shift() || { type: 'object', properties: {} };
+      if (!first.properties) first.properties = {};
       return items.reduce((pv, cv) => {
         Object.entries(cv?.properties ?? {}).forEach(([key, val]) => {
           if (!pv.properties) pv.properties = {};
