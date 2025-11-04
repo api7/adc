@@ -4,13 +4,17 @@ import { filter, isEmpty, unset } from 'lodash';
 import * as typing from './typing';
 
 export class ToADC {
-  private static transformLabels(labels?: ADCSDK.Labels): ADCSDK.Labels {
-    if (!labels) return {};
+  private static transformLabels(
+    labels?: ADCSDK.Labels,
+  ): ADCSDK.Labels | undefined {
+    if (!labels) return undefined;
     const filteredLabels = filter(
       labels,
       (val, key) => key !== '__ADC_NAME',
     ) as unknown as ADCSDK.Labels;
-    return Object.values(filteredLabels).length > 0 ? filteredLabels : {};
+    return Object.values(filteredLabels).length > 0
+      ? filteredLabels
+      : undefined;
   }
 
   public transformRoute(route: typing.Route): ADCSDK.Route {
@@ -252,9 +256,9 @@ export class ToADC {
 export class FromADC {
   private static transformLabels(
     labels?: ADCSDK.Labels,
-  ): Record<string, string> {
-    if (!labels) return {};
-    return Object.entries(labels).reduce<Record<string, string>>(
+  ): Record<string, string> | undefined {
+    if (!labels) return undefined;
+    return Object.entries(labels).reduce(
       (pv, [key, value]) => {
         pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
         return pv;
