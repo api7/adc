@@ -65,7 +65,10 @@ export class ToADC {
   }
 
   public transformUpstream(upstream: typing.Upstream): ADCSDK.Upstream {
-    return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.Upstream>({
+    return ADCSDK.utils.recursiveOmitUndefined<
+      ADCSDK.Upstream & { id?: string }
+    >({
+      id: upstream?.id,
       name: upstream.name,
       description: upstream.desc,
       labels: ToADC.transformLabels(upstream.labels),
@@ -195,9 +198,9 @@ export class FromADC {
       labels: FromADC.transformLabels(route.labels),
       service_id: serviceId,
       plugins: route.plugins,
-      server_addr: route.server_addr || '',
-      server_port: route.server_port || 0,
-      remote_addr: route.remote_addr || '',
+      server_addr: route.server_addr,
+      server_port: route.server_port,
+      remote_addr: route.remote_addr,
     });
   }
 
@@ -218,8 +221,9 @@ export class FromADC {
     });
   }
 
-  public transformUpstream(upstream: ADCSDK.Upstream): typing.Upstream {
+  public transformUpstream(upstream: ADCSDK.Upstream & { id?: string }): typing.Upstream {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Upstream>({
+      id: upstream?.id,
       name: upstream.name || '',
       desc: upstream.description,
       labels: FromADC.transformLabels(upstream.labels),

@@ -53,9 +53,9 @@ export interface StreamRoute {
 
   plugins?: Plugins;
 
-  server_addr: string;
-  server_port: number;
-  remote_addr: string;
+  server_addr?: string;
+  server_port?: number;
+  remote_addr?: string;
 }
 export interface Service {
   id?: string;
