@@ -424,7 +424,7 @@ describe('Sync and Dump - 1', () => {
     const plugin1Name = 'prometheus';
     const plugin1 = {
       prefer_name: true,
-    } as unknown as ADCSDK.GlobalRule;
+    } as ADCSDK.Plugin;
     const plugin2Name = 'file-logger';
     const plugin2 = {
       path: 'logs/file.log',
@@ -444,7 +444,7 @@ describe('Sync and Dump - 1', () => {
     });
 
     it('Update plugin1', async () => {
-      plugin1.test = { value: 'test' };
+      plugin1.test = 'test';
       await syncEvents(backend, [
         updateEvent(ADCSDK.ResourceType.GLOBAL_RULE, plugin1Name, plugin1),
       ]);
