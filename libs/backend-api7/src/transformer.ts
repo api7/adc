@@ -137,16 +137,14 @@ export class ToADC {
   public transformGlobalRule(
     globalRules: Array<typing.GlobalRule>,
   ): Record<string, ADCSDK.GlobalRule> {
-    const entries: Array<[string, ADCSDK.GlobalRule]> = globalRules.map(
-      (globalRule) => {
-        const [name, config] = Object.entries(globalRule.plugins)[0] as [
+    return Object.fromEntries<ADCSDK.GlobalRule>(
+      globalRules.map((globalRule) => {
+        return Object.entries(globalRule.plugins)[0] as [
           string,
           ADCSDK.GlobalRule,
         ];
-        return [name, config];
-      },
+      }),
     );
-    return Object.fromEntries(entries);
   }
 
   public transformPluginMetadatas(
@@ -159,8 +157,8 @@ export class ToADC {
 export class FromADC {
   private static transformLabels(
     labels?: ADCSDK.Labels,
-  ): Record<string, string> {
-    if (!labels) return {};
+  ): Record<string, string> | undefined {
+    if (!labels) return undefined;
     return Object.entries(labels).reduce<Record<string, string>>(
       (pv, [key, value]) => {
         pv[key] = typeof value === 'string' ? value : JSON.stringify(value);
@@ -172,7 +170,7 @@ export class FromADC {
 
   public transformRoute(route: ADCSDK.Route, serviceId: string): typing.Route {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Route>({
-      route_id: route.id || '',
+      route_id: route.id!,
       name: route.name,
       desc: route.description,
       labels: FromADC.transformLabels(route.labels),
@@ -183,7 +181,7 @@ export class FromADC {
       paths: route.uris,
       priority: route.priority,
       timeout: route.timeout,
-      vars: route.vars || [],
+      vars: route.vars!,
     });
   }
 
@@ -192,9 +190,9 @@ export class FromADC {
     serviceId: string,
   ): typing.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined<typing.StreamRoute>({
-      stream_route_id: route.id || '',
+      stream_route_id: route.id!,
       name: route.name,
-      desc: route.description || '',
+      desc: route.description!,
       labels: FromADC.transformLabels(route.labels),
       service_id: serviceId,
       plugins: route.plugins,
@@ -221,10 +219,12 @@ export class FromADC {
     });
   }
 
-  public transformUpstream(upstream: ADCSDK.Upstream & { id?: string }): typing.Upstream {
+  public transformUpstream(
+    upstream: ADCSDK.Upstream & { id?: string },
+  ): typing.Upstream {
     return ADCSDK.utils.recursiveOmitUndefined<typing.Upstream>({
       id: upstream?.id,
-      name: upstream.name || '',
+      name: upstream.name!,
       desc: upstream.description,
       labels: FromADC.transformLabels(upstream.labels),
       type: upstream.type,

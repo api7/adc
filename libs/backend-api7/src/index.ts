@@ -12,7 +12,7 @@ import * as typing from './typing';
 
 export class BackendAPI7 implements ADCSDK.Backend {
   private readonly client: AxiosInstance;
-  private readonly gatewayGroupName?: string;
+  private readonly gatewayGroupName: string;
   private static logScope = ['API7'];
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
@@ -31,7 +31,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
       httpsAgent: opts.httpsAgent,
       ...(opts.timeout ? { timeout: opts.timeout } : {}),
     });
-    this.gatewayGroupName = opts.gatewayGroup;
+    this.gatewayGroupName = opts.gatewayGroup!;
   }
 
   public metadata() {
@@ -55,8 +55,8 @@ export class BackendAPI7 implements ADCSDK.Backend {
 
     return (this._version =
       resp?.data?.value === 'dev'
-        ? semver.coerce('999.999.999')!
-        : semver.coerce(resp?.data?.value) || semver.coerce('0.0.0')!);
+        ? new semver.SemVer('999.999.999')
+        : semver.coerce(resp?.data?.value) || new semver.SemVer('0.0.0'));
   }
 
   public async defaultValue() {

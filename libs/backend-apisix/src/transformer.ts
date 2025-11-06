@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { filter, isEmpty, unset, omit } from 'lodash';
+import { filter, isEmpty, omit, unset } from 'lodash';
 
 import * as typing from './typing';
 
@@ -122,7 +122,7 @@ export class ToADC {
             skip_mtls_uri_regex: ssl.client.skip_mtls_uri_regex,
           }
         : undefined,
-      ssl_protocols: ssl.ssl_protocols as ('TLSv1.1' | 'TLSv1.2' | 'TLSv1.3')[],
+      ssl_protocols: ssl.ssl_protocols,
     });
   }
 
@@ -368,11 +368,15 @@ export class FromADC {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
-        id: consumerGroupId,
+        // @ts-expect-error ignored
+        id: undefined,
+        name: undefined,
+        consumers: undefined,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),
           ADC_NAME: consumerGroup.name,
         },
+
       }),
       consumers,
     ];
@@ -403,7 +407,7 @@ export class FromADC {
       (pv, [key, value]) => {
         pv.push(
           ADCSDK.utils.recursiveOmitUndefined<Record<string, any>>({
-            id: undefined ,
+            id: undefined,
             ...value,
             __plugin_name: key,
           }),
@@ -441,7 +445,7 @@ export class FromADC {
   public transformUpstream(
     upstream: ADCSDK.Upstream,
   ): Omit<typing.Upstream, 'id'> {
-   return ADCSDK.utils.recursiveOmitUndefined<Omit<typing.Upstream, 'id'>>({
+    return ADCSDK.utils.recursiveOmitUndefined<Omit<typing.Upstream, 'id'>>({
       ...omit(upstream, 'id'),
       labels: FromADC.transformLabels(upstream.labels),
     });

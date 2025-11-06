@@ -38,8 +38,6 @@
     "src/**/*.spec.tsx",
     "src/**/*.test.js",
     "src/**/*.spec.js",
-    "src/**/*.test.jsx",
-    "src/**/*.spec.jsx",
-    "e2e/**/*.ts"
+    "src/**/*.test.jsx"
   ]
 }

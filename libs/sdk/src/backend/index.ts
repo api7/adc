@@ -22,9 +22,9 @@ export interface BackendOptions {
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
 
-  cacheKey?: string;
-  httpAgent?: httpAgent;
-  httpsAgent?: httpsAgent;
+  cacheKey: string;
+  httpAgent: httpAgent;
+  httpsAgent: httpsAgent;
 }
 
 export const BackendEventType = {

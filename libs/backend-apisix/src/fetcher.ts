@@ -152,7 +152,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       map(({ list }) =>
         Object.fromEntries<ADCSDK.Plugin>(
           list.map((item) => [
-            item.key.split('/').pop() ?? item.key,
+            item.key.split('/').pop() as string,
             ADCSDK.utils.recursiveOmitUndefined(item.value),
           ]),
         ),

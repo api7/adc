@@ -96,7 +96,7 @@ export interface SSL {
     depth: number;
     skip_mtls_uri_regex?: Array<string>;
   };
-  ssl_protocols?: Array<string>;
+  ssl_protocols?: ('TLSv1.1' | 'TLSv1.2' | 'TLSv1.3')[];
 
   status: number;
 }

@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "files": [],
-  "compilerOptions": {
-    "lib": ["esnext"],
-  },
+  "compilerOptions": {},
   "references": [
     {
       "path": "./apps/cli"
