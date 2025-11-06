@@ -368,15 +368,15 @@ export class FromADC {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
-        // @ts-expect-error ignored
+        // @ts-ignore
         id: undefined,
+        // @ts-ignore
         name: undefined,
         consumers: undefined,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),
           ADC_NAME: consumerGroup.name,
         },
-
       }),
       consumers,
     ];
