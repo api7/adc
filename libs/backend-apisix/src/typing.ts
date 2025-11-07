@@ -96,7 +96,7 @@ export interface SSL {
     depth: number;
     skip_mtls_uri_regex?: Array<string>;
   };
-  ssl_protocols?: Array<string>;
+  ssl_protocols?: ('TLSv1.1' | 'TLSv1.2' | 'TLSv1.3')[];
 
   status: number;
 }
@@ -115,7 +115,10 @@ export interface ConsumerGroup {
 
   plugins: Plugins;
 }
-export type GlobalRule = ADCGlobalRule;
+export interface GlobalRule {
+  plugins: Plugins;
+}
+
 export type PluginMetadata = ADCPluginMetadata;
 export interface StreamRoute {
   id: string;
@@ -194,10 +197,10 @@ export interface Resources {
   [ResourceType.SERVICE]?: Array<Service>;
   [ResourceType.CONSUMER]?: Array<Consumer>;
   [ResourceType.SSL]?: Array<SSL>;
-  [ResourceType.GLOBAL_RULE]?: Record<string, GlobalRule>;
+  [ResourceType.GLOBAL_RULE]?: ADCGlobalRule;
   [ResourceType.PLUGIN_CONFIG]?: Array<PluginConfig>;
   [ResourceType.CONSUMER_GROUP]?: Array<ConsumerGroup>;
-  [ResourceType.PLUGIN_METADATA]?: Record<string, PluginMetadata>;
+  [ResourceType.PLUGIN_METADATA]?: PluginMetadata;
   [ResourceType.STREAM_ROUTE]?: Array<StreamRoute>;
   [ResourceType.UPSTREAM]?: Array<Upstream>;
 }

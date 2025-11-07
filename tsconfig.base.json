@@ -9,6 +9,7 @@
     "module": "nodenext",
     "lib": [
       "esnext"
-    ]
+    ],
+    "skipLibCheck": true
   }
 }

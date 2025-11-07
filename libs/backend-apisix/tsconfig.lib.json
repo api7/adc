@@ -12,10 +12,17 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
+    {
+      "path": "../differ/tsconfig.lib.json"
+    },
     {
       "path": "../sdk/tsconfig.lib.json"
     }
@@ -31,7 +38,6 @@
     "src/**/*.spec.tsx",
     "src/**/*.test.js",
     "src/**/*.spec.js",
-    "src/**/*.test.jsx",
-    "src/**/*.spec.jsx"
+    "src/**/*.test.jsx"
   ]
 }

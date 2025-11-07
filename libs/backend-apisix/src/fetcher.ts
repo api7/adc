@@ -145,15 +145,14 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       ),
     );
   }
-
   private listPluginMetadata() {
-    return this._list<typing.ListResponse<typing.PluginMetadata>>(
-      ADCSDK.ResourceType.PLUGIN_METADATA,
-    ).pipe<ADCSDK.Plugins>(
+    return this._list<
+      typing.ListResponse<Record<string, typing.PluginMetadata>>
+    >(ADCSDK.ResourceType.PLUGIN_METADATA).pipe<ADCSDK.Plugins>(
       map(({ list }) =>
         Object.fromEntries<ADCSDK.Plugin>(
           list.map((item) => [
-            item.key.split('/').pop(),
+            item.key.split('/').pop() as string,
             ADCSDK.utils.recursiveOmitUndefined(item.value),
           ]),
         ),
@@ -221,7 +220,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       // Move plugin templates to route
       map((resources) => {
         const pluginConfigIdMap = Object.fromEntries(
-          resources?.[ADCSDK.ResourceType.PLUGIN_CONFIG]?.map((item) => [
+          (resources?.[ADCSDK.ResourceType.PLUGIN_CONFIG] ?? []).map((item) => [
             item.id,
             item,
           ]),
@@ -241,7 +240,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       // Move upstreams to service or route
       map((resources) => {
         const upstreamIdMap = Object.fromEntries(
-          resources?.upstream?.map((item) => [
+          (resources?.upstream ?? []).map((item) => [
             item.id,
             this.toADC.transformUpstream(item),
           ]),
@@ -274,7 +273,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
                   serviceDraft.upstream = upstreamIdMap[service.upstream_id];
                 unset(serviceDraft, 'upstream.id');
                 unset(serviceDraft, 'upstream.name');
-                if (upstreamServiceIdMap[service.id])
+                if (upstreamServiceIdMap?.[service.id])
                   serviceDraft.upstreams = upstreamServiceIdMap[service.id];
               }),
           );
@@ -294,7 +293,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
           // Move routes and stream_routes to service
           map((config) => {
             const serviceIdMap = Object.fromEntries(
-              resources?.service?.map((item) => [
+              (resources?.service ?? []).map((item) => [
                 item.id,
                 this.toADC.transformService(item),
               ]),
@@ -305,7 +304,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
                 if (!serviceIdMap[item.service_id]) return; //TODO error report
                 if (!serviceIdMap[item.service_id].routes)
                   serviceIdMap[item.service_id].routes = [];
-                serviceIdMap[item.service_id].routes.push(route);
+                serviceIdMap[item.service_id].routes?.push(route);
               }
             });
             resources?.stream_route?.forEach((item) => {
@@ -314,16 +313,17 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
                 if (!serviceIdMap[item.service_id]) return; //TODO error report
                 if (!serviceIdMap[item.service_id].stream_routes)
                   serviceIdMap[item.service_id].stream_routes = [];
-                serviceIdMap[item.service_id].stream_routes.push(route);
+                serviceIdMap[item.service_id].stream_routes?.push(route);
               }
             });
             return produce(config, (draft) => {
               draft.services = Object.values(serviceIdMap).map((item) =>
                 ADCSDK.utils.recursiveOmitUndefined({
                   ...item,
-                  routes: item?.routes?.length > 0 ? item.routes : undefined,
+                  routes:
+                    item?.routes?.length || 0 > 0 ? item?.routes : undefined,
                   stream_routes:
-                    item?.stream_routes?.length > 0
+                    item?.stream_routes?.length || 0 > 0
                       ? item.stream_routes
                       : undefined,
                 }),

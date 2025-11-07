@@ -40,7 +40,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
     await this.client.get(`/apisix/admin/routes`);
   }
 
-  public async version() {
+  public async version(): Promise<SemVer> {
     if (this._version) return this._version;
 
     const resp = await this.client.get<{ value: string }>(
@@ -51,10 +51,11 @@ export class BackendAPISIX implements ADCSDK.Backend {
       event: { response: resp, description: `Get APISIX version` },
     });
 
-    this._version = semver.coerce('999.999.999');
+    const fallback = new semver.SemVer('999.999.999');
+    this._version = fallback;
     if (resp.headers.server) {
       const version = (resp.headers.server as string).match(/APISIX\/(.*)/);
-      if (version) this._version = semver.coerce(version[1]);
+      if (version) this._version = semver.coerce(version[1]) ?? fallback;
     }
 
     return this._version;

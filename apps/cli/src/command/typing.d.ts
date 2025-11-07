@@ -9,6 +9,9 @@ export type BackendOptions = {
   server: string;
   token: string;
   gatewayGroup: string;
+  cacheKey: string;
+  httpAgent: httpAgent;
+  httpsAgent: httpsAgent;
 
   labelSelector?: Record<string, string>;
   includeResourceType?: Array<ADCSDK.ResourceType>;

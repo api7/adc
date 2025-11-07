@@ -54,7 +54,7 @@ export const syncHandler: RequestHandler<
       task.config,
       task.opts.includeResourceType,
       task.opts.excludeResourceType,
-    ) as ADCSDK.Configuration;
+    ) as ADCSDK.InternalConfiguration;
     if (task.opts.lint) {
       const result = check(local);
       if (!result.success)
@@ -105,7 +105,7 @@ export const syncHandler: RequestHandler<
     // diff local and remote configuration
     const diff = DifferV3.diff(
       local,
-      remote,
+      remote as ADCSDK.InternalConfiguration,
       await backend.defaultValue(),
       undefined,
       {

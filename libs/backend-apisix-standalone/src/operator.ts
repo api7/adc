@@ -308,7 +308,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           filter_func: res.filter_func,
           service_id: event.parentId!,
           enable_websocket: res.enable_websocket,
-          plugins: res.plugins,
+          plugins: res.plugins as typing.Route['plugins'],
           priority: res.priority,
           timeout: res.timeout,
           status: 1,
@@ -325,7 +325,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           labels: this.fromADCLabels(res.labels),
           hosts: res.hosts,
           upstream_id: id,
-          plugins: res.plugins,
+          plugins: res.plugins as typing.Service['plugins'],
         } satisfies typing.Service as typing.Service;
       }
       case ADCSDK.ResourceType.CONSUMER: {
@@ -335,7 +335,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           username: this.generateIdFromEvent(event),
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
-          plugins: res.plugins,
+          plugins: res.plugins as typing.Consumer['plugins'],
         } satisfies typing.Consumer as typing.Consumer;
       }
       case ADCSDK.ResourceType.CONSUMER_CREDENTIAL: {
@@ -369,7 +369,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                 keys: res.certificates.slice(1).map((cert) => cert.key),
               }
             : {}),
-          client: res.client,
+          client: res.client as typing.SSL['client'],
           ssl_protocols: res.ssl_protocols,
           status: 1,
         } satisfies typing.SSL as typing.SSL;
@@ -408,7 +408,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           name: res.name,
           desc: res.description,
           labels: this.fromADCLabels(res.labels),
-          plugins: res.plugins,
+          plugins: res.plugins as typing.StreamRoute['plugins'],
           remote_addr: res.remote_addr,
           server_addr: res.server_addr,
           server_port: res.server_port,

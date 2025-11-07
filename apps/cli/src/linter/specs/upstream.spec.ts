@@ -141,7 +141,7 @@ describe('Upstream Linter', () => {
             ],
           },
         ],
-      } as ADCSDK.Configuration,
+      } as unknown as ADCSDK.Configuration,
       expect: false,
       errors: [
         {

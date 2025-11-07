@@ -4,6 +4,9 @@
   "include": [],
   "references": [
     {
+      "path": "../differ"
+    },
+    {
       "path": "../sdk"
     },
     {

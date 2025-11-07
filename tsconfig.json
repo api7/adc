@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "files": [],
+  "compilerOptions": {},
   "references": [
     {
       "path": "./apps/cli"
@@ -22,9 +23,6 @@
     },
     {
       "path": "./libs/differ"
-    },
-    {
-      "path": "./libs/tstetsetse"
     }
   ]
 }

@@ -49,7 +49,7 @@ describe('CLI utils', () => {
               name: 'Test Stream Route',
             },
           ],
-        },
+        } as ADCSDK.Configuration,
         { test1: 'test1', test2: 'test2' },
       ),
     ).toEqual({
@@ -147,7 +147,7 @@ describe('CLI utils', () => {
               labels: { test: 'test' },
             },
           ],
-        },
+        } as ADCSDK.Configuration,
         { test1: 'test1', test2: 'test2' },
       ),
     ).toEqual({
@@ -201,7 +201,7 @@ describe('CLI utils', () => {
   });
 
   it('should remove metadata from dump result', () => {
-    const config: ADCSDK.Configuration = {
+    const config = {
       services: [
         {
           name: 'TestService1',
@@ -232,7 +232,7 @@ describe('CLI utils', () => {
           metadata: { id: 'test_ssl' },
         },
       ],
-    };
+    } as unknown as ADCSDK.Configuration;
     recursiveRemoveMetadataField(config);
     expect(config).toEqual({
       services: [

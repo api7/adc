@@ -78,8 +78,8 @@ export class DifferV3 {
   }
 
   public static diff(
-    local: ADCSDK.Configuration,
-    remote: ADCSDK.Configuration,
+    local: ADCSDK.InternalConfiguration,
+    remote: ADCSDK.InternalConfiguration,
     defaultValue?: ADCSDK.DefaultValue,
     parentName?: string,
     logger?: ADCSDK.Logger,
@@ -134,14 +134,14 @@ export class DifferV3 {
           ([pluginName, pluginConfig]) => [
             pluginName,
             pluginName,
-            pluginConfig,
+            pluginConfig as Record<string, unknown>,
           ],
         ) ?? [],
         Object.entries(remote?.global_rules ?? {}).map(
           ([pluginName, pluginConfig]) => [
             pluginName,
             pluginName,
-            pluginConfig,
+            pluginConfig as Record<string, unknown>,
           ],
         ) ?? [],
       ),
@@ -151,14 +151,14 @@ export class DifferV3 {
           ([pluginName, pluginConfig]) => [
             pluginName,
             pluginName,
-            pluginConfig,
+            pluginConfig as Record<string, unknown>,
           ],
         ) ?? [],
         Object.entries(remote?.plugin_metadata ?? {}).map(
           ([pluginName, pluginConfig]) => [
             pluginName,
             pluginName,
-            pluginConfig,
+            pluginConfig as Record<string, unknown>,
           ],
         ) ?? [],
       ),
@@ -192,12 +192,16 @@ export class DifferV3 {
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,
-        local?.upstreams?.map((res) => [
+        local?.upstreams?.map((res: ADCSDK.Upstream & { id?: string }) => [
           res.name!,
           res.id ?? ADCSDK.utils.generateId(generateResourceName(res.name!)),
           res,
         ]) ?? [],
-        remote?.upstreams?.map((res) => [res.name!, res.id!, res]) ?? [],
+        remote?.upstreams?.map((res: ADCSDK.Upstream & { id?: string }) => [
+          res.name!,
+          res.id!,
+          res,
+        ]) ?? [],
       ),
     ];
 
@@ -596,7 +600,10 @@ export class DifferV3 {
     local = Object.fromEntries(
       Object.entries(local).map(([pluginName, config]) => {
         const defaultValue = this.defaultValue?.plugins?.[pluginName] ?? {};
-        return [pluginName, this.mergeDefault(config, cloneDeep(defaultValue))];
+        return [
+          pluginName,
+          this.mergeDefault(config as ADCSDK.Plugin, cloneDeep(defaultValue)),
+        ];
       }),
     ) as ADCSDK.Plugins;
     const checker = (left: ADCSDK.Plugins, right: ADCSDK.Plugins) => {

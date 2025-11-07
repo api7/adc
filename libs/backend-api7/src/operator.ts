@@ -271,6 +271,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         );
       case ADCSDK.ResourceType.UPSTREAM:
         return fromADC.transformUpstream(event.newValue as ADCSDK.Upstream);
+      default:
+        throw new Error(`Unsupported resource type: ${event.resourceType}`);
     }
   }
 }

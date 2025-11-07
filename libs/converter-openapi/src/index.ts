@@ -112,6 +112,7 @@ export class OpenAPIConverter implements ADCSDK.Converter {
                     console.log(
                       `${method.toUpperCase()} "${path}" contains the service or upstream defaults, so it will be included to the separate service`,
                     );
+                    return undefined;
                   } else {
                     return route;
                   }

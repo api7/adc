@@ -29,9 +29,9 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
-    "src/**/*.d.ts",
-    "e2e/**/*.ts"
+    "src/**/*.d.ts"
   ],
+  "exclude": [],
   "references": [
     {
       "path": "./tsconfig.lib.json"

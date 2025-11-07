@@ -62,7 +62,12 @@ export const toKVConfiguration = (
       ) {
         return [
           resourceType,
-          Object.fromEntries(resources.map((item) => [item.name, item])),
+          Object.fromEntries(
+            (Array.isArray(resources) ? resources : []).map((item) => [
+              item.name,
+              item,
+            ]),
+          ),
         ];
       } else {
         throw new Error(
@@ -118,52 +123,6 @@ export const mergeKVConfigurations = (
     },
   );
   return baseConfiguration;
-};
-
-export const mergeConfigurations = (
-  ...fileContents: Array<ADCSDK.Configuration>
-) => {
-  const result: ADCSDK.Configuration = {
-    services: [],
-    ssls: [],
-    consumers: [],
-    global_rules: {},
-    plugin_metadata: {},
-
-    routes: [],
-    stream_routes: [],
-    /* consumer_groups: [],
-    plugin_configs: [],
-    upstreams: [], */
-  };
-
-  fileContents.forEach((config) => {
-    config.services && result.services.push(...config.services);
-    config.ssls && result.ssls.push(...config.ssls);
-    config.consumers && result.consumers.push(...config.consumers);
-    config.global_rules &&
-      Object.keys(config.global_rules).forEach((globalRuleName: string) => {
-        result.global_rules[globalRuleName] =
-          config.global_rules[globalRuleName];
-      });
-    config.plugin_metadata &&
-      Object.keys(config.plugin_metadata).forEach(
-        (pluginMetadataName: string) => {
-          result.plugin_metadata[pluginMetadataName] =
-            config.plugin_metadata[pluginMetadataName];
-        },
-      );
-
-    config.routes && result.routes.push(...config.routes);
-    config.stream_routes && result.stream_routes.push(...config.stream_routes);
-    /* config.consumer_groups &&
-      result.consumer_groups.push(...config.consumer_groups);
-    config.plugin_configs &&
-      result.plugin_configs.push(...config.plugin_configs);
-    config.upstreams && result.upstreams.push(...config.upstreams); */
-  });
-
-  return result;
 };
 
 export const filterConfiguration = (
@@ -332,7 +291,7 @@ export const resortConfiguration = (
         ];
       return [
         key,
-        value.sort((a, b) => {
+        (Array.isArray(value) ? value : []).sort((a, b) => {
           // sort nested resources
           if (key === 'services') {
             if (a.routes) a.routes.sort((x, y) => x.name.localeCompare(y.name));

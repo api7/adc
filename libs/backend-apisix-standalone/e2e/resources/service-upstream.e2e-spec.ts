@@ -8,14 +8,7 @@ import {
 } from '../../src/cache';
 import * as typing from '../../src/typing';
 import { server1, token1 } from '../support/constants';
-import {
-  createEvent,
-  deleteEvent,
-  dumpConfiguration,
-  restartAPISIX,
-  syncEvents,
-  updateEvent,
-} from '../support/utils';
+import { dumpConfiguration, restartAPISIX, syncEvents } from '../support/utils';
 
 const cacheKey = 'default';
 describe('Service-Upstreams E2E', () => {
@@ -168,7 +161,7 @@ describe('Service-Upstreams E2E', () => {
           typing.ADC_UPSTREAM_SERVICE_ID_LABEL
         ],
       ).toEqual(ADCSDK.utils.generateId(serviceName));
-      expect(rawConfig?.upstreams?.[1].nodes[0].host).toEqual('8.8.8.8');
+      expect(rawConfig?.upstreams?.[1].nodes?.[0].host).toEqual('8.8.8.8');
 
       const config = configCache.get(cacheKey);
       expect(config?.services).not.toBeUndefined();

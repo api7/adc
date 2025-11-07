@@ -24,7 +24,18 @@ export interface Route {
 
   // matcher
   paths: Array<string>;
-  methods?: Array<string>;
+  methods?: Array<
+    | 'GET'
+    | 'POST'
+    | 'PUT'
+    | 'DELETE'
+    | 'PATCH'
+    | 'HEAD'
+    | 'OPTIONS'
+    | 'TRACE'
+    | 'CONNECT'
+    | 'PURGE'
+  >;
   vars: Expr;
 
   // misc
@@ -42,9 +53,9 @@ export interface StreamRoute {
 
   plugins?: Plugins;
 
-  server_addr: string;
-  server_port: number;
-  remote_addr: string;
+  server_addr?: string;
+  server_port?: number;
+  remote_addr?: string;
 }
 export interface Service {
   id?: string;
@@ -95,6 +106,7 @@ export interface SSL {
     depth: number;
   };
   snis?: string[];
+  status?: number;
 }
 export interface GlobalRule {
   plugins: Plugins;

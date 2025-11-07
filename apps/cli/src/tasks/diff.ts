@@ -15,8 +15,8 @@ export const DiffResourceTask = (
     const defaultValue = await backend.defaultValue();
     const logger = new ListrOutputLogger(task);
     ctx.diff = DifferV3.diff(
-      ctx.local,
-      ctx.remote,
+      ctx.local as ADCSDK.InternalConfiguration,
+      ctx.remote as ADCSDK.InternalConfiguration,
       defaultValue,
       undefined,
       logger,

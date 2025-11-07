@@ -248,7 +248,11 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       }),
     ).pipe(
       tap((resp) => logger(this.debugLogEvent(resp))),
-      map((resp) => this.toADC.transformPluginMetadatas(resp?.data?.value)),
+      map((resp) =>
+        this.toADC.transformPluginMetadatas(
+          resp?.data?.value as typing.PluginMetadata,
+        ),
+      ),
       tap(() => logger(taskStateEvent('TASK_DONE'))),
     );
   }
@@ -278,18 +282,18 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
   private isSkip(type: ADCSDK.ResourceType): boolean {
     const { includeResourceType, excludeResourceType } =
       this.opts.backendOpts || {};
-    if (!isEmpty(includeResourceType) && !includeResourceType.includes(type)) {
+    if (!isEmpty(includeResourceType) && !includeResourceType?.includes(type)) {
       return true;
     }
-    if (!isEmpty(excludeResourceType) && excludeResourceType.includes(type)) {
+    if (!isEmpty(excludeResourceType) && excludeResourceType?.includes(type)) {
       return true;
     }
     return false;
   }
 
   private attachLabelSelector(
-    params: Record<string, string> = {},
-  ): Record<string, string> {
+    params: Record<string, string | undefined> = {},
+  ): Record<string, string | undefined> {
     const { labelSelector } = this.opts.backendOpts || {};
     if (labelSelector)
       Object.entries(labelSelector).forEach(([key, value]) => {

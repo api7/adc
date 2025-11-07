@@ -55,7 +55,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
   }
 
   public async version() {
-    const cachedVersion = versionCache.get(this.opts.cacheKey);
+    const cachedVersion = versionCache.get(this.opts.cacheKey!);
     if (cachedVersion) return cachedVersion;
 
     const resp = await this.client.head<{ value: string }>(
@@ -78,7 +78,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
 
     // Only cache it when the actual value is obtained
     if (!semverEQ(version, mockVersion))
-      versionCache.set(this.opts.cacheKey, version);
+      versionCache.set(this.opts.cacheKey!, version);
 
     return version;
   }
@@ -92,7 +92,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
   public dump(): Observable<ADCSDK.Configuration> {
     return from(this.version()).pipe<ADCSDK.Configuration>(
       switchMap((version) => {
-        const cachedConfig = configCache.get(this.opts.cacheKey);
+        const cachedConfig = configCache.get(this.opts.cacheKey!);
         if (cachedConfig) return of(cachedConfig);
 
         // Initialize config cache
@@ -108,8 +108,8 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
         return from(fetcher.dump()).pipe(
           map(
             ([config, rawConfig]) => (
-              configCache.set(this.opts.cacheKey, config),
-              rawConfigCache.set(this.opts.cacheKey, rawConfig),
+              configCache.set(this.opts.cacheKey!, config),
+              rawConfigCache.set(this.opts.cacheKey!, rawConfig),
               config
             ),
           ),
@@ -132,12 +132,12 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
     return from(this.version()).pipe(
       switchMap((version) => {
         return new Operator({
-          cacheKey: this.opts.cacheKey,
+          cacheKey: this.opts.cacheKey!,
           client: this.client,
           serverTokenMap: this.serverTokenMap,
           version,
           eventSubject: this.subject,
-          oldRawConfiguration: rawConfigCache.get(this.opts.cacheKey) ?? {},
+          oldRawConfiguration: rawConfigCache.get(this.opts.cacheKey!) ?? {},
         }).sync(events, opts);
       }),
     );
