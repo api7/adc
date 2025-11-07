@@ -39,5 +39,6 @@
     "src/**/*.test.js",
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
+    "e2e/**/*.ts"
   ]
 }

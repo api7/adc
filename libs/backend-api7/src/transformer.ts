@@ -4,8 +4,10 @@ import { attempt, isError } from 'lodash';
 import * as typing from './typing';
 
 export class ToADC {
-  private static transformLabels(labels?: ADCSDK.Labels): ADCSDK.Labels {
-    if (!labels) return {} as ADCSDK.Labels;
+  private static transformLabels(
+    labels?: ADCSDK.Labels,
+  ): ADCSDK.Labels | undefined {
+    if (!labels) return undefined;
     return Object.entries(labels).reduce<ADCSDK.Labels>((pv, [key, value]) => {
       const res = attempt(JSON.parse, value as string);
       pv[key] = !isError(res) && Array.isArray(res) ? res : value;

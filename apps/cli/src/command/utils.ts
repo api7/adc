@@ -125,68 +125,6 @@ export const mergeKVConfigurations = (
   return baseConfiguration;
 };
 
-export const mergeConfigurations = (
-  ...fileContents: Array<ADCSDK.Configuration>
-) => {
-  const result: ADCSDK.Configuration = {
-    services: [],
-    ssls: [],
-    consumers: [],
-    global_rules: {},
-    plugin_metadata: {},
-
-    routes: [],
-    stream_routes: [],
-    /* consumer_groups: [],
-    plugin_configs: [],
-    upstreams: [], */
-  };
-
-  fileContents.forEach((config) => {
-    if (config.services) {
-      result.services.push(...config.services);
-    }
-    if (config.ssls) {
-      result.ssls.push(...config.ssls);
-    }
-    if (config.consumers) {
-      result.consumers.push(...config.consumers);
-    }
-    if (config.global_rules) {
-      Object.keys(config.global_rules).forEach((globalRuleName: string) => {
-        result.global_rules[globalRuleName] =
-          config.global_rules[globalRuleName];
-      });
-    }
-    if (config.plugin_metadata) {
-      Object.keys(config.plugin_metadata).forEach(
-        (pluginMetadataName: string) => {
-          result.plugin_metadata[pluginMetadataName] =
-            config.plugin_metadata[pluginMetadataName];
-        },
-      );
-    }
-
-    if (config.routes) {
-      result.routes.push(...config.routes);
-    }
-    if (config.stream_routes) {
-      result.stream_routes.push(...config.stream_routes);
-    }
-    /* if (config.consumer_groups) {
-      result.consumer_groups.push(...config.consumer_groups);
-    }
-    if (config.plugin_configs) {
-      result.plugin_configs.push(...config.plugin_configs);
-    }
-    if (config.upstreams) {
-      result.upstreams.push(...config.upstreams);
-    } */
-  });
-
-  return result;
-};
-
 export const filterConfiguration = (
   configuration: ADCSDK.Configuration,
   rules: Record<string, string>,

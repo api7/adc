@@ -115,7 +115,10 @@ export interface ConsumerGroup {
 
   plugins: Plugins;
 }
-export type GlobalRule = ADCGlobalRule;
+export interface GlobalRule {
+  plugins: Plugins;
+}
+
 export type PluginMetadata = ADCPluginMetadata;
 export interface StreamRoute {
   id: string;
@@ -194,7 +197,7 @@ export interface Resources {
   [ResourceType.SERVICE]?: Array<Service>;
   [ResourceType.CONSUMER]?: Array<Consumer>;
   [ResourceType.SSL]?: Array<SSL>;
-  [ResourceType.GLOBAL_RULE]?: GlobalRule;
+  [ResourceType.GLOBAL_RULE]?: ADCGlobalRule;
   [ResourceType.PLUGIN_CONFIG]?: Array<PluginConfig>;
   [ResourceType.CONSUMER_GROUP]?: Array<ConsumerGroup>;
   [ResourceType.PLUGIN_METADATA]?: PluginMetadata;

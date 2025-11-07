@@ -133,7 +133,7 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
   }
 
   private listGlobalRules() {
-    return this._list<typing.ListResponse<Record<string, typing.GlobalRule>>>(
+    return this._list<typing.ListResponse<typing.GlobalRule>>(
       ADCSDK.ResourceType.GLOBAL_RULE,
     ).pipe<ADCSDK.Plugins>(
       map(({ list }) =>

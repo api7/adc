@@ -78,8 +78,8 @@ export class DifferV3 {
   }
 
   public static diff(
-    local: ADCSDK.Configuration,
-    remote: ADCSDK.Configuration,
+    local: ADCSDK.InternalConfiguration,
+    remote: ADCSDK.InternalConfiguration,
     defaultValue?: ADCSDK.DefaultValue,
     parentName?: string,
     logger?: ADCSDK.Logger,

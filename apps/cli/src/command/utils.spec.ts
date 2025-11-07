@@ -49,7 +49,7 @@ describe('CLI utils', () => {
               name: 'Test Stream Route',
             },
           ],
-        },
+        } as ADCSDK.Configuration,
         { test1: 'test1', test2: 'test2' },
       ),
     ).toEqual({
@@ -147,7 +147,7 @@ describe('CLI utils', () => {
               labels: { test: 'test' },
             },
           ],
-        },
+        } as ADCSDK.Configuration,
         { test1: 'test1', test2: 'test2' },
       ),
     ).toEqual({
