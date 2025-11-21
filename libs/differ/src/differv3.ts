@@ -13,16 +13,16 @@ const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.DELETE}`]: 6,
   [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.DELETE}`]: 7,
 
-  [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.UPDATE}`]: 8,
-  [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.UPDATE}`]: 9,
-  [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.UPDATE}`]: 10,
-  [`${ADCSDK.ResourceType.UPSTREAM}.${ADCSDK.EventType.UPDATE}`]: 11,
-  [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.UPDATE}`]: 12,
-  [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.UPDATE}`]: 13,
-  [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.UPDATE}`]: 14,
-  [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.UPDATE}`]: 15,
+  [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.CREATE}`]: 8, // SSL may be referenced by upstream mTLS, so it needs to be created in advance
+  [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.UPDATE}`]: 9,
+  [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.UPDATE}`]: 10,
+  [`${ADCSDK.ResourceType.STREAM_ROUTE}.${ADCSDK.EventType.UPDATE}`]: 11,
+  [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.UPDATE}`]: 12,
+  [`${ADCSDK.ResourceType.UPSTREAM}.${ADCSDK.EventType.UPDATE}`]: 13,
+  [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.UPDATE}`]: 14,
+  [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.UPDATE}`]: 15,
+  [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.UPDATE}`]: 16,
 
-  [`${ADCSDK.ResourceType.SSL}.${ADCSDK.EventType.CREATE}`]: 16, // SSL may be referenced by upstream mTLS, so it needs to be created in advance
   [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.CREATE}`]: 17,
   [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.CREATE}`]: 18,
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.CREATE}`]: 19,
