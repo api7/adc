@@ -21,8 +21,8 @@ describe('Differ V3 - upstream', () => {
               upstreams: [
                 // We need to use multiple upstreams to test this scenario.
                 // The key reason is that upstream splitting within the service occurs at each backend rather than within this diff.
-                // This necessitates ensuring SSL creation and updates are always completed before the upstream and service.
-                // We can precisely test this through the multi-upstream functionality.
+                // This necessitates ensuring SSL creates and updates are always completed before the upstream and service.
+                // We can precisely test this through the multiple upstreams functionality.
                 {
                   name: upstreamName,
                   type: 'roundrobin',
