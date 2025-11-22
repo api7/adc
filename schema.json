@@ -346,6 +346,7 @@
                   },
                   "required": [
                     "host",
+                    "port",
                     "weight"
                   ],
                   "additionalProperties": false
@@ -777,6 +778,7 @@
                     },
                     "required": [
                       "host",
+                      "port",
                       "weight"
                     ],
                     "additionalProperties": false
