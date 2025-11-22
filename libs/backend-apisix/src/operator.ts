@@ -51,6 +51,15 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     ];
 
     if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
+      // If there are no differences in the service apart from the upstream field,
+      // the service shall not be updated.
+      if (
+        (event.diff || []).filter((item) => item.path?.[0] !== 'upstream')
+          .length <= 0
+      )
+        paths.pop();
+
+      // process inline upstream
       const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
       if (event.type === ADCSDK.EventType.DELETE) {
         paths.push(path); // services will be deleted before upstreams
