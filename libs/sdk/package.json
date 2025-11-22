@@ -6,6 +6,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./schema": {
+      "types": "./src/core/schema.ts",
+      "import": "./src/core/schema.ts",
+      "default": "./src/core/schema.ts"
     }
   },
   "nx": {

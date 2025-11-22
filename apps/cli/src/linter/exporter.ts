@@ -4,10 +4,9 @@
  * $ nx export-schema cli
  *
  */
+import { ConfigurationSchema } from '@api7/adc-sdk/schema';
 import { writeFileSync } from 'fs';
 import { z } from 'zod';
-
-import { ConfigurationSchema } from './schema';
 
 writeFileSync(
   'schema.json',
