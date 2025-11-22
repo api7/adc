@@ -54,6 +54,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
       if (event.type === ADCSDK.EventType.DELETE) {
         paths.push(path); // services will be deleted before upstreams
+      } else if (event.type === ADCSDK.EventType.CREATE) {
+        paths.unshift(path); // services will be created/updated after upstreams
       } else {
         // only update upstream when the differences pertain to upstream
         if (
