@@ -1,3 +1,4 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
 import { lastValueFrom, toArray } from 'rxjs';
@@ -19,6 +20,9 @@ export const syncEvents = async (
 
 export const dumpConfiguration = async (backend: BackendAPISIX) =>
   lastValueFrom(backend.dump());
+
+export const cleanup = async (backend: BackendAPISIX) =>
+  syncEvents(backend, Differ.diff({}, await dumpConfiguration(backend)));
 
 export const getDefaultValue = async (backend: BackendAPISIX) =>
   backend.defaultValue();
