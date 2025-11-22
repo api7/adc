@@ -8,6 +8,7 @@ import {
   catchError,
   concatMap,
   defer,
+  finalize,
   from,
   map,
   mergeMap,
@@ -162,7 +163,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                   }),
                 } satisfies ADCSDK.BackendSyncResult);
               }),
-              tap(() => logger(taskStateEvent('TASK_DONE'))),
+              finalize(() => logger(taskStateEvent('TASK_DONE'))),
             );
           }, opts.concurrent),
         ),
