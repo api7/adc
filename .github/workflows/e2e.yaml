@@ -47,7 +47,7 @@ jobs:
           - 3.11.0
           - 3.12.0
           - 3.13.0
-          - 3.14.0
+          - 3.14.1
     env:
       BACKEND_APISIX_VERSION: ${{ matrix.version }}
       BACKEND_APISIX_IMAGE: ${{ matrix.version }}-debian
@@ -79,7 +79,7 @@ jobs:
       matrix:
         version:
           - 3.13.0
-          - 3.14.0
+          - 3.14.1
           - dev
     steps:
       - name: Determine APISIX image tag
