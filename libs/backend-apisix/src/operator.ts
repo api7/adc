@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { AxiosError, type AxiosInstance, AxiosResponse } from 'axios';
+import { unset } from 'lodash';
 import {
   Observable,
   ObservableInput,
@@ -7,6 +8,7 @@ import {
   catchError,
   concatMap,
   defer,
+  finalize,
   from,
   map,
   mergeMap,
@@ -50,11 +52,31 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
     if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
       const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
-      if (event.type === ADCSDK.EventType.DELETE)
+      if (event.type === ADCSDK.EventType.DELETE) {
         paths.push(path); // services will be deleted before upstreams
-      else paths.unshift(path); // services will be created/updated after upstreams
+      } else if (event.type === ADCSDK.EventType.CREATE) {
+        paths.unshift(path); // services will be created/updated after upstreams
+      } else {
+        // if there are no differences in the service apart from the upstream field,
+        // the service shall not be updated
+        if (
+          (event.diff || []).filter((item) => item.path?.[0] !== 'upstream')
+            .length <= 0
+        )
+          paths.pop();
+
+        // only update upstream when the differences pertain to upstream
+        if (
+          (event.diff || []).filter((item) => item.path?.[0] === 'upstream')
+            .length > 0
+        )
+          paths.unshift(path); // services will be created/updated after upstreams
+      }
     }
 
+    const removeInlinedUpstream = (s: typing.Service) => (
+      unset(s, 'upstream'), s
+    );
     const operateWithRetry = (op: () => Promise<AxiosResponse>) =>
       defer(op).pipe(retry({ count: 3, delay: 100 }));
     return from(paths).pipe(
@@ -66,10 +88,16 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
             ...(isUpdate && {
               method: 'PUT',
               data:
-                event.resourceType === ADCSDK.ResourceType.SERVICE &&
-                path.includes('/upstreams')
-                  ? (this.fromADC(event, this.opts.version) as typing.Service)
-                      .upstream
+                event.resourceType === ADCSDK.ResourceType.SERVICE
+                  ? path.includes('/upstreams')
+                    ? (this.fromADC(event, this.opts.version) as typing.Service)
+                        .upstream
+                    : removeInlinedUpstream(
+                        this.fromADC(
+                          event,
+                          this.opts.version,
+                        ) as typing.Service,
+                      )
                   : this.fromADC(event, this.opts.version),
             }),
           }),
@@ -152,7 +180,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                   }),
                 } satisfies ADCSDK.BackendSyncResult);
               }),
-              tap(() => logger(taskStateEvent('TASK_DONE'))),
+              finalize(() => logger(taskStateEvent('TASK_DONE'))),
             );
           }, opts.concurrent),
         ),

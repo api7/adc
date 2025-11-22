@@ -385,8 +385,8 @@ export const InternalConfigurationSchema = z.strictObject({
   consumers: z.array(consumerSchema).optional(),
 
   // object format resources
-  global_rules: z.record(z.string(), globalRuleSchema).optional(),
-  plugin_metadata: z.record(z.string(), pluginMetadataSchema).optional(),
+  global_rules: globalRuleSchema.optional(),
+  plugin_metadata: pluginMetadataSchema.optional(),
 
   // internal use only
   routes: z.array(routeSchema).optional(),

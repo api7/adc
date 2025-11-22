@@ -1,3 +1,4 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { unset } from 'lodash';
 import { readFileSync } from 'node:fs';
@@ -67,10 +68,12 @@ describe('Sync and Dump - 1', () => {
     });
 
     it('Update service1', async () => {
+      const old = structuredClone(service1);
       service1.description = 'desc';
-      await syncEvents(backend, [
-        updateEvent(ADCSDK.ResourceType.SERVICE, service1Name, service1),
-      ]);
+      await syncEvents(
+        backend,
+        Differ.diff({ services: [service1] }, { services: [old] }),
+      );
     });
 
     it('Dump again (service1 updated)', async () => {
