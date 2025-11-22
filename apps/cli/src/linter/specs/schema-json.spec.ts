@@ -1,8 +1,7 @@
+import { ConfigurationSchema } from '@api7/adc-sdk/schema';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-
-import { ConfigurationSchema } from '../schema';
 
 describe('Schema JSON Check', () => {
   it('should check schema.json is consistent with git HEAD', () => {
