@@ -52,11 +52,11 @@ describe('Service E2E', () => {
       const data = (await fetch(
         `${server}/apisix/admin/services/${serviceName}`,
         { headers: { 'X-API-KEY': token } },
-      ).then((res) => res.json())) as typing.Service;
+      ).then((res) => res.json())) as { value: typing.Service };
 
       expect(data).toBeDefined();
-      expect(data.upstream_id).toBeDefined();
-      expect(data.upstream).toBeUndefined();
+      expect(data.value.upstream_id).toBeDefined();
+      expect(data.value.upstream).toBeUndefined();
     });
 
     it('cleanup service', async () =>
