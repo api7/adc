@@ -52,9 +52,16 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
     if (event.resourceType === ADCSDK.ResourceType.SERVICE) {
       const path = `${PATH_PREFIX}/upstreams/${event.resourceId}`;
-      if (event.type === ADCSDK.EventType.DELETE)
+      if (event.type === ADCSDK.EventType.DELETE) {
         paths.push(path); // services will be deleted before upstreams
-      else paths.unshift(path); // services will be created/updated after upstreams
+      } else {
+        // only update upstream when the differences pertain to upstream
+        if (
+          (event.diff || []).filter((item) => item.path?.[0] === 'upstream')
+            .length > 0
+        )
+          paths.unshift(path); // services will be created/updated after upstreams
+      }
     }
 
     const removeInlinedUpstream = (s: typing.Service) => (
