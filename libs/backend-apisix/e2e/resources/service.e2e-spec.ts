@@ -1,25 +1,16 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
-import { globalAgent as httpGlobalAgent } from 'node:http';
-import { globalAgent as httpsGlobalAgent } from 'node:https';
 
 import { BackendAPISIX } from '../../src';
 import * as typing from '../../src/typing';
-import { server, token } from '../support/constants';
+import { defaultBackendOptions, server, token } from '../support/constants';
 import { cleanup, syncEvents } from '../support/utils';
 
 describe('Service E2E', () => {
   let backend: BackendAPISIX;
 
   beforeAll(async () => {
-    backend = new BackendAPISIX({
-      server,
-      token,
-      tlsSkipVerify: true,
-      cacheKey: 'default',
-      httpAgent: httpGlobalAgent,
-      httpsAgent: httpsGlobalAgent,
-    });
+    backend = new BackendAPISIX(defaultBackendOptions);
 
     await cleanup(backend);
   });

@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../../src';
-import { server, token } from '../support/constants';
+import { defaultBackendOptions } from '../support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -13,11 +13,7 @@ describe('Upstream E2E', () => {
   let backend: BackendAPISIX;
 
   beforeAll(() => {
-    backend = new BackendAPISIX({
-      server,
-      token,
-      tlsSkipVerify: true,
-    });
+    backend = new BackendAPISIX(defaultBackendOptions);
   });
 
   describe('Sync and dump upstream (nodes = null)', () => {
@@ -40,7 +36,7 @@ describe('Upstream E2E', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
+      expect(result.services![0]).toMatchObject(service);
     });
 
     it('Delete service', async () =>

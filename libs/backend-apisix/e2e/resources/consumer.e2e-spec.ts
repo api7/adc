@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { gte } from 'semver';
 
 import { BackendAPISIX } from '../../src';
-import { server, token } from '../support/constants';
+import { defaultBackendOptions } from '../support/constants';
 import { conditionalDescribe, semverCondition } from '../support/utils';
 import {
   createEvent,
@@ -16,11 +16,7 @@ describe('Consumer E2E', () => {
   let backend: BackendAPISIX;
 
   beforeAll(() => {
-    backend = new BackendAPISIX({
-      server,
-      token,
-      tlsSkipVerify: true,
-    });
+    backend = new BackendAPISIX(defaultBackendOptions);
   });
 
   conditionalDescribe(semverCondition(gte, '3.11.0'))(
@@ -54,14 +50,14 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
-        expect(result.consumers[0].credentials).toMatchObject(
-          consumer1.credentials,
+        expect(result.consumers![0]).toMatchObject(consumer1);
+        expect(result.consumers![0].credentials).toMatchObject(
+          consumer1.credentials!,
         );
       });
 
       it('Update consumer credential', async () => {
-        consumer1.credentials[0].config.key = 'new-key';
+        consumer1.credentials![0].config.key = 'new-key';
         await syncEvents(backend, [
           updateEvent(
             ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
@@ -76,8 +72,8 @@ describe('Consumer E2E', () => {
         const result = (await dumpConfiguration(
           backend,
         )) as ADCSDK.Configuration;
-        expect(result.consumers[0]).toMatchObject(consumer1);
-        expect(result.consumers[0].credentials[0].config.key).toEqual(
+        expect(result.consumers![0]).toMatchObject(consumer1);
+        expect(result.consumers![0].credentials![0].config.key).toEqual(
           'new-key',
         );
       });
@@ -96,7 +92,7 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0].credentials).toBeUndefined();
+        expect(result.consumers![0].credentials).toBeUndefined();
       });
 
       it('Delete consumer', async () =>

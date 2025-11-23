@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../src';
-import { server, token } from './support/constants';
+import { defaultBackendOptions } from './support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -14,10 +14,7 @@ describe('Miscellaneous', () => {
   let backend: BackendAPISIX;
 
   beforeAll(() => {
-    backend = new BackendAPISIX({
-      server,
-      token,
-    });
+    backend = new BackendAPISIX(defaultBackendOptions);
   });
 
   describe('Sync resources with custom id', () => {
@@ -60,8 +57,8 @@ describe('Miscellaneous', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes[0]).toMatchObject(route);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].routes![0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>
