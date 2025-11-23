@@ -111,30 +111,28 @@ const upstreamSchema = (extend?: ZodRawShape) =>
       key: z.string().optional(),
       checks: z
         .strictObject({
-          active: z
-            .strictObject({
-              type: upstreamHealthCheckType.optional(),
-              timeout: z.coerce.number().default(1).optional(),
-              concurrency: z.coerce.number().default(10).optional(),
-              host: hostSchema.optional(),
-              port: portSchema.optional(),
-              http_path: z.string().default('/').optional(),
-              https_verify_cert: z.boolean().default(true).optional(),
-              http_request_headers: z.array(z.string()).min(1).optional(),
-              healthy: z
-                .strictObject({
-                  ...upstreamHealthCheckPassiveHealthy.shape,
-                  interval: z.coerce.number().int().min(1).default(1),
-                })
-                .optional(),
-              unhealthy: z
-                .strictObject({
-                  ...upstreamHealthCheckPassiveUnhealthy.shape,
-                  interval: z.coerce.number().int().min(1).default(1),
-                })
-                .optional(),
-            })
-            .optional(),
+          active: z.strictObject({
+            type: upstreamHealthCheckType.optional(),
+            timeout: z.coerce.number().default(1).optional(),
+            concurrency: z.coerce.number().default(10).optional(),
+            host: hostSchema.optional(),
+            port: portSchema.optional(),
+            http_path: z.string().default('/').optional(),
+            https_verify_cert: z.boolean().default(true).optional(),
+            http_request_headers: z.array(z.string()).min(1).optional(),
+            healthy: z
+              .strictObject({
+                ...upstreamHealthCheckPassiveHealthy.shape,
+                interval: z.coerce.number().int().min(1).default(1),
+              })
+              .optional(),
+            unhealthy: z
+              .strictObject({
+                ...upstreamHealthCheckPassiveUnhealthy.shape,
+                interval: z.coerce.number().int().min(1).default(1),
+              })
+              .optional(),
+          }),
           passive: z
             .strictObject({
               type: upstreamHealthCheckType.optional(),
@@ -311,7 +309,7 @@ const sslSchema = z.strictObject({
   client: z
     .strictObject({
       ca: certificateSchema,
-      depth: z.coerce.number().int().min(0).default(1),
+      depth: z.coerce.number().int().min(0).default(1).optional(),
       skip_mtls_uri_regex: z.array(z.string()).min(1).optional(),
     })
     .optional(),
