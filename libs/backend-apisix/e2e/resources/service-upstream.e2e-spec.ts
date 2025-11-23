@@ -2,7 +2,7 @@ import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIX } from '../../src';
-import { server, token } from '../support/constants';
+import { defaultBackendOptions } from '../support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -16,11 +16,7 @@ describe('Service-Upstreams E2E', () => {
   let backend: BackendAPISIX;
 
   beforeAll(() => {
-    backend = new BackendAPISIX({
-      server,
-      token,
-      tlsSkipVerify: true,
-    });
+    backend = new BackendAPISIX(defaultBackendOptions);
   });
 
   describe('Service inline upstream', () => {
@@ -173,10 +169,10 @@ describe('Service-Upstreams E2E', () => {
     it('Dump', async () => {
       const result = await dumpConfiguration(backend);
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].upstreams).toHaveLength(2);
+      expect(result.services![0]).toMatchObject(service);
+      expect(result.services![0].upstreams).toHaveLength(2);
 
-      const upstreams = sortResult(result.services[0].upstreams, 'name');
+      const upstreams = sortResult(result.services![0].upstreams!, 'name');
       expect(upstreams[0]).toMatchObject(upstreamND1);
       expect(upstreams[1]).toMatchObject(upstreamND2);
     });
@@ -199,7 +195,7 @@ describe('Service-Upstreams E2E', () => {
       const result = await dumpConfiguration(backend);
       expect(result.services).toHaveLength(1);
 
-      const upstreams = sortResult(result.services[0].upstreams, 'name');
+      const upstreams = sortResult(result.services![0].upstreams!, 'name');
       expect(upstreams[0]).toMatchObject(newUpstreamND1);
     });
 
@@ -211,8 +207,8 @@ describe('Service-Upstreams E2E', () => {
     it('Dump (non-default upstream 2 should not exist)', async () => {
       const result = await dumpConfiguration(backend);
       expect(result.services).toHaveLength(1);
-      expect(result.services[0].upstreams).toHaveLength(1);
-      expect(result.services[0].upstreams[0]).toMatchObject(newUpstreamND1);
+      expect(result.services![0].upstreams).toHaveLength(1);
+      expect(result.services![0].upstreams![0]).toMatchObject(newUpstreamND1);
     });
 
     it('Delete', async () =>

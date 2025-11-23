@@ -116,6 +116,7 @@ export interface ConsumerGroup {
   plugins: Plugins;
 }
 export interface GlobalRule {
+  id: string;
   plugins: Plugins;
 }
 

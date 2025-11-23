@@ -21,7 +21,7 @@
     "vite.config.mts",
     "vitest.config.ts",
     "vitest.config.mts",
-    "e2e/**/*.e2e-spec.ts",
+    "e2e/**/*.ts",
     "test/**/*.spec.ts",
   ],
   "exclude": [],

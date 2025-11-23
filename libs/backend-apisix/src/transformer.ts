@@ -154,13 +154,6 @@ export class ToADC {
     return adcConsumerGroup;
   }
 
-  public transformGlobalRule(globalRule: typing.GlobalRule): ADCSDK.GlobalRule {
-    return ADCSDK.utils.recursiveOmitUndefined({
-      name: globalRule.id,
-      plugins: globalRule.plugins,
-    });
-  }
-
   public transformStreamRoute(
     streamRoute: typing.StreamRoute,
   ): ADCSDK.StreamRoute {
@@ -368,11 +361,7 @@ export class FromADC {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
-        // @ts-ignore
-        id: undefined,
-        // @ts-ignore
-        name: undefined,
-        consumers: undefined,
+        id: consumerGroupId,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),
           ADC_NAME: consumerGroup.name,
@@ -380,24 +369,6 @@ export class FromADC {
       }),
       consumers,
     ];
-  }
-
-  public transformGlobalRules(
-    globalRules: Record<string, ADCSDK.GlobalRule>,
-  ): Array<typing.GlobalRule> {
-    return Object.entries(globalRules).reduce<Array<typing.GlobalRule>>(
-      (pv, [key, value]) => {
-        pv.push(
-          ADCSDK.utils.recursiveOmitUndefined<typing.GlobalRule>({
-            plugins: {
-              [key]: value as ADCSDK.Plugin,
-            },
-          }),
-        );
-        return pv;
-      },
-      [],
-    );
   }
 
   public transformPluginMetadatas(

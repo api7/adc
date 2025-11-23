@@ -1,5 +1,6 @@
+import { AxiosError } from 'axios';
 import { readFileSync } from 'node:fs';
-import { globalAgent as httpAgent } from 'node:http';
+import { globalAgent as httpGlobalAgent } from 'node:http';
 import {
   Agent as httpsAgent,
   globalAgent as httpsGlobalAgent,
@@ -15,7 +16,7 @@ describe('Ping', () => {
       server,
       token,
       cacheKey: 'default',
-      httpAgent,
+      httpAgent: httpGlobalAgent,
       httpsAgent: httpsGlobalAgent,
     });
     await backend.ping();
@@ -26,7 +27,7 @@ describe('Ping', () => {
       server: 'https://localhost:29180',
       token,
       cacheKey: 'default',
-      httpAgent,
+      httpAgent: httpGlobalAgent,
       httpsAgent: new httpsAgent({
         cert: readFileSync(
           join(__dirname, 'assets/apisix_conf/mtls/client.cer'),
@@ -48,7 +49,7 @@ describe('Ping', () => {
       server: 'http://0.0.0.0',
       token: '',
       cacheKey: 'default',
-      httpAgent,
+      httpAgent: httpGlobalAgent,
       httpsAgent: httpsGlobalAgent,
     });
     await expect(backend.ping()).rejects.toThrow(
@@ -61,7 +62,7 @@ describe('Ping', () => {
       server: 'https://localhost:29180',
       token,
       cacheKey: 'default',
-      httpAgent,
+      httpAgent: httpGlobalAgent,
       httpsAgent: httpsGlobalAgent,
     });
     await expect(backend.ping()).rejects.toThrow(
@@ -74,7 +75,7 @@ describe('Ping', () => {
       server: 'https://localhost:29180',
       token,
       cacheKey: 'default',
-      httpAgent,
+      httpAgent: httpGlobalAgent,
       httpsAgent: new httpsAgent({
         ca: readFileSync(join(__dirname, 'assets/apisix_conf/mtls/ca.cer')),
       }),
@@ -84,8 +85,10 @@ describe('Ping', () => {
     try {
       await backend.ping();
     } catch (err) {
-      expect(err.toString()).toContain('Request failed with status code 400');
-      expect(err.response.data).toContain(
+      expect((err as AxiosError).toString()).toContain(
+        'Request failed with status code 400',
+      );
+      expect((err as AxiosError).response!.data).toContain(
         'No required SSL certificate was sent',
       );
     }
