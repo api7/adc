@@ -98,8 +98,10 @@ export const overrideEventResourceId = (
   return event;
 };
 
-export const sortResult = <T>(result: Array<T>, field: string) =>
-  structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
+export const sortResult = <T extends Record<string, any>>(
+  result: Array<T>,
+  field: string,
+) => structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
 
 export const wait = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
