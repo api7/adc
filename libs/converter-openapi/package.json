@@ -30,7 +30,7 @@
     "projectType": "library",
     "targets": {
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/converter-openapi/vitest.config.ts"
         }

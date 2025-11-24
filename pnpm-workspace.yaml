@@ -15,9 +15,9 @@ catalog:
   "@types/lodash": ^4.17.4
   semver: ^7.7.3
   "@types/semver": ^7.7.1
-  vitest: ^4.0.13
-  "@vitest/ui": ^4.0.13
-  "@vitest/coverage-v8": ^4.0.13
+  vitest: ^4.0.0
+  "@vitest/ui": ^4.0.0
+  "@vitest/coverage-v8": ^4.0.0
   deep-diff: ^1.0.2
   "@types/deep-diff": ^1.0.5
 

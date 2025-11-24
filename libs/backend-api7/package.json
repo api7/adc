@@ -35,7 +35,7 @@
         ]
       },
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/backend-api7/vitest.config.ts"
         }
