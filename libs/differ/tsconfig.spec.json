@@ -5,7 +5,6 @@
     "types": [
       "vitest/globals",
       "vitest/importMeta",
-      "vite/client",
       "node",
       "vitest"
     ],
@@ -31,7 +30,9 @@
     "src/**/*.spec.jsx",
     "src/**/*.d.ts"
   ],
-  "exclude": ["src/test/*.spec.ts"],
+  "exclude": [
+    "src/test/*.spec.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.lib.json"
