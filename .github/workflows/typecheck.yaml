@@ -20,5 +20,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run TypeScript Type Check
+      - name: Typecheck
         run: pnpm exec nx run-many --target=typecheck --all --skip-nx-cache

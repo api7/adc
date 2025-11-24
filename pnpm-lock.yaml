@@ -30,6 +30,12 @@ catalogs:
     immer:
       specifier: ^10.2.0
       version: 10.2.0
+    js-yaml:
+      specifier: ^4.1.0
+      version: 4.1.0
+    listr2:
+      specifier: ^8.2.1
+      version: 8.2.1
     lodash:
       specifier: ^4.17.21
       version: 4.17.21
@@ -177,10 +183,10 @@ importers:
         specifier: ^13.0.0
         version: 13.0.0
       js-yaml:
-        specifier: ^4.1.0
+        specifier: 'catalog:'
         version: 4.1.0
       listr2:
-        specifier: ^8.2.1
+        specifier: 'catalog:'
         version: 8.2.1
       lodash:
         specifier: 'catalog:'
@@ -240,12 +246,18 @@ importers:
       '@types/qs':
         specifier: ^6.9.15
         version: 6.9.15
+      '@types/semver':
+        specifier: 'catalog:'
+        version: 7.7.1
       '@types/signale':
         specifier: ^1.4.7
         version: 1.4.7
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
+      semver:
+        specifier: 'catalog:'
+        version: 7.7.3
       supertest:
         specifier: ^7.1.4
         version: 7.1.4
@@ -393,6 +405,9 @@ importers:
       slugify:
         specifier: ^1.6.6
         version: 1.6.6
+      tslib:
+        specifier: 'catalog:'
+        version: 2.8.1
       zod:
         specifier: 'catalog:'
         version: 4.1.12
@@ -400,6 +415,18 @@ importers:
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      '@types/lodash':
+        specifier: 'catalog:'
+        version: 4.17.4
+      js-yaml:
+        specifier: 'catalog:'
+        version: 4.1.0
+      listr2:
+        specifier: 'catalog:'
+        version: 8.2.1
       vitest:
         specifier: 'catalog:'
         version: 4.0.13(@types/node@22.16.5)(@vitest/ui@4.0.13)(jiti@2.4.2)(less@4.1.3)(sass-embedded@1.86.0)(sass@1.86.0)(terser@5.39.1)(yaml@2.8.0)
