@@ -16,6 +16,6 @@ export default defineConfig({
       provider: 'v8',
     },
     maxWorkers: 1,
-    isolate: false,
+    isolate: true,
   },
 });
