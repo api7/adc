@@ -157,7 +157,7 @@ export class OpenAPIConverter implements ADCSDK.Converter {
   }
 
   private parseOAS(content: string): Observable<OpenAPIV3_1.Document> {
-    return from(dereference(content)).pipe(
+    return of(dereference(content)).pipe(
       map((res) => {
         if (res.errors?.length)
           throw new Error(

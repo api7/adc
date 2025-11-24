@@ -1,17 +1,9 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
-import { Listr, SilentRenderer } from 'listr2';
 import { lastValueFrom, toArray } from 'rxjs';
 import semver from 'semver';
 
 import { BackendAPISIX } from '../../src';
-
-export const runTask = async (tasks: Listr, ctx = {}) => {
-  //@ts-expect-error just ignore
-  tasks.renderer = new SilentRenderer();
-  await tasks.run(ctx);
-  return tasks.ctx.local;
-};
 
 export const syncEvents = async (
   backend: BackendAPISIX,

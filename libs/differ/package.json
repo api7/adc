@@ -10,13 +10,20 @@
     }
   },
   "devDependencies": {
-    "@api7/adc-sdk": "workspace:*"
+    "@api7/adc-sdk": "workspace:*",
+    "@types/lodash": "catalog:",
+    "@types/deep-diff": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "lodash": "catalog:",
+    "deep-diff": "catalog:"
   },
   "nx": {
     "name": "differ",
     "targets": {
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/differ/vitest.config.ts"
         }

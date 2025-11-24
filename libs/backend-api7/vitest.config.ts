@@ -15,7 +15,8 @@ export default defineConfig({
         : '../../coverage/libs/backend-api7',
       provider: 'v8',
     },
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
     ...(isE2E ? { globalSetup: 'e2e/support/global-setup.ts' } : {}),
   },
 });

@@ -15,6 +15,7 @@ export default defineConfig({
         : '../../coverage/libs/backend-apisix',
       provider: 'v8',
     },
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
   },
 });

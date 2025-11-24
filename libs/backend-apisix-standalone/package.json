@@ -11,7 +11,18 @@
   "devDependencies": {
     "@api7/adc-sdk": "workspace:*",
     "@api7/adc-differ": "workspace:*",
-    "docker-compose": "^1.2.0"
+    "@types/lodash": "catalog:",
+    "@types/semver": "catalog:",
+    "docker-compose": "^1.2.0",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "rxjs": "catalog:",
+    "lodash": "catalog:",
+    "zod": "catalog:",
+    "tslib": "catalog:",
+    "semver": "catalog:"
   },
   "nx": {
     "name": "backend-apisix-standalone",
@@ -24,7 +35,7 @@
         ]
       },
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/backend-apisix-standalone/vitest.config.ts"
         }

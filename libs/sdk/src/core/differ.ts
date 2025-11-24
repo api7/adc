@@ -1,4 +1,4 @@
-import { Diff } from 'deep-diff';
+import type { Diff } from 'deep-diff';
 
 import { Plugin, ResourceFor, ResourceType } from '.';
 

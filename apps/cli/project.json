@@ -7,9 +7,7 @@
   "targets": {
     "build": {
       "executor": "@nx/webpack:webpack",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "target": "node",
@@ -17,9 +15,7 @@
         "outputPath": "dist/apps/cli",
         "main": "apps/cli/src/main.ts",
         "tsConfig": "apps/cli/tsconfig.app.json",
-        "assets": [
-          "apps/cli/src/assets"
-        ],
+        "assets": ["apps/cli/src/assets"],
         "webpackConfig": "apps/cli/webpack.config.js",
         "sourceMap": true
       },
@@ -30,12 +26,10 @@
     },
     "lint": {
       "executor": "@nx/eslint:lint",
-      "outputs": [
-        "{options.outputFile}"
-      ]
+      "outputs": ["{options.outputFile}"]
     },
     "test": {
-      "executor": "@nx/vite:test",
+      "executor": "@nx/vitest:test",
       "options": {
         "configFile": "apps/cli/vitest.config.ts"
       }

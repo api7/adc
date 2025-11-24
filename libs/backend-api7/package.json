@@ -10,7 +10,19 @@
   },
   "devDependencies": {
     "@api7/adc-differ": "workspace:*",
-    "@api7/adc-sdk": "workspace:*"
+    "@api7/adc-sdk": "workspace:*",
+    "@types/lodash": "catalog:",
+    "@types/semver": "catalog:",
+    "@types/json-schema": "^7.0.15",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "rxjs": "catalog:",
+    "lodash": "catalog:",
+    "tslib": "catalog:",
+    "semver": "catalog:",
+    "immer": "catalog:"
   },
   "nx": {
     "name": "backend-api7",
@@ -23,7 +35,7 @@
         ]
       },
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/backend-api7/vitest.config.ts"
         }

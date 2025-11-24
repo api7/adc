@@ -1,28 +1,9 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { Listr, SilentRenderer } from 'listr2';
 import { Agent as httpsAgent } from 'node:https';
 import { lastValueFrom, toArray } from 'rxjs';
 import * as semver from 'semver';
 
 import { BackendAPI7 } from '../../src';
-
-export const runTask = async (tasks: Listr, ctx = {}) => {
-  // add sync delay
-  if (Array.isArray(tasks.task)) {
-    const delayedTasks = tasks.task.reduce((pv, cv) => {
-      pv.push(cv, {
-        task: async () => new Promise((resolve) => setTimeout(resolve, 20)),
-      });
-      return pv;
-    }, []);
-    tasks = new Listr(delayedTasks, { concurrent: false });
-  }
-
-  //@ts-expect-error just ignore
-  tasks.renderer = new SilentRenderer();
-  await tasks.run(ctx);
-  return tasks.ctx.local;
-};
 
 export const syncEvents = async (
   backend: BackendAPI7,

@@ -13,6 +13,21 @@
       "default": "./src/core/schema.ts"
     }
   },
+  "devDependencies": {
+    "@types/lodash": "catalog:",
+    "@types/semver": "catalog:",
+    "@types/deep-diff": "catalog:"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "lodash": "catalog:",
+    "rxjs": "catalog:",
+    "semver": "catalog:",
+    "tslib": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:",
+    "deep-diff": "catalog:"
+  },
   "nx": {
     "name": "sdk",
     "projectType": "library",
@@ -39,21 +54,11 @@
         ]
       },
       "test": {
-        "executor": "@nx/vite:test",
+        "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/sdk/vitest.config.ts"
         }
       }
     }
-  },
-  "dependencies": {
-    "axios": "^1.13.1",
-    "deep-diff": "^1.0.2",
-    "lodash": "^4.17.21",
-    "rxjs": "^7.8.1",
-    "semver": "^7.6.3",
-    "tslib": "^2.6.2",
-    "vitest": "3.0.0",
-    "zod": "^4.0.10"
   }
 }
