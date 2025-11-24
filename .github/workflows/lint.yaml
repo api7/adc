@@ -1,4 +1,4 @@
-name: Typecheck
+name: Lint
 permissions:
   contents: read
 on:
@@ -9,7 +9,7 @@ on:
     branches:
       - main
 jobs:
-  typecheck:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +20,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run TypeScript Type Check
-        run: pnpm exec nx run-many --target=typecheck --all --skip-nx-cache
+      - name: Lint
+        run: pnpm exec nx run-many --target=lint --all --skip-nx-cache

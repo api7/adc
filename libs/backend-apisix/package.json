@@ -10,7 +10,18 @@
   },
   "devDependencies": {
     "@api7/adc-differ": "workspace:*",
-    "@api7/adc-sdk": "workspace:*"
+    "@api7/adc-sdk": "workspace:*",
+    "@types/lodash": "catalog:",
+    "@types/semver": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "rxjs": "catalog:",
+    "lodash": "catalog:",
+    "tslib": "catalog:",
+    "semver": "catalog:",
+    "immer": "catalog:"
   },
   "nx": {
     "name": "backend-apisix",

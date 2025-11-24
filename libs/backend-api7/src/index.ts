@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { type AxiosInstance } from 'axios';
-import { JSONSchema4 } from 'json-schema';
+import type { JSONSchema4 } from 'json-schema';
 import { isEmpty, isNil } from 'lodash';
 import { Subject, forkJoin, from, switchMap } from 'rxjs';
 import semver, { SemVer } from 'semver';
