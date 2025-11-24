@@ -28,8 +28,8 @@ catalogs:
       specifier: ^1.0.2
       version: 1.0.2
     immer:
-      specifier: ^10.2.0
-      version: 10.2.0
+      specifier: ^11.0.0
+      version: 11.0.0
     js-yaml:
       specifier: ^4.1.0
       version: 4.1.0
@@ -278,7 +278,7 @@ importers:
         version: 1.13.2
       immer:
         specifier: 'catalog:'
-        version: 10.2.0
+        version: 11.0.0
       lodash:
         specifier: 'catalog:'
         version: 4.17.21
@@ -318,7 +318,7 @@ importers:
         version: 1.13.2
       immer:
         specifier: 'catalog:'
-        version: 10.2.0
+        version: 11.0.0
       lodash:
         specifier: 'catalog:'
         version: 4.17.21
@@ -4144,8 +4144,8 @@ packages:
     engines: {node: '>=0.10.0'}
     hasBin: true
 
-  immer@10.2.0:
-    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
+  immer@11.0.0:
+    resolution: {integrity: sha512-XtRG4SINt4dpqlnJvs70O2j6hH7H0X8fUzFsjMn1rwnETaxwp83HLNimXBjZ78MrKl3/d3/pkzDH0o0Lkxm37Q==}
 
   immutable@5.0.3:
     resolution: {integrity: sha512-P8IdPQHq3lA1xVeBRi5VPqUm5HDgKnx0Ru51wZz5mjxHr5n3RWhjIpOFU7ybkUxfB+5IToy+OLaHYDBIWsv+uw==}
@@ -11186,7 +11186,7 @@ snapshots:
   image-size@0.5.5:
     optional: true
 
-  immer@10.2.0: {}
+  immer@11.0.0: {}
 
   immutable@5.0.3: {}
 
