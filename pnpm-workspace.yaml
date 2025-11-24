@@ -16,7 +16,7 @@ catalog:
   vitest: ^4.0.13
   "@vitest/ui": ^4.0.13
   "@vitest/coverage-v8": ^4.0.13
-  "deep-diff": ^1.0.2
+  deep-diff: ^1.0.2
   "@types/deep-diff": ^1.0.5
 
 minimumReleaseAge: 1440
