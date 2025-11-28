@@ -179,6 +179,7 @@ describe('Cache - Single APISIX', () => {
       ],
       consumers_conf_version: timestamp,
     });
+    expect(latestVersionCache.get(cacheKey)).toEqual(timestamp);
   });
 
   it('wait for sync', async () => wait(100));
