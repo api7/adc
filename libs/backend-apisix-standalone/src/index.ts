@@ -5,6 +5,7 @@ import semver, { SemVer, eq as semverEQ } from 'semver';
 
 import {
   config as configCache,
+  latestVersion as latestVersionCache,
   rawConfig as rawConfigCache,
   version as versionCache,
 } from './cache';
@@ -108,6 +109,18 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
         return from(fetcher.dump()).pipe(
           map(
             ([config, rawConfig]) => (
+              latestVersionCache.set(
+                this.opts.cacheKey!,
+                Math.max(
+                  ...Object.entries(rawConfig)
+                    .filter(
+                      ([key, value]) =>
+                        key.endsWith('_conf_version') &&
+                        typeof value === 'number',
+                    )
+                    .map(([, value]) => value as number),
+                ),
+              ),
               configCache.set(this.opts.cacheKey!, config),
               rawConfigCache.set(this.opts.cacheKey!, rawConfig),
               config
