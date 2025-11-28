@@ -25,11 +25,11 @@ import {
   config as configCache,
   latestVersion as latestVersionCache,
   rawConfig as rawConfigCache,
-  startTime,
 } from './cache';
 import { ENDPOINT_CONFIG, HEADER_CREDENTIAL, HEADER_DIGEST } from './constants';
 import { toADC } from './transformer';
 import * as typing from './typing';
+import { stableTimestamp } from './utils';
 
 export interface OperatorOptions {
   cacheKey: string;
@@ -63,7 +63,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
 
-    let timestamp = startTime + Math.floor(performance.now());
+    let timestamp = stableTimestamp();
     const latestVersion = latestVersionCache.get(this.opts.cacheKey) ?? 0;
     // We have used a static start time combined with incrementing startup timestamps to generate
     // non-reversible timestamps. Consequently, when a single ADC server is operational,

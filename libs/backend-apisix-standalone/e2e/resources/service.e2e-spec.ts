@@ -4,7 +4,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIXStandalone } from '../../src';
 import { rawConfig as rawConfigCache } from '../../src/cache';
-import { server1, token1 } from '../support/constants';
+import { defaultBackendOptions, server1, token1 } from '../support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -23,6 +23,7 @@ describe('Service E2E', () => {
       server: server1,
       token: token1,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
 

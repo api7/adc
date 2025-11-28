@@ -6,8 +6,15 @@ import {
   config as configCache,
   rawConfig as rawConfigCache,
 } from '../../src/cache';
-import { server1, token1 } from '../support/constants';
+import { stableTimestamp } from '../../src/utils';
+import { defaultBackendOptions, server1, token1 } from '../support/constants';
 import { dumpConfiguration, restartAPISIX, syncEvents } from '../support/utils';
+
+vi.mock('../../src/utils', () => ({
+  stableTimestamp: vi.fn(),
+}));
+
+const mockStableTimestamp = vi.mocked(stableTimestamp);
 
 const cacheKey = 'default';
 describe('Service E2E - inline upstream', () => {
@@ -19,10 +26,9 @@ describe('Service E2E - inline upstream', () => {
       server: server1,
       token: token1,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
-
-  afterEach(() => vi.useRealTimers());
 
   it('Initialize cache', () =>
     expect(dumpConfiguration(backend)).resolves.not.toThrow());
@@ -45,8 +51,7 @@ describe('Service E2E - inline upstream', () => {
     ],
   };
   it('Create service', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(100);
+    mockStableTimestamp.mockReturnValueOnce(100);
     const events = DifferV3.diff(config, await dumpConfiguration(backend));
     return syncEvents(backend, events);
   });
@@ -78,8 +83,7 @@ describe('Service E2E - inline upstream', () => {
   });
 
   it('Update inlined upstream', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(200);
+    mockStableTimestamp.mockReturnValueOnce(200);
 
     const newConfig = structuredClone(config);
     newConfig.services[0].upstream.nodes[0].port = 19080;
@@ -107,8 +111,7 @@ describe('Service E2E - inline upstream', () => {
   });
 
   it('Update inlined upstream again', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(300);
+    mockStableTimestamp.mockReturnValueOnce(300);
 
     const newConfig = structuredClone(config);
     newConfig.services[0].upstream.nodes = [];
@@ -137,8 +140,7 @@ describe('Service E2E - inline upstream', () => {
   });
 
   it('Delete service', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(400);
+    mockStableTimestamp.mockReturnValueOnce(400);
 
     const events = DifferV3.diff({}, await dumpConfiguration(backend));
     expect(events).toHaveLength(1);
