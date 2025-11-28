@@ -6,9 +6,12 @@ import { gt, lte } from 'semver';
 import { BackendAPISIXStandalone } from '../src';
 import {
   config as configCache,
+  latestVersion as latestVersionCache,
   rawConfig as rawConfigCache,
 } from '../src/cache';
+import { stableTimestamp } from '../src/utils';
 import {
+  defaultBackendOptions,
   server1,
   server2,
   server3,
@@ -26,6 +29,12 @@ import {
   wait,
 } from './support/utils';
 
+vi.mock('../src/utils', () => ({
+  stableTimestamp: vi.fn(),
+}));
+
+const mockStableTimestamp = vi.mocked(stableTimestamp);
+
 describe('Cache - Single APISIX', () => {
   let backend: BackendAPISIXStandalone;
 
@@ -37,14 +46,11 @@ describe('Cache - Single APISIX', () => {
       token: token1,
       tlsSkipVerify: true,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
 
   afterAll(() => (configCache.clear(), rawConfigCache.clear()));
-
-  beforeEach(() => vi.useFakeTimers());
-
-  afterEach(() => vi.useRealTimers());
 
   it('initialize cache (load from fresh new APISIX instance)', async () => {
     expect(configCache).toBeDefined();
@@ -101,6 +107,8 @@ describe('Cache - Single APISIX', () => {
     ],
   } as ADCSDK.Configuration;
   const now = new Date();
+  mockStableTimestamp.mockReset();
+  mockStableTimestamp.mockReturnValue(now.getTime());
   it('update config', async () => {
     const oldConfig = await dumpConfiguration(backend);
     const events = DifferV3.diff(config, oldConfig);
@@ -110,8 +118,6 @@ describe('Cache - Single APISIX', () => {
         .map((item) => item.type)
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(4);
-
-    vi.setSystemTime(now);
 
     const result = await syncEvents(backend, events);
     expect(result[0].server).toEqual(server1);
@@ -175,7 +181,7 @@ describe('Cache - Single APISIX', () => {
     });
   });
 
-  it('wait for sync', async () => (vi.useRealTimers(), wait(100)));
+  it('wait for sync', async () => wait(100));
 
   it('check route', async () => {
     const res = await axios.get('http://127.0.0.1:19080/apisix/admin/configs', {
@@ -198,6 +204,7 @@ describe('Cache - Multiple APISIX (completely new instances)', () => {
       token: tokens,
       tlsSkipVerify: true,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
 
@@ -305,12 +312,9 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
       token: tokens,
       tlsSkipVerify: true,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
-
-  beforeEach(() => vi.useFakeTimers());
-
-  afterEach(() => vi.useRealTimers());
 
   it('send config to instance 1', async () => {
     const config = {
@@ -328,6 +332,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
       ],
     } as ADCSDK.Configuration;
     const events = DifferV3.diff(config, {});
+    latestVersionCache.clear();
     configCache.set(cacheKey, {});
     rawConfigCache.set(cacheKey, {});
     expect(events).toHaveLength(1 + 1); // service * 1 + route * 1
@@ -337,7 +342,8 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(100);
+    mockStableTimestamp.mockReset();
+    mockStableTimestamp.mockReturnValue(100);
 
     return syncEvents(
       new BackendAPISIXStandalone({
@@ -345,12 +351,13 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         token: token1,
         tlsSkipVerify: true,
         cacheKey,
+        ...defaultBackendOptions,
       }),
       events,
     );
   });
 
-  it('wait for sync', () => (vi.useRealTimers(), wait(1000)));
+  it('wait for sync', () => wait(1000));
 
   it('send config to instance 2', async () => {
     const config = {
@@ -377,7 +384,8 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    vi.setSystemTime(200);
+    mockStableTimestamp.mockReset();
+    mockStableTimestamp.mockReturnValue(200);
 
     return syncEvents(
       new BackendAPISIXStandalone({
@@ -385,6 +393,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         token: token2,
         tlsSkipVerify: true,
         cacheKey,
+        ...defaultBackendOptions,
       }),
       events,
     );
