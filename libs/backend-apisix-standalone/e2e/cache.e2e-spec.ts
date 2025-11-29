@@ -107,8 +107,7 @@ describe('Cache - Single APISIX', () => {
     ],
   } as ADCSDK.Configuration;
   const now = new Date();
-  mockStableTimestamp.mockReset();
-  mockStableTimestamp.mockReturnValue(now.getTime());
+  mockStableTimestamp.mockReturnValueOnce(now.getTime());
   it('update config', async () => {
     const oldConfig = await dumpConfiguration(backend);
     const events = DifferV3.diff(config, oldConfig);
@@ -343,8 +342,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    mockStableTimestamp.mockReset();
-    mockStableTimestamp.mockReturnValue(100);
+    mockStableTimestamp.mockReturnValueOnce(100);
 
     return syncEvents(
       new BackendAPISIXStandalone({
@@ -385,8 +383,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         .filter((item) => item === ADCSDK.EventType.CREATE),
     ).toHaveLength(2);
 
-    mockStableTimestamp.mockReset();
-    mockStableTimestamp.mockReturnValue(200);
+    mockStableTimestamp.mockReturnValueOnce(200);
 
     return syncEvents(
       new BackendAPISIXStandalone({
