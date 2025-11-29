@@ -3,7 +3,7 @@ import axios from 'axios';
 
 import { BackendAPISIXStandalone } from '../../src';
 import * as typing from '../../src/typing';
-import { server1, token1 } from '../support/constants';
+import { defaultBackendOptions, server1, token1 } from '../support/constants';
 import {
   createEvent,
   deleteEvent,
@@ -23,6 +23,7 @@ describe('Consumer E2E', () => {
       token: token1,
       tlsSkipVerify: true,
       cacheKey: 'default',
+      ...defaultBackendOptions,
     });
   });
 

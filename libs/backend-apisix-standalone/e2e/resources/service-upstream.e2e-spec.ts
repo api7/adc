@@ -7,7 +7,7 @@ import {
   rawConfig as rawConfigCache,
 } from '../../src/cache';
 import * as typing from '../../src/typing';
-import { server1, token1 } from '../support/constants';
+import { defaultBackendOptions, server1, token1 } from '../support/constants';
 import { dumpConfiguration, restartAPISIX, syncEvents } from '../support/utils';
 
 const cacheKey = 'default';
@@ -21,6 +21,7 @@ describe('Service-Upstreams E2E', () => {
       token: token1,
       tlsSkipVerify: true,
       cacheKey,
+      ...defaultBackendOptions,
     });
   });
 

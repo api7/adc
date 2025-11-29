@@ -21,10 +21,15 @@ import {
 } from 'rxjs';
 import { type SemVer } from 'semver';
 
-import { config as configCache, rawConfig as rawConfigCache } from './cache';
+import {
+  config as configCache,
+  latestVersion as latestVersionCache,
+  rawConfig as rawConfigCache,
+} from './cache';
 import { ENDPOINT_CONFIG, HEADER_CREDENTIAL, HEADER_DIGEST } from './constants';
 import { toADC } from './transformer';
 import * as typing from './typing';
+import { stableTimestamp } from './utils';
 
 export interface OperatorOptions {
   cacheKey: string;
@@ -58,7 +63,26 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
     const taskStateEvent = this.taskStateEvent(taskName);
     logger(taskStateEvent('TASK_START'));
 
-    const timestamp = Date.now();
+    let timestamp = stableTimestamp();
+    const latestVersion = latestVersionCache.get(this.opts.cacheKey) ?? 0;
+    // We have used a static start time combined with incrementing startup timestamps to generate
+    // non-reversible timestamps. Consequently, when a single ADC server is operational,
+    // its timestamps will not revert due to system time rollbacks.
+    // However, this does not cover scenarios where the ADC restarts. So, we use another approach:
+    // we override this value with the latest version number obtained from the APISIX data plane
+    // configuration (when initializing the configuration cache), incrementing it by one.
+    // This ensures the APISIX Admin API can accept the change.
+    // Then, as time progresses, the timestamp will eventually surpass the timestamp of the last used
+    // version number, allowing the synchronisation process to revert to its normal workflow.
+    if (latestVersion > timestamp) {
+      console.error(
+        `[WARN] The current sync operation timestamp "${timestamp}" is less than the latest configuration timestamp "${latestVersion}". A time rollback may have occurred.`,
+      );
+      // We increment the new latest version by one millisecond to ensure it is monotonically increasing
+      // and will not be blocked by the APISIX Admin API.
+      timestamp = latestVersion + 1;
+    }
+
     return from(events).pipe(
       // derive the latest configuration from the old config
       tap((event) =>
@@ -150,6 +174,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
               }),
               tap((res) => {
                 if (res.success) {
+                  latestVersionCache.set(this.opts.cacheKey, timestamp);
                   configCache.set(this.opts.cacheKey, toADC(newConfig));
                   rawConfigCache.set(this.opts.cacheKey, newConfig);
                 }
