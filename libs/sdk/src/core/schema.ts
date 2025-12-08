@@ -163,10 +163,6 @@ const upstreamSchema = (extend?: ZodRawShape) =>
           client_cert_id: z.string().optional(),
           verify: z.boolean().optional(),
         })
-        .refine(
-          (data) => data.client_cert || data.client_key,
-          'Please replace `client_cert` and `client_key` with SSL resources and `client_cert_id`.',
-        )
         .optional(),
       keepalive_pool: z
         .strictObject({
