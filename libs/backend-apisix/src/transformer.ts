@@ -222,8 +222,8 @@ export class ToADC {
       tls: upstream.tls
         ? {
             client_cert_id: upstream.tls.client_cert_id,
-            cert: upstream.tls.client_cert,
-            key: upstream.tls.client_key,
+            client_cert: upstream.tls.client_cert,
+            client_key: upstream.tls.client_key,
             verify: upstream.tls.verify,
           }
         : undefined,
