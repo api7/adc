@@ -1,6 +1,7 @@
 import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
+import { AxiosResponse } from 'axios';
 import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
@@ -127,45 +128,15 @@ export const syncHandler: RequestHandler<
     );
     const successes = results.filter((result) => result.success);
     const faileds = results.filter((result) => !result.success);
-    const simplifyEvent = (event: ADCSDK.Event) =>
-      omit(event, ['diff', 'oldValue', 'newValue', 'subEvents']);
-    const output = {
-      status:
-        results.length === successes.length
-          ? 'success'
-          : results.length === faileds.length
-            ? 'all_failed'
-            : 'partial_failure',
-      total_resources: results.length,
-      success_count: successes.length,
-      failed_count: faileds.length,
-      success: [
-        ...successes.map(({ event, axiosResponse, server }) => ({
-          server,
-          event: simplifyEvent(event),
-          synced_at: new Date(
-            axiosResponse?.headers?.date ?? new Date(),
-          ).toISOString(),
-        })),
-      ],
-      failed: [
-        ...faileds.map(({ event, error, axiosResponse, server }) => ({
-          server,
-          event: simplifyEvent(event),
-          failed_at: new Date(
-            axiosResponse?.headers?.date ?? new Date(),
-          ).toISOString(),
-          reason: error.message,
-          ...(axiosResponse && {
-            response: {
-              status: axiosResponse.status,
-              headers: axiosResponse.headers,
-              data: axiosResponse.data,
-            },
-          }),
-        })),
-      ],
-    };
+
+    const output =
+      task.opts.backend !== 'apisix-standalone'
+        ? generateOutput([results, successes, faileds])
+        : generateOutputForAPISIXStandalone(diff, [
+            results,
+            successes,
+            faileds,
+          ]);
 
     logger.log({
       level: 'debug',
@@ -185,4 +156,111 @@ export const syncHandler: RequestHandler<
       message: toString(err),
     });
   }
+};
+
+const simplifyEvent = (event: ADCSDK.Event) =>
+  omit(event, ['diff', 'oldValue', 'newValue', 'subEvents']);
+
+const formatAxiosResponse = (axiosResponse: AxiosResponse) => ({
+  response: {
+    status: axiosResponse.status,
+    headers: axiosResponse.headers,
+    data: axiosResponse.data,
+  },
+  request: {
+    url: axiosResponse.config.url,
+    method: axiosResponse.config.method,
+    headers:
+      ((axiosResponse.config.headers['X-API-KEY'] = '*****'),
+      axiosResponse.config.headers),
+    data: axiosResponse.config.data,
+  },
+});
+
+const generateOutput = ([results, successes, faileds]: [
+  Array<ADCSDK.BackendSyncResult>,
+  Array<ADCSDK.BackendSyncResult>,
+  Array<ADCSDK.BackendSyncResult>,
+]) => {
+  const date = new Date();
+  return {
+    status:
+      results.length === successes.length
+        ? 'success'
+        : results.length === faileds.length
+          ? 'all_failed'
+          : 'partial_failure',
+    total_resources: results.length,
+    success_count: successes.length,
+    failed_count: faileds.length,
+    success: [
+      ...successes.map(({ event, axiosResponse, server }) => ({
+        server,
+        event: simplifyEvent(event),
+        synced_at: new Date(axiosResponse?.headers?.date ?? date).toISOString(),
+      })),
+    ],
+    failed: [
+      ...faileds.map(({ event, error, axiosResponse, server }) => ({
+        server,
+        event: simplifyEvent(event),
+        failed_at: new Date(axiosResponse?.headers?.date ?? date).toISOString(),
+        reason: error.message,
+        ...(axiosResponse && formatAxiosResponse(axiosResponse)),
+      })),
+    ],
+  };
+};
+
+/**
+ * The `sync` of the APISIX Standalone backend returns whether sync on the endpoint succeeded or failed,
+ * while other backends should return the synchronization success status for each individual Event.
+ * This represents a significant difference in backend behavior, as the APISIX Standalone backend
+ * always initiates only one request regardless of how many Events require synchronization.
+ *
+ * According to the standard of the ADC server sync API, we will use the `success` array to store
+ * all events and add an additional `endpoint_status` to track the success of synchronization
+ * across each backend.
+ * @param events
+ * @param results
+ * @returns
+ */
+const generateOutputForAPISIXStandalone = (
+  events: Array<ADCSDK.Event>,
+  [results, successes, faileds]: [
+    Array<ADCSDK.BackendSyncResult>,
+    Array<ADCSDK.BackendSyncResult>,
+    Array<ADCSDK.BackendSyncResult>,
+  ],
+) => {
+  const date = new Date();
+  return {
+    status:
+      results.length === successes.length
+        ? 'success'
+        : results.length === faileds.length
+          ? 'all_failed'
+          : 'partial_failure',
+    total_resources: 0,
+    success_count: successes.length,
+    failed_count: faileds.length,
+    success: [
+      ...events.map((event) => ({
+        event: simplifyEvent(event),
+        synced_at: date.toISOString(),
+      })),
+    ],
+    failed: [],
+    endpoint_status: results.map((result) => {
+      return {
+        server: result.server,
+        success: result.success,
+        reason: result.error.message,
+        requested_at: new Date(
+          result.axiosResponse?.headers?.date ?? date,
+        ).toISOString(),
+        ...(result.axiosResponse && formatAxiosResponse(result.axiosResponse)),
+      };
+    }),
+  };
 };
