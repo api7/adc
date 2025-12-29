@@ -255,7 +255,7 @@ const generateOutputForAPISIXStandalone = (
       return {
         server: result.server,
         success: result.success,
-        reason: result.error.message,
+        reason: result?.error?.message,
         requested_at: new Date(
           result.axiosResponse?.headers?.date ?? date,
         ).toISOString(),
