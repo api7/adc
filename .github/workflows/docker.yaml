@@ -41,7 +41,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Install cosign
-        # if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: sigstore/cosign-installer@v3
 
       - name: Docker meta
@@ -62,16 +62,16 @@ jobs:
           platforms: linux/amd64 #,linux/arm64
           context: .
           file: libs/tools/src/docker/Dockerfile
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          load: true
-          push: false
           provenance: false
           sbom: false
 
       - name: Sign images and push
+        if: ${{ github.event_name == 'push' }}
         env:
           COSIGN_REPOSITORY: ${{ secrets.DOCKER_REGISTRY }}/api7/notary
         run: |
-          cosign sign --yes --recursive --upload=false "docker.io/api7/adc@${{ steps.build.outputs.digest }}" 
-          cosign sign --yes --recursive --upload=false "ghcr.io/api7/adc@${{ steps.build.outputs.digest }}"
+          cosign sign --yes --recursive "docker.io/api7/adc@${{ steps.build.outputs.digest }}" 
+          cosign sign --yes --recursive "ghcr.io/api7/adc@${{ steps.build.outputs.digest }}"
