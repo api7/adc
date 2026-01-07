@@ -68,5 +68,5 @@ jobs:
         env:
           COSIGN_REPOSITORY: ${{ secrets.DOCKER_REGISTRY }}/api7/notary
         run: |
-          echo docker.io/api7/adc@${{ steps.build.outputs.digest }}
-          echo ghcr.io/api7/adc@${{ steps.build.outputs.digest }}
+          cosign sign --yes --recursive --upload=false "docker.io/api7/adc@${{ steps.build.outputs.digest }}" 
+          cosign sign --yes --recursive --upload=false "ghcr.io/api7/adc@${{ steps.build.outputs.digest }}"
