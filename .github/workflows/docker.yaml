@@ -36,7 +36,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Install cosign
-        if: ${{ github.event_name == 'push' }}
+        # if: ${{ github.event_name == 'push' }}
         uses: sigstore/cosign-installer@v3
 
       - name: Docker meta
@@ -59,6 +59,7 @@ jobs:
           file: libs/tools/src/docker/Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          load: true
           push: false
           provenance: false
           sbom: false
