@@ -8,6 +8,11 @@ on:
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,18 +40,23 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Install cosign
+        if: ${{ github.event_name == 'push' }}
+        uses: sigstore/cosign-installer@v3
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            api7/adc
+            docker.io/api7/adc
             ghcr.io/api7/adc
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=dev,enable={{is_default_branch}}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
@@ -55,5 +65,13 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: mode=max
+          provenance: false
           sbom: false
+
+      - name: Sign images and push
+        if: ${{ github.event_name == 'push' }}
+        env:
+          COSIGN_REPOSITORY: ${{ secrets.DOCKER_REGISTRY }}/api7/notary
+        run: |
+          cosign sign --yes --recursive "docker.io/api7/adc@${{ steps.build.outputs.digest }}" 
+          cosign sign --yes --recursive "ghcr.io/api7/adc@${{ steps.build.outputs.digest }}"
