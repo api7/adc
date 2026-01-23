@@ -163,7 +163,7 @@ describe('Miscellaneous', () => {
       upstream: structuredClone(upstream),
     } as ADCSDK.Service;
 
-    const errorPattern = `validate request failed: request body has an error: doesn't match schema: doesn't match schema due to: Error at "/path_prefix": value must be a string`;
+    const errorPattern = `Error at "/path_prefix": value must be a string`;
     it('Create services (exitOnFailure = true, default)', async () => {
       await expect(
         syncEvents(backend, [
