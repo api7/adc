@@ -87,8 +87,8 @@ describe('Default Value', () => {
     },
   );
 
-  conditionalIt(semverCondition(gte, '3.6.0'))(
-    'Check default value (>=3.6.0)',
+  conditionalIt(semverCondition(gte, '3.6.0') && semverCondition(lt, '3.8.0'))(
+    'Check default value (>=3.6.0 && <3.8.0)',
     async () => {
       const defaultValue = await getDefaultValue(backend);
       expect(defaultValue).toMatchObject({
@@ -99,6 +99,14 @@ describe('Default Value', () => {
           ssl: { client: { depth: 1 } },
         },
       });
+    },
+  );
+
+  conditionalIt(semverCondition(gte, '3.8.0'))(
+    'Check default value (>=3.8.0)',
+    async () => {
+      const defaultValue = await getDefaultValue(backend);
+      expect(defaultValue).toContainEqual('');
     },
   );
 });
