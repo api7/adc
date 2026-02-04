@@ -13,7 +13,7 @@ import { PingCommand } from './ping.command';
 import { SyncCommand } from './sync.command';
 import { configurePluralize } from './utils';
 
-const versionCode = '0.24.1';
+const versionCode = '0.24.2';
 
 // initialize dotenv
 dotenv.config();
