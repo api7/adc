@@ -21,7 +21,8 @@ const keepAlive: HttpOptions = {
   keepAlive: true,
   maxSockets: 256, // per host
   maxFreeSockets: 16, // per host free
-  freeSocketTimeout: 60000,
+  freeSocketTimeout:
+    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT) ?? 50000, // free socket keepalive for 50 seconds, and if the ADC_INGRESS_FREE_SOCKET_TIMEOUT environment variable is provided, it takes precedence.
 };
 const httpAgent = new HttpAgent(keepAlive);
 
