@@ -37,8 +37,8 @@ catalogs:
       specifier: ^8.2.1
       version: 8.2.1
     lodash:
-      specifier: ^4.17.21
-      version: 4.17.21
+      specifier: ^4.17.23
+      version: 4.17.23
     rxjs:
       specifier: ^7.8.2
       version: 7.8.2
@@ -190,7 +190,7 @@ importers:
         version: 8.2.1
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       parse-duration:
         specifier: ^2.1.5
         version: 2.1.5
@@ -281,7 +281,7 @@ importers:
         version: 10.2.0
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -321,7 +321,7 @@ importers:
         version: 10.2.0
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -355,7 +355,7 @@ importers:
         version: 1.13.2
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -398,7 +398,7 @@ importers:
         version: 0.5.1
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -438,7 +438,7 @@ importers:
         version: 1.0.2
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
     devDependencies:
       '@api7/adc-sdk':
         specifier: workspace:*
@@ -463,7 +463,7 @@ importers:
         version: 1.0.2
       lodash:
         specifier: 'catalog:'
-        version: 4.17.21
+        version: 4.17.23
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -3447,6 +3447,7 @@ packages:
 
   deep-diff@1.0.2:
     resolution: {integrity: sha512-aWS3UIVH+NPGCD1kki+DCU9Dua032iSsO43LqQpcs4R3+dVv7tX0qBGjiVHJHjplsoUM2XRO/KB92glqc68awg==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
@@ -4605,6 +4606,9 @@ packages:
 
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
+
+  lodash@4.17.23:
+    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
 
   log-symbols@4.1.0:
     resolution: {integrity: sha512-8XPvpAA8uyhfteu8pIvQxpJZ7SYYdpUivZpGy6sFsBuKRY/7rQGavedeB8aK+Zkyq6upMFVL/9AW6vOYzfRyLg==}
@@ -11786,6 +11790,8 @@ snapshots:
   lodash.uniq@4.5.0: {}
 
   lodash@4.17.21: {}
+
+  lodash@4.17.23: {}
 
   log-symbols@4.1.0:
     dependencies:
