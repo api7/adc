@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+paths:
+  /anything:
+    x-adc-route-uris:
+      - /anything-alias
+      - /anything-alternative
+    get:
+      summary: Returns anything passed in request data.
+      operationId: get-anything
+      responses:
+        '200':
+          description: Anything passed in request
+          content: {}
+    post:
+      summary: Returns anything passed in request data.
+      operationId: post-anything
+      x-adc-route-uris:
+        - /post-alias
+        - /post-alternative
+      responses:
+        '200':
+          description: Anything passed in request
+          content: {}

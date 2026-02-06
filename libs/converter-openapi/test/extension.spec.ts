@@ -612,4 +612,38 @@ describe('Extension', () => {
       ],
     });
   });
+
+  it('case 13 (append additional URIs)', async () => {
+    const oas = parse(loadAsset('extension-13.yaml'));
+    const config = await convert(oas);
+
+    expect(config).toMatchObject({
+      services: [
+        {
+          description: 'httpbin.org description',
+          name: 'httpbin.org',
+          routes: [
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['GET'],
+              name: 'get-anything',
+              uris: ['/anything', '/anything-alias', '/anything-alternative'],
+            },
+            {
+              description: 'Returns anything passed in request data.',
+              methods: ['POST'],
+              name: 'post-anything',
+              uris: ['/anything', '/post-alias', '/post-alternative'],
+            },
+          ],
+          upstream: {
+            nodes: [{ host: 'httpbin.org', port: 443, weight: 100 }],
+            pass_host: 'pass',
+            scheme: 'https',
+            timeout: { connect: 60, read: 60, send: 60 },
+          },
+        },
+      ],
+    });
+  });
 });

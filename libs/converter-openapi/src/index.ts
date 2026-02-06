@@ -83,6 +83,13 @@ export class OpenAPIConverter implements ADCSDK.Converter {
                     ...pathPlugins,
                     ...parseExtPlugins(operation),
                   };
+                  const baseUri = path.replaceAll(pathVariableRegex, (match) => {
+                    return `:${match.slice(1, match.length - 1)}`;
+                  });
+                  const additionalUris =
+                    operation[ExtKey.ROUTE_URIS] ||
+                    operations![ExtKey.ROUTE_URIS] ||
+                    [];
                   const route = ADCSDK.utils.recursiveOmitUndefined({
                     name: operation[ExtKey.NAME]
                       ? operation[ExtKey.NAME]
@@ -94,11 +101,7 @@ export class OpenAPIConverter implements ADCSDK.Converter {
                     description: operation.summary ?? operation.description,
                     labels: operation[ExtKey.LABELS],
                     methods: [method.toUpperCase()],
-                    uris: [
-                      path.replaceAll(pathVariableRegex, (match) => {
-                        return `:${match.slice(1, match.length - 1)}`;
-                      }),
-                    ],
+                    uris: [baseUri, ...additionalUris],
                     plugins: !isEmpty(plugins) ? plugins : undefined,
                     ...structuredClone(oas[ExtKey.ROUTE_DEFAULTS]),
                     ...structuredClone(operations![ExtKey.ROUTE_DEFAULTS]),

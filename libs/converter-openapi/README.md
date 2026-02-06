@@ -124,6 +124,14 @@ servers:
     <tr>
       <td>Operation Level</td>
     </tr>
+    <tr>
+      <td rowspan="2">x-adc-route-uris</td>
+      <td>Path Level</td>
+      <td rowspan="2">Append additional URIs to the route. Accepts a string array of URI patterns. The original path-based URI is preserved, and additional URIs are appended to the route's uris array. Operation level takes precedence over Path level.</td>
+    </tr>
+    <tr>
+      <td>Operation Level</td>
+    </tr>
   </tbody>
 </table>
 

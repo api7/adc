@@ -9,6 +9,7 @@ export enum ExtKey {
   UPSTREAM_DEFAULTS = 'x-adc-upstream-defaults',
   UPSTREAM_NODE_DEFAULTS = 'x-adc-upstream-node-defaults',
   ROUTE_DEFAULTS = 'x-adc-route-defaults',
+  ROUTE_URIS = 'x-adc-route-uris',
 }
 
 export const parseExtPlugins = (context: object) => {
