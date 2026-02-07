@@ -16,7 +16,7 @@
     "@types/semver": "catalog:",
     "supertest": "^7.1.4",
     "vitest": "catalog:",
-    "webpack": "5.101.3",
+    "webpack": "5.104.1",
     "terser-webpack-plugin": "^5.3.14",
     "semver": "catalog:"
   },
