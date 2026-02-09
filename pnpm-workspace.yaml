@@ -8,7 +8,7 @@ catalog:
   axios: 1.13.2
   zod: ^4.1.12
   rxjs: ^7.8.2
-  immer: ^10.2.0
+  immer: ^11.0.0
   js-yaml: ^4.1.0
   listr2: ^8.2.1
   lodash: ^4.17.21
