@@ -7,7 +7,6 @@ import { omit, toString } from 'lodash';
 import { lastValueFrom, toArray } from 'rxjs';
 
 import {
-  fillLabels,
   filterConfiguration,
   filterResourceType,
   loadBackend,
@@ -52,11 +51,15 @@ export const syncHandler: RequestHandler<
 
     // load local configuration and validate it
     //TODO: merged with the listr task
-    const local = filterResourceType(
+    let local = filterResourceType(
       task.config,
       task.opts.includeResourceType,
       task.opts.excludeResourceType,
     ) as ADCSDK.InternalConfiguration;
+    [local] = filterConfiguration(
+      local,
+      task.opts.labelSelector,
+    ) as unknown as [ADCSDK.InternalConfiguration, ADCSDK.Configuration];
     if (task.opts.lint) {
       const result = check(local);
       if (!result.success)
@@ -65,7 +68,6 @@ export const syncHandler: RequestHandler<
           errors: result.error.issues,
         });
     }
-    fillLabels(local, task.opts.labelSelector);
 
     // load and filter remote configuration
     const backend = loadBackend(task.opts.backend, {

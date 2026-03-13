@@ -5,11 +5,55 @@ import { has } from 'lodash';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import parseDuration from 'parse-duration';
-import qs from 'qs';
 
 export interface BaseOptions {
   verbose: number;
 }
+
+export const parseLabelSelector = (
+  val: string,
+  previous: Record<string, string> = {},
+) => {
+  const current = val.trim();
+  if (!current) {
+    throw new InvalidArgumentError(
+      'Label selector must be in the format key=value',
+    );
+  }
+
+  const parsed = current.split(',').reduce<Record<string, string>>(
+    (acc, pair) => {
+      const item = pair.trim();
+      const separatorIndex = item.indexOf('=');
+
+      if (
+        !item ||
+        separatorIndex <= 0 ||
+        separatorIndex === item.length - 1
+      ) {
+        throw new InvalidArgumentError(
+          `Invalid label selector "${item}". Expected key=value`,
+        );
+      }
+
+      const key = item.slice(0, separatorIndex).trim();
+      const value = item.slice(separatorIndex + 1).trim();
+
+      if (!key || !value) {
+        throw new InvalidArgumentError(
+          `Invalid label selector "${item}". Expected key=value`,
+        );
+      }
+
+      acc[key] = value;
+      return acc;
+    },
+    {},
+  );
+
+  return Object.assign(previous, parsed);
+};
+
 export class BaseCommand<
   OPTS extends BaseOptions = BaseOptions,
 > extends Command {
@@ -129,9 +173,7 @@ export class BackendCommand<
         new Option(
           '--label-selector <labelKey=labelValue>',
           'filter resources by labels',
-        ).argParser((val, previous: Record<string, string> = {}) =>
-          Object.assign(previous, qs.parse(val, { delimiter: ',' })),
-        ),
+        ).argParser(parseLabelSelector),
       )
       .addOption(
         new Option(

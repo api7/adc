@@ -7,7 +7,7 @@ import { ListrTask } from 'listr2';
 import path from 'node:path';
 
 import {
-  fillLabels,
+  filterConfiguration,
   filterResourceType,
   mergeKVConfigurations,
   recursiveReplaceEnvVars,
@@ -100,8 +100,7 @@ export const LoadLocalConfigurationTask = (
           title: 'Filter configuration',
           enabled: !!labelSelector && Object.keys(labelSelector).length > 0,
           task: async () => {
-            // Merge label selectors from CLI inputs to each resource
-            fillLabels(ctx.local, labelSelector);
+            [ctx.local] = filterConfiguration(ctx.local, labelSelector);
           },
         },
       ],

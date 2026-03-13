@@ -1,7 +1,10 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { InvalidArgumentError } from 'commander';
 
+import { parseLabelSelector } from './helper';
 import {
   fillLabels,
+  filterConfiguration,
   recursiveRemoveMetadataField,
   recursiveReplaceEnvVars,
 } from './utils';
@@ -198,6 +201,74 @@ describe('CLI utils', () => {
         },
       ],
     });
+  });
+
+  it('should filter configuration by exact label key match', () => {
+    const [filtered, removed] = filterConfiguration(
+      {
+        services: [
+          {
+            name: 'match-by-name',
+            labels: { name: 'yanglao_wx_pgm' },
+          },
+          {
+            name: 'should-not-match-appname',
+            labels: { appname: 'yanglao_wx_pgm' },
+          },
+          {
+            name: 'should-not-match-different-value',
+            labels: { name: 'other' },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      { name: 'yanglao_wx_pgm' },
+    );
+
+    expect(filtered.services).toEqual([
+      {
+        name: 'match-by-name',
+        labels: { name: 'yanglao_wx_pgm' },
+      },
+    ]);
+    expect(removed.services).toEqual([
+      {
+        name: 'should-not-match-appname',
+        labels: { appname: 'yanglao_wx_pgm' },
+      },
+      {
+        name: 'should-not-match-different-value',
+        labels: { name: 'other' },
+      },
+    ]);
+  });
+
+  it('should parse label selectors in key=value format only', () => {
+    expect(parseLabelSelector('name=yanglao_wx_pgm')).toEqual({
+      name: 'yanglao_wx_pgm',
+    });
+    expect(parseLabelSelector('release=2026-03-13T12:00:00Z')).toEqual({
+      release: '2026-03-13T12:00:00Z',
+    });
+    expect(parseLabelSelector('url=http://a')).toEqual({
+      url: 'http://a',
+    });
+    expect(
+      parseLabelSelector('name=yanglao_wx_pgm,team=adc', { env: 'prod' }),
+    ).toEqual({
+      env: 'prod',
+      name: 'yanglao_wx_pgm',
+      team: 'adc',
+    });
+  });
+
+  it('should reject invalid label selector formats', () => {
+    expect(() => parseLabelSelector('name:yanglao_wx_pgm')).toThrow(
+      InvalidArgumentError,
+    );
+    expect(() => parseLabelSelector('name=')).toThrow(InvalidArgumentError);
+    expect(() => parseLabelSelector('=yanglao_wx_pgm')).toThrow(
+      InvalidArgumentError,
+    );
   });
 
   it('should remove metadata from dump result', () => {
