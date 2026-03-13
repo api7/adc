@@ -59,7 +59,7 @@ export const syncHandler: RequestHandler<
     [local] = filterConfiguration(
       local,
       task.opts.labelSelector,
-    ) as unknown as [ADCSDK.InternalConfiguration, ADCSDK.Configuration];
+    ) as [ADCSDK.InternalConfiguration, ADCSDK.Configuration];
     if (task.opts.lint) {
       const result = check(local);
       if (!result.success)
@@ -136,10 +136,10 @@ export const syncHandler: RequestHandler<
       task.opts.backend !== 'apisix-standalone'
         ? generateOutput([results, successes, faileds])
         : generateOutputForAPISIXStandalone(diff, [
-            results,
-            successes,
-            faileds,
-          ]);
+          results,
+          successes,
+          faileds,
+        ]);
 
     logger.log({
       level: 'debug',
@@ -175,7 +175,7 @@ const formatAxiosResponse = (axiosResponse: AxiosResponse) => ({
     method: axiosResponse.config.method,
     headers:
       ((axiosResponse.config.headers['X-API-KEY'] = '*****'),
-      axiosResponse.config.headers),
+        axiosResponse.config.headers),
     data: axiosResponse.config.data,
   },
 });
