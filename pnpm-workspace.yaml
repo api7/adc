@@ -5,13 +5,13 @@ packages:
 catalogMode: strict
 catalog:
   tslib: ^2.6.2
-  axios: 1.13.2
+  axios: 1.13.6
   zod: ^4.1.12
   rxjs: ^7.8.2
   immer: ^10.2.0
-  js-yaml: ^4.1.0
+  js-yaml: ^4.1.1
   listr2: ^8.2.1
-  lodash: ^4.17.21
+  lodash: ^4.17.23
   "@types/lodash": ^4.17.4
   semver: ^7.7.3
   "@types/semver": ^7.7.1
