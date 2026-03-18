@@ -12,13 +12,13 @@ catalog:
   js-yaml: ^4.1.1
   listr2: ^8.2.1
   lodash: ^4.17.23
-  '@types/lodash': ^4.17.4
+  "@types/lodash": ^4.17.4
   semver: ^7.7.3
-  '@types/semver': ^7.7.1
+  "@types/semver": ^7.7.1
   vitest: ^4.0.0
-  '@vitest/ui': ^4.0.0
-  '@vitest/coverage-v8': ^4.0.0
+  "@vitest/ui": ^4.0.0
+  "@vitest/coverage-v8": ^4.0.0
   deep-diff: ^1.0.2
-  '@types/deep-diff': ^1.0.5
+  "@types/deep-diff": ^1.0.5
 
 minimumReleaseAge: 1440
