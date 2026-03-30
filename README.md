@@ -112,7 +112,7 @@ nx build cli
 To use the binary, run:
 
 ```bash
-node dist/apps/cli/main.js -h
+node dist/apps/cli/main.cjs -h
 ```
 
 ## License

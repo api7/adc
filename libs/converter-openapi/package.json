@@ -1,15 +1,19 @@
 {
   "name": "@api7/adc-converter-openapi",
   "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/main.js",
+  "main": "./dist/main.js",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@api7/adc-sdk": "workspace:*",
     "@types/lodash": "catalog:",
     "@types/js-yaml": "^4.0.9",
     "vitest": "catalog:",
@@ -17,6 +21,7 @@
     "listr2": "catalog:"
   },
   "dependencies": {
+    "@api7/adc-sdk": "workspace:*",
     "@scalar/openapi-parser": "0.23.3",
     "@scalar/openapi-types": "^0.5.1",
     "slugify": "^1.6.6",
@@ -33,6 +38,32 @@
         "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/converter-openapi/vitest.config.ts"
+        }
+      },
+      "build": {
+        "executor": "@nx/esbuild:esbuild",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "defaultConfiguration": "production",
+        "options": {
+          "main": "libs/converter-openapi/src/index.ts",
+          "outputPath": "libs/converter-openapi/dist",
+          "outputFileName": "main.js",
+          "tsConfig": "libs/converter-openapi/tsconfig.lib.json",
+          "platform": "node",
+          "format": [
+            "esm"
+          ],
+          "declarationRootDir": "libs/converter-openapi/src"
+        },
+        "configurations": {
+          "development": {
+            "minify": false
+          },
+          "production": {
+            "minify": true
+          }
         }
       }
     }

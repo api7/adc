@@ -5,17 +5,13 @@
   "scripts": {},
   "private": true,
   "devDependencies": {
-    "@nx/esbuild": "22.6.3",
+    "@nx/esbuild": "catalog:",
     "@nx/eslint": "22.6.3",
     "@nx/eslint-plugin": "22.6.3",
     "@nx/js": "22.6.3",
-    "@nx/node": "22.6.3",
     "@nx/vitest": "22.6.3",
     "@nx/web": "22.6.3",
-    "@nx/webpack": "22.6.3",
     "@nx/workspace": "22.6.3",
-    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.2",
-    "@svgr/webpack": "^8.1.0",
     "@swc-node/register": "1.11.1",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.20",
@@ -31,12 +27,9 @@
     "jsonc-eslint-parser": "^3.1.0",
     "nx": "22.6.3",
     "prettier": "^3.8.1",
-    "terser-webpack-plugin": "^5.4.0",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.57.2",
-    "url-loader": "^4.1.1",
-    "vitest": "catalog:",
-    "webpack": "5.101.3"
+    "vitest": "catalog:"
   },
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "pnpm": {

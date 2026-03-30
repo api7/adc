@@ -1,5 +1,3 @@
-import 'source-map-support/register';
-
 import { setupCommands, setupIngressCommands } from './command';
 
 async function bootstrap() {

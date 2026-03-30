@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "@types/lodash": "catalog:",
-    "@types/semver": "catalog:"
+    "@types/semver": "catalog:",
+    "vitest": "catalog:"
   },
   "dependencies": {
     "axios": "catalog:",
@@ -23,7 +24,6 @@
     "rxjs": "catalog:",
     "semver": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:",
     "zod": "catalog:",
     "datum-diff": "catalog:"
   },
