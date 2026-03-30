@@ -22,7 +22,6 @@
     "lodash": "catalog:",
     "rxjs": "catalog:",
     "semver": "catalog:",
-    "tslib": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:",
     "datum-diff": "catalog:"
