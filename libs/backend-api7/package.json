@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@api7/adc-differ": "workspace:*",
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "@types/semver": "catalog:",
     "vitest": "catalog:"
   },
@@ -24,7 +24,7 @@
     "@types/json-schema": "^7.0.15",
     "axios": "catalog:",
     "rxjs": "catalog:",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "tslib": "catalog:",
     "semver": "catalog:",
     "immer": "catalog:"

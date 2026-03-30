@@ -15,7 +15,7 @@ describe('Fetcher', () => {
       new Fetcher({
         client: axios.create(),
         backendOpts: opts as ADCSDK.BackendOptions,
-        version: semver.coerce('999.999.999'),
+        version: new semver.SemVer('999.999.999'),
         eventSubject: subject,
       }) as unknown as TrickFetcher;
 

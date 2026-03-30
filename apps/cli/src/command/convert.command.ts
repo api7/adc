@@ -3,7 +3,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { InvalidArgumentError } from 'commander';
 import { dump } from 'js-yaml';
 import { Listr } from 'listr2';
-import { cloneDeep } from 'lodash';
+import { cloneDeep } from 'lodash-es';
 import { existsSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

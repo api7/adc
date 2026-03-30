@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
+import { unset } from 'lodash-es';
 import { readFileSync } from 'node:fs';
 import { globalAgent as httpAgent } from 'node:http';
 import { join } from 'node:path';
@@ -71,7 +71,7 @@ describe('Label Selector', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
+        expect(result.consumers?.[0]).toMatchObject(consumer1);
       });
 
       it('Dump consumer with label team = 2', async () => {
@@ -83,7 +83,7 @@ describe('Label Selector', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer2);
+        expect(result.consumers?.[0]).toMatchObject(consumer2);
       });
 
       it('Delete consumers', async () =>
@@ -151,8 +151,8 @@ describe('Label Selector', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
-        expect(result.consumers[0].credentials).toHaveLength(2);
+        expect(result.consumers?.[0]).toMatchObject(consumer1);
+        expect(result.consumers?.[0].credentials).toHaveLength(2);
       });
 
       it('Dump consumer with label team = 2', async () => {
@@ -164,7 +164,7 @@ describe('Label Selector', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer2);
+        expect(result.consumers?.[0]).toMatchObject(consumer2);
       });
 
       it('Delete consumers', async () =>
@@ -231,7 +231,7 @@ describe('Label Selector', () => {
       });
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.ssls).toHaveLength(1);
-      expect(result.ssls[0]).toMatchObject(ssl1test);
+      expect(result.ssls?.[0]).toMatchObject(ssl1test);
     });
 
     it('Dump consumer with label team = 2', async () => {
@@ -241,7 +241,7 @@ describe('Label Selector', () => {
       });
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.ssls).toHaveLength(1);
-      expect(result.ssls[0]).toMatchObject(ssl2test);
+      expect(result.ssls?.[0]).toMatchObject(ssl2test);
     });
 
     it('Delete ssls', async () =>

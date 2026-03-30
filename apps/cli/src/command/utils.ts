@@ -4,7 +4,7 @@ import { BackendAPISIXStandalone } from '@api7/adc-backend-apisix-standalone';
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { type AxiosResponse } from 'axios';
 import { type ListrTaskWrapper } from 'listr2';
-import { isObject, mapValues, unset } from 'lodash';
+import { isObject, mapValues, unset } from 'lodash-es';
 import path from 'node:path';
 import pluralize from 'pluralize';
 

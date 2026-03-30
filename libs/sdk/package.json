@@ -1,6 +1,7 @@
 {
   "name": "@api7/adc-sdk",
   "version": "0.0.1",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -14,13 +15,13 @@
     }
   },
   "devDependencies": {
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "@types/semver": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
     "axios": "catalog:",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "rxjs": "catalog:",
     "semver": "catalog:",
     "tslib": "catalog:",

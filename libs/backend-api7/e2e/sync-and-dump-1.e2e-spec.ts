@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
+import { unset } from 'lodash-es';
 import { readFileSync } from 'node:fs';
 import { globalAgent as httpAgent } from 'node:http';
 import { join } from 'node:path';
@@ -60,7 +60,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      result.services = sortResult(result.services, 'name');
+      result.services = sortResult(result.services!, 'name');
       expect(result.services).toHaveLength(2);
       expect(result.services[0]).toMatchObject(service1);
       expect(result.services[1]).toMatchObject(service2);
@@ -75,7 +75,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (service1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      result.services = sortResult(result.services, 'name');
+      result.services = sortResult(result.services!, 'name');
       expect(result.services[0]).toMatchObject(service1);
     });
 
@@ -87,7 +87,7 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (service1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service2);
+      expect(result.services?.[0]).toMatchObject(service2);
     });
 
     it('Delete service2', async () =>
@@ -142,15 +142,21 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      result.services[0].routes = sortResult(result.services[0].routes, 'name');
+      result.services![0].routes = sortResult(
+        result.services![0].routes!,
+        'name',
+      );
 
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
+      expect(result.services?.[0]).toMatchObject(service);
 
-      result.services[0].routes = sortResult(result.services[0].routes, 'name');
-      expect(result.services[0].routes).toHaveLength(2);
-      expect(result.services[0].routes[0]).toMatchObject(route1);
-      expect(result.services[0].routes[1]).toMatchObject(route2);
+      result.services![0].routes = sortResult(
+        result.services![0].routes!,
+        'name',
+      );
+      expect(result.services?.[0].routes).toHaveLength(2);
+      expect(result.services?.[0].routes?.[0]).toMatchObject(route1);
+      expect(result.services?.[0].routes?.[1]).toMatchObject(route2);
     });
 
     it('Delete route1', async () =>
@@ -161,9 +167,9 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (check remain route2)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes).toHaveLength(1);
-      expect(result.services[0].routes[0]).toMatchObject(route2);
+      expect(result.services?.[0]).toMatchObject(service);
+      expect(result.services?.[0].routes).toHaveLength(1);
+      expect(result.services?.[0].routes?.[0]).toMatchObject(route2);
     });
 
     it('Delete service', async () =>
@@ -226,15 +232,15 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
+      expect(result.services?.[0]).toMatchObject(service);
 
-      result.services[0].stream_routes = sortResult(
-        result.services[0].stream_routes,
+      result.services![0].stream_routes = sortResult(
+        result.services![0].stream_routes!,
         'id',
       );
-      expect(result.services[0].stream_routes).toHaveLength(2);
-      expect(result.services[0].stream_routes[0]).toMatchObject(route2);
-      expect(result.services[0].stream_routes[1]).toMatchObject(route1);
+      expect(result.services?.[0].stream_routes).toHaveLength(2);
+      expect(result.services?.[0].stream_routes?.[0]).toMatchObject(route2);
+      expect(result.services?.[0].stream_routes?.[1]).toMatchObject(route1);
     });
 
     it('Delete stream route1', async () =>
@@ -245,9 +251,9 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (check remain stream route2)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].stream_routes).toHaveLength(1);
-      expect(result.services[0].stream_routes[0]).toMatchObject(route2);
+      expect(result.services?.[0]).toMatchObject(service);
+      expect(result.services?.[0].stream_routes).toHaveLength(1);
+      expect(result.services?.[0].stream_routes?.[0]).toMatchObject(route2);
     });
 
     it('Delete service', async () =>
@@ -306,10 +312,10 @@ describe('Sync and Dump - 1', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
 
-      result.ssls = sortResult(result.ssls, 'id');
+      result.ssls = sortResult(result.ssls!, 'id');
       expect(result.ssls).toHaveLength(2);
-      expect(result.ssls[0]).toMatchObject(ssl2test);
-      expect(result.ssls[1]).toMatchObject(ssl1test);
+      expect(result.ssls?.[0]).toMatchObject(ssl2test);
+      expect(result.ssls?.[1]).toMatchObject(ssl1test);
     });
 
     it('Update ssl1', async () => {
@@ -323,7 +329,7 @@ describe('Sync and Dump - 1', () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       const testCase = structuredClone(ssl1);
       unset(testCase, 'certificates.0.key');
-      expect(result.ssls[0]).toMatchObject(testCase);
+      expect(result.ssls?.[0]).toMatchObject(testCase);
     });
 
     it('Delete ssl1', async () =>
@@ -334,7 +340,7 @@ describe('Sync and Dump - 1', () => {
     it('Dump again (ssl1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.ssls).toHaveLength(1);
-      expect(result.ssls[0]).toMatchObject(ssl2test);
+      expect(result.ssls?.[0]).toMatchObject(ssl2test);
     });
 
     it('Delete ssl2', async () =>
@@ -352,11 +358,11 @@ describe('Sync and Dump - 1', () => {
     const plugin1Name = 'prometheus';
     const plugin1 = {
       prefer_name: true,
-    } as ADCSDK.GlobalRule;
+    } as ADCSDK.Plugin;
     const plugin2Name = 'file-logger';
     const plugin2 = {
       path: 'logs/file.log',
-    } as ADCSDK.GlobalRule;
+    } as ADCSDK.Plugin;
 
     it('Create global rules', async () =>
       syncEvents(backend, [
@@ -366,9 +372,9 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.global_rules)).toHaveLength(2);
-      expect(result.global_rules[plugin1Name]).toMatchObject(plugin1);
-      expect(result.global_rules[plugin2Name]).toMatchObject(plugin2);
+      expect(Object.keys(result.global_rules!)).toHaveLength(2);
+      expect(result.global_rules?.[plugin1Name]).toMatchObject(plugin1);
+      expect(result.global_rules?.[plugin2Name]).toMatchObject(plugin2);
     });
 
     it('Update plugin1', async () => {
@@ -380,7 +386,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.global_rules[plugin1Name]).toMatchObject(plugin1);
+      expect(result.global_rules?.[plugin1Name]).toMatchObject(plugin1);
     });
 
     it('Delete plugin1', async () =>
@@ -390,9 +396,9 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.global_rules)).toHaveLength(1);
-      expect(result.global_rules[plugin1Name]).toBeUndefined();
-      expect(result.global_rules[plugin2Name]).toMatchObject(plugin2);
+      expect(Object.keys(result.global_rules!)).toHaveLength(1);
+      expect(result.global_rules?.[plugin1Name]).toBeUndefined();
+      expect(result.global_rules?.[plugin2Name]).toMatchObject(plugin2);
     });
 
     it('Delete plugin2', async () =>
@@ -402,7 +408,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin2 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.global_rules)).toHaveLength(0);
+      expect(Object.keys(result.global_rules!)).toHaveLength(0);
     });
   });
 
@@ -410,11 +416,11 @@ describe('Sync and Dump - 1', () => {
     const plugin1Name = 'http-logger';
     const plugin1 = {
       log_format: { test: 'test', test1: 'test1' },
-    } as ADCSDK.PluginMetadata;
+    } as ADCSDK.Plugin;
     const plugin2Name = 'tcp-logger';
     const plugin2 = {
       log_format: { test: 'test', test1: 'test1' },
-    } as ADCSDK.PluginMetadata;
+    } as ADCSDK.Plugin;
 
     it('Create plugin metadata', async () =>
       syncEvents(backend, [
@@ -424,9 +430,9 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.plugin_metadata)).toHaveLength(2);
-      expect(result.plugin_metadata[plugin1Name]).toMatchObject(plugin1);
-      expect(result.plugin_metadata[plugin2Name]).toMatchObject(plugin2);
+      expect(Object.keys(result.plugin_metadata!)).toHaveLength(2);
+      expect(result.plugin_metadata?.[plugin1Name]).toMatchObject(plugin1);
+      expect(result.plugin_metadata?.[plugin2Name]).toMatchObject(plugin2);
     });
 
     it('Update plugin1', async () => {
@@ -438,7 +444,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin1 updated)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(result.plugin_metadata[plugin1Name]).toMatchObject(plugin1);
+      expect(result.plugin_metadata?.[plugin1Name]).toMatchObject(plugin1);
     });
 
     it('Delete plugin1', async () =>
@@ -448,9 +454,9 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin1 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.plugin_metadata)).toHaveLength(1);
-      expect(result.plugin_metadata[plugin1Name]).toBeUndefined();
-      expect(result.plugin_metadata[plugin2Name]).toMatchObject(plugin2);
+      expect(Object.keys(result.plugin_metadata!)).toHaveLength(1);
+      expect(result.plugin_metadata?.[plugin1Name]).toBeUndefined();
+      expect(result.plugin_metadata?.[plugin2Name]).toMatchObject(plugin2);
     });
 
     it('Delete plugin2', async () =>
@@ -460,7 +466,7 @@ describe('Sync and Dump - 1', () => {
 
     it('Dump again (plugin2 should not exist)', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
-      expect(Object.keys(result.plugin_metadata)).toHaveLength(0);
+      expect(Object.keys(result.plugin_metadata!)).toHaveLength(0);
     });
   });
 });

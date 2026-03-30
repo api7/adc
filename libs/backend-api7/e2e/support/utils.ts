@@ -89,7 +89,9 @@ export const overrideEventResourceId = (
 };
 
 export const sortResult = <T>(result: Array<T>, field: string) =>
-  structuredClone(result).sort((a, b) => a[field].localeCompare(b[field]));
+  structuredClone(result).sort((a: any, b: any) =>
+    (a[field] as string).localeCompare(b[field] as string),
+  );
 
 export const generateHTTPSAgent = () => {
   return new httpsAgent({
@@ -99,10 +101,12 @@ export const generateHTTPSAgent = () => {
 
 type cond = boolean | (() => boolean);
 
-export const conditionalDescribe = (cond: cond) =>
-  cond ? describe : describe.skip;
+export const conditionalDescribe = (
+  cond: cond,
+): typeof describe | typeof describe.skip => (cond ? describe : describe.skip);
 
-export const conditionalIt = (cond: cond) => (cond ? it : it.skip);
+export const conditionalIt = (cond: cond): typeof it | typeof it.skip =>
+  cond ? it : it.skip;
 
 export const semverCondition = (
   op: (v1: string | semver.SemVer, v2: string | semver.SemVer) => boolean,

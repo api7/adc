@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { toString } from 'lodash';
+import { toString } from 'lodash-es';
 import { globalAgent as httpAgent } from 'node:http';
 
 import { BackendAPI7 } from '../src';
@@ -59,9 +59,9 @@ describe('Miscellaneous', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes[0]).toMatchObject(route);
+      expect(result.services?.[0]).toMatchObject(service);
+      expect(result.services?.[0]).toMatchObject(service);
+      expect(result.services?.[0].routes?.[0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>
@@ -116,8 +116,8 @@ describe('Miscellaneous', () => {
     it('Dump', async () => {
       const result = (await dumpConfiguration(backend)) as ADCSDK.Configuration;
       expect(result.services).toHaveLength(1);
-      expect(result.services[0]).toMatchObject(service);
-      expect(result.services[0].routes[0]).toMatchObject(route);
+      expect(result.services?.[0]).toMatchObject(service);
+      expect(result.services?.[0].routes?.[0]).toMatchObject(route);
     });
 
     it('Delete service', async () =>

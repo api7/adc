@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { type AxiosInstance } from 'axios';
 import { produce } from 'immer';
-import { isEmpty } from 'lodash';
+import { isEmpty } from 'lodash-es';
 import {
   Subject,
   combineLatest,

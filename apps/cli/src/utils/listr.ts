@@ -6,7 +6,7 @@ import {
   ListrTaskState,
   ListrTaskWrapper,
 } from 'listr2';
-import { attempt, isError, isObject } from 'lodash';
+import { attempt, isError, isObject } from 'lodash-es';
 import { Signale } from 'signale';
 
 type SignaleRendererTask<T extends object = object> = ListrTaskObject<

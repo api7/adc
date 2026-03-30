@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@api7/adc-differ": "workspace:*",
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "@types/semver": "catalog:",
     "docker-compose": "^1.2.0",
     "vitest": "catalog:"
@@ -24,7 +24,7 @@
     "@api7/adc-sdk": "workspace:*",
     "axios": "catalog:",
     "rxjs": "catalog:",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "zod": "catalog:",
     "tslib": "catalog:",
     "semver": "catalog:"

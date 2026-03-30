@@ -1,6 +1,6 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
-import { unset } from 'lodash';
+import { unset } from 'lodash-es';
 import { globalAgent as httpAgent } from 'node:http';
 import { gte } from 'semver';
 

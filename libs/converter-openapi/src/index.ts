@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { dereference, upgrade } from '@scalar/openapi-parser';
 import { OpenAPIV3_1 } from '@scalar/openapi-types';
-import { isEmpty, unset } from 'lodash';
+import { isEmpty, unset } from 'lodash-es';
 import { Observable, from, map, of, switchMap, tap } from 'rxjs';
 import slugify from 'slugify';
 import { z } from 'zod';

@@ -1,4 +1,4 @@
-import { isUndefined, mapValues, pickBy } from 'lodash';
+import { isUndefined, mapValues, pickBy } from 'lodash-es';
 import { createHash } from 'node:crypto';
 
 export { Logger, LogEntry, LogEntryOptions } from './utils/logger';

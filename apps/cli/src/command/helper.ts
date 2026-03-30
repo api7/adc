@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import chalk from 'chalk';
 import { Command, InvalidArgumentError, Option } from 'commander';
-import { has } from 'lodash';
+import { has } from 'lodash-es';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import parseDuration from 'parse-duration';

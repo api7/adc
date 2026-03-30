@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { AxiosError, type AxiosInstance, AxiosResponse } from 'axios';
-import { unset } from 'lodash';
+import { unset } from 'lodash-es';
 import {
   Observable,
   ObservableInput,

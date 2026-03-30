@@ -1,4 +1,4 @@
-import { isNil } from 'lodash';
+import { isNil } from 'lodash-es';
 import type { ZodRawShape } from 'zod';
 import { z } from 'zod';
 

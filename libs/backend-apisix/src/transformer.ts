@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { filter, isEmpty, omit, unset } from 'lodash';
+import { filter, isEmpty, omit, unset } from 'lodash-es';
 
 import * as typing from './typing';
 

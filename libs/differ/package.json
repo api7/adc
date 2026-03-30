@@ -14,12 +14,12 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
     "@api7/adc-sdk": "workspace:*",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "datum-diff": "catalog:"
   },
   "nx": {

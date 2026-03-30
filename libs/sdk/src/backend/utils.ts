@@ -1,5 +1,5 @@
 import { AxiosResponse } from 'axios';
-import { curry } from 'lodash';
+import { curry } from 'lodash-es';
 import { Subject } from 'rxjs';
 
 import * as ADCSDK from '..';

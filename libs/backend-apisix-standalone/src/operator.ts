@@ -4,7 +4,7 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios';
-import { cloneDeep, unset } from 'lodash';
+import { cloneDeep, unset } from 'lodash-es';
 import { createHash } from 'node:crypto';
 import {
   type ObservableInput,

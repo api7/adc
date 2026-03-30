@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "@types/js-yaml": "^4.0.9",
     "vitest": "catalog:",
     "js-yaml": "catalog:",
@@ -25,7 +25,7 @@
     "@scalar/openapi-parser": "0.23.3",
     "@scalar/openapi-types": "^0.5.1",
     "slugify": "^1.6.6",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "rxjs": "catalog:",
     "zod": "catalog:",
     "tslib": "catalog:"
