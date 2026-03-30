@@ -1,4 +1,4 @@
-import type { Diff } from 'deep-diff';
+import type { Diff } from 'datum-diff';
 
 import { Plugin, ResourceFor, ResourceType } from '.';
 
@@ -15,7 +15,7 @@ export type Event<T extends ResourceType = any> = {
   type: EventType;
   resourceId: string;
   resourceName: string;
-  diff?: Array<Diff<unknown>>;
+  diff?: Array<Diff<ResourceFor<T>, object>>;
 
   resourceType: ResourceType;
   oldValue?: ResourceFor<T>;
