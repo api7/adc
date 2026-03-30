@@ -25,5 +25,7 @@ catalogMode: strict
 
 minimumReleaseAge: 1440
 
+strictPeerDependencies: false
+autoInstallPeers: true
 publicHoistPattern:
   - "@types/*"

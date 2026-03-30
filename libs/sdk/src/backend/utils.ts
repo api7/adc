@@ -26,11 +26,21 @@ export class BackendEventSource {
     });
   }
 
-  protected getLogger = curry((name: string, event: ADCSDK.BackendEvent) => {
-    this._innerSubject.next({ name, event });
-  });
+  protected getLogger: (
+    name: string,
+  ) => (event: ADCSDK.BackendEvent) => void = curry(
+    (name: string, event: ADCSDK.BackendEvent) => {
+      this._innerSubject.next({ name, event });
+    },
+  );
 
-  protected taskStateEvent = curry(
+  protected taskStateEvent: (
+    name: string,
+  ) => (
+    type:
+      | typeof ADCSDK.BackendEventType.TASK_START
+      | typeof ADCSDK.BackendEventType.TASK_DONE,
+  ) => ADCSDK.BackendEvent = curry(
     (
       name: string,
       type:
