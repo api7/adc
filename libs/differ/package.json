@@ -12,12 +12,11 @@
   "devDependencies": {
     "@api7/adc-sdk": "workspace:*",
     "@types/lodash": "catalog:",
-    "@types/deep-diff": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
     "lodash": "catalog:",
-    "deep-diff": "catalog:"
+    "datum-diff": "catalog:"
   },
   "nx": {
     "name": "differ",

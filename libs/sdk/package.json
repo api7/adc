@@ -15,8 +15,7 @@
   },
   "devDependencies": {
     "@types/lodash": "catalog:",
-    "@types/semver": "catalog:",
-    "@types/deep-diff": "catalog:"
+    "@types/semver": "catalog:"
   },
   "dependencies": {
     "axios": "catalog:",
@@ -26,7 +25,7 @@
     "tslib": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:",
-    "deep-diff": "catalog:"
+    "datum-diff": "catalog:"
   },
   "nx": {
     "name": "sdk",

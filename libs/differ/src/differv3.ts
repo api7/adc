@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { randomUUID } from 'crypto';
-import { diff as objectDiff } from 'deep-diff';
+import { type Diff, diff as objectDiff } from 'datum-diff';
 import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash';
 
 const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
@@ -523,7 +523,7 @@ export class DifferV3 {
 
           // Even if only the plugin part has changed, the difference is recorded
           // on the whole resource.
-          diff,
+          diff: diff as Array<Diff<ADCSDK.ResourceFor<T>, object>>,
 
           // Attach sub resources update events
           subEvents,
