@@ -4,9 +4,9 @@
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "target": "esnext",
-    "module": "nodenext",
+    "module": "esnext",
     "lib": [
       "esnext"
     ],

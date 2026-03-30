@@ -61,8 +61,8 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(2);
-        expect(result.consumers[0]).toMatchObject(consumer2);
-        expect(result.consumers[1]).toMatchObject(consumer1);
+        expect(result.consumers?.[0]).toMatchObject(consumer2);
+        expect(result.consumers?.[1]).toMatchObject(consumer1);
       });
 
       it('Update consumer1', async () => {
@@ -76,7 +76,7 @@ describe('Consumer E2E', () => {
         const result = (await dumpConfiguration(
           backend,
         )) as ADCSDK.Configuration;
-        expect(result.consumers[0]).toMatchObject(consumer1);
+        expect(result.consumers?.[0]).toMatchObject(consumer1);
       });
 
       it('Delete consumer1', async () =>
@@ -89,7 +89,7 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer2);
+        expect(result.consumers?.[0]).toMatchObject(consumer2);
       });
 
       it('Delete consumer2', async () =>
@@ -137,14 +137,14 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0]).toMatchObject(consumer1);
-        expect(result.consumers[0].credentials).toMatchObject(
-          consumer1.credentials,
+        expect(result.consumers?.[0]).toMatchObject(consumer1);
+        expect(result.consumers?.[0].credentials).toMatchObject(
+          consumer1.credentials!,
         );
       });
 
       it('Update consumer credential', async () => {
-        consumer1.credentials[0].config.key = 'new-key';
+        consumer1.credentials![0].config.key = 'new-key';
         await syncEvents(backend, [
           updateEvent(
             ADCSDK.ResourceType.CONSUMER_CREDENTIAL,
@@ -159,8 +159,8 @@ describe('Consumer E2E', () => {
         const result = (await dumpConfiguration(
           backend,
         )) as ADCSDK.Configuration;
-        expect(result.consumers[0]).toMatchObject(consumer1);
-        expect(result.consumers[0].credentials[0].config.key).toEqual(
+        expect(result.consumers?.[0]).toMatchObject(consumer1);
+        expect(result.consumers?.[0].credentials?.[0].config.key).toEqual(
           'new-key',
         );
       });
@@ -179,7 +179,7 @@ describe('Consumer E2E', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.consumers).toHaveLength(1);
-        expect(result.consumers[0].credentials).toHaveLength(0);
+        expect(result.consumers?.[0].credentials).toHaveLength(0);
       });
 
       it('Delete consumer', async () =>

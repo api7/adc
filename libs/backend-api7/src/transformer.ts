@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { attempt, isError } from 'lodash';
+import { attempt, isError } from 'lodash-es';
 
 import * as typing from './typing';
 

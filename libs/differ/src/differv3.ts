@@ -1,7 +1,7 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { randomUUID } from 'crypto';
 import { type Diff, diff as objectDiff } from 'datum-diff';
-import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash';
+import { cloneDeep, has, isEmpty, isEqual, isNil, unset } from 'lodash-es';
 
 const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.DELETE}`]: 0,

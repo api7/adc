@@ -16,7 +16,7 @@ import { configurePluralize } from './utils';
 const versionCode = '0.24.2';
 
 // initialize dotenv
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // initialize pluralize
 configurePluralize();

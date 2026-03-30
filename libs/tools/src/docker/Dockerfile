@@ -15,6 +15,6 @@ RUN pnpm install nx -g \
 
 FROM node:lts-bookworm-slim
 
-COPY --from=builder /build/dist/apps/cli/main.js .
+COPY --from=builder /build/dist/apps/cli/main.cjs .
 
-ENTRYPOINT [ "node", "main.js" ]
+ENTRYPOINT [ "node", "main.cjs" ]

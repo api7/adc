@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import { cloneDeep, isEmpty, unset } from 'lodash';
+import { cloneDeep, isEmpty, unset } from 'lodash-es';
 
 import * as typing from './typing';
 

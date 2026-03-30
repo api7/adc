@@ -46,9 +46,9 @@ describe('Sync and Dump - 2', () => {
     });
 
     it('Check', () => {
-      dump.ssls[0].certificates[0].certificate =
-        dump.ssls[0].certificates[0].certificate.trim();
-      expect(dump.ssls[0]).toMatchObject({
+      dump.ssls![0].certificates[0].certificate =
+        dump.ssls![0].certificates[0].certificate.trim();
+      expect(dump.ssls?.[0]).toMatchObject({
         type: 'server',
         snis: ['test.com'],
         certificates: [
@@ -59,10 +59,10 @@ describe('Sync and Dump - 2', () => {
         ],
       });
 
-      dump.services = dump.services.sort((a, b) =>
+      dump.services = dump.services?.sort((a, b) =>
         a.name.localeCompare(b.name),
       );
-      expect(dump.services[0]).toMatchObject({
+      expect(dump.services?.[0]).toMatchObject({
         name: 'service1',
         description: 'service1 description',
         upstream: {
@@ -116,8 +116,8 @@ describe('Sync and Dump - 2', () => {
         },
       });
 
-      dump.services[0].routes = sortResult(dump.services[0].routes, 'name');
-      expect(dump.services[0].routes[0]).toMatchObject({
+      dump.services![0].routes = sortResult(dump.services![0].routes!, 'name');
+      expect(dump.services?.[0].routes?.[0]).toMatchObject({
         uris: ['/anything'],
         name: 'route1.1',
         methods: ['GET'],
@@ -135,14 +135,14 @@ describe('Sync and Dump - 2', () => {
           },
         },
       });
-      expect(dump.services[0].routes[1]).toMatchObject({
+      expect(dump.services?.[0].routes?.[1]).toMatchObject({
         uris: ['/anything'],
         name: 'route1.2',
         methods: ['POST'],
         enable_websocket: false,
       });
 
-      expect(dump.services[1]).toMatchObject({
+      expect(dump.services?.[1]).toMatchObject({
         name: 'service2',
         description: 'service2 description',
         upstream: {
@@ -163,8 +163,8 @@ describe('Sync and Dump - 2', () => {
         },
       });
 
-      dump.services[1].routes = sortResult(dump.services[1].routes, 'name');
-      expect(dump.services[1].routes[0]).toMatchObject({
+      dump.services![1].routes = sortResult(dump.services![1].routes!, 'name');
+      expect(dump.services?.[1].routes?.[0]).toMatchObject({
         uris: ['/getSomething'],
         name: 'route2.1',
         methods: ['GET', 'POST'],
@@ -182,18 +182,18 @@ describe('Sync and Dump - 2', () => {
           },
         },
       });
-      expect(dump.services[1].routes[1]).toMatchObject({
+      expect(dump.services?.[1].routes?.[1]).toMatchObject({
         uris: ['/postSomething'],
         name: 'route2.2',
         methods: ['POST', 'PUT'],
         enable_websocket: false,
       });
 
-      expect(dump.global_rules.prometheus).toMatchObject({
+      expect(dump.global_rules?.prometheus).toMatchObject({
         prefer_name: false,
       });
 
-      expect(dump.plugin_metadata['http-logger']).toMatchObject({
+      expect(dump.plugin_metadata?.['http-logger']).toMatchObject({
         log_format: {
           '@timestamp': '$time_iso8601',
           client_ip: '$remote_addr',
@@ -201,7 +201,7 @@ describe('Sync and Dump - 2', () => {
         },
       });
 
-      expect(dump.plugin_metadata['tcp-logger']).toMatchObject({
+      expect(dump.plugin_metadata?.['tcp-logger']).toMatchObject({
         log_format: {
           '@timestamp': '$time_iso8601',
           client_ip: '$remote_addr',

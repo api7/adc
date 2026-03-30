@@ -1,25 +1,30 @@
 {
   "name": "@api7/adc-backend-api7",
   "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/main.js",
+  "main": "./dist/main.js",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "devDependencies": {
     "@api7/adc-differ": "workspace:*",
-    "@api7/adc-sdk": "workspace:*",
-    "@types/lodash": "catalog:",
+    "@types/lodash-es": "catalog:",
     "@types/semver": "catalog:",
-    "@types/json-schema": "^7.0.15",
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@api7/adc-sdk": "workspace:*",
+    "@types/json-schema": "^7.0.15",
     "axios": "catalog:",
     "rxjs": "catalog:",
-    "lodash": "catalog:",
+    "lodash-es": "catalog:",
     "tslib": "catalog:",
     "semver": "catalog:",
     "immer": "catalog:"
@@ -38,6 +43,32 @@
         "executor": "@nx/vitest:test",
         "options": {
           "configFile": "libs/backend-api7/vitest.config.ts"
+        }
+      },
+      "build": {
+        "executor": "@nx/esbuild:esbuild",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "defaultConfiguration": "production",
+        "options": {
+          "main": "libs/backend-api7/src/index.ts",
+          "outputPath": "libs/backend-api7/dist",
+          "outputFileName": "main.js",
+          "tsConfig": "libs/backend-api7/tsconfig.lib.json",
+          "platform": "node",
+          "format": [
+            "esm"
+          ],
+          "declarationRootDir": "libs/backend-api7/src"
+        },
+        "configurations": {
+          "development": {
+            "minify": false
+          },
+          "production": {
+            "minify": true
+          }
         }
       }
     }

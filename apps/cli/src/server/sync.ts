@@ -3,7 +3,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import { AxiosResponse } from 'axios';
 import type { RequestHandler } from 'express';
-import { omit, toString } from 'lodash';
+import { omit, toString } from 'lodash-es';
 import { lastValueFrom, toArray } from 'rxjs';
 
 import {

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import commander, { Option } from 'commander';
+import { InvalidArgumentError, Option } from 'commander';
 import { readFileSync } from 'node:fs';
 
 import { ADCServer } from '../server';
@@ -24,7 +24,7 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
       try {
         return new URL(val);
       } catch (err) {
-        throw new commander.InvalidArgumentError(err);
+        throw new InvalidArgumentError(err);
       }
     },
     new URL('http://127.0.0.1:3000'),
@@ -35,7 +35,7 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
     (val) => {
       const port = parseInt(val, 10);
       if (!port || isNaN(port) || port < 1 || port > 65535)
-        throw new commander.InvalidArgumentError(
+        throw new InvalidArgumentError(
           'The status listen port must be a number between 1 and 65535',
         );
       return port;

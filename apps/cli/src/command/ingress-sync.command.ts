@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { Listr, SilentRenderer } from 'listr2';
-import { omit, toString } from 'lodash';
+import { omit, toString } from 'lodash-es';
 import { lastValueFrom, toArray } from 'rxjs';
 
 import {
