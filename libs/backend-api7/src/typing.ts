@@ -66,7 +66,7 @@ export interface Service {
   hosts?: Array<string>;
   path_prefix?: string;
   strip_path_prefix?: boolean;
-  upstream: Upstream;
+  upstream?: Upstream;
   plugins?: Plugins;
   version?: string;
   service_version_id?: string;
