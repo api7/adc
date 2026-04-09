@@ -23,7 +23,6 @@
     "@api7/adc-differ": "workspace:*",
     "@api7/adc-sdk": "workspace:*",
     "agentkeepalive": "^4.6.0",
-    "ajv": "catalog:",
     "ajv-draft-04": "catalog:",
     "axios": "catalog:",
     "chalk": "^5.6.2",

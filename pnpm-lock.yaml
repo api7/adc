@@ -177,9 +177,6 @@ importers:
       agentkeepalive:
         specifier: ^4.6.0
         version: 4.6.0
-      ajv:
-        specifier: 'catalog:'
-        version: 8.18.0
       ajv-draft-04:
         specifier: 'catalog:'
         version: 1.0.0(ajv@8.18.0)

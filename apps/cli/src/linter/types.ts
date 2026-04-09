@@ -1,7 +1,7 @@
 import type { PluginSchemaMap } from '@api7/adc-sdk';
 
 export interface LintError {
-  path: Array<string | number>;
+  path: PropertyKey[];
   message: string;
   code: string;
   [key: string]: unknown;
