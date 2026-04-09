@@ -24,9 +24,6 @@ catalogs:
     '@vitest/ui':
       specifier: ^4.1.2
       version: 4.1.2
-    ajv:
-      specifier: ^8.18.0
-      version: 8.18.0
     ajv-draft-04:
       specifier: ^1.0.0
       version: 1.0.0
@@ -70,13 +67,6 @@ catalogs:
 importers:
 
   .:
-    dependencies:
-      ajv:
-        specifier: 'catalog:'
-        version: 8.18.0
-      ajv-draft-04:
-        specifier: 'catalog:'
-        version: 1.0.0(ajv@8.18.0)
     devDependencies:
       '@nx/esbuild':
         specifier: 'catalog:'
@@ -6172,6 +6162,7 @@ snapshots:
       fast-uri: 3.0.6
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+    optional: true
 
   ansi-colors@4.1.3: {}
 
