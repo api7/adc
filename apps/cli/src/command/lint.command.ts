@@ -23,25 +23,22 @@ export const LintCommand = new BaseCommand('lint')
   )
   .addOption(
     new Option('--backend <backend>', 'type of backend to validate plugins against')
-      .env('ADC_BACKEND')
       .choices(['apisix', 'api7ee']),
   )
   .addOption(
-    new Option('--server <string>', 'HTTP address of the backend')
-      .env('ADC_SERVER'),
+    new Option('--server <string>', 'HTTP address of the backend'),
   )
   .addOption(
     new Option(
       '--token <string>',
       'token for ADC to connect to the backend',
-    ).env('ADC_TOKEN'),
+    ),
   )
   .addOption(
     new Option(
       '--gateway-group <string>',
       'gateway group to operate on (only for "api7ee" backend)',
     )
-      .env('ADC_GATEWAY_GROUP')
       .default('default'),
   )
   .addExamples([

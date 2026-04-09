@@ -8,9 +8,8 @@ export const FetchPluginSchemasTask = (): ListrTask<{
   title: 'Fetch plugin schemas',
   enabled: (ctx) => !!ctx.backend?.fetchPluginSchemas,
   task: async (ctx) => {
-    const { fetchPluginSchemas } = ctx.backend;
-    if (fetchPluginSchemas) {
-      ctx.pluginSchemas = await fetchPluginSchemas();
+    if (ctx.backend.fetchPluginSchemas) {
+      ctx.pluginSchemas = await ctx.backend.fetchPluginSchemas();
     }
   },
 });
