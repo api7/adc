@@ -81,7 +81,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
         InitializeBackendTask(opts.backend, opts),
-        FetchPluginSchemasTask(),
+        opts.lint ? FetchPluginSchemasTask() : { task: () => undefined },
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,

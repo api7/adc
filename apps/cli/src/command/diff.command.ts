@@ -65,7 +65,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
         InitializeBackendTask(opts.backend, opts),
-        FetchPluginSchemasTask(),
+        opts.lint ? FetchPluginSchemasTask() : { task: () => undefined },
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,
