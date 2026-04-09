@@ -3,3 +3,4 @@ export * from './load_remote';
 export * from './diff';
 export * from './lint';
 export * from './experimental';
+export * from './fetch_plugin_schemas';

@@ -61,8 +61,8 @@ export const syncHandler: RequestHandler<
       const result = check(local);
       if (!result.success)
         return res.status(400).json({
-          message: result.error.message,
-          errors: result.error.issues,
+          message: 'Lint configuration failed',
+          errors: result.errors,
         });
     }
     fillLabels(local, task.opts.labelSelector);

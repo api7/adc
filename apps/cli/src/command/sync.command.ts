@@ -4,6 +4,7 @@ import { lastValueFrom, toArray } from 'rxjs';
 import {
   DiffResourceTask,
   ExperimentalRemoteStateFileTask,
+  FetchPluginSchemasTask,
   LintTask,
   LoadLocalConfigurationTask,
   LoadRemoteConfigurationTask,
@@ -80,6 +81,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
         InitializeBackendTask(opts.backend, opts),
+        FetchPluginSchemasTask(),
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,

@@ -1,6 +1,7 @@
 import { AxiosResponse } from 'axios';
 import { Agent as httpAgent } from 'http';
 import { Agent as httpsAgent } from 'https';
+import type { JSONSchema4 } from 'json-schema';
 import { Observable, Subscription } from 'rxjs';
 import { SemVer } from 'semver';
 
@@ -71,6 +72,14 @@ export interface BackendMetadata {
   logScope: string[];
 }
 
+export interface PluginSchemaEntry {
+  configSchema: JSONSchema4;
+  metadataSchema?: JSONSchema4;
+  consumerSchema?: JSONSchema4;
+}
+
+export type PluginSchemaMap = Record<string, PluginSchemaEntry>;
+
 export interface Backend {
   metadata: () => BackendMetadata;
 
@@ -86,6 +95,7 @@ export interface Backend {
 
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
+  fetchPluginSchemas?: () => Promise<PluginSchemaMap>;
 
   // Event report: optional standard, backends may not implement event reporting.
   // They will therefore lose output related to task start, end and verbose logs.

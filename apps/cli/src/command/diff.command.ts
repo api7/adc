@@ -6,6 +6,7 @@ import { writeFile } from 'node:fs/promises';
 import {
   DiffResourceTask,
   ExperimentalRemoteStateFileTask,
+  FetchPluginSchemasTask,
   LintTask,
   LoadLocalConfigurationTask,
 } from '../tasks';
@@ -64,6 +65,7 @@ export const DiffCommand = new BackendCommand<DiffOptions>(
     const tasks = new Listr<TaskContext, typeof SignaleRenderer>(
       [
         InitializeBackendTask(opts.backend, opts),
+        FetchPluginSchemasTask(),
         LoadLocalConfigurationTask(
           opts.file,
           opts.labelSelector,

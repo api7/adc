@@ -19,6 +19,7 @@ export class BackendAPI7 implements ADCSDK.Backend {
   private _version?: SemVer;
   private gatewayGroupId?: string;
   private innerDefaultValue?: ADCSDK.DefaultValue;
+  private _pluginSchemas?: ADCSDK.PluginSchemaMap;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     this.client = axios.create({
@@ -225,5 +226,60 @@ export class BackendAPI7 implements ADCSDK.Backend {
     return this.subject.subscribe(({ type, event }) => {
       if (eventType === type) cb(event);
     });
+  }
+
+  public async fetchPluginSchemas(): Promise<ADCSDK.PluginSchemaMap> {
+    if (this._pluginSchemas) return this._pluginSchemas;
+
+    // Fetch plugin list via APISIX Admin API compatibility layer
+    const listResp = await this.client.get<string[]>(
+      '/apisix/admin/plugins/list',
+    );
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: listResp, description: 'Get plugins list' },
+    });
+    const pluginNames = listResp.data ?? [];
+
+    // Fetch schema for each plugin
+    const schemas: ADCSDK.PluginSchemaMap = {};
+    await Promise.all(
+      pluginNames.map(async (name) => {
+        try {
+          const resp = await this.client.get<JSONSchema4>(
+            `/apisix/admin/schema/plugins/${name}`,
+          );
+          this.subject.next({
+            type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+            event: {
+              response: resp,
+              description: `Get plugin schema: ${name}`,
+            },
+          });
+          const entry: ADCSDK.PluginSchemaEntry = {
+            configSchema: resp.data,
+          };
+
+          // Fetch consumer schema if applicable
+          try {
+            const consumerResp = await this.client.get<JSONSchema4>(
+              `/apisix/admin/schema/plugins/${name}`,
+              { params: { schema_type: 'consumer' } },
+            );
+            if (consumerResp.data && Object.keys(consumerResp.data).length > 0)
+              entry.consumerSchema = consumerResp.data;
+          } catch {
+            // Plugin doesn't have a consumer schema — skip
+          }
+
+          schemas[name] = entry;
+        } catch {
+          // Skip plugins whose schema cannot be fetched
+        }
+      }),
+    );
+
+    this._pluginSchemas = schemas;
+    return schemas;
   }
 }

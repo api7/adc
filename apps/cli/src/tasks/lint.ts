@@ -1,16 +1,29 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
-import { z } from 'zod';
 
 import { check } from '../linter';
+import type { LintError } from '../linter';
 
-export const LintTask = (): ListrTask<{ local: ADCSDK.Configuration }> => ({
+const formatLintErrors = (errors: LintError[]): string =>
+  errors
+    .map(
+      (e) =>
+        `  - ${e.path.length > 0 ? e.path.join('.') + ': ' : ''}${e.message}`,
+    )
+    .join('\n');
+
+export const LintTask = (): ListrTask<{
+  local: ADCSDK.Configuration;
+  pluginSchemas?: ADCSDK.PluginSchemaMap;
+}> => ({
   title: 'Lint configuration',
   task: (ctx) => {
-    const result = check(ctx.local);
+    const result = check(ctx.local, {
+      pluginSchemas: ctx.pluginSchemas,
+    });
 
     if (!result.success) {
-      const err = `Lint configuration\nThe following errors were found in configuration:\n${z.prettifyError(result.error)}`;
+      const err = `Lint configuration\nThe following errors were found in configuration:\n${formatLintErrors(result.errors)}`;
       const error = new Error(err);
       error.stack = '';
       throw error;

@@ -1,5 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import axios, { type AxiosInstance } from 'axios';
+import type { JSONSchema4 } from 'json-schema';
 import { Observable, Subject, forkJoin, from, switchMap } from 'rxjs';
 import semver, { SemVer } from 'semver';
 
@@ -12,6 +13,7 @@ export class BackendAPISIX implements ADCSDK.Backend {
   private readonly subject = new Subject<ADCSDK.BackendEvent>();
 
   private _version?: SemVer;
+  private _pluginSchemas?: ADCSDK.PluginSchemaMap;
 
   constructor(private readonly opts: ADCSDK.BackendOptions) {
     this.client = axios.create({
@@ -104,4 +106,59 @@ export class BackendAPISIX implements ADCSDK.Backend {
 
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
+
+  public async fetchPluginSchemas(): Promise<ADCSDK.PluginSchemaMap> {
+    if (this._pluginSchemas) return this._pluginSchemas;
+
+    // Fetch plugin list
+    const listResp = await this.client.get<string[]>(
+      '/apisix/admin/plugins/list',
+    );
+    this.subject.next({
+      type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+      event: { response: listResp, description: 'Get plugins list' },
+    });
+    const pluginNames = listResp.data ?? [];
+
+    // Fetch schema for each plugin
+    const schemas: ADCSDK.PluginSchemaMap = {};
+    await Promise.all(
+      pluginNames.map(async (name) => {
+        try {
+          const resp = await this.client.get<JSONSchema4>(
+            `/apisix/admin/schema/plugins/${name}`,
+          );
+          this.subject.next({
+            type: ADCSDK.BackendEventType.AXIOS_DEBUG,
+            event: {
+              response: resp,
+              description: `Get plugin schema: ${name}`,
+            },
+          });
+          const entry: ADCSDK.PluginSchemaEntry = {
+            configSchema: resp.data,
+          };
+
+          // Fetch consumer schema if applicable
+          try {
+            const consumerResp = await this.client.get<JSONSchema4>(
+              `/apisix/admin/schema/plugins/${name}`,
+              { params: { schema_type: 'consumer' } },
+            );
+            if (consumerResp.data && Object.keys(consumerResp.data).length > 0)
+              entry.consumerSchema = consumerResp.data;
+          } catch {
+            // Plugin doesn't have a consumer schema — skip
+          }
+
+          schemas[name] = entry;
+        } catch {
+          // Skip plugins whose schema cannot be fetched
+        }
+      }),
+    );
+
+    this._pluginSchemas = schemas;
+    return schemas;
+  }
 }

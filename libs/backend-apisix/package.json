@@ -21,12 +21,13 @@
   },
   "dependencies": {
     "@api7/adc-sdk": "workspace:*",
+    "@types/json-schema": "catalog:",
     "axios": "catalog:",
-    "rxjs": "catalog:",
+    "immer": "catalog:",
     "lodash-es": "catalog:",
-    "tslib": "catalog:",
+    "rxjs": "catalog:",
     "semver": "catalog:",
-    "immer": "catalog:"
+    "tslib": "catalog:"
   },
   "nx": {
     "name": "backend-apisix",

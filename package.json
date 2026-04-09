@@ -37,5 +37,9 @@
       "@parcel/watcher",
       "nx"
     ]
+  },
+  "dependencies": {
+    "ajv": "catalog:",
+    "ajv-draft-04": "catalog:"
   }
 }

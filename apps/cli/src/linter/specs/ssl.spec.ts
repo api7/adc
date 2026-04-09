@@ -122,7 +122,7 @@ describe('SSL Linter', () => {
       const result = check(item.input);
       expect(result.success).toEqual(item.expect);
       if (!item.expect) {
-        expect(result.error.issues).toEqual(item.errors);
+        expect(result.errors).toEqual(item.errors);
       }
     });
   });

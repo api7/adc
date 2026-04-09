@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@api7/adc-sdk": "workspace:*",
-    "@types/json-schema": "^7.0.15",
+    "@types/json-schema": "catalog:",
     "axios": "catalog:",
     "rxjs": "catalog:",
     "lodash-es": "catalog:",

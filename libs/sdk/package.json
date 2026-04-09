@@ -20,13 +20,14 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@types/json-schema": "catalog:",
     "axios": "catalog:",
+    "datum-diff": "catalog:",
     "lodash-es": "catalog:",
     "rxjs": "catalog:",
     "semver": "catalog:",
     "tslib": "catalog:",
-    "zod": "catalog:",
-    "datum-diff": "catalog:"
+    "zod": "catalog:"
   },
   "nx": {
     "name": "sdk",

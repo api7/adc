@@ -1,13 +1,17 @@
 packages:
   - apps/*
   - libs/*
+autoInstallPeers: true
 
 catalog:
   "@nx/esbuild": 22.6.3
+  '@types/json-schema': ^7.0.15
   "@types/lodash-es": ^4.17.12
   "@types/semver": ^7.7.1
   "@vitest/coverage-v8": ^4.1.2
   "@vitest/ui": ^4.1.2
+  ajv: ^8.18.0
+  ajv-draft-04: ^1.0.0
   axios: 1.14.0
   datum-diff: 1.0.3
   esbuild: ^0.27.4
@@ -24,8 +28,7 @@ catalog:
 catalogMode: strict
 
 minimumReleaseAge: 1440
-
-strictPeerDependencies: false
-autoInstallPeers: true
 publicHoistPattern:
   - "@types/*"
+
+strictPeerDependencies: false

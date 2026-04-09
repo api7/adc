@@ -9,6 +9,9 @@ catalogs:
     '@nx/esbuild':
       specifier: 22.6.3
       version: 22.6.3
+    '@types/json-schema':
+      specifier: ^7.0.15
+      version: 7.0.15
     '@types/lodash-es':
       specifier: ^4.17.12
       version: 4.17.12
@@ -21,6 +24,12 @@ catalogs:
     '@vitest/ui':
       specifier: ^4.1.2
       version: 4.1.2
+    ajv:
+      specifier: ^8.18.0
+      version: 8.18.0
+    ajv-draft-04:
+      specifier: ^1.0.0
+      version: 1.0.0
     axios:
       specifier: 1.14.0
       version: 1.14.0
@@ -61,6 +70,13 @@ catalogs:
 importers:
 
   .:
+    dependencies:
+      ajv:
+        specifier: 'catalog:'
+        version: 8.18.0
+      ajv-draft-04:
+        specifier: 'catalog:'
+        version: 1.0.0(ajv@8.18.0)
     devDependencies:
       '@nx/esbuild':
         specifier: 'catalog:'
@@ -161,6 +177,12 @@ importers:
       agentkeepalive:
         specifier: ^4.6.0
         version: 4.6.0
+      ajv:
+        specifier: 'catalog:'
+        version: 8.18.0
+      ajv-draft-04:
+        specifier: 'catalog:'
+        version: 1.0.0(ajv@8.18.0)
       axios:
         specifier: 'catalog:'
         version: 1.14.0
@@ -250,7 +272,7 @@ importers:
         specifier: workspace:*
         version: link:../sdk
       '@types/json-schema':
-        specifier: ^7.0.15
+        specifier: 'catalog:'
         version: 7.0.15
       axios:
         specifier: 'catalog:'
@@ -289,6 +311,9 @@ importers:
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk
+      '@types/json-schema':
+        specifier: 'catalog:'
+        version: 7.0.15
       axios:
         specifier: 'catalog:'
         version: 1.14.0
@@ -425,6 +450,9 @@ importers:
 
   libs/sdk:
     dependencies:
+      '@types/json-schema':
+        specifier: 'catalog:'
+        version: 7.0.15
       axios:
         specifier: 'catalog:'
         version: 1.14.0
@@ -2270,6 +2298,9 @@ packages:
 
   ajv@8.17.1:
     resolution: {integrity: sha512-B/gBuNg5SiMTrPkC+A2+cW0RszwxYmn6VYxB/inlBStS5nx6xHIt/ehKRhIMhqusl7a8LjQoZnjCs5vhwxOQ1g==}
+
+  ajv@8.18.0:
+    resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
 
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
@@ -6116,6 +6147,10 @@ snapshots:
     optionalDependencies:
       ajv: 8.17.1
 
+  ajv-draft-04@1.0.0(ajv@8.18.0):
+    optionalDependencies:
+      ajv: 8.18.0
+
   ajv-formats@3.0.1(ajv@8.17.1):
     optionalDependencies:
       ajv: 8.17.1
@@ -6128,6 +6163,13 @@ snapshots:
       uri-js: 4.4.1
 
   ajv@8.17.1:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-uri: 3.0.6
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
+
+  ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
       fast-uri: 3.0.6
