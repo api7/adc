@@ -11,6 +11,7 @@ import { IngressSyncCommand } from './ingress-sync.command';
 import { LintCommand } from './lint.command';
 import { PingCommand } from './ping.command';
 import { SyncCommand } from './sync.command';
+import { ValidateCommand } from './validate.command';
 import { configurePluralize } from './utils';
 
 const versionCode = '0.24.3';
@@ -47,8 +48,8 @@ export const setupCommands = (): Command => {
     .addCommand(DiffCommand)
     .addCommand(SyncCommand)
     .addCommand(ConvertCommand)
-    .addCommand(LintCommand);
-  //.addCommand(ValidateCommand)
+    .addCommand(LintCommand)
+    .addCommand(ValidateCommand);
 
   if (process.env.NODE_ENV === 'development') program.addCommand(DevCommand);
 

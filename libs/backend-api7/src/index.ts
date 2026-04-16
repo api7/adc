@@ -9,6 +9,9 @@ import { Fetcher } from './fetcher';
 import { Operator } from './operator';
 import { ToADC } from './transformer';
 import * as typing from './typing';
+import { Validator } from './validator';
+
+const MINIMUM_VALIDATE_VERSION = '3.9.10';
 
 export class BackendAPI7 implements ADCSDK.Backend {
   private readonly client: AxiosInstance;
@@ -225,5 +228,21 @@ export class BackendAPI7 implements ADCSDK.Backend {
     return this.subject.subscribe(({ type, event }) => {
       if (eventType === type) cb(event);
     });
+  }
+
+  public async supportValidate(): Promise<boolean> {
+    const version = await this.version();
+    return semver.gte(version, MINIMUM_VALIDATE_VERSION);
+  }
+
+  public async validate(
+    config: ADCSDK.Configuration,
+  ): Promise<ADCSDK.BackendValidateResult> {
+    const gatewayGroupId = await this.getGatewayGroupId();
+    return new Validator({
+      client: this.client,
+      eventSubject: this.subject,
+      gatewayGroupId,
+    }).validate(config);
   }
 }
