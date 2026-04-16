@@ -133,12 +133,20 @@ jobs:
             echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
-            echo "BACKEND_API7_LICENSE=${{ secrets.BACKEND_API7_DEV_LICENSE }}" >> $GITHUB_ENV
+            {
+              echo "BACKEND_API7_LICENSE<<EOLICENSE"
+              echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"
+              echo "EOLICENSE"
+            } >> $GITHUB_ENV
           else
             echo "BACKEND_API7_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=v${{ matrix.version }}" >> $GITHUB_ENV
-            echo "BACKEND_API7_LICENSE=${{ secrets.BACKEND_API7_LICENSE }}" >> $GITHUB_ENV
+            {
+              echo "BACKEND_API7_LICENSE<<EOLICENSE"
+              echo "${{ secrets.BACKEND_API7_LICENSE }}"
+              echo "EOLICENSE"
+            } >> $GITHUB_ENV
           fi
 
       - uses: actions/checkout@v4
