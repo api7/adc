@@ -64,22 +64,29 @@ const waitForDashboard = async (
   );
 };
 
-const setupAPI7 = async () => {
-  const pullPolicy =
-    process.env.API7_IMAGE_TAG === 'dev' ? '--pull always' : '';
+const runCompose = (...args: string[]) => {
+  const result = spawnSync('docker', ['compose', ...args], {
+    cwd: assetsDir,
+    stdio: 'inherit',
+  });
 
-  console.log('\nSetup API7 Instance via Docker Compose\n');
-  const result = spawnSync(
-    'sh',
-    ['-c', `docker compose ${pullPolicy} up -d`],
-    {
-      cwd: assetsDir,
-      stdio: 'inherit',
-    },
-  );
-
+  if (result.error) throw result.error;
+  if (result.signal)
+    throw new Error(
+      `docker compose ${args.join(' ')} terminated by signal ${result.signal}`,
+    );
   if (result.status !== 0)
-    throw new Error(`docker compose up failed with code ${result.status}`);
+    throw new Error(
+      `docker compose ${args.join(' ')} failed with code ${result.status}`,
+    );
+};
+
+const setupAPI7 = async () => {
+  console.log('\nSetup API7 Instance via Docker Compose\n');
+  if (process.env.API7_IMAGE_TAG === 'dev') {
+    runCompose('pull');
+  }
+  runCompose('up', '-d');
 
   console.log('Docker Compose started');
   await waitForDashboard();
@@ -195,9 +202,10 @@ export default async () => {
   return async () => {
     if (process.env['SKIP_API7_SETUP'] === 'true') return;
     console.log('Tearing down API7 via Docker Compose');
-    spawnSync('sh', ['-c', 'docker compose down -v'], {
-      cwd: assetsDir,
-      stdio: 'inherit',
-    });
+    try {
+      runCompose('down', '-v');
+    } catch (err) {
+      console.error('Teardown failed:', err);
+    }
   };
 };

@@ -1,6 +1,7 @@
 name: E2E Test
 permissions:
   contents: read
+  packages: read
 on:
   push:
     branches:
