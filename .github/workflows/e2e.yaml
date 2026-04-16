@@ -125,6 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
     strategy:
+      fail-fast: false
       matrix:
         version: [3.5.5, 3.6.1, 3.7.8, 3.8.22, 3.9.2, dev]
     steps:
