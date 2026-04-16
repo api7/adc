@@ -1,0 +1,29 @@
+services:
+  postgresql:
+    image: bitnami/postgresql:14
+    environment:
+      POSTGRESQL_USERNAME: api7ee
+      POSTGRESQL_PASSWORD: changeme
+      POSTGRESQL_DATABASE: api7ee
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "api7ee", "-d", "api7ee"]
+      interval: 5s
+      retries: 10
+    networks:
+      api7:
+
+  dashboard:
+    image: ${API7_DASHBOARD_IMAGE:-api7/api7-ee-3-integrated}:${API7_IMAGE_TAG:-dev}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - ./dashboard-conf.yaml:/app/conf/config.yaml:ro
+    ports:
+      - "7443:7443"
+    networks:
+      api7:
+
+networks:
+  api7:
+    driver: bridge

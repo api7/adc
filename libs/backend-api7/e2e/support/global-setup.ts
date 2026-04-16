@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve as pathResolve } from 'node:path';
 import { Agent } from 'node:https';
 import * as semver from 'semver';
 
@@ -31,49 +31,58 @@ httpClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+const assetsDir = pathResolve(__dirname, '../../e2e/assets');
+
+const waitForDashboard = async (
+  maxRetries = 60,
+  intervalMs = 2000,
+): Promise<void> => {
+  console.log('Waiting for Dashboard to be ready...');
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await httpClient.get('/api/status', { timeout: 2000 });
+      console.log('Dashboard is ready');
+      return;
+    } catch {
+      // Also try login endpoint as a fallback health check
+      try {
+        await httpClient.post(
+          '/api/login',
+          { username: '', password: '' },
+          { timeout: 2000, validateStatus: () => true },
+        );
+        console.log('Dashboard is ready');
+        return;
+      } catch {
+        // not ready yet
+      }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(
+    `Dashboard not ready after ${maxRetries * intervalMs / 1000}s`,
+  );
+};
+
 const setupAPI7 = async () => {
-  return new Promise<void>((resolve, reject) => {
-    const download = spawnSync(
-      'sh',
-      [
-        '-c',
-        `curl -O ${process.env.BACKEND_API7_DOWNLOAD_URL} && tar xf api7-ee-*.tar.gz`,
-      ],
-      { cwd: `/tmp` },
-    );
+  const pullPolicy =
+    process.env.API7_IMAGE_TAG === 'dev' ? '--pull always' : '';
 
-    console.log('stdout: ' + download.stdout.toString('utf-8'));
-    console.log('stderr: ' + download.stderr.toString('utf-8'));
+  console.log('\nSetup API7 Instance via Docker Compose\n');
+  const result = spawnSync(
+    'sh',
+    ['-c', `docker compose ${pullPolicy} up -d`],
+    {
+      cwd: assetsDir,
+      stdio: 'inherit',
+    },
+  );
 
-    const dockerComposePath = `/tmp/api7-ee/docker-compose.yaml`;
-    const dockerCompose = readFileSync(dockerComposePath, 'utf-8').replaceAll(
-      ': bitnami/',
-      ': bitnamilegacy/',
-    );
-    writeFileSync(dockerComposePath, dockerCompose, 'utf-8');
+  if (result.status !== 0)
+    throw new Error(`docker compose up failed with code ${result.status}`);
 
-    const setup = spawn('sh', ['-c', `cd api7-ee && bash run.sh start`], {
-      cwd: `/tmp`,
-    });
-
-    console.log('\nSetup API7 Instance\n');
-
-    setup.stdout.on('data', function (data) {
-      console.log('stdout: ' + data.toString());
-    });
-
-    setup.stderr.on('data', function (data) {
-      console.log('stderr: ' + data.toString());
-    });
-
-    setup.on('exit', function (code) {
-      if (code)
-        reject(`child process exited with non-zero code: ${code?.toString()}`);
-
-      console.log('Successful deployment');
-      resolve();
-    });
-  });
+  console.log('Docker Compose started');
+  await waitForDashboard();
 };
 
 const initUser = async (
@@ -181,4 +190,14 @@ export default async () => {
   process.env.GATEWAY_GROUP = 'adc';
   process.env.BACKEND_API7_VERSION = '0.0.0'; */
   // ONLY FOR LOCAL TEST //
+
+  // Return teardown function to clean up Docker Compose
+  return async () => {
+    if (process.env['SKIP_API7_SETUP'] === 'true') return;
+    console.log('Tearing down API7 via Docker Compose');
+    spawnSync('sh', ['-c', 'docker compose down -v'], {
+      cwd: assetsDir,
+      stdio: 'inherit',
+    });
+  };
 };
