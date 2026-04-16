@@ -15,13 +15,17 @@ import { configurePluralize } from './utils';
 
 const versionCode = '0.24.3';
 
-// initialize dotenv
-dotenv.config({ quiet: true });
+function setupInternal() {
+  // initialize dotenv
+  dotenv.config({ quiet: true });
 
-// initialize pluralize
-configurePluralize();
+  // initialize pluralize
+  configurePluralize();
+}
 
 export const setupCommands = (): Command => {
+  setupInternal();
+
   const program = new Command('adc');
 
   program
@@ -56,6 +60,8 @@ export const setupCommands = (): Command => {
 };
 
 export const setupIngressCommands = (): Command => {
+  setupInternal();
+
   const program = new Command('adc-ingress');
 
   program

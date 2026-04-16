@@ -10,7 +10,6 @@
     "@nx/eslint-plugin": "22.6.3",
     "@nx/js": "22.6.3",
     "@nx/vitest": "22.6.3",
-    "@nx/web": "22.6.3",
     "@nx/workspace": "22.6.3",
     "@swc-node/register": "1.11.1",
     "@swc/core": "1.15.8",
