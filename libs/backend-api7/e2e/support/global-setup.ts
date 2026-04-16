@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve as pathResolve } from 'node:path';
 import { Agent } from 'node:https';
 import * as semver from 'semver';
 
@@ -31,49 +31,65 @@ httpClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-const setupAPI7 = async () => {
-  return new Promise<void>((resolve, reject) => {
-    const download = spawnSync(
-      'sh',
-      [
-        '-c',
-        `curl -O ${process.env.BACKEND_API7_DOWNLOAD_URL} && tar xf api7-ee-*.tar.gz`,
-      ],
-      { cwd: `/tmp` },
-    );
+const assetsDir = pathResolve(__dirname, '../../e2e/assets');
 
-    console.log('stdout: ' + download.stdout.toString('utf-8'));
-    console.log('stderr: ' + download.stderr.toString('utf-8'));
+const waitForDashboard = async (
+  maxRetries = 60,
+  intervalMs = 2000,
+): Promise<void> => {
+  console.log('Waiting for Dashboard to be ready...');
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await httpClient.get('/api/status', { timeout: 2000 });
+      console.log('Dashboard is ready');
+      return;
+    } catch {
+      // Also try login endpoint as a fallback health check
+      try {
+        await httpClient.post(
+          '/api/login',
+          { username: '', password: '' },
+          { timeout: 2000, validateStatus: () => true },
+        );
+        console.log('Dashboard is ready');
+        return;
+      } catch {
+        // not ready yet
+      }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(
+    `Dashboard not ready after ${maxRetries * intervalMs / 1000}s`,
+  );
+};
 
-    const dockerComposePath = `/tmp/api7-ee/docker-compose.yaml`;
-    const dockerCompose = readFileSync(dockerComposePath, 'utf-8').replaceAll(
-      ': bitnami/',
-      ': bitnamilegacy/',
-    );
-    writeFileSync(dockerComposePath, dockerCompose, 'utf-8');
-
-    const setup = spawn('sh', ['-c', `cd api7-ee && bash run.sh start`], {
-      cwd: `/tmp`,
-    });
-
-    console.log('\nSetup API7 Instance\n');
-
-    setup.stdout.on('data', function (data) {
-      console.log('stdout: ' + data.toString());
-    });
-
-    setup.stderr.on('data', function (data) {
-      console.log('stderr: ' + data.toString());
-    });
-
-    setup.on('exit', function (code) {
-      if (code)
-        reject(`child process exited with non-zero code: ${code?.toString()}`);
-
-      console.log('Successful deployment');
-      resolve();
-    });
+const runCompose = (...args: string[]) => {
+  const result = spawnSync('docker', ['compose', ...args], {
+    cwd: assetsDir,
+    stdio: 'inherit',
   });
+
+  if (result.error) throw result.error;
+  if (result.signal)
+    throw new Error(
+      `docker compose ${args.join(' ')} terminated by signal ${result.signal}`,
+    );
+  if (result.status !== 0)
+    throw new Error(
+      `docker compose ${args.join(' ')} failed with code ${result.status}`,
+    );
+};
+
+const setupAPI7 = async () => {
+  console.log('\nSetup API7 Instance via Docker Compose\n');
+  if (process.env.API7_IMAGE_TAG === 'dev') {
+    runCompose('pull');
+  }
+  runCompose('up', '-d');
+
+  console.log('Docker Compose started');
+  await waitForDashboard();
 };
 
 const initUser = async (
@@ -162,7 +178,7 @@ const generateToken = async () => {
   process.env.TOKEN = resp.data.value.token;
 };
 
-export default async () => {
+export async function setup() {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
   try {
     await initUser();
@@ -181,4 +197,14 @@ export default async () => {
   process.env.GATEWAY_GROUP = 'adc';
   process.env.BACKEND_API7_VERSION = '0.0.0'; */
   // ONLY FOR LOCAL TEST //
-};
+}
+
+export async function teardown() {
+  if (process.env['SKIP_API7_SETUP'] === 'true') return;
+  console.log('Tearing down API7 via Docker Compose');
+  try {
+    runCompose('down', '-v');
+  } catch (err) {
+    console.error('Teardown failed:', err);
+  }
+}

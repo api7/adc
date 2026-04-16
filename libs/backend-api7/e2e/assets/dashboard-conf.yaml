@@ -1,0 +1,11 @@
+server:
+  listen:
+    disable: true
+  tls:
+    host: "0.0.0.0"
+    port: 7443
+log:
+  level: warn
+  output: stderr
+database:
+  dsn: "postgres://api7ee:changeme@postgresql:5432/api7ee"

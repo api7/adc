@@ -86,7 +86,6 @@ describe('Sync and Dump - 2', () => {
               timeout: 1,
               concurrency: 10,
               http_path: '/',
-              https_verify_certificate: true,
               healthy: {
                 interval: 1,
                 http_statuses: [200, 302],
