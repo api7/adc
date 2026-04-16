@@ -178,7 +178,7 @@ const generateToken = async () => {
   process.env.TOKEN = resp.data.value.token;
 };
 
-export default async () => {
+export async function setup() {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
   try {
     await initUser();
@@ -197,15 +197,14 @@ export default async () => {
   process.env.GATEWAY_GROUP = 'adc';
   process.env.BACKEND_API7_VERSION = '0.0.0'; */
   // ONLY FOR LOCAL TEST //
+}
 
-  // Return teardown function to clean up Docker Compose
-  return async () => {
-    if (process.env['SKIP_API7_SETUP'] === 'true') return;
-    console.log('Tearing down API7 via Docker Compose');
-    try {
-      runCompose('down', '-v');
-    } catch (err) {
-      console.error('Teardown failed:', err);
-    }
-  };
-};
+export async function teardown() {
+  if (process.env['SKIP_API7_SETUP'] === 'true') return;
+  console.log('Tearing down API7 via Docker Compose');
+  try {
+    runCompose('down', '-v');
+  } catch (err) {
+    console.error('Teardown failed:', err);
+  }
+}
