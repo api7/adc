@@ -7,9 +7,6 @@ import {
   conditionalDescribe,
   generateHTTPSAgent,
   semverCondition,
-  syncEvents,
-  createEvent,
-  deleteEvent,
 } from './support/utils';
 
 conditionalDescribe(semverCondition(gte, '3.9.10'))(
@@ -233,7 +230,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
       expect(result.success).toBe(true);
 
       // Verify no resources were created by dumping
-      const { lastValueFrom, toArray } = await import('rxjs');
+      const { lastValueFrom } = await import('rxjs');
       const dumped = await lastValueFrom(backend.dump());
       const found = dumped.services?.find((s) => s.name === serviceName);
       expect(found).toBeUndefined();
