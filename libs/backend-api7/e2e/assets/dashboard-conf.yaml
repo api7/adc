@@ -1,25 +1,11 @@
 server:
   listen:
     disable: true
-    host: "0.0.0.0"
-    port: 7080
   tls:
-    disable: false
     host: "0.0.0.0"
     port: 7443
-  status:
-    disable: false
-    host: "0.0.0.0"
-    port: 7081
-  cron_spec: "@every 1s"
 log:
   level: warn
   output: stderr
-  access_log: stdout
 database:
   dsn: "postgres://api7ee:changeme@postgresql:5432/api7ee"
-  max_open_conns: 30
-session_options_config:
-  same_site: "lax"
-  secure: false
-  max_age: 86400
