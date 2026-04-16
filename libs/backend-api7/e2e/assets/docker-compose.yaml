@@ -1,6 +1,6 @@
 services:
   postgresql:
-    image: bitnami/postgresql:14
+    image: bitnami/postgresql:15.4.0-debian-11-r45
     environment:
       POSTGRESQL_USERNAME: api7ee
       POSTGRESQL_PASSWORD: changeme
