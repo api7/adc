@@ -1,10 +1,10 @@
 services:
   postgresql:
-    image: postgres:15-alpine
+    image: api7/postgresql:15.4.0-debian-11-r45
     environment:
-      POSTGRES_USER: api7ee
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: api7ee
+      POSTGRESQL_USERNAME: api7ee
+      POSTGRESQL_PASSWORD: changeme
+      POSTGRESQL_DATABASE: api7ee
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "api7ee", "-d", "api7ee"]
       interval: 5s
