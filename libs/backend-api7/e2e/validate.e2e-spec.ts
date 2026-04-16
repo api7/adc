@@ -51,7 +51,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
             routes: [
               {
                 name: 'validate-test-route',
-                paths: ['/validate-test'],
+                uris: ['/validate-test'],
                 methods: ['GET'],
               },
             ],
@@ -93,7 +93,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
             routes: [
               {
                 name: 'validate-bad-plugin-route',
-                paths: ['/bad-plugin'],
+                uris: ['/bad-plugin'],
                 plugins: {
                   'limit-count': {
                     // missing required fields: count, time_window
@@ -124,7 +124,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
               {
                 name: 'validate-bad-route',
                 // paths should be an array of strings, provide number instead
-                paths: [123 as unknown as string],
+                uris: [123 as unknown as string],
               },
             ],
           },
@@ -148,14 +148,14 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
             routes: [
               {
                 name: 'validate-multi-err-route1',
-                paths: ['/multi-err-1'],
+                uris: ['/multi-err-1'],
                 plugins: {
                   'limit-count': {},
                 },
               },
               {
                 name: 'validate-multi-err-route2',
-                paths: ['/multi-err-2'],
+                uris: ['/multi-err-2'],
                 plugins: {
                   'limit-count': {},
                 },
@@ -182,7 +182,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
             routes: [
               {
                 name: 'validate-mixed-route',
-                paths: ['/mixed-test'],
+                uris: ['/mixed-test'],
                 methods: ['GET', 'POST'],
               },
             ],
@@ -221,7 +221,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
             routes: [
               {
                 name: routeName,
-                paths: ['/dryrun-test'],
+                uris: ['/dryrun-test'],
               },
             ],
           },
