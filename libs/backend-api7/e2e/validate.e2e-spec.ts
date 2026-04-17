@@ -105,7 +105,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
       const result = await backend.validate(config);
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors[0].resource_type).toBe('route');
+      expect(result.errors[0].resource_type).toBe('routes');
     });
 
     it('should fail with invalid route (bad uri type)', async () => {
