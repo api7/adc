@@ -28,8 +28,10 @@ export const ValidateTask = (): ListrTask<{
         lines.push(result.errorMessage);
       }
       for (const e of result.errors) {
-        const id = e.resource_id ? ` "${e.resource_id}"` : '';
-        lines.push(`  - [${e.resource_type}${id}]: ${e.error}`);
+        const parts: string[] = [e.resource_type];
+        if (e.resource_id) parts.push(`id="${e.resource_id}"`);
+        if (e.index !== undefined) parts.push(`index=${e.index}`);
+        lines.push(`  - [${parts.join(', ')}]: ${e.error}`);
       }
       const error = new Error(
         `Configuration validation failed:\n${lines.join('\n')}`,
