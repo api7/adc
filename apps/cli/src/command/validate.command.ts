@@ -1,6 +1,11 @@
 import { Listr } from 'listr2';
 
-import { LintTask, LoadLocalConfigurationTask, ValidateTask } from '../tasks';
+import {
+  DiffResourceTask,
+  LintTask,
+  LoadLocalConfigurationTask,
+  ValidateTask,
+} from '../tasks';
 import { InitializeBackendTask } from '../tasks/init_backend';
 import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
@@ -53,6 +58,7 @@ export const ValidateCommand = new BackendCommand<ValidateOptions>(
           opts.excludeResourceType,
         ),
         opts.lint ? LintTask() : { task: () => undefined },
+        DiffResourceTask(),
         ValidateTask(),
       ],
       {

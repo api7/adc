@@ -33,9 +33,9 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
   }
 
   public async validate(
-    config: ADCSDK.Configuration,
+    events: Array<ADCSDK.Event>,
   ): Promise<ADCSDK.BackendValidateResult> {
-    const { body, nameIndex } = this.buildRequestBody(config);
+    const { body, nameIndex } = this.buildRequestBody(events);
 
     try {
       const resp = await this.client.post(
@@ -74,106 +74,161 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
     }
   }
 
-  private buildRequestBody(config: ADCSDK.Configuration): {
+  private flattenEvents(events: Array<ADCSDK.Event>): Array<ADCSDK.Event> {
+    const flat: Array<ADCSDK.Event> = [];
+    for (const event of events) {
+      if (event.type !== ADCSDK.EventType.ONLY_SUB_EVENTS) {
+        flat.push(event);
+      }
+      if (event.subEvents?.length) {
+        flat.push(...this.flattenEvents(event.subEvents));
+      }
+    }
+    return flat;
+  }
+
+  private buildRequestBody(events: Array<ADCSDK.Event>): {
     body: ValidateRequestBody;
     nameIndex: Record<string, string[]>;
   } {
     const body: ValidateRequestBody = {};
     const nameIndex: Record<string, string[]> = {};
 
-    if (config.services?.length) {
-      const services: Array<typing.Service> = [];
-      const routes: Array<typing.Route> = [];
-      const streamRoutes: Array<typing.StreamRoute> = [];
-      const serviceNames: string[] = [];
-      const routeNames: string[] = [];
-      const streamRouteNames: string[] = [];
+    const flat = this.flattenEvents(events).filter(
+      (e) =>
+        e.type === ADCSDK.EventType.CREATE ||
+        e.type === ADCSDK.EventType.UPDATE,
+    );
 
-      for (const service of config.services) {
-        const serviceId =
-          service.id ?? ADCSDK.utils.generateId(service.name);
-        const svc = { ...service, id: serviceId };
-        const transformed = this.fromADC.transformService(svc);
-        services.push(transformed);
-        serviceNames.push(service.name);
+    const services: Array<typing.Service> = [];
+    const serviceNames: string[] = [];
+    const routes: Array<typing.Route> = [];
+    const routeNames: string[] = [];
+    const streamRoutes: Array<typing.StreamRoute> = [];
+    const streamRouteNames: string[] = [];
+    const consumers: Array<typing.Consumer> = [];
+    const consumerNames: string[] = [];
+    const ssls: Array<typing.SSL> = [];
+    const sslNames: string[] = [];
+    const globalRules: Array<typing.GlobalRule> = [];
+    const globalRuleNames: string[] = [];
+    const pluginMetadata: Array<Record<string, unknown>> = [];
+    const pluginMetadataNames: string[] = [];
+    const consumerGroups: Array<Record<string, unknown>> = [];
+    const consumerGroupNames: string[] = [];
 
-        for (const route of service.routes ?? []) {
-          const routeId = route.id ?? ADCSDK.utils.generateId(route.name);
-          const r = { ...route, id: routeId };
-          routes.push(this.fromADC.transformRoute(r, serviceId));
-          routeNames.push(route.name);
-        }
-
-        for (const streamRoute of service.stream_routes ?? []) {
-          const streamRouteId =
-            streamRoute.id ?? ADCSDK.utils.generateId(streamRoute.name);
-          const sr = { ...streamRoute, id: streamRouteId };
-          streamRoutes.push(
-            this.fromADC.transformStreamRoute(sr, serviceId),
+    for (const event of flat) {
+      switch (event.resourceType) {
+        case ADCSDK.ResourceType.SERVICE: {
+          (event.newValue as ADCSDK.Service).id = event.resourceId;
+          services.push(
+            this.fromADC.transformService(event.newValue as ADCSDK.Service),
           );
-          streamRouteNames.push(streamRoute.name);
+          serviceNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.ROUTE: {
+          (event.newValue as ADCSDK.Route).id = event.resourceId;
+          routes.push(
+            this.fromADC.transformRoute(
+              event.newValue as ADCSDK.Route,
+              event.parentId!,
+            ),
+          );
+          routeNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.STREAM_ROUTE: {
+          (event.newValue as ADCSDK.StreamRoute).id = event.resourceId;
+          streamRoutes.push(
+            this.fromADC.transformStreamRoute(
+              event.newValue as ADCSDK.StreamRoute,
+              event.parentId!,
+            ),
+          );
+          streamRouteNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.CONSUMER: {
+          consumers.push(
+            this.fromADC.transformConsumer(event.newValue as ADCSDK.Consumer),
+          );
+          consumerNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.SSL: {
+          (event.newValue as ADCSDK.SSL).id = event.resourceId;
+          ssls.push(
+            this.fromADC.transformSSL(event.newValue as ADCSDK.SSL),
+          );
+          sslNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.GLOBAL_RULE: {
+          globalRules.push({
+            plugins: { [event.resourceId]: event.newValue },
+          } as unknown as typing.GlobalRule);
+          globalRuleNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.PLUGIN_METADATA: {
+          pluginMetadata.push({
+            id: event.resourceId,
+            ...ADCSDK.utils.recursiveOmitUndefined(
+              event.newValue as Record<string, unknown>,
+            ),
+          });
+          pluginMetadataNames.push(event.resourceName);
+          break;
+        }
+        case ADCSDK.ResourceType.CONSUMER_GROUP: {
+          const cg = event.newValue as ADCSDK.ConsumerGroup;
+          consumerGroups.push(
+            ADCSDK.utils.recursiveOmitUndefined({
+              id: event.resourceId,
+              name: cg.name,
+              desc: cg.description,
+              labels: cg.labels,
+              plugins: cg.plugins,
+            }) as unknown as Record<string, unknown>,
+          );
+          consumerGroupNames.push(event.resourceName);
+          break;
         }
       }
+    }
 
+    if (services.length) {
       body.services = services;
       nameIndex.services = serviceNames;
-      if (routes.length) {
-        body.routes = routes;
-        nameIndex.routes = routeNames;
-      }
-      if (streamRoutes.length) {
-        body.stream_routes = streamRoutes;
-        nameIndex.stream_routes = streamRouteNames;
-      }
     }
-
-    if (config.consumers?.length) {
-      body.consumers = config.consumers.map((c) =>
-        this.fromADC.transformConsumer(c),
-      );
-      nameIndex.consumers = config.consumers.map((c) => c.username);
+    if (routes.length) {
+      body.routes = routes;
+      nameIndex.routes = routeNames;
     }
-
-    if (config.ssls?.length) {
-      body.ssls = config.ssls.map((ssl) => {
-        const sslId = ssl.id ?? ADCSDK.utils.generateId(ssl.snis?.[0] ?? '');
-        return this.fromADC.transformSSL({ ...ssl, id: sslId });
-      });
-      nameIndex.ssls = config.ssls.map((ssl) => ssl.snis?.[0] ?? '');
+    if (streamRoutes.length) {
+      body.stream_routes = streamRoutes;
+      nameIndex.stream_routes = streamRouteNames;
     }
-
-    if (config.global_rules && Object.keys(config.global_rules).length) {
-      body.global_rules = this.fromADC.transformGlobalRule(
-        config.global_rules as Record<string, ADCSDK.GlobalRule>,
-      );
-      nameIndex.global_rules = Object.keys(config.global_rules);
+    if (consumers.length) {
+      body.consumers = consumers;
+      nameIndex.consumers = consumerNames;
     }
-
-    if (
-      config.plugin_metadata &&
-      Object.keys(config.plugin_metadata).length
-    ) {
-      body.plugin_metadata = Object.entries(config.plugin_metadata).map(
-        ([pluginName, config]) => ({
-          id: pluginName,
-          ...ADCSDK.utils.recursiveOmitUndefined(config),
-        }),
-      );
-      nameIndex.plugin_metadata = Object.keys(config.plugin_metadata);
+    if (ssls.length) {
+      body.ssls = ssls;
+      nameIndex.ssls = sslNames;
     }
-
-    if (config.consumer_groups?.length) {
-      body.consumer_groups = config.consumer_groups.map((cg) => {
-        const id = ADCSDK.utils.generateId(cg.name);
-        return ADCSDK.utils.recursiveOmitUndefined({
-          id,
-          name: cg.name,
-          desc: cg.description,
-          labels: cg.labels,
-          plugins: cg.plugins,
-        }) as unknown as Record<string, unknown>;
-      });
-      nameIndex.consumer_groups = config.consumer_groups.map((cg) => cg.name);
+    if (globalRules.length) {
+      body.global_rules = globalRules;
+      nameIndex.global_rules = globalRuleNames;
+    }
+    if (pluginMetadata.length) {
+      body.plugin_metadata = pluginMetadata;
+      nameIndex.plugin_metadata = pluginMetadataNames;
+    }
+    if (consumerGroups.length) {
+      body.consumer_groups = consumerGroups;
+      nameIndex.consumer_groups = consumerGroupNames;
     }
 
     return { body, nameIndex };

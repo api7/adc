@@ -235,14 +235,17 @@ export class BackendAPI7 implements ADCSDK.Backend {
     return semver.gte(version, MINIMUM_VALIDATE_VERSION);
   }
 
-  public async validate(
-    config: ADCSDK.Configuration,
-  ): Promise<ADCSDK.BackendValidateResult> {
-    const gatewayGroupId = await this.getGatewayGroupId();
-    return new Validator({
-      client: this.client,
-      eventSubject: this.subject,
-      gatewayGroupId,
-    }).validate(config);
+  public validate(events: Array<ADCSDK.Event>) {
+    return from(this.getGatewayGroupId()).pipe(
+      switchMap((gatewayGroupId) =>
+        from(
+          new Validator({
+            client: this.client,
+            eventSubject: this.subject,
+            gatewayGroupId,
+          }).validate(events),
+        ),
+      ),
+    );
   }
 }

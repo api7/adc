@@ -1,5 +1,7 @@
+import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { gte } from 'semver';
+import { lastValueFrom } from 'rxjs';
 import { globalAgent as httpAgent } from 'node:http';
 
 import { BackendAPI7 } from '../src';
@@ -8,6 +10,15 @@ import {
   generateHTTPSAgent,
   semverCondition,
 } from './support/utils';
+
+const configToEvents = (
+  config: ADCSDK.Configuration,
+): Array<ADCSDK.Event> => {
+  return DifferV3.diff(
+    config as ADCSDK.InternalConfiguration,
+    {} as ADCSDK.InternalConfiguration,
+  );
+};
 
 conditionalDescribe(semverCondition(gte, '3.9.10'))(
   'Validate',
@@ -31,7 +42,7 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
     });
 
     it('should succeed with empty configuration', async () => {
-      const result = await backend.validate({});
+      const result = await lastValueFrom(backend.validate([]));
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -56,7 +67,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         ],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -73,7 +86,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         ],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -102,7 +117,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         ],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0].resource_type).toBe('routes');
@@ -128,7 +145,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         ],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
@@ -162,7 +181,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         ],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(2);
     });
@@ -198,7 +219,9 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
         } as ADCSDK.Configuration['global_rules'],
       };
 
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -226,11 +249,12 @@ conditionalDescribe(semverCondition(gte, '3.9.10'))(
       };
 
       // Validate should succeed
-      const result = await backend.validate(config);
+      const result = await lastValueFrom(
+        backend.validate(configToEvents(config)),
+      );
       expect(result.success).toBe(true);
 
       // Verify no resources were created by dumping
-      const { lastValueFrom } = await import('rxjs');
       const dumped = await lastValueFrom(backend.dump());
       const found = dumped.services?.find((s) => s.name === serviceName);
       expect(found).toBeUndefined();

@@ -99,8 +99,8 @@ export interface Backend {
   ) => Observable<BackendSyncResult>;
 
   validate?: (
-    config: ADCSDK.Configuration,
-  ) => Promise<BackendValidateResult>;
+    events: Array<ADCSDK.Event>,
+  ) => Observable<BackendValidateResult>;
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
 

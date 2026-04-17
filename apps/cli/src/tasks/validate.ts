@@ -1,9 +1,10 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
+import { lastValueFrom } from 'rxjs';
 
 export const ValidateTask = (): ListrTask<{
   backend: ADCSDK.Backend;
-  local: ADCSDK.Configuration;
+  diff: ADCSDK.Event[];
 }> => ({
   title: 'Validate configuration against backend',
   task: async (ctx) => {
@@ -21,7 +22,7 @@ export const ValidateTask = (): ListrTask<{
       );
     }
 
-    const result = await ctx.backend.validate!(ctx.local);
+    const result = await lastValueFrom(ctx.backend.validate!(ctx.diff));
     if (!result.success) {
       const lines: string[] = [];
       if (result.errorMessage) {
