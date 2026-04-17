@@ -35,7 +35,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
   public async validate(
     config: ADCSDK.Configuration,
   ): Promise<ADCSDK.BackendValidateResult> {
-    const body = this.buildRequestBody(config);
+    const { body, nameIndex } = this.buildRequestBody(config);
 
     try {
       const resp = await this.client.post(
@@ -58,23 +58,36 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           },
         });
         const data = error.response.data;
+        const errors: ADCSDK.BackendValidationError[] = (data?.errors ?? []).map(
+          (e: ADCSDK.BackendValidationError) => {
+            const name = nameIndex[e.resource_type]?.[e.index];
+            return name ? { ...e, resource_name: name } : e;
+          },
+        );
         return {
           success: false,
           errorMessage: data?.error_msg,
-          errors: data?.errors ?? [],
+          errors,
         };
       }
       throw error;
     }
   }
 
-  private buildRequestBody(config: ADCSDK.Configuration): ValidateRequestBody {
+  private buildRequestBody(config: ADCSDK.Configuration): {
+    body: ValidateRequestBody;
+    nameIndex: Record<string, string[]>;
+  } {
     const body: ValidateRequestBody = {};
+    const nameIndex: Record<string, string[]> = {};
 
     if (config.services?.length) {
       const services: Array<typing.Service> = [];
       const routes: Array<typing.Route> = [];
       const streamRoutes: Array<typing.StreamRoute> = [];
+      const serviceNames: string[] = [];
+      const routeNames: string[] = [];
+      const streamRouteNames: string[] = [];
 
       for (const service of config.services) {
         const serviceId =
@@ -82,11 +95,13 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
         const svc = { ...service, id: serviceId };
         const transformed = this.fromADC.transformService(svc);
         services.push(transformed);
+        serviceNames.push(service.name);
 
         for (const route of service.routes ?? []) {
           const routeId = route.id ?? ADCSDK.utils.generateId(route.name);
           const r = { ...route, id: routeId };
           routes.push(this.fromADC.transformRoute(r, serviceId));
+          routeNames.push(route.name);
         }
 
         for (const streamRoute of service.stream_routes ?? []) {
@@ -96,18 +111,27 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           streamRoutes.push(
             this.fromADC.transformStreamRoute(sr, serviceId),
           );
+          streamRouteNames.push(streamRoute.name);
         }
       }
 
       body.services = services;
-      if (routes.length) body.routes = routes;
-      if (streamRoutes.length) body.stream_routes = streamRoutes;
+      nameIndex.services = serviceNames;
+      if (routes.length) {
+        body.routes = routes;
+        nameIndex.routes = routeNames;
+      }
+      if (streamRoutes.length) {
+        body.stream_routes = streamRoutes;
+        nameIndex.stream_routes = streamRouteNames;
+      }
     }
 
     if (config.consumers?.length) {
       body.consumers = config.consumers.map((c) =>
         this.fromADC.transformConsumer(c),
       );
+      nameIndex.consumers = config.consumers.map((c) => c.username);
     }
 
     if (config.ssls?.length) {
@@ -115,12 +139,14 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
         const sslId = ssl.id ?? ADCSDK.utils.generateId(ssl.snis?.[0] ?? '');
         return this.fromADC.transformSSL({ ...ssl, id: sslId });
       });
+      nameIndex.ssls = config.ssls.map((ssl) => ssl.snis?.[0] ?? '');
     }
 
     if (config.global_rules && Object.keys(config.global_rules).length) {
       body.global_rules = this.fromADC.transformGlobalRule(
         config.global_rules as Record<string, ADCSDK.GlobalRule>,
       );
+      nameIndex.global_rules = Object.keys(config.global_rules);
     }
 
     if (
@@ -133,6 +159,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           ...ADCSDK.utils.recursiveOmitUndefined(config),
         }),
       );
+      nameIndex.plugin_metadata = Object.keys(config.plugin_metadata);
     }
 
     if (config.consumer_groups?.length) {
@@ -146,8 +173,9 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           plugins: cg.plugins,
         }) as unknown as Record<string, unknown>;
       });
+      nameIndex.consumer_groups = config.consumer_groups.map((cg) => cg.name);
     }
 
-    return body;
+    return { body, nameIndex };
   }
 }

@@ -70,6 +70,7 @@ export interface BackendSyncResult {
 export interface BackendValidationError {
   resource_type: string;
   resource_id?: string;
+  resource_name?: string;
   index: number;
   error: string;
 }
