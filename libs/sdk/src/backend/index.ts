@@ -97,11 +97,8 @@ export interface Backend {
     events: Array<ADCSDK.Event>,
     opts?: BackendSyncOptions,
   ) => Observable<BackendSyncResult>;
+  validate?: (events: Array<ADCSDK.Event>) => Observable<BackendValidateResult>;
 
-  validate?: (
-    events: Array<ADCSDK.Event>,
-  ) => Observable<BackendValidateResult>;
-  supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
 
   // Event report: optional standard, backends may not implement event reporting.

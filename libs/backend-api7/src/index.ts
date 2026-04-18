@@ -11,8 +11,6 @@ import { ToADC } from './transformer';
 import * as typing from './typing';
 import { Validator } from './validator';
 
-const MINIMUM_VALIDATE_VERSION = '3.9.10';
-
 export class BackendAPI7 implements ADCSDK.Backend {
   private readonly client: AxiosInstance;
   private readonly gatewayGroupName: string;
@@ -230,17 +228,16 @@ export class BackendAPI7 implements ADCSDK.Backend {
     });
   }
 
-  public async supportValidate(): Promise<boolean> {
-    const version = await this.version();
-    return semver.gte(version, MINIMUM_VALIDATE_VERSION);
-  }
-
   public validate(events: Array<ADCSDK.Event>) {
-    return from(this.getGatewayGroupId()).pipe(
-      switchMap((gatewayGroupId) =>
+    return forkJoin([
+      from(this.version()),
+      from(this.getGatewayGroupId()),
+    ]).pipe(
+      switchMap(([version, gatewayGroupId]) =>
         from(
           new Validator({
             client: this.client,
+            version,
             eventSubject: this.subject,
             gatewayGroupId,
           }).validate(events),
