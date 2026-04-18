@@ -36,7 +36,9 @@ conditionalDescribe(semverCondition(lt, '3.9.10'))(
     });
 
     it('should report unsupported version', async () => {
-      await expect(backend.validate([])).rejects.toThrow('not supported');
+      await expect(lastValueFrom(backend.validate([]))).rejects.toThrow(
+        'not supported',
+      );
     });
   },
 );
