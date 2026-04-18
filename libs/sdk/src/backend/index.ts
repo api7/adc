@@ -67,6 +67,20 @@ export interface BackendSyncResult {
   server?: string;
 }
 
+export interface BackendValidationError {
+  resource_type: string;
+  resource_id?: string;
+  resource_name?: string;
+  index: number;
+  error: string;
+}
+
+export interface BackendValidateResult {
+  success: boolean;
+  errorMessage?: string;
+  errors: BackendValidationError[];
+}
+
 export interface BackendMetadata {
   logScope: string[];
 }
@@ -84,6 +98,9 @@ export interface Backend {
     opts?: BackendSyncOptions,
   ) => Observable<BackendSyncResult>;
 
+  validate?: (
+    events: Array<ADCSDK.Event>,
+  ) => Observable<BackendValidateResult>;
   supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
 
