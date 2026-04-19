@@ -102,6 +102,5 @@ export class BackendAPISIX implements ADCSDK.Backend {
     });
   }
 
-  supportValidate?: () => Promise<boolean>;
   supportStreamRoute?: () => Promise<boolean>;
 }
