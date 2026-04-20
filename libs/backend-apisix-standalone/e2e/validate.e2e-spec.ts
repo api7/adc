@@ -18,7 +18,7 @@ const configToEvents = (config: ADCSDK.Configuration): Array<ADCSDK.Event> => {
   );
 };
 
-conditionalDescribe(semverCondition(gte, '3.17.0'))('Validate', () => {
+conditionalDescribe(semverCondition(gte, '3.16.0'))('Validate', () => {
   let backend: BackendAPISIXStandalone;
 
   beforeAll(() => {
