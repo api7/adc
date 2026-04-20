@@ -49,6 +49,11 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
       });
       return { success: true, errors: [] };
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new Error(
+          'Validate is not supported by the current APISIX version. Please upgrade to a newer version.',
+        );
+      }
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         this.subject.next({
           type: ADCSDK.BackendEventType.AXIOS_DEBUG,

@@ -1,6 +1,7 @@
 import { DifferV3 } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { lastValueFrom } from 'rxjs';
+import { gte } from 'semver';
 
 import { BackendAPISIXStandalone } from '../src';
 import {
@@ -8,6 +9,7 @@ import {
   server1,
   token1,
 } from './support/constants';
+import { conditionalDescribe, semverCondition } from './support/utils';
 
 const configToEvents = (config: ADCSDK.Configuration): Array<ADCSDK.Event> => {
   return DifferV3.diff(
@@ -16,7 +18,7 @@ const configToEvents = (config: ADCSDK.Configuration): Array<ADCSDK.Event> => {
   );
 };
 
-describe('Validate', () => {
+conditionalDescribe(semverCondition(gte, '3.15.0'))('Validate', () => {
   let backend: BackendAPISIXStandalone;
 
   beforeAll(() => {
