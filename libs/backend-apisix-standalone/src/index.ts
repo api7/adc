@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { Validator } from '@api7/adc-backend-apisix';
 import axios, { type AxiosInstance } from 'axios';
 import { type Observable, Subject, from, map, of, switchMap } from 'rxjs';
 import semver, { SemVer, eq as semverEQ } from 'semver';
@@ -164,6 +165,21 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
     return this.subject.subscribe(({ type, event }) => {
       if (eventType === type) cb(event);
     });
+  }
+
+  public validate(events: Array<ADCSDK.Event>) {
+    const server = this.serverTokenMap.keys().next().value as string;
+    const token = this.serverTokenMap.get(server)!;
+    return from(
+      new Validator({
+        client: this.client,
+        eventSubject: this.subject,
+        requestConfig: {
+          baseURL: server,
+          headers: { 'X-API-KEY': token },
+        },
+      }).validate(events),
+    );
   }
 
   supportStreamRoute?: () => Promise<boolean>;

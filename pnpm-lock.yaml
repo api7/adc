@@ -329,6 +329,9 @@ importers:
 
   libs/backend-apisix-standalone:
     dependencies:
+      '@api7/adc-backend-apisix':
+        specifier: workspace:*
+        version: link:../backend-apisix
       '@api7/adc-sdk':
         specifier: workspace:*
         version: link:../sdk
