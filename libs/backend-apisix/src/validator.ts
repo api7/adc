@@ -164,6 +164,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
         }
         case ADCSDK.ResourceType.GLOBAL_RULE: {
           body.global_rules.push({
+            id: event.resourceId,
             plugins: { [event.resourceId]: event.newValue },
           } as unknown as typing.GlobalRule);
           nameIndex.global_rules.push(event.resourceName);
