@@ -5,6 +5,9 @@ import semver, { SemVer } from 'semver';
 
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
+import { Validator } from './validator';
+
+export { Validator } from './validator';
 
 export class BackendAPISIX implements ADCSDK.Backend {
   private static logScope = ['APISIX'];
@@ -100,6 +103,15 @@ export class BackendAPISIX implements ADCSDK.Backend {
     return this.subject.subscribe(({ type, event }) => {
       if (eventType === type) cb(event);
     });
+  }
+
+  public validate(events: Array<ADCSDK.Event>) {
+    return from(
+      new Validator({
+        client: this.client,
+        eventSubject: this.subject,
+      }).validate(events),
+    );
   }
 
   supportStreamRoute?: () => Promise<boolean>;

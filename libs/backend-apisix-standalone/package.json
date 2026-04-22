@@ -21,6 +21,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@api7/adc-backend-apisix": "workspace:*",
     "@api7/adc-sdk": "workspace:*",
     "axios": "catalog:",
     "rxjs": "catalog:",
