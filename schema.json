@@ -75,7 +75,12 @@
               "type": {
                 "default": "roundrobin",
                 "type": "string",
-                "enum": ["roundrobin", "chash", "least_conn", "ewma"]
+                "enum": [
+                  "roundrobin",
+                  "chash",
+                  "least_conn",
+                  "ewma"
+                ]
               },
               "hash_on": {
                 "type": "string"
@@ -92,7 +97,11 @@
                       "type": {
                         "default": "http",
                         "type": "string",
-                        "enum": ["http", "https", "tcp"]
+                        "enum": [
+                          "http",
+                          "https",
+                          "tcp"
+                        ]
                       },
                       "timeout": {
                         "default": 1,
@@ -130,7 +139,10 @@
                         "type": "object",
                         "properties": {
                           "http_statuses": {
-                            "default": [200, 302],
+                            "default": [
+                              200,
+                              302
+                            ],
                             "minItems": 1,
                             "type": "array",
                             "items": {
@@ -152,14 +164,25 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["interval"],
+                        "required": [
+                          "interval"
+                        ],
                         "additionalProperties": false
                       },
                       "unhealthy": {
                         "type": "object",
                         "properties": {
                           "http_statuses": {
-                            "default": [429, 404, 500, 501, 502, 503, 504, 505],
+                            "default": [
+                              429,
+                              404,
+                              500,
+                              501,
+                              502,
+                              503,
+                              504,
+                              505
+                            ],
                             "minItems": 1,
                             "type": "array",
                             "items": {
@@ -193,7 +216,9 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["interval"],
+                        "required": [
+                          "interval"
+                        ],
                         "additionalProperties": false
                       }
                     },
@@ -205,13 +230,20 @@
                       "type": {
                         "default": "http",
                         "type": "string",
-                        "enum": ["http", "https", "tcp"]
+                        "enum": [
+                          "http",
+                          "https",
+                          "tcp"
+                        ]
                       },
                       "healthy": {
                         "type": "object",
                         "properties": {
                           "http_statuses": {
-                            "default": [200, 302],
+                            "default": [
+                              200,
+                              302
+                            ],
                             "minItems": 1,
                             "type": "array",
                             "items": {
@@ -233,7 +265,16 @@
                         "type": "object",
                         "properties": {
                           "http_statuses": {
-                            "default": [429, 404, 500, 501, 502, 503, 504, 505],
+                            "default": [
+                              429,
+                              404,
+                              500,
+                              501,
+                              502,
+                              503,
+                              504,
+                              505
+                            ],
                             "minItems": 1,
                             "type": "array",
                             "items": {
@@ -267,7 +308,9 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["active"],
+                "required": [
+                  "active"
+                ],
                 "additionalProperties": false
               },
               "nodes": {
@@ -301,7 +344,11 @@
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["host", "port", "weight"],
+                  "required": [
+                    "host",
+                    "port",
+                    "weight"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -344,7 +391,11 @@
                     "exclusiveMinimum": 0
                   }
                 },
-                "required": ["connect", "send", "read"],
+                "required": [
+                  "connect",
+                  "send",
+                  "read"
+                ],
                 "additionalProperties": false
               },
               "tls": {
@@ -386,13 +437,21 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["size", "idle_timeout", "requests"],
+                "required": [
+                  "size",
+                  "idle_timeout",
+                  "requests"
+                ],
                 "additionalProperties": false
               },
               "pass_host": {
                 "default": "pass",
                 "type": "string",
-                "enum": ["pass", "node", "rewrite"]
+                "enum": [
+                  "pass",
+                  "node",
+                  "rewrite"
+                ]
               },
               "upstream_host": {
                 "type": "string",
@@ -448,7 +507,12 @@
                 "type": {
                   "default": "roundrobin",
                   "type": "string",
-                  "enum": ["roundrobin", "chash", "least_conn", "ewma"]
+                  "enum": [
+                    "roundrobin",
+                    "chash",
+                    "least_conn",
+                    "ewma"
+                  ]
                 },
                 "hash_on": {
                   "type": "string"
@@ -465,7 +529,11 @@
                         "type": {
                           "default": "http",
                           "type": "string",
-                          "enum": ["http", "https", "tcp"]
+                          "enum": [
+                            "http",
+                            "https",
+                            "tcp"
+                          ]
                         },
                         "timeout": {
                           "default": 1,
@@ -503,7 +571,10 @@
                           "type": "object",
                           "properties": {
                             "http_statuses": {
-                              "default": [200, 302],
+                              "default": [
+                                200,
+                                302
+                              ],
                               "minItems": 1,
                               "type": "array",
                               "items": {
@@ -525,7 +596,9 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": ["interval"],
+                          "required": [
+                            "interval"
+                          ],
                           "additionalProperties": false
                         },
                         "unhealthy": {
@@ -533,7 +606,14 @@
                           "properties": {
                             "http_statuses": {
                               "default": [
-                                429, 404, 500, 501, 502, 503, 504, 505
+                                429,
+                                404,
+                                500,
+                                501,
+                                502,
+                                503,
+                                504,
+                                505
                               ],
                               "minItems": 1,
                               "type": "array",
@@ -568,7 +648,9 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": ["interval"],
+                          "required": [
+                            "interval"
+                          ],
                           "additionalProperties": false
                         }
                       },
@@ -580,13 +662,20 @@
                         "type": {
                           "default": "http",
                           "type": "string",
-                          "enum": ["http", "https", "tcp"]
+                          "enum": [
+                            "http",
+                            "https",
+                            "tcp"
+                          ]
                         },
                         "healthy": {
                           "type": "object",
                           "properties": {
                             "http_statuses": {
-                              "default": [200, 302],
+                              "default": [
+                                200,
+                                302
+                              ],
                               "minItems": 1,
                               "type": "array",
                               "items": {
@@ -609,7 +698,14 @@
                           "properties": {
                             "http_statuses": {
                               "default": [
-                                429, 404, 500, 501, 502, 503, 504, 505
+                                429,
+                                404,
+                                500,
+                                501,
+                                502,
+                                503,
+                                504,
+                                505
                               ],
                               "minItems": 1,
                               "type": "array",
@@ -644,7 +740,9 @@
                       "additionalProperties": false
                     }
                   },
-                  "required": ["active"],
+                  "required": [
+                    "active"
+                  ],
                   "additionalProperties": false
                 },
                 "nodes": {
@@ -678,7 +776,11 @@
                         "additionalProperties": {}
                       }
                     },
-                    "required": ["host", "port", "weight"],
+                    "required": [
+                      "host",
+                      "port",
+                      "weight"
+                    ],
                     "additionalProperties": false
                   }
                 },
@@ -721,7 +823,11 @@
                       "exclusiveMinimum": 0
                     }
                   },
-                  "required": ["connect", "send", "read"],
+                  "required": [
+                    "connect",
+                    "send",
+                    "read"
+                  ],
                   "additionalProperties": false
                 },
                 "tls": {
@@ -763,13 +869,21 @@
                       "maximum": 9007199254740991
                     }
                   },
-                  "required": ["size", "idle_timeout", "requests"],
+                  "required": [
+                    "size",
+                    "idle_timeout",
+                    "requests"
+                  ],
                   "additionalProperties": false
                 },
                 "pass_host": {
                   "default": "pass",
                   "type": "string",
-                  "enum": ["pass", "node", "rewrite"]
+                  "enum": [
+                    "pass",
+                    "node",
+                    "rewrite"
+                  ]
                 },
                 "upstream_host": {
                   "type": "string",
@@ -795,7 +909,9 @@
                   "pattern": "^[a-zA-Z0-9-_.]+$"
                 }
               },
-              "required": ["name"],
+              "required": [
+                "name"
+              ],
               "additionalProperties": false
             }
           },
@@ -897,7 +1013,11 @@
                       "exclusiveMinimum": 0
                     }
                   },
-                  "required": ["connect", "send", "read"],
+                  "required": [
+                    "connect",
+                    "send",
+                    "read"
+                  ],
                   "additionalProperties": false
                 },
                 "vars": {
@@ -968,7 +1088,10 @@
                   "type": "string"
                 }
               },
-              "required": ["name", "uris"],
+              "required": [
+                "name",
+                "uris"
+              ],
               "additionalProperties": false
             }
           },
@@ -1038,12 +1161,16 @@
                   "minLength": 1
                 }
               },
-              "required": ["name"],
+              "required": [
+                "name"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "additionalProperties": false
       }
     },
@@ -1080,7 +1207,10 @@
           "type": {
             "default": "server",
             "type": "string",
-            "enum": ["server", "client"]
+            "enum": [
+              "server",
+              "client"
+            ]
           },
           "snis": {
             "minItems": 1,
@@ -1122,7 +1252,10 @@
                   ]
                 }
               },
-              "required": ["certificate", "key"],
+              "required": [
+                "certificate",
+                "key"
+              ],
               "additionalProperties": false
             }
           },
@@ -1156,7 +1289,9 @@
                 }
               }
             },
-            "required": ["ca"],
+            "required": [
+              "ca"
+            ],
             "additionalProperties": false
           },
           "ssl_protocols": {
@@ -1164,11 +1299,18 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": ["TLSv1.1", "TLSv1.2", "TLSv1.3"]
+              "enum": [
+                "TLSv1.1",
+                "TLSv1.2",
+                "TLSv1.3"
+              ]
             }
           }
         },
-        "required": ["snis", "certificates"],
+        "required": [
+          "snis",
+          "certificates"
+        ],
         "additionalProperties": false
       }
     },
@@ -1264,12 +1406,18 @@
                   "additionalProperties": {}
                 }
               },
-              "required": ["name", "type", "config"],
+              "required": [
+                "name",
+                "type",
+                "config"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["username"],
+        "required": [
+          "username"
+        ],
         "additionalProperties": false
       }
     },
@@ -1415,17 +1563,26 @@
                         "additionalProperties": {}
                       }
                     },
-                    "required": ["name", "type", "config"],
+                    "required": [
+                      "name",
+                      "type",
+                      "config"
+                    ],
                     "additionalProperties": false
                   }
                 }
               },
-              "required": ["username"],
+              "required": [
+                "username"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["name", "plugins"],
+        "required": [
+          "name",
+          "plugins"
+        ],
         "additionalProperties": false
       }
     },
