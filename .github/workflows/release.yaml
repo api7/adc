@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - "v*.*.*"
+env:
+  NODE_VERSION: "24.15.0"
 jobs:
   adc:
     runs-on: ubuntu-latest
@@ -14,11 +16,11 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v6
         with:
-          node-version: "24.15.0"
+          node-version: "${{ env.NODE_VERSION }}"
       - uses: pnpm/action-setup@v4
       - name: Build ADC
         env:
-          NODE_VERSION: "24.15.0"
+          NODE_VERSION: "${{ env.NODE_VERSION }}"
         run: |
           node -v
           pnpm install
@@ -62,11 +64,11 @@ jobs:
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
         with:
-          node-version: "24.15.0"
+          node-version: "${{ env.NODE_VERSION }}"
       - uses: pnpm/action-setup@v2
       - name: Build ADC
         env:
-          NODE_VERSION: "24.15.0"
+          NODE_VERSION: "${{ env.NODE_VERSION }}"
         run: |
           pnpm install
           NODE_ENV=production npx nx build cli
