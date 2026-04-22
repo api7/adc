@@ -16,26 +16,26 @@ catalogs:
       specifier: 1.15.1
       version: 1.15.1
     datum-diff:
-      specifier: 1.0.3
-      version: 1.0.3
+      specifier: 1.0.4
+      version: 1.0.4
     immer:
       specifier: ^10.2.0
       version: 10.2.0
     js-yaml:
-      specifier: ^4.1.0
-      version: 4.1.0
+      specifier: ^4.1.1
+      version: 4.1.1
     listr2:
       specifier: ^8.2.1
       version: 8.2.1
     lodash-es:
-      specifier: ^4.17.23
-      version: 4.17.23
+      specifier: ^4.18.1
+      version: 4.18.1
     rxjs:
       specifier: ^7.8.2
       version: 7.8.2
     semver:
-      specifier: ^7.7.3
-      version: 7.7.3
+      specifier: ^7.7.4
+      version: 7.7.4
     source-map-support:
       specifier: ^0.5.21
       version: 0.5.21
@@ -169,13 +169,13 @@ importers:
         version: 13.0.0
       js-yaml:
         specifier: 'catalog:'
-        version: 4.1.0
+        version: 4.1.1
       listr2:
         specifier: 'catalog:'
         version: 8.2.1
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       parse-duration:
         specifier: ^2.1.5
         version: 2.1.5
@@ -230,7 +230,7 @@ importers:
         version: 7.2.0
       semver:
         specifier: 'catalog:'
-        version: 7.7.3
+        version: 7.7.4
       supertest:
         specifier: ^7.1.4
         version: 7.1.4
@@ -254,13 +254,13 @@ importers:
         version: 10.2.0
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
       semver:
         specifier: 'catalog:'
-        version: 7.7.3
+        version: 7.7.4
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -291,13 +291,13 @@ importers:
         version: 10.2.0
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
       semver:
         specifier: 'catalog:'
-        version: 7.7.3
+        version: 7.7.4
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -328,13 +328,13 @@ importers:
         version: 1.15.1
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
       semver:
         specifier: 'catalog:'
-        version: 7.7.3
+        version: 7.7.4
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -371,7 +371,7 @@ importers:
         version: 0.5.1
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -393,7 +393,7 @@ importers:
         version: 4.17.12
       js-yaml:
         specifier: 'catalog:'
-        version: 4.1.0
+        version: 4.1.1
       listr2:
         specifier: 'catalog:'
         version: 8.2.1
@@ -408,10 +408,10 @@ importers:
         version: link:../sdk
       datum-diff:
         specifier: 'catalog:'
-        version: 1.0.3
+        version: 1.0.4
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
     devDependencies:
       '@types/lodash-es':
         specifier: 'catalog:'
@@ -427,16 +427,16 @@ importers:
         version: 1.15.1
       datum-diff:
         specifier: 'catalog:'
-        version: 1.0.3
+        version: 1.0.4
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
       semver:
         specifier: 'catalog:'
-        version: 7.7.3
+        version: 7.7.4
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -2560,8 +2560,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  datum-diff@1.0.3:
-    resolution: {integrity: sha512-3F7RN3vYEt91VH9+MDpYADCQLRfOyaih1OzgyjAWZ78Vkoi9Nfl5r95hYdN2/zx5t/FPc0EwybAypL2gA2J+WA==}
+  datum-diff@1.0.4:
+    resolution: {integrity: sha512-kjspjQR4d7+A/I4EVkYEysnKNQi+omcPm5mAC8T1LEQ2fjVClxOgKMgzsg4hB3u3QWXMXqM/LIUT8DTK/cZVbg==}
     engines: {node: '>=16', npm: '>=10'}
 
   debug@4.4.1:
@@ -3122,10 +3122,6 @@ packages:
     resolution: {integrity: sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg==}
     hasBin: true
 
-  js-yaml@4.1.0:
-    resolution: {integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==}
-    hasBin: true
-
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
     hasBin: true
@@ -3217,6 +3213,9 @@ packages:
 
   lodash-es@4.17.23:
     resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
+
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
@@ -3780,11 +3779,6 @@ packages:
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
-    hasBin: true
-
-  semver@7.7.3:
-    resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
-    engines: {node: '>=10'}
     hasBin: true
 
   semver@7.7.4:
@@ -6374,7 +6368,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  datum-diff@1.0.3: {}
+  datum-diff@1.0.4: {}
 
   debug@4.4.1:
     dependencies:
@@ -6956,10 +6950,6 @@ snapshots:
       argparse: 1.0.10
       esprima: 4.0.1
 
-  js-yaml@4.1.0:
-    dependencies:
-      argparse: 2.0.1
-
   js-yaml@4.1.1:
     dependencies:
       argparse: 2.0.1
@@ -7055,6 +7045,8 @@ snapshots:
       p-locate: 5.0.0
 
   lodash-es@4.17.23: {}
+
+  lodash-es@4.18.1: {}
 
   lodash.debounce@4.0.8: {}
 
@@ -7647,8 +7639,6 @@ snapshots:
     optional: true
 
   semver@6.3.1: {}
-
-  semver@7.7.3: {}
 
   semver@7.7.4: {}
 
