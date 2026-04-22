@@ -22,8 +22,8 @@ catalogs:
       specifier: ^4.1.2
       version: 4.1.2
     axios:
-      specifier: 1.14.0
-      version: 1.14.0
+      specifier: 1.15.0
+      version: 1.15.0
     datum-diff:
       specifier: 1.0.3
       version: 1.0.3
@@ -163,7 +163,7 @@ importers:
         version: 4.6.0
       axios:
         specifier: 'catalog:'
-        version: 1.14.0
+        version: 1.15.0
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -260,7 +260,7 @@ importers:
         version: 7.0.15
       axios:
         specifier: 'catalog:'
-        version: 1.14.0
+        version: 1.15.0
       immer:
         specifier: 'catalog:'
         version: 10.2.0
@@ -297,7 +297,7 @@ importers:
         version: link:../sdk
       axios:
         specifier: 'catalog:'
-        version: 1.14.0
+        version: 1.15.0
       immer:
         specifier: 'catalog:'
         version: 10.2.0
@@ -337,7 +337,7 @@ importers:
         version: link:../sdk
       axios:
         specifier: 'catalog:'
-        version: 1.14.0
+        version: 1.15.0
       lodash-es:
         specifier: 'catalog:'
         version: 4.17.23
@@ -436,7 +436,7 @@ importers:
     dependencies:
       axios:
         specifier: 'catalog:'
-        version: 1.14.0
+        version: 1.15.0
       datum-diff:
         specifier: 'catalog:'
         version: 1.0.3
@@ -2337,6 +2337,9 @@ packages:
   axios@1.14.0:
     resolution: {integrity: sha512-3Y8yrqLSwjuzpXuZ0oIYZ/XGgLwUIBU3uLvbcpb0pidD9ctpShJd43KSlEEkVQg6DS0G9NKyzOvBfUtDKEyHvQ==}
 
+  axios@1.15.0:
+    resolution: {integrity: sha512-wWyJDlAatxk30ZJer+GeCWS209sA42X+N5jU2jy6oHTp7ufw8uzUTVFBX9+wTfAlhiJXGS0Bq7X6efruWjuK9Q==}
+
   babel-plugin-const-enum@1.2.0:
     resolution: {integrity: sha512-o1m/6iyyFnp9MRsK1dHF3bneqyf3AlM2q3A/YbgQr2pCat6B6XJVDv2TXqzfY2RYUi4mak6WAksSBPlyYGx9dg==}
     peerDependencies:
@@ -2884,10 +2887,6 @@ packages:
     peerDependenciesMeta:
       debug:
         optional: true
-
-  form-data@4.0.4:
-    resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
-    engines: {node: '>= 6'}
 
   form-data@4.0.5:
     resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
@@ -6117,6 +6116,14 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
+  axios@1.15.0:
+    dependencies:
+      follow-redirects: 1.15.11
+      form-data: 4.0.5
+      proxy-from-env: 2.1.0
+    transitivePeerDependencies:
+      - debug
+
   babel-plugin-const-enum@1.2.0(@babel/core@7.29.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -6740,14 +6747,6 @@ snapshots:
   fn.name@1.1.0: {}
 
   follow-redirects@1.15.11: {}
-
-  form-data@4.0.4:
-    dependencies:
-      asynckit: 0.4.0
-      combined-stream: 1.0.8
-      es-set-tostringtag: 2.1.0
-      hasown: 2.0.2
-      mime-types: 2.1.35
 
   form-data@4.0.5:
     dependencies:
@@ -7804,7 +7803,7 @@ snapshots:
       cookiejar: 2.1.4
       debug: 4.4.3
       fast-safe-stringify: 2.1.1
-      form-data: 4.0.4
+      form-data: 4.0.5
       formidable: 3.5.4
       methods: 1.1.2
       mime: 2.6.0
