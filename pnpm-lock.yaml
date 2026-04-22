@@ -40,8 +40,8 @@ catalogs:
       specifier: ^8.2.1
       version: 8.2.1
     lodash-es:
-      specifier: ^4.17.23
-      version: 4.17.23
+      specifier: ^4.18.1
+      version: 4.18.1
     rxjs:
       specifier: ^7.8.2
       version: 7.8.2
@@ -187,7 +187,7 @@ importers:
         version: 8.2.1
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       parse-duration:
         specifier: ^2.1.5
         version: 2.1.5
@@ -266,7 +266,7 @@ importers:
         version: 10.2.0
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -303,7 +303,7 @@ importers:
         version: 10.2.0
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -340,7 +340,7 @@ importers:
         version: 1.14.0
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -383,7 +383,7 @@ importers:
         version: 0.5.1
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -423,7 +423,7 @@ importers:
         version: 1.0.3
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
     devDependencies:
       '@types/lodash-es':
         specifier: 'catalog:'
@@ -442,7 +442,7 @@ importers:
         version: 1.0.3
       lodash-es:
         specifier: 'catalog:'
-        version: 4.17.23
+        version: 4.18.1
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -3226,6 +3226,9 @@ packages:
 
   lodash-es@4.17.23:
     resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
+
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
@@ -7056,6 +7059,8 @@ snapshots:
       p-locate: 5.0.0
 
   lodash-es@4.17.23: {}
+
+  lodash-es@4.18.1: {}
 
   lodash.debounce@4.0.8: {}
 
