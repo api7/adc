@@ -119,7 +119,7 @@ const upstreamSchema = (extend?: ZodRawShape) =>
             host: hostSchema.optional(),
             port: portSchema.optional(),
             http_path: z.string().default('/').optional(),
-            https_verify_cert: z.boolean().default(true).optional(),
+            https_verify_certificate: z.boolean().default(true).optional(),
             http_request_headers: z.array(z.string()).min(1).optional(),
             healthy: z
               .strictObject({
