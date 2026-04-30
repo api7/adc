@@ -124,7 +124,7 @@
                         "default": "/",
                         "type": "string"
                       },
-                      "https_verify_cert": {
+                      "https_verify_certificate": {
                         "default": true,
                         "type": "boolean"
                       },
@@ -556,7 +556,7 @@
                           "default": "/",
                           "type": "string"
                         },
-                        "https_verify_cert": {
+                        "https_verify_certificate": {
                           "default": true,
                           "type": "boolean"
                         },
