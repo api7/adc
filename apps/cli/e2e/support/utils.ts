@@ -47,6 +47,12 @@ export const mockBackend = (): ADCSDK.Backend => {
         ),
       );
     }
+    public validate(events: Array<ADCSDK.Event>) {
+      return of({
+        success: true,
+        errors: [],
+      } as ADCSDK.BackendValidateResult);
+    }
     public on() {
       return new Subscription();
     }
