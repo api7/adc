@@ -52,7 +52,7 @@ describe('Validator', () => {
     ];
 
     const client = axios.create();
-    const postSpy = vi.spyOn(client, 'post').mockRejectedValue(
+    vi.spyOn(client, 'post').mockRejectedValue(
       createAxios400Error({
         error_msg: 'Configuration validation failed',
         errors: [
@@ -97,7 +97,7 @@ describe('Validator', () => {
     ];
 
     const client = axios.create();
-    const postSpy = vi.spyOn(client, 'post').mockRejectedValue(
+    vi.spyOn(client, 'post').mockRejectedValue(
       createAxios400Error({
         error_msg: 'Configuration validation failed',
         errors: [
@@ -131,7 +131,7 @@ describe('Validator', () => {
     const events = [createEvent(ADCSDK.ResourceType.SERVICE, 'httpbin.org')];
 
     const client = axios.create();
-    const postSpy = vi.spyOn(client, 'post').mockResolvedValue({
+    vi.spyOn(client, 'post').mockResolvedValue({
       status: 200,
       data: {},
     });
@@ -157,7 +157,7 @@ describe('Validator', () => {
     ];
 
     const client = axios.create();
-    const postSpy = vi.spyOn(client, 'post').mockRejectedValue(
+    vi.spyOn(client, 'post').mockRejectedValue(
       createAxios400Error({
         error_msg: 'Configuration validation failed',
         errors: [
@@ -209,7 +209,7 @@ describe('Validator', () => {
     const events = [createEvent(ADCSDK.ResourceType.SERVICE, 'my-service')];
 
     const client = axios.create();
-    const postSpy = vi.spyOn(client, 'post').mockRejectedValue(
+    vi.spyOn(client, 'post').mockRejectedValue(
       createAxios400Error({
         errors: [
           {
