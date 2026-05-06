@@ -12,14 +12,13 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
+    {
+      "path": "../backend-apisix/tsconfig.lib.json"
+    },
     {
       "path": "../sdk/tsconfig.lib.json"
     },
