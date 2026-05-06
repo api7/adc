@@ -128,7 +128,7 @@ export const validateHandler: RequestHandler<
 
     res.status(200).json({
       success: result.success,
-      ...(result.errorMessage ? { error_message: result.errorMessage } : {}),
+      ...(result.errorMessage ? { message: result.errorMessage } : {}),
       errors: result.errors,
     });
   } catch (err) {
