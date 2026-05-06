@@ -40,6 +40,7 @@ export const validateHandler: RequestHandler<
     if (!parsedInput.success)
       return res.status(400).json({
         success: false,
+        source: 'input',
         message: parsedInput.error.message,
         errors: parsedInput.error.issues,
       });
@@ -58,6 +59,7 @@ export const validateHandler: RequestHandler<
       if (!result.success)
         return res.status(400).json({
           success: false,
+          source: 'lint',
           message: result.error.message,
           errors: result.error.issues,
         });
@@ -111,6 +113,7 @@ export const validateHandler: RequestHandler<
     if (!backend.validate)
       return res.status(400).json({
         success: false,
+        source: 'validate',
         message: 'Validate is not supported by the current backend.',
         errors: [],
       });
@@ -128,6 +131,7 @@ export const validateHandler: RequestHandler<
 
     res.status(200).json({
       success: result.success,
+      source: 'validate',
       ...(result.errorMessage ? { message: result.errorMessage } : {}),
       errors: result.errors,
     });
