@@ -35,7 +35,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
   public async validate(
     events: Array<ADCSDK.Event>,
   ): Promise<ADCSDK.BackendValidateResult> {
-    const { body, nameIndex } = this.buildRequestBody(events);
+    const { body, nameIndex, eventIndex } = this.buildRequestBody(events);
 
     try {
       const resp = await this.client.post(
@@ -67,7 +67,12 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           data?.errors ?? []
         ).map((e: ADCSDK.BackendValidationError) => {
           const name = nameIndex[e.resource_type]?.[e.index];
-          return name ? { ...e, resource_name: name } : e;
+          const event = eventIndex[e.resource_type]?.[e.index];
+          return {
+            ...e,
+            ...(name ? { resource_name: name } : {}),
+            ...(event ? { event } : {}),
+          };
         });
         return {
           success: false,
@@ -82,6 +87,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
   private buildRequestBody(events: Array<ADCSDK.Event>): {
     body: ValidateRequestBody;
     nameIndex: Record<string, string[]>;
+    eventIndex: Record<string, Array<ADCSDK.Event | undefined>>;
   } {
     const body: ValidateRequestBody = {
       routes: [],
@@ -94,6 +100,16 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
       upstreams: [],
     };
     const nameIndex: Record<string, string[]> = {
+      routes: [],
+      services: [],
+      consumers: [],
+      ssls: [],
+      global_rules: [],
+      stream_routes: [],
+      plugin_metadata: [],
+      upstreams: [],
+    };
+    const eventIndex: Record<string, Array<ADCSDK.Event | undefined>> = {
       routes: [],
       services: [],
       consumers: [],
@@ -119,9 +135,11 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
           );
           body.services.push(service);
           nameIndex.services.push(event.resourceName);
+          eventIndex.services.push(event);
           if (upstream) {
             body.upstreams.push(upstream);
             nameIndex.upstreams.push(event.resourceName);
+            eventIndex.upstreams.push(event);
           }
           break;
         }
@@ -134,6 +152,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             ),
           );
           nameIndex.routes.push(event.resourceName);
+          eventIndex.routes.push(event);
           break;
         }
         case ADCSDK.ResourceType.STREAM_ROUTE: {
@@ -145,6 +164,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             ),
           );
           nameIndex.stream_routes.push(event.resourceName);
+          eventIndex.stream_routes.push(event);
           break;
         }
         case ADCSDK.ResourceType.CONSUMER: {
@@ -152,6 +172,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             this.fromADC.transformConsumer(event.newValue as ADCSDK.Consumer),
           );
           nameIndex.consumers.push(event.resourceName);
+          eventIndex.consumers.push(event);
           break;
         }
         case ADCSDK.ResourceType.SSL: {
@@ -160,6 +181,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             this.fromADC.transformSSL(event.newValue as ADCSDK.SSL),
           );
           nameIndex.ssls.push(event.resourceName);
+          eventIndex.ssls.push(event);
           break;
         }
         case ADCSDK.ResourceType.GLOBAL_RULE: {
@@ -168,6 +190,7 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             plugins: { [event.resourceId]: event.newValue },
           } as unknown as typing.GlobalRule);
           nameIndex.global_rules.push(event.resourceName);
+          eventIndex.global_rules.push(event);
           break;
         }
         case ADCSDK.ResourceType.PLUGIN_METADATA: {
@@ -178,10 +201,11 @@ export class Validator extends ADCSDK.backend.BackendEventSource {
             ),
           });
           nameIndex.plugin_metadata.push(event.resourceName);
+          eventIndex.plugin_metadata.push(event);
           break;
         }
       }
     }
-    return { body, nameIndex };
+    return { body, nameIndex, eventIndex };
   }
 }
