@@ -6,6 +6,7 @@ import * as https from 'node:https';
 
 import { loggerMiddleware } from './logger';
 import { syncHandler } from './sync';
+import { validateHandler } from './validate';
 
 interface ADCServerOptions {
   listen: URL;
@@ -29,6 +30,7 @@ export class ADCServer {
     this.express.use(express.json({ limit: '100mb' }));
     this.express.use(loggerMiddleware);
     this.express.put('/sync', syncHandler);
+    this.express.put('/validate', validateHandler);
     this.expressStatus.get('/healthz/ready', (_, res) =>
       res.status(200).send('OK'),
     );

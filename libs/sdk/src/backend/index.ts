@@ -73,6 +73,7 @@ export interface BackendValidationError {
   resource_name?: string;
   index: number;
   error: string;
+  event?: ADCSDK.Event;
 }
 
 export interface BackendValidateResult {
