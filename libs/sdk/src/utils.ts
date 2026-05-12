@@ -1,3 +1,4 @@
+import axios, { type AxiosInstance } from 'axios';
 import { isUndefined, mapValues, pickBy } from 'lodash-es';
 import { createHash } from 'node:crypto';
 
@@ -28,9 +29,29 @@ const featureGateEnabled = (key: string) => {
   );
 };
 
+const registerTimeoutInterceptor = (client: AxiosInstance) => {
+  client.interceptors.response.use(undefined, (error) => {
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+      const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+      const url = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
+      const timeout = error.config?.timeout;
+      const newMessage = `Request "${method} ${url}" timed out after ${timeout}ms. Consider increasing the timeout with the --timeout flag.`;
+      error.message = newMessage;
+      if (error.stack) {
+        error.stack = error.stack.replace(
+          /^(.*?):\s*(.*)/,
+          `$1: ${newMessage}`,
+        );
+      }
+    }
+    return Promise.reject(error);
+  });
+};
+
 export const utils = {
   generateId,
   recursiveOmitUndefined,
   featureGate,
   featureGateEnabled,
+  registerTimeoutInterceptor,
 };
