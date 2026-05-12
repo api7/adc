@@ -41,14 +41,21 @@ describe('SDK utils', () => {
         },
       );
 
-      // Simulate the interceptor by manually invoking it
       const interceptor = client.interceptors.response as any;
       const handlers = interceptor.handlers;
       const rejectedHandler = handlers[handlers.length - 1].rejected;
 
-      await expect(rejectedHandler(timeoutError)).rejects.toThrow(
-        'Request "GET https://example.com/api/gateway_groups" timed out after 5000ms. Consider increasing the timeout with the --timeout flag.',
-      );
+      try {
+        await rejectedHandler(timeoutError);
+        throw new Error('Expected rejection');
+      } catch (err) {
+        const error = err as Error;
+        const expectedMsg =
+          'Request "GET https://example.com/api/gateway_groups" timed out after 5000ms. Consider increasing the timeout with the --timeout flag.';
+        expect(error.message).toBe(expectedMsg);
+        // Stack trace should also contain the updated message
+        expect(error.stack).toContain(expectedMsg);
+      }
     });
 
     it('should not modify non-timeout errors', async () => {
