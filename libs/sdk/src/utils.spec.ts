@@ -22,6 +22,12 @@ describe('SDK utils', () => {
   });
 
   describe('registerTimeoutInterceptor', () => {
+    const getInterceptorHandler = (client: ReturnType<typeof axios.create>) => {
+      const interceptor = client.interceptors.response as any;
+      const handlers = interceptor.handlers;
+      return handlers[handlers.length - 1].rejected;
+    };
+
     it('should enhance timeout error message with request details', async () => {
       const client = axios.create({
         baseURL: 'https://example.com',
@@ -41,20 +47,68 @@ describe('SDK utils', () => {
         },
       );
 
-      const interceptor = client.interceptors.response as any;
-      const handlers = interceptor.handlers;
-      const rejectedHandler = handlers[handlers.length - 1].rejected;
-
       try {
-        await rejectedHandler(timeoutError);
+        await getInterceptorHandler(client)(timeoutError);
         throw new Error('Expected rejection');
       } catch (err) {
         const error = err as Error;
         const expectedMsg =
           'Request "GET https://example.com/api/gateway_groups" timed out after 5000ms. Consider increasing the timeout with the --timeout flag.';
         expect(error.message).toBe(expectedMsg);
-        // Stack trace should also contain the updated message
         expect(error.stack).toContain(expectedMsg);
+      }
+    });
+
+    it('should handle absolute URL without duplicating baseURL', async () => {
+      const client = axios.create({ baseURL: 'https://example.com' });
+      utils.registerTimeoutInterceptor(client);
+
+      const timeoutError = new axios.AxiosError(
+        'timeout of 3000ms exceeded',
+        'ECONNABORTED',
+        {
+          method: 'put',
+          url: 'https://other-server.com/api/services/123',
+          baseURL: 'https://example.com',
+          timeout: 3000,
+          headers: new axios.AxiosHeaders(),
+        },
+      );
+
+      try {
+        await getInterceptorHandler(client)(timeoutError);
+        throw new Error('Expected rejection');
+      } catch (err) {
+        const error = err as Error;
+        expect(error.message).toContain(
+          'https://other-server.com/api/services/123',
+        );
+        expect(error.message).not.toContain('https://example.com');
+      }
+    });
+
+    it('should handle missing timeout value gracefully', async () => {
+      const client = axios.create({ baseURL: 'https://example.com' });
+      utils.registerTimeoutInterceptor(client);
+
+      const timeoutError = new axios.AxiosError(
+        'timeout exceeded',
+        'ECONNABORTED',
+        {
+          method: 'get',
+          url: '/api/version',
+          baseURL: 'https://example.com',
+          headers: new axios.AxiosHeaders(),
+        },
+      );
+
+      try {
+        await getInterceptorHandler(client)(timeoutError);
+        throw new Error('Expected rejection');
+      } catch (err) {
+        const error = err as Error;
+        expect(error.message).toContain('timed out after an unknown duration');
+        expect(error.message).not.toContain('undefinedms');
       }
     });
 
@@ -67,11 +121,7 @@ describe('SDK utils', () => {
         'ERR_BAD_RESPONSE',
       );
 
-      const interceptor = client.interceptors.response as any;
-      const handlers = interceptor.handlers;
-      const rejectedHandler = handlers[handlers.length - 1].rejected;
-
-      await expect(rejectedHandler(nonTimeoutError)).rejects.toThrow(
+      await expect(getInterceptorHandler(client)(nonTimeoutError)).rejects.toThrow(
         'Request failed with status code 500',
       );
     });

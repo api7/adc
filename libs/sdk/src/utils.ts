@@ -33,9 +33,14 @@ const registerTimeoutInterceptor = (client: AxiosInstance) => {
   client.interceptors.response.use(undefined, (error) => {
     if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
       const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
-      const url = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
+      const rawUrl = error.config?.url ?? '';
+      const url = /^https?:\/\//i.test(rawUrl)
+        ? rawUrl
+        : `${error.config?.baseURL ?? ''}${rawUrl}`;
       const timeout = error.config?.timeout;
-      const newMessage = `Request "${method} ${url}" timed out after ${timeout}ms. Consider increasing the timeout with the --timeout flag.`;
+      const timeoutText =
+        typeof timeout === 'number' ? `${timeout}ms` : 'an unknown duration';
+      const newMessage = `Request "${method} ${url}" timed out after ${timeoutText}. Consider increasing the timeout with the --timeout flag.`;
       error.message = newMessage;
       if (error.stack) {
         error.stack = error.stack.replace(
