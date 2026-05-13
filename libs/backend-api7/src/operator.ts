@@ -95,8 +95,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                     return throwError(
                       () =>
                         new Error(
-                          error.response?.data?.error_msg ??
-                            JSON.stringify(error.response?.data),
+                          ADCSDK.utils.formatAxiosErrorMessage(error),
                         ),
                     );
                   return throwError(() => error);
@@ -107,8 +106,10 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                   error,
                   ...(axios.isAxiosError(error) && {
                     axiosResponse: error.response,
-                    ...(error.response?.data?.error_msg && {
-                      error: new Error(error.response.data.error_msg),
+                    ...(error.response && {
+                      error: new Error(
+                        ADCSDK.utils.formatAxiosErrorMessage(error),
+                      ),
                     }),
                   }),
                 } satisfies ADCSDK.BackendSyncResult);

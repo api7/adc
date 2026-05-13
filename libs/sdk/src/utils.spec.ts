@@ -126,4 +126,115 @@ describe('SDK utils', () => {
       );
     });
   });
+
+  describe('formatAxiosErrorMessage', () => {
+    it('should format error with error_msg from response data', () => {
+      const error = {
+        config: {
+          method: 'put',
+          url: '/apisix/admin/routes/123',
+          baseURL: 'https://example.com',
+        },
+        response: {
+          status: 400,
+          statusText: 'Bad Request',
+          data: { error_msg: 'route name is reduplicate' },
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toBe(
+        'PUT https://example.com/apisix/admin/routes/123, responded with status 400 Bad Request, error_msg: route name is reduplicate',
+      );
+    });
+
+    it('should format error when response body is empty string (Error: "" scenario)', () => {
+      const error = {
+        config: {
+          method: 'put',
+          url: '/apisix/admin/routes/456',
+          baseURL: 'https://dashboard.example.com',
+        },
+        response: {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: '',
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toBe(
+        'PUT https://dashboard.example.com/apisix/admin/routes/456, responded with status 500 Internal Server Error',
+      );
+    });
+
+    it('should include response body when no error_msg field exists', () => {
+      const error = {
+        config: {
+          method: 'get',
+          url: '/api/services',
+          baseURL: 'https://example.com',
+        },
+        response: {
+          status: 502,
+          statusText: 'Bad Gateway',
+          data: '<html><body>Bad Gateway</body></html>',
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toContain('responded with status 502 Bad Gateway');
+      expect(msg).toContain(
+        'response body: <html><body>Bad Gateway</body></html>',
+      );
+    });
+
+    it('should handle absolute URL without duplicating baseURL', () => {
+      const error = {
+        config: {
+          method: 'delete',
+          url: 'https://other.com/api/routes/789',
+          baseURL: 'https://example.com',
+        },
+        response: {
+          status: 404,
+          statusText: 'Not Found',
+          data: { error_msg: 'not found' },
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toContain('DELETE https://other.com/api/routes/789');
+      expect(msg).not.toContain('https://example.com');
+    });
+
+    it('should handle missing config gracefully', () => {
+      const error = {
+        response: {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: null,
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toContain('UNKNOWN');
+      expect(msg).toContain('responded with status 500');
+    });
+
+    it('should handle JSON object response without error_msg', () => {
+      const error = {
+        config: {
+          method: 'post',
+          url: '/api/consumers',
+          baseURL: 'https://example.com',
+        },
+        response: {
+          status: 409,
+          statusText: 'Conflict',
+          data: { code: 10001, message: 'conflict detected' },
+        },
+      };
+      const msg = utils.formatAxiosErrorMessage(error);
+      expect(msg).toContain('responded with status 409 Conflict');
+      expect(msg).toContain(
+        'response body: {"code":10001,"message":"conflict detected"}',
+      );
+    });
+  });
 });

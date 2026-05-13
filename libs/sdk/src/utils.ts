@@ -29,6 +29,50 @@ const featureGateEnabled = (key: string) => {
   );
 };
 
+const formatAxiosErrorMessage = (error: {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: unknown;
+    config?: { method?: string; url?: string; baseURL?: string };
+  };
+  config?: { method?: string; url?: string; baseURL?: string };
+}): string => {
+  const config = error.config ?? error.response?.config;
+  const method = config?.method?.toUpperCase() ?? 'UNKNOWN';
+  const rawUrl = config?.url ?? '';
+  const url = /^https?:\/\//i.test(rawUrl)
+    ? rawUrl
+    : `${config?.baseURL ?? ''}${rawUrl}`;
+  const status = error.response?.status;
+  const statusText = error.response?.statusText ?? '';
+
+  const errorMsg =
+    typeof error.response?.data === 'object' &&
+    error.response?.data !== null &&
+    'error_msg' in (error.response.data as Record<string, unknown>)
+      ? (error.response.data as Record<string, string>).error_msg
+      : undefined;
+
+  const parts: Array<string> = [];
+  parts.push(`${method} ${url}`);
+  if (status) parts.push(`responded with status ${status} ${statusText}`.trim());
+
+  if (errorMsg) {
+    parts.push(`error_msg: ${errorMsg}`);
+  } else {
+    const body =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response?.data);
+    if (body && body !== '""' && body !== 'undefined') {
+      parts.push(`response body: ${body}`);
+    }
+  }
+
+  return parts.join(', ');
+};
+
 const registerTimeoutInterceptor = (client: AxiosInstance) => {
   client.interceptors.response.use(undefined, (error) => {
     if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
@@ -59,4 +103,5 @@ export const utils = {
   featureGate,
   featureGateEnabled,
   registerTimeoutInterceptor,
+  formatAxiosErrorMessage,
 };
