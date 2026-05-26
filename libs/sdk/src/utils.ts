@@ -1,3 +1,4 @@
+import axios, { type AxiosInstance } from 'axios';
 import { isUndefined, mapValues, pickBy } from 'lodash-es';
 import { createHash } from 'node:crypto';
 
@@ -28,9 +29,79 @@ const featureGateEnabled = (key: string) => {
   );
 };
 
+const formatAxiosErrorMessage = (error: {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: unknown;
+    config?: { method?: string; url?: string; baseURL?: string };
+  };
+  config?: { method?: string; url?: string; baseURL?: string };
+}): string => {
+  const config = error.config ?? error.response?.config;
+  const method = config?.method?.toUpperCase() ?? 'UNKNOWN';
+  const rawUrl = config?.url ?? '';
+  const url = /^https?:\/\//i.test(rawUrl)
+    ? rawUrl
+    : `${config?.baseURL ?? ''}${rawUrl}`;
+  const status = error.response?.status;
+  const statusText = error.response?.statusText ?? '';
+
+  const errorMsg =
+    typeof error.response?.data === 'object' &&
+    error.response?.data !== null &&
+    'error_msg' in (error.response.data as Record<string, unknown>)
+      ? (error.response.data as Record<string, string>).error_msg
+      : undefined;
+
+  const parts: Array<string> = [];
+  parts.push(`${method} ${url}`);
+  if (status) parts.push(`responded with status ${status} ${statusText}`.trim());
+
+  if (errorMsg) {
+    parts.push(`error_msg: ${errorMsg}`);
+  } else {
+    const body =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response?.data);
+    if (body && body !== '""' && body !== 'undefined') {
+      parts.push(`response body: ${body}`);
+    }
+  }
+
+  return parts.join(', ');
+};
+
+const registerTimeoutInterceptor = (client: AxiosInstance) => {
+  client.interceptors.response.use(undefined, (error) => {
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+      const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+      const rawUrl = error.config?.url ?? '';
+      const url = /^https?:\/\//i.test(rawUrl)
+        ? rawUrl
+        : `${error.config?.baseURL ?? ''}${rawUrl}`;
+      const timeout = error.config?.timeout;
+      const timeoutText =
+        typeof timeout === 'number' ? `${timeout}ms` : 'an unknown duration';
+      const newMessage = `Request "${method} ${url}" timed out after ${timeoutText}. Consider increasing the timeout with the --timeout flag.`;
+      error.message = newMessage;
+      if (error.stack) {
+        error.stack = error.stack.replace(
+          /^(.*?):\s*(.*)/,
+          `$1: ${newMessage}`,
+        );
+      }
+    }
+    return Promise.reject(error);
+  });
+};
+
 export const utils = {
   generateId,
   recursiveOmitUndefined,
   featureGate,
   featureGateEnabled,
+  registerTimeoutInterceptor,
+  formatAxiosErrorMessage,
 };

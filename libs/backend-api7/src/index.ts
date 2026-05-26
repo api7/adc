@@ -33,6 +33,8 @@ export class BackendAPI7 implements ADCSDK.Backend {
       ...(opts.timeout ? { timeout: opts.timeout } : {}),
     });
     this.gatewayGroupName = opts.gatewayGroup!;
+
+    ADCSDK.utils.registerTimeoutInterceptor(this.client);
   }
 
   public metadata() {

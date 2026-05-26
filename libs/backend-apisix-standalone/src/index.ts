@@ -40,6 +40,8 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
       httpsAgent: opts.httpsAgent,
       ...(opts.timeout ? { timeout: opts.timeout } : {}),
     });
+
+    ADCSDK.utils.registerTimeoutInterceptor(this.client);
   }
 
   public metadata() {
