@@ -11,10 +11,10 @@ import { IngressSyncCommand } from './ingress-sync.command';
 import { LintCommand } from './lint.command';
 import { PingCommand } from './ping.command';
 import { SyncCommand } from './sync.command';
-import { ValidateCommand } from './validate.command';
 import { configurePluralize } from './utils';
+import { ValidateCommand } from './validate.command';
 
-const versionCode = '0.25.0';
+const versionCode = '0.26.0';
 
 function setupInternal() {
   // initialize dotenv
