@@ -22,6 +22,87 @@ const httpMethods: Array<OpenAPIV3_1.HttpMethods> = [
   'trace',
 ];
 
+type UnknownRecord = Record<string, unknown>;
+
+const copiedExtensionKeys = [
+  ExtKey.NAME,
+  ExtKey.LABELS,
+  ExtKey.PLUGINS,
+  ExtKey.SERVICE_DEFAULTS,
+  ExtKey.UPSTREAM_DEFAULTS,
+  ExtKey.UPSTREAM_NODE_DEFAULTS,
+  ExtKey.ROUTE_DEFAULTS,
+];
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const copyKey = (source: UnknownRecord, target: UnknownRecord, key: string) => {
+  if (source[key] !== undefined) target[key] = source[key];
+};
+
+const copyExtensionKeys = (source: UnknownRecord, target: UnknownRecord) => {
+  copiedExtensionKeys.forEach((key) => copyKey(source, target, key));
+  Object.entries(source)
+    .filter(([key]) => key.startsWith(ExtKey.PLUGIN_PREFIX))
+    .forEach(([key, value]) => {
+      target[key] = value;
+    });
+};
+
+const pruneOperation = (operation: unknown): unknown => {
+  if (!isRecord(operation)) return operation;
+
+  const result: UnknownRecord = {};
+  ['$ref', 'operationId', 'summary', 'description', 'servers'].forEach((key) =>
+    copyKey(operation, result, key),
+  );
+  copyExtensionKeys(operation, result);
+  return result;
+};
+
+const prunePathItem = (pathItem: unknown): unknown => {
+  if (!isRecord(pathItem)) return pathItem;
+
+  const result: UnknownRecord = {};
+  ['$ref', 'servers'].forEach((key) => copyKey(pathItem, result, key));
+  copyExtensionKeys(pathItem, result);
+  httpMethods.forEach((method) => {
+    if (pathItem[method] !== undefined)
+      result[method] = pruneOperation(pathItem[method]);
+  });
+  return result;
+};
+
+const prunePathItems = (pathItems: UnknownRecord): UnknownRecord =>
+  Object.fromEntries(
+    Object.entries(pathItems).map(([path, pathItem]) => [
+      path,
+      prunePathItem(pathItem),
+    ]),
+  );
+
+const createConversionDocument = (
+  specification: unknown,
+): OpenAPIV3_1.Document => {
+  const source = specification as unknown as UnknownRecord;
+  const result: UnknownRecord = {};
+
+  ['openapi', 'info', 'servers'].forEach((key) => copyKey(source, result, key));
+  copyExtensionKeys(source, result);
+
+  if (isRecord(source.paths)) result.paths = prunePathItems(source.paths);
+
+  const components = source.components;
+  if (isRecord(components) && isRecord(components.pathItems)) {
+    result.components = {
+      pathItems: prunePathItems(components.pathItems),
+    };
+  }
+
+  return result as unknown as OpenAPIV3_1.Document;
+};
+
 export class OpenAPIConverter implements ADCSDK.Converter {
   public toADC(content: string): Observable<ADCSDK.Configuration> {
     return from(this.parseOAS(content)).pipe(
@@ -135,9 +216,9 @@ export class OpenAPIConverter implements ADCSDK.Converter {
           tap((services) =>
             services.map((service) => {
               if (!service.path_prefix) return service;
-              service.routes = service.routes!.map((route) => {
+              service.routes = service.routes!.map((route: ADCSDK.Route) => {
                 route.uris = route.uris.map(
-                  (uri) => `${service.path_prefix}${uri}`,
+                  (uri: string) => `${service.path_prefix}${uri}`,
                 );
                 return route;
               });
@@ -157,7 +238,12 @@ export class OpenAPIConverter implements ADCSDK.Converter {
   }
 
   private parseOAS(content: string): Observable<OpenAPIV3_1.Document> {
-    return of(dereference(content)).pipe(
+    return of(upgrade(content).specification).pipe(
+      map((res) => {
+        if (!res) throw new Error('No schema found in OpenAPI document');
+        return createConversionDocument(res);
+      }),
+      map((specification) => dereference(specification)),
       map((res) => {
         if (res.errors?.length)
           throw new Error(
@@ -166,9 +252,8 @@ export class OpenAPIConverter implements ADCSDK.Converter {
               .join(', ')}`,
           );
         if (!res.schema) throw new Error('No schema found in OpenAPI document');
-        return res.schema;
+        return res.schema as OpenAPIV3_1.Document;
       }),
-      map((schema) => upgrade(schema).specification),
       tap((specification) => {
         const result = schema.safeParse(specification);
 
