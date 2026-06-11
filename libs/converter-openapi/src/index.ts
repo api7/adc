@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { dereference, upgrade } from '@scalar/openapi-parser';
 import { OpenAPIV3_1 } from '@scalar/openapi-types';
 import { isEmpty, unset } from 'lodash-es';
-import { Observable, from, map, of, switchMap, tap } from 'rxjs';
+import { Observable, defer, from, map, of, switchMap, tap } from 'rxjs';
 import slugify from 'slugify';
 import { z } from 'zod';
 
@@ -238,11 +238,12 @@ export class OpenAPIConverter implements ADCSDK.Converter {
   }
 
   private parseOAS(content: string): Observable<OpenAPIV3_1.Document> {
-    return of(upgrade(content).specification).pipe(
-      map((res) => {
-        if (!res) throw new Error('No schema found in OpenAPI document');
-        return createConversionDocument(res);
-      }),
+    return defer(() => {
+      const upgraded = upgrade(content);
+      if (!upgraded.specification)
+        throw new Error('No schema found in OpenAPI document');
+      return of(createConversionDocument(upgraded.specification));
+    }).pipe(
       map((specification) => dereference(specification)),
       map((res) => {
         if (res.errors?.length)
