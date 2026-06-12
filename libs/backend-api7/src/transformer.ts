@@ -37,6 +37,7 @@ export class ToADC {
       name: route.name,
       description: route.desc,
       labels: ToADC.transformLabels(route.labels),
+      plugins: route.plugins,
       server_addr: route.server_addr,
       server_port: route.server_port,
       remote_addr: route.remote_addr,
