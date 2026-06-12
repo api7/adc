@@ -52,12 +52,16 @@ export const LoadLocalConfigurationTask = (
                   (await readFile(filePath, { encoding: 'utf-8' })) ?? '';
 
                 const ext = path.extname(filePath).toLowerCase();
-                if (ext === '.json') {
-                  subCtx.configurations[filePath] =
-                    JSON.parse(fileContent) ?? {};
-                  return;
-                }
-                subCtx.configurations[filePath] = YAML.load(fileContent) ?? {};
+                const config: ADCSDK.Configuration =
+                  ext === '.json'
+                    ? (JSON.parse(fileContent) ?? {})
+                    : (YAML.load(fileContent) ?? {});
+
+                // Inline external Lua sources referenced by custom plugins and
+                // validate the declared name against the source.
+                await resolveCustomPluginSources(config, filePath);
+
+                subCtx.configurations[filePath] = config;
               },
             };
           }),
@@ -111,3 +115,43 @@ export const LoadLocalConfigurationTask = (
     );
   },
 });
+
+// Resolve each custom plugin's `path` reference into an inline `content`
+// (read relative to the config file), and verify that the declared `name`
+// actually appears in the (plaintext) Lua source so a typo is caught locally
+// rather than rejected later by the control plane.
+const resolveCustomPluginSources = async (
+  config: ADCSDK.Configuration,
+  configFilePath: string,
+) => {
+  const customPlugins = config.custom_plugins;
+  if (!Array.isArray(customPlugins) || customPlugins.length === 0) return;
+
+  const baseDir = path.dirname(configFilePath);
+  const looksLikeLua = (source: string) =>
+    /\b(function|return|local)\b/.test(source);
+
+  for (const plugin of customPlugins) {
+    if (plugin.path) {
+      const sourcePath = path.resolve(baseDir, plugin.path);
+      if (!existsSync(sourcePath))
+        throw new Error(
+          `Custom plugin "${plugin.name}" references a source file that does not exist: ${sourcePath}`,
+        );
+      plugin.content =
+        (await readFile(sourcePath, { encoding: 'utf-8' })) ?? '';
+      delete plugin.path;
+    }
+
+    // Only validate when the source is plaintext Lua; obfuscated/bytecode
+    // uploads will not contain the name literally.
+    if (
+      plugin.content &&
+      looksLikeLua(plugin.content) &&
+      !plugin.content.includes(plugin.name)
+    )
+      throw new Error(
+        `Custom plugin name "${plugin.name}" was not found in its Lua source; the declared name must match the plugin's name in the source.`,
+      );
+  }
+};

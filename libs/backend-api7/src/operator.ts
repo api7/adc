@@ -25,6 +25,7 @@ import {
 import { SemVer } from 'semver';
 
 import { FromADC } from './transformer';
+import * as typing from './typing';
 import { capitalizeFirstLetter } from './utils';
 
 export interface OperatorOptions {
@@ -37,6 +38,10 @@ export interface OperatorOptions {
 export class Operator extends ADCSDK.backend.BackendEventSource {
   private readonly client: AxiosInstance;
 
+  // Memoized control-plane-global custom plugin list, used to reconcile group
+  // membership during a sync (resolve ids, preserve/trim gateway_groups).
+  private customPluginListCache?: Promise<Array<typing.CustomPlugin>>;
+
   constructor(private readonly opts: OperatorOptions) {
     super();
     this.client = opts.client;
@@ -45,6 +50,13 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
 
   private operate(event: ADCSDK.Event) {
     const { type, resourceType, resourceId, parentId } = event;
+
+    // Custom plugins are control-plane-global resources addressed under
+    // "/api/custom_plugins" (not the gateway-group-scoped admin API). They are
+    // reconciled by membership rather than created/deleted outright.
+    if (resourceType === ADCSDK.ResourceType.CUSTOM_PLUGIN)
+      return from(this.operateCustomPlugin(event));
+
     const isUpdate = type !== ADCSDK.EventType.DELETE;
     const path = `/apisix/admin/${
       resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL
@@ -94,9 +106,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
                   if (axios.isAxiosError(error) && error.response)
                     return throwError(
                       () =>
-                        new Error(
-                          ADCSDK.utils.formatAxiosErrorMessage(error),
-                        ),
+                        new Error(ADCSDK.utils.formatAxiosErrorMessage(error)),
                     );
                   return throwError(() => error);
                 }
@@ -275,5 +285,95 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       default:
         throw new Error(`Unsupported resource type: ${event.resourceType}`);
     }
+  }
+
+  private getCustomPluginList(): Promise<Array<typing.CustomPlugin>> {
+    if (!this.customPluginListCache)
+      this.customPluginListCache = this.client
+        .get<typing.ListResponse<typing.CustomPlugin>>('/api/custom_plugins')
+        .then((resp) => resp.data?.list ?? []);
+    return this.customPluginListCache;
+  }
+
+  // Reconciles a custom plugin against the control plane while only touching
+  // the gateway group this backend targets:
+  // - create/update: ensure this group is in the plugin's membership (POST when
+  //   the plugin does not exist yet, otherwise PUT and append the group).
+  // - delete (prune): drop this group from the membership; the plugin is only
+  //   removed entirely when no other group still references it.
+  // Because a custom plugin is shared across its member groups, the uploaded
+  // source/metadata in the local config is authoritative for every group.
+  private async operateCustomPlugin(
+    event: ADCSDK.Event,
+  ): Promise<AxiosResponse> {
+    const groupId = this.opts.gatewayGroupId;
+    if (!groupId)
+      throw new Error(
+        'Managing custom plugins requires a resolved gateway group, but none is available for the current backend.',
+      );
+
+    const name = event.resourceName;
+    const existing = (await this.getCustomPluginList()).find(
+      (plugin) => plugin.name === name,
+    );
+    const fromADC = new FromADC();
+
+    if (event.type === ADCSDK.EventType.DELETE) {
+      if (!existing)
+        return this.syntheticResponse('delete', 'custom plugin already absent');
+
+      const remaining = (existing.gateway_groups ?? []).filter(
+        (id) => id !== groupId,
+      );
+      if (remaining.length === 0)
+        return this.client.request({
+          method: 'DELETE',
+          url: `/api/custom_plugins/${existing.id}`,
+        });
+
+      return this.client.request({
+        method: 'PUT',
+        url: `/api/custom_plugins/${existing.id}`,
+        data: {
+          ...fromADC.transformCustomPlugin(
+            event.oldValue as ADCSDK.CustomPlugin,
+          ),
+          gateway_groups: remaining,
+        },
+      });
+    }
+
+    const body = fromADC.transformCustomPlugin(
+      event.newValue as ADCSDK.CustomPlugin,
+    );
+    if (existing)
+      return this.client.request({
+        method: 'PUT',
+        url: `/api/custom_plugins/${existing.id}`,
+        data: {
+          ...body,
+          gateway_groups: Array.from(
+            new Set([...(existing.gateway_groups ?? []), groupId]),
+          ),
+        },
+      });
+
+    return this.client.request({
+      method: 'POST',
+      url: '/api/custom_plugins',
+      data: { ...body, gateway_groups: [groupId] },
+    });
+  }
+
+  // A no-op result for the case where a pruned plugin is already absent, shaped
+  // so the shared debug/logging path can render it without a real request.
+  private syntheticResponse(method: string, message: string): AxiosResponse {
+    return {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: { method, url: '/api/custom_plugins', headers: {} },
+      data: { value: { message } },
+    } as unknown as AxiosResponse;
   }
 }

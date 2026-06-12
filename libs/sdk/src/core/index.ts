@@ -2,6 +2,7 @@ import { ResourceType } from './resource';
 import {
   Consumer,
   ConsumerCredential,
+  CustomPlugin,
   GlobalRule,
   Labels,
   PluginMetadata,
@@ -36,6 +37,7 @@ export type {
   PluginMetadata,
   ConsumerCredential,
   Consumer,
+  CustomPlugin,
   StreamRoute,
   Configuration,
   InternalConfiguration,
@@ -83,4 +85,6 @@ export type ResourceFor<T extends ResourceType> = T extends ResourceType.SERVICE
                     ? PluginConfig
                     : T extends ResourceType.CONSUMER_CREDENTIAL
                       ? ConsumerCredential
-                      : never;
+                      : T extends ResourceType.CUSTOM_PLUGIN
+                        ? CustomPlugin
+                        : never;
