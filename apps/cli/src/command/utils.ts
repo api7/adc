@@ -58,6 +58,7 @@ export const toKVConfiguration = (
           'plugin_metadata',
           'stream_routes',
           'upstreams',
+          'custom_plugins',
         ].includes(resourceType) // ensure that you don't convert unexpected keys
       ) {
         return [
@@ -131,7 +132,13 @@ export const filterConfiguration = (
 ): [ADCSDK.Configuration, ADCSDK.Configuration] => {
   const removed: ADCSDK.Configuration = {};
   Object.keys(configuration).forEach((resourceType) => {
-    if (resourceType === 'plugin_metadata' || resourceType === 'global_rules')
+    // Keyed-object and label-less resources are not subject to label filtering;
+    // custom plugins are global and must not be pruned by a label selector.
+    if (
+      resourceType === 'plugin_metadata' ||
+      resourceType === 'global_rules' ||
+      resourceType === 'custom_plugins'
+    )
       return;
     const result = labelFilter(configuration[resourceType], rules);
     configuration[resourceType] = result.filtered;
@@ -146,11 +153,10 @@ const labelFilter = <T extends ADCSDK.Event['newValue']>(
   rules: Record<string, string> = {},
 ) => {
   const filtered = resources.filter((resource) => {
+    // Some resources (e.g. custom plugins) carry no labels.
+    const labels = (resource as { labels?: ADCSDK.Labels })?.labels;
     return Object.entries(rules).every(
-      ([key, value]) =>
-        resource?.labels &&
-        resource?.labels[key] &&
-        resource?.labels[key] === value,
+      ([key, value]) => labels && labels[key] && labels[key] === value,
     );
   });
 
@@ -170,10 +176,17 @@ export const fillLabels = (
       : labels;
 
   for (const resourceType in configuration) {
-    if (['global_rules', 'plugin_metadata'].includes(resourceType)) continue;
+    // global_rules/plugin_metadata are keyed objects; custom_plugins are
+    // label-less, so none of them participate in label selectors.
+    if (
+      ['global_rules', 'plugin_metadata', 'custom_plugins'].includes(
+        resourceType,
+      )
+    )
+      continue;
 
-    (configuration[resourceType] as Array<ADCSDK.ResourceFor<any>>).forEach(
-      (resource) => {
+    (configuration[resourceType] as Array<{ labels?: ADCSDK.Labels }>).forEach(
+      (resource: any) => {
         resource.labels = assignSelector(resource.labels as ADCSDK.Labels);
 
         // Process the nested resources

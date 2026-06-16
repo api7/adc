@@ -155,6 +155,25 @@ export class ToADC {
   ): Record<string, ADCSDK.PluginMetadata> {
     return pluginMetadatas;
   }
+
+  public transformCustomPlugin(
+    plugin: typing.CustomPlugin,
+  ): ADCSDK.CustomPlugin {
+    // Note: when the control plane stores an obfuscated/bytecode plugin
+    // (is_obfuscated), the returned source_code will not match the user's
+    // plaintext source, which would surface as a perpetual update. Such
+    // plugins are expected to be managed outside the declarative workflow.
+    return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.CustomPlugin>({
+      id: plugin.id,
+      name: plugin.name!,
+      description: plugin.description,
+      content: plugin.source_code,
+      catalog: plugin.catalog,
+      documentation_link: plugin.documentation_link,
+      author: plugin.author,
+      logo: plugin.logo,
+    });
+  }
 }
 
 export class FromADC {
@@ -307,5 +326,22 @@ export class FromADC {
     pluginMetadatas: Record<string, ADCSDK.PluginMetadata>,
   ): typing.PluginMetadata {
     return ADCSDK.utils.recursiveOmitUndefined(pluginMetadatas);
+  }
+
+  // Produces the metadata portion of the create/update body. The "file"
+  // (base64 Lua source) and "gateway_groups" membership are attached by the
+  // operator, which owns the group-scoping reconciliation. By load time,
+  // "path" has already been resolved into "content".
+  public transformCustomPlugin(
+    plugin: ADCSDK.CustomPlugin,
+  ): Omit<typing.CustomPluginInput, 'gateway_groups'> {
+    return ADCSDK.utils.recursiveOmitUndefined({
+      file: Buffer.from(plugin.content ?? '', 'utf-8').toString('base64'),
+      catalog: plugin.catalog,
+      description: plugin.description,
+      documentation_link: plugin.documentation_link,
+      author: plugin.author,
+      logo: plugin.logo,
+    });
   }
 }

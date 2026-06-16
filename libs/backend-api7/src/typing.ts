@@ -112,6 +112,35 @@ export interface GlobalRule {
   plugins: Plugins;
 }
 export type PluginMetadata = Record<string, ADCPluginMetadata>;
+// Custom plugins are control-plane-global objects (not scoped by a single
+// gateway group via query param). Their "name"/"version" are parsed by the
+// control plane from the uploaded Lua source, and "gateway_groups" lists the
+// groups the plugin is deployed to.
+export interface CustomPlugin {
+  id?: string;
+  name?: string;
+  version?: string;
+  source_code?: string;
+  catalog?: string;
+  description?: string;
+  documentation_link?: string;
+  author?: string;
+  logo?: string;
+  gateway_groups?: Array<string>;
+  is_obfuscated?: boolean;
+  updated_at?: number;
+}
+// Request body for creating/updating a custom plugin. "file" is the base64
+// encoded Lua source; "gateway_groups" is the full membership list.
+export interface CustomPluginInput {
+  file: string;
+  catalog?: string;
+  description?: string;
+  documentation_link?: string;
+  author?: string;
+  logo?: string;
+  gateway_groups: Array<string>;
+}
 export interface Upstream {
   id?: string;
   name: string;

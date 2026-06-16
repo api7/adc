@@ -356,6 +356,37 @@ const consumerGroupSchema = z.strictObject({
 });
 export type ConsumerGroup = z.infer<typeof consumerGroupSchema>;
 
+const customPluginSchema = z
+  .strictObject({
+    id: idSchema.optional(),
+    // The plugin name must match the one declared inside the Lua source. It is
+    // declared explicitly so the diff can be keyed without parsing the source.
+    name: z
+      .string()
+      .min(1)
+      .max(256)
+      .regex(/^[a-zA-Z0-9-_.]+$/),
+    description: descriptionSchema.optional(),
+
+    // The Lua source. Either provided inline via "content" or referenced from
+    // an external file via "path" (resolved into "content" at load time).
+    content: z.string().min(1).optional(),
+    path: z.string().min(1).optional(),
+
+    // Display-only metadata stored on the control plane.
+    catalog: z.string().optional(),
+    documentation_link: z.string().optional(),
+    author: z.string().optional(),
+    logo: z.string().optional(),
+  })
+  .refine((val) => !isNil(val.content) || !isNil(val.path), {
+    error: 'Custom plugin must set either "content" or "path"',
+  })
+  .refine((val) => !(!isNil(val.content) && !isNil(val.path)), {
+    error: 'Custom plugin "content" and "path" are mutually exclusive',
+  });
+export type CustomPlugin = z.infer<typeof customPluginSchema>;
+
 const globalRuleSchema = pluginsSchema;
 export type GlobalRule = z.infer<typeof globalRuleSchema>;
 
@@ -369,6 +400,7 @@ export const ConfigurationSchema = z.strictObject({
   consumer_groups: z.array(consumerGroupSchema).optional(),
   global_rules: globalRuleSchema.optional(),
   plugin_metadata: pluginMetadataSchema.optional(),
+  custom_plugins: z.array(customPluginSchema).optional(),
 });
 export type Configuration = z.infer<typeof ConfigurationSchema>;
 
@@ -380,6 +412,7 @@ export const InternalConfigurationSchema = z.strictObject({
   // object format resources
   global_rules: globalRuleSchema.optional(),
   plugin_metadata: pluginMetadataSchema.optional(),
+  custom_plugins: z.array(customPluginSchema).optional(),
 
   // internal use only
   routes: z.array(routeSchema).optional(),

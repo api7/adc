@@ -23,6 +23,12 @@ const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.CONSUMER_GROUP}.${ADCSDK.EventType.UPDATE}`]: 15,
   [`${ADCSDK.ResourceType.CONSUMER}.${ADCSDK.EventType.UPDATE}`]: 16,
 
+  // Custom plugin definitions must exist before anything references them
+  // (route/service/consumer plugins, global rules), so create/update them
+  // first; prune them only after every reference has been removed.
+  [`${ADCSDK.ResourceType.CUSTOM_PLUGIN}.${ADCSDK.EventType.CREATE}`]: 7.1,
+  [`${ADCSDK.ResourceType.CUSTOM_PLUGIN}.${ADCSDK.EventType.UPDATE}`]: 7.2,
+
   [`${ADCSDK.ResourceType.SERVICE}.${ADCSDK.EventType.CREATE}`]: 17,
   [`${ADCSDK.ResourceType.PLUGIN_CONFIG}.${ADCSDK.EventType.CREATE}`]: 18,
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.CREATE}`]: 19,
@@ -40,6 +46,7 @@ const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.DELETE}`]: 30,
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.CREATE}`]: 31,
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.UPDATE}`]: 32,
+  [`${ADCSDK.ResourceType.CUSTOM_PLUGIN}.${ADCSDK.EventType.DELETE}`]: 33,
 
   // Just placeholders, simply to fix ts type errors, they never appear at runtime
   [`${ADCSDK.ResourceType.ROUTE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
@@ -53,6 +60,7 @@ const order: Record<`${ADCSDK.ResourceType}.${ADCSDK.EventType}`, number> = {
   [`${ADCSDK.ResourceType.GLOBAL_RULE}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
   [`${ADCSDK.ResourceType.PLUGIN_METADATA}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
   [`${ADCSDK.ResourceType.CONSUMER_CREDENTIAL}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
+  [`${ADCSDK.ResourceType.CUSTOM_PLUGIN}.${ADCSDK.EventType.ONLY_SUB_EVENTS}`]: 999,
   [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.DELETE}`]: 999,
   [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.UPDATE}`]: 999,
   [`${ADCSDK.ResourceType.INTERNAL_STREAM_SERVICE}.${ADCSDK.EventType.CREATE}`]: 999,
@@ -189,6 +197,11 @@ export class DifferV3 {
         ]) ?? [],
         remote?.consumer_credentials?.map((res) => [res.name, res.id!, res]) ??
           [],
+      ),
+      ...differ.diffResource(
+        ADCSDK.ResourceType.CUSTOM_PLUGIN,
+        local?.custom_plugins?.map((res) => [res.name, res.name, res]) ?? [],
+        remote?.custom_plugins?.map((res) => [res.name, res.name, res]) ?? [],
       ),
       ...differ.diffResource(
         ADCSDK.ResourceType.UPSTREAM,

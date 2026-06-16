@@ -1607,6 +1607,54 @@
         "properties": {},
         "additionalProperties": {}
       }
+    },
+    "custom_plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[a-zA-Z0-9-_.]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[a-zA-Z0-9-_.]+$"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "catalog": {
+            "type": "string"
+          },
+          "documentation_link": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

@@ -10,6 +10,7 @@ export enum ResourceType {
   CONSUMER_GROUP = 'consumer_group',
   CONSUMER_CREDENTIAL = 'consumer_credential',
   STREAM_ROUTE = 'stream_route',
+  CUSTOM_PLUGIN = 'custom_plugin',
 
   // internal use only
   INTERNAL_STREAM_SERVICE = 'stream_service',

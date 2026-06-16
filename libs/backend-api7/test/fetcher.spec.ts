@@ -77,6 +77,23 @@ describe('Fetcher', () => {
       );
     });
 
+    it('should include only custom plugins', () => {
+      const fetcher = newFetcher({
+        includeResourceType: [ADCSDK.ResourceType.CUSTOM_PLUGIN],
+      });
+      expect(fetcher.isSkip(ADCSDK.ResourceType.CUSTOM_PLUGIN)).toEqual(false);
+      expect(fetcher.isSkip(ADCSDK.ResourceType.SERVICE)).toEqual(true);
+      expect(fetcher.isSkip(ADCSDK.ResourceType.GLOBAL_RULE)).toEqual(true);
+    });
+
+    it('should exclude custom plugins', () => {
+      const fetcher = newFetcher({
+        excludeResourceType: [ADCSDK.ResourceType.CUSTOM_PLUGIN],
+      });
+      expect(fetcher.isSkip(ADCSDK.ResourceType.CUSTOM_PLUGIN)).toEqual(true);
+      expect(fetcher.isSkip(ADCSDK.ResourceType.SERVICE)).toEqual(false);
+    });
+
     it('should exclude services', () => {
       const fetcher = newFetcher({
         excludeResourceType: [ADCSDK.ResourceType.SERVICE],

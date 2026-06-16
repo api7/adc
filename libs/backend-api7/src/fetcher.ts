@@ -5,6 +5,7 @@ import { isEmpty } from 'lodash-es';
 import {
   Subject,
   combineLatest,
+  filter,
   from,
   map,
   mergeMap,
@@ -257,6 +258,37 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
     );
   }
 
+  public listCustomPlugins() {
+    if (this.isSkip(ADCSDK.ResourceType.CUSTOM_PLUGIN))
+      return of<Array<ADCSDK.CustomPlugin>>([]);
+
+    const taskName = 'Fetch custom plugins';
+    const logger = this.getLogger(taskName);
+    const taskStateEvent = this.taskStateEvent(taskName);
+    logger(taskStateEvent('TASK_START'));
+    return from(
+      this.client.get<typing.ListResponse<typing.CustomPlugin>>(
+        '/api/custom_plugins',
+      ),
+    ).pipe(
+      tap((resp) => logger(this.debugLogEvent(resp))),
+      mergeMap((resp) =>
+        from(resp.data.list ?? []).pipe(
+          // Custom plugins are control-plane-global; only manage those deployed
+          // to the gateway group that this backend targets.
+          filter(
+            (plugin) =>
+              !this.opts.gatewayGroupId ||
+              (plugin.gateway_groups ?? []).includes(this.opts.gatewayGroupId),
+          ),
+          map((plugin) => this.toADC.transformCustomPlugin(plugin)),
+        ),
+      ),
+      toArray(),
+      tap(() => logger(taskStateEvent('TASK_DONE'))),
+    );
+  }
+
   public dump() {
     return combineLatest([
       this.listServices(),
@@ -264,16 +296,25 @@ export class Fetcher extends ADCSDK.backend.BackendEventSource {
       this.listSSLs(),
       this.listGlobalRules(),
       this.listMetadatas(),
+      this.listCustomPlugins(),
     ]).pipe(
       takeLast(1),
       map(
-        ([services, consumers, ssls, global_rules, plugin_metadata]) =>
+        ([
+          services,
+          consumers,
+          ssls,
+          global_rules,
+          plugin_metadata,
+          custom_plugins,
+        ]) =>
           ({
             services,
             consumers,
             ssls,
             global_rules,
             plugin_metadata,
+            custom_plugins,
           }) as ADCSDK.Configuration,
       ),
     );
