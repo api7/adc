@@ -19,7 +19,7 @@
     "@typescript-eslint/utils": "^8.57.2",
     "@vitest/coverage-v8": "^4.1.7",
     "@vitest/ui": "^4.1.7",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9.33.0",
     "eslint-config-prettier": "10.1.5",
     "jiti": "2.4.2",
