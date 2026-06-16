@@ -35,12 +35,9 @@ A library for implementing the OpenAPI specification and ADC profile conversion.
       <td>Override the name of the generated route</td>
     </tr>
     <tr>
-      <td rowspan="3">x-adc-labels</td>
+      <td rowspan="2">x-adc-labels</td>
       <td>Root Level</td>
-      <td rowspan="3">Add labels field to the specified level. It supports string and string array formats.</td>
-    </tr>
-    <tr>
-      <td>Path Level</td>
+      <td rowspan="2">Add labels field to the specified level. It supports string and string array formats.</td>
     </tr>
     <tr>
       <td>Operation Level</td>
@@ -48,11 +45,10 @@ A library for implementing the OpenAPI specification and ADC profile conversion.
     <tr>
       <td rowspan="3">x-adc-plugins</td>
       <td>Root Level</td>
-      <td>Add plugins field to the specified level. It is an object that contains one or more plugins.</td>
+      <td rowspan="3">Add plugins field to the specified level. It is an object that contains one or more plugins. Plugins set at the path or operation level are attached directly to the routes generated from that path or operation; they do not by themselves cause the service to be split.</td>
     </tr>
     <tr>
       <td>Path Level</td>
-      <td rowspan="2">Plugin objects at the Path level and Operation level will cause the service to be split, i.e. the sub-level containing the plugin will be included in a new service.</td>
     </tr>
     <tr>
       <td>Operation Level</td>
