@@ -408,4 +408,30 @@ describe('Basic', () => {
       ],
     });
   });
+
+  it('case 8 (self-referencing component schema)', async () => {
+    const oas = parse(loadAsset('basic-8.yaml'));
+    const config = await convert(oas);
+
+    expect(config).toEqual({
+      services: [
+        {
+          name: 'SectorAPI',
+          routes: [
+            {
+              methods: ['GET'],
+              name: 'getSectors',
+              uris: ['/v3/sectors'],
+            },
+          ],
+          upstream: {
+            nodes: [{ host: 'localhost', port: 8080, weight: 100 }],
+            pass_host: 'pass',
+            scheme: 'http',
+            timeout: { connect: 60, read: 60, send: 60 },
+          },
+        },
+      ],
+    });
+  });
 });

@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { dereference, upgrade } from '@scalar/openapi-parser';
 import { OpenAPIV3_1 } from '@scalar/openapi-types';
 import { isEmpty, unset } from 'lodash-es';
-import { Observable, from, map, of, switchMap, tap } from 'rxjs';
+import { Observable, defer, from, map, of, switchMap, tap } from 'rxjs';
 import slugify from 'slugify';
 import { z } from 'zod';
 
@@ -21,6 +21,56 @@ const httpMethods: Array<OpenAPIV3_1.HttpMethods> = [
   'patch',
   'trace',
 ];
+
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const operationSchemaFields = [
+  'parameters',
+  'requestBody',
+  'responses',
+  'callbacks',
+  'security',
+  'tags',
+  'deprecated',
+  'externalDocs',
+];
+
+const componentSchemaFields = [
+  'schemas',
+  'responses',
+  'requestBodies',
+  'headers',
+  'parameters',
+  'examples',
+  'links',
+  'callbacks',
+];
+
+const rootSchemaFields = ['tags', 'externalDocs', 'security', 'webhooks'];
+
+const prunePaths = (paths: unknown) => {
+  if (!isRecord(paths)) return;
+  Object.values(paths)
+    .filter(isRecord)
+    .forEach((pathItem) => {
+      unset(pathItem, 'parameters');
+      httpMethods.forEach((method) => {
+        const operation = pathItem[method];
+        if (isRecord(operation))
+          operationSchemaFields.forEach((f) => unset(operation, f));
+      });
+    });
+};
+
+const pruneConversionDocument = (spec: UnknownRecord): void => {
+  rootSchemaFields.forEach((k) => unset(spec, k));
+  componentSchemaFields.forEach((k) => unset(spec, `components.${k}`));
+  prunePaths(spec.paths);
+  prunePaths(isRecord(spec.components) ? spec.components.pathItems : undefined);
+};
 
 export class OpenAPIConverter implements ADCSDK.Converter {
   public toADC(content: string): Observable<ADCSDK.Configuration> {
@@ -135,9 +185,9 @@ export class OpenAPIConverter implements ADCSDK.Converter {
           tap((services) =>
             services.map((service) => {
               if (!service.path_prefix) return service;
-              service.routes = service.routes!.map((route) => {
+              service.routes = service.routes!.map((route: ADCSDK.Route) => {
                 route.uris = route.uris.map(
-                  (uri) => `${service.path_prefix}${uri}`,
+                  (uri: string) => `${service.path_prefix}${uri}`,
                 );
                 return route;
               });
@@ -157,7 +207,14 @@ export class OpenAPIConverter implements ADCSDK.Converter {
   }
 
   private parseOAS(content: string): Observable<OpenAPIV3_1.Document> {
-    return of(dereference(content)).pipe(
+    return defer(() => {
+      const upgraded = upgrade(content);
+      if (!upgraded.specification)
+        throw new Error('No schema found in OpenAPI document');
+      pruneConversionDocument(upgraded.specification as UnknownRecord);
+      return of(upgraded.specification as OpenAPIV3_1.Document);
+    }).pipe(
+      map((specification) => dereference(specification)),
       map((res) => {
         if (res.errors?.length)
           throw new Error(
@@ -166,9 +223,8 @@ export class OpenAPIConverter implements ADCSDK.Converter {
               .join(', ')}`,
           );
         if (!res.schema) throw new Error('No schema found in OpenAPI document');
-        return res.schema;
+        return res.schema as OpenAPIV3_1.Document;
       }),
-      map((schema) => upgrade(schema).specification),
       tap((specification) => {
         const result = schema.safeParse(specification);
 
