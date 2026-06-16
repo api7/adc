@@ -112,7 +112,7 @@ servers:
     <tr>
       <td rowspan="3">x-adc-route-defaults</td>
       <td>Root Level</td>
-      <td rowspan="3">It supports setting/overriding parameters in the route at various levels. This field on sub-levels will cause the service to be split.</td>
+      <td rowspan="3">It supports setting/overriding parameters in the route at various levels. Sub-level values override root-level values (operation > path > root); the merged result is applied to each route. This field does not by itself cause the service to be split.</td>
     </tr>
     <tr>
       <td>Path Level</td>
