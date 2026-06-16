@@ -4,7 +4,6 @@ import {
   ListrTaskEventType,
   ListrTaskObject,
   ListrTaskState,
-  ListrTaskWrapper,
 } from 'listr2';
 import { attempt, isError, isObject } from 'lodash-es';
 import { Signale } from 'signale';
@@ -148,13 +147,7 @@ export class SignaleRenderer implements ListrRenderer {
 }
 
 export class ListrOutputLogger implements Logger {
-  constructor(
-    private readonly task: ListrTaskWrapper<
-      unknown,
-      typeof SignaleRenderer,
-      any
-    >,
-  ) {}
+  constructor(private readonly task: { output: string }) {}
 
   log(message: string): void {
     this.task.output = message;

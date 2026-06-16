@@ -9,6 +9,7 @@ export default config([
     ignores: [
       'node_modules',
       '**/dist',
+      '**/out-tsc',
       '**/vite.config.*.timestamp*',
       '**/vitest.config.*.timestamp*',
       '**/test-output',
