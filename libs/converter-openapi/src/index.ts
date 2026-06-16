@@ -49,27 +49,25 @@ const componentSchemaFields = [
   'callbacks',
 ];
 
-const pruneConversionDocument = (spec: UnknownRecord): void => {
-  ['tags', 'externalDocs', 'security', 'webhooks'].forEach((k) =>
-    unset(spec, k),
-  );
-  componentSchemaFields.forEach((k) => unset(spec, `components.${k}`));
+const rootSchemaFields = ['tags', 'externalDocs', 'security', 'webhooks'];
 
-  const prunePaths = (paths: unknown) => {
-    if (!isRecord(paths)) return;
-    Object.values(paths)
-      .filter(isRecord)
-      .forEach((pathItem) => {
-        unset(pathItem, 'parameters');
-        httpMethods.forEach((method) => {
-          if (isRecord(pathItem[method]))
-            operationSchemaFields.forEach((f) =>
-              unset(pathItem[method] as UnknownRecord, f),
-            );
-        });
+const prunePaths = (paths: unknown) => {
+  if (!isRecord(paths)) return;
+  Object.values(paths)
+    .filter(isRecord)
+    .forEach((pathItem) => {
+      unset(pathItem, 'parameters');
+      httpMethods.forEach((method) => {
+        const operation = pathItem[method];
+        if (isRecord(operation))
+          operationSchemaFields.forEach((f) => unset(operation, f));
       });
-  };
+    });
+};
 
+const pruneConversionDocument = (spec: UnknownRecord): void => {
+  rootSchemaFields.forEach((k) => unset(spec, k));
+  componentSchemaFields.forEach((k) => unset(spec, `components.${k}`));
   prunePaths(spec.paths);
   prunePaths(isRecord(spec.components) ? spec.components.pathItems : undefined);
 };
