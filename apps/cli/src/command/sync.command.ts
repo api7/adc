@@ -98,16 +98,19 @@ export const SyncCommand = new BackendCommand<SyncOption>(
         {
           title: 'Sync configuration',
           task: async (ctx, task) => {
-            const cancel = addBackendEventListener(ctx.backend, task);
-            await lastValueFrom(
-              ctx.backend
-                .sync(ctx.diff, {
-                  exitOnFailure: true,
-                  concurrent: opts.requestConcurrent,
-                })
-                .pipe(toArray()),
-            );
-            cancel();
+            const cancel = addBackendEventListener(ctx.backend!, task);
+            try {
+              await lastValueFrom(
+                ctx.backend!
+                  .sync(ctx.diff!, {
+                    exitOnFailure: true,
+                    concurrent: opts.requestConcurrent,
+                  })
+                  .pipe(toArray()),
+              );
+            } finally {
+              cancel();
+            }
           },
           exitOnError: true,
         },

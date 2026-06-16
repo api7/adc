@@ -22,18 +22,19 @@ export const mockBackend = (): ADCSDK.Backend => {
       return Promise.resolve({});
     }
     public dump() {
-      return of(this.cache.config);
+      return of(this.cache.config ?? {});
     }
     public sync(events: Array<ADCSDK.Event>) {
       const config: ADCSDK.Configuration = {};
+      const configByKey = config as Record<string, unknown[]>;
       const resourceTypeToPluralKey = (type: ADCSDK.ResourceType) =>
         pluralize.plural(type);
       return from(events).pipe(
         tap((event) => {
           if (event.type === ADCSDK.EventType.DELETE) return;
           const key = resourceTypeToPluralKey(event.resourceType);
-          if (!config[key]) config[key] = [];
-          config[key].push(event.newValue);
+          if (!configByKey[key]) configByKey[key] = [];
+          configByKey[key].push(event.newValue);
         }),
         toArray(),
         switchMap(

@@ -22,7 +22,7 @@ const keepAlive: HttpOptions = {
   maxSockets: 256, // per host
   maxFreeSockets: 16, // per host free
   freeSocketTimeout:
-    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT) || 50000, // free socket keepalive for 50 seconds, and if the ADC_INGRESS_FREE_SOCKET_TIMEOUT environment variable is provided, it takes precedence.
+    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT ?? '') || 50000, // free socket keepalive for 50 seconds, and if the ADC_INGRESS_FREE_SOCKET_TIMEOUT environment variable is provided, it takes precedence.
 };
 const httpAgent = new HttpAgent(keepAlive);
 
@@ -70,17 +70,17 @@ export const syncHandler: RequestHandler<
     // load and filter remote configuration
     const backend = loadBackend(task.opts.backend, {
       ...task.opts,
-      server: Array.isArray(task.opts.server)
+      server: (Array.isArray(task.opts.server)
         ? task.opts.server.join(',')
-        : task.opts.server,
+        : task.opts.server) as string,
       httpAgent,
-      httpsAgent: task.opts.tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
+      httpsAgent: (task.opts as any).tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
     });
 
     backend.on('AXIOS_DEBUG', ({ description, response }) =>
       logger.log({
         level: 'debug',
-        message: description,
+        message: description ?? '',
         request: {
           method: response.config.method,
           url: response.config.url,
@@ -101,7 +101,7 @@ export const syncHandler: RequestHandler<
       task.opts.includeResourceType,
       task.opts.excludeResourceType,
     );
-    [remote] = filterConfiguration(remote, task.opts.labelSelector);
+    [remote] = filterConfiguration(remote, task.opts.labelSelector ?? {});
 
     // diff local and remote configuration
     const diff = DifferV3.diff(
@@ -205,7 +205,7 @@ const generateOutput = ([results, successes, faileds]: [
         server,
         event: simplifyEvent(event),
         failed_at: new Date(axiosResponse?.headers?.date ?? date).toISOString(),
-        reason: error.message,
+        reason: error?.message ?? '',
         ...(axiosResponse && formatAxiosResponse(axiosResponse)),
       })),
     ],

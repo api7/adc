@@ -46,8 +46,8 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
           task: async (ctx) => {
             try {
               const results = await lastValueFrom(
-                ctx.backend
-                  .sync(ctx.diff, {
+                ctx.backend!
+                  .sync(ctx.diff!, {
                     exitOnFailure: false,
                     concurrent: opts.requestConcurrent,
                   })
@@ -88,7 +88,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
                     failed_at: new Date(
                       axiosResponse?.headers?.date ?? new Date(),
                     ).toISOString(),
-                    reason: error.message,
+                    reason: error?.message ?? '',
                     ...(axiosResponse && {
                       response: {
                         status: axiosResponse.status,
@@ -102,6 +102,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
               process.stdout.write(JSON.stringify(output));
             } catch (err) {
               process.stderr.write(toString(err));
+              throw err;
             }
           },
         },

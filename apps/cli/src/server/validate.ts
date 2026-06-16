@@ -16,7 +16,7 @@ const keepAlive: HttpOptions = {
   maxSockets: 256, // per host
   maxFreeSockets: 16, // per host free
   freeSocketTimeout:
-    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT) || 50000,
+    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT ?? '') || 50000,
 };
 const httpAgent = new HttpAgent(keepAlive);
 
@@ -69,21 +69,23 @@ export const validateHandler: RequestHandler<
     // initialize backend
     const backend = loadBackend(task.opts.backend, {
       ...task.opts,
-      server: Array.isArray(task.opts.server)
+      server: (Array.isArray(task.opts.server)
         ? task.opts.server.join(',')
-        : task.opts.server,
+        : task.opts.server) as string,
       httpAgent,
-      httpsAgent: task.opts.tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
+      httpsAgent: (task.opts as any).tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
     });
 
     backend.on('AXIOS_DEBUG', ({ description, response }) =>
       logger.log({
         level: 'debug',
-        message: description,
+        message: description ?? '',
         request: {
           method: response.config.method,
           url: response.config.url,
-          headers: response.config.headers,
+          headers:
+            ((response.config.headers['X-API-KEY'] = '*****'),
+            response.config.headers),
           data: response.config.data,
         },
         response: {

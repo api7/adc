@@ -3,6 +3,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
 import { lastValueFrom } from 'rxjs';
 
+import type { TaskContext } from '../command/diff.command';
 import {
   addBackendEventListener,
   filterConfiguration,
@@ -19,19 +20,20 @@ export const LoadRemoteConfigurationTask = ({
   labelSelector,
   includeResourceType,
   excludeResourceType,
-}: LoadRemoteConfigurationTaskOptions): ListrTask => ({
+}: LoadRemoteConfigurationTaskOptions): ListrTask<TaskContext> => ({
   title: 'Load remote configuration',
   task: async (ctx, task) => {
     return task.newListr([
       {
         title: 'Fetch all configuration',
         task: async (ctx, task) => {
-          const cancel = addBackendEventListener(ctx.backend, task);
-          ctx.remote = await lastValueFrom(
-            (ctx.backend as ADCSDK.Backend).dump(),
-          );
-          ctx.remote = structuredClone(ctx.remote); //TODO: refactor this to immer produce
-          cancel();
+          const cancel = addBackendEventListener(ctx.backend!, task);
+          try {
+            ctx.remote = await lastValueFrom(ctx.backend!.dump());
+            ctx.remote = structuredClone(ctx.remote); //TODO: refactor this to immer produce
+          } finally {
+            cancel();
+          }
         },
       },
       {
@@ -39,7 +41,7 @@ export const LoadRemoteConfigurationTask = ({
         enabled: () =>
           //TODO implement API-level resource filtering on APISIX backend
           !(ctx.backend instanceof BackendAPI7) &&
-          (includeResourceType?.length > 0 || excludeResourceType?.length > 0),
+          ((includeResourceType?.length ?? 0) > 0 || (excludeResourceType?.length ?? 0) > 0),
         task: () => {
           ctx.remote = filterResourceType(
             ctx.remote,
@@ -52,7 +54,7 @@ export const LoadRemoteConfigurationTask = ({
         title: 'Filter remote configuration',
         enabled: !!labelSelector,
         task: (ctx) => {
-          [ctx.remote] = filterConfiguration(ctx.remote, labelSelector);
+          [ctx.remote] = filterConfiguration(ctx.remote!, labelSelector!);
         },
       },
     ]);

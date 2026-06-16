@@ -3,12 +3,13 @@ import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import { ListrTask } from 'listr2';
 import { readFileSync } from 'node:fs';
 
+import type { TaskContext } from '../command/diff.command';
 import { loadBackend } from '../command/utils';
 
 export const InitializeBackendTask = (
   type: string,
   opts: ADCSDK.BackendOptions,
-): ListrTask => ({
+): ListrTask<TaskContext> => ({
   task: async (ctx) => {
     const keepAlive: HttpOptions = {
       keepAlive: true,

@@ -236,7 +236,7 @@ describe('Server - Basic', () => {
             expect(res.statusCode).toBe(202);
             expect(JSON.parse(body).status).toBe('success');
             resolve({
-              status: res.statusCode,
+              status: res.statusCode ?? 0,
               data: JSON.parse(body),
             });
           });
