@@ -6,6 +6,8 @@ import YAML from 'js-yaml';
 import { ListrTask } from 'listr2';
 import path from 'node:path';
 
+import type { TaskContext } from '../command/diff.command';
+
 import {
   fillLabels,
   filterResourceType,
@@ -20,9 +22,7 @@ export const LoadLocalConfigurationTask = (
   labelSelector?: ADCSDK.BackendOptions['labelSelector'],
   includeResourceType?: Array<ADCSDK.ResourceType>,
   excludeResourceType?: Array<ADCSDK.ResourceType>,
-): ListrTask<{
-  local: ADCSDK.Configuration;
-}> => ({
+): ListrTask<TaskContext> => ({
   title: `Load local configuration`,
   task: async (ctx, task) => {
     if (!files || files.length <= 0) files = ['adc.yaml'];
@@ -81,13 +81,13 @@ export const LoadLocalConfigurationTask = (
         {
           title: 'Resolve value variables',
           task: async () => {
-            ctx.local = recursiveReplaceEnvVars(ctx.local);
+            ctx.local = recursiveReplaceEnvVars(ctx.local!);
           },
         },
         {
           title: 'Filter configuration resource type',
           enabled: () =>
-            includeResourceType?.length > 0 || excludeResourceType?.length > 0,
+            (includeResourceType?.length ?? 0) > 0 || (excludeResourceType?.length ?? 0) > 0,
           task: () => {
             ctx.local = filterResourceType(
               ctx.local,

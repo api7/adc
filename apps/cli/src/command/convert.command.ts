@@ -19,8 +19,9 @@ interface ConvertOptions {
   verbose: number;
 }
 
-type ConvertContext = TaskContext & {
-  buffer?: Array<ADCSDK.Configuration>;
+type ConvertContext = Omit<TaskContext, 'local'> & {
+  local: ADCSDK.Configuration;
+  buffer: Array<ADCSDK.Configuration>;
 };
 
 class BaseConvertCommand extends BaseCommand {
@@ -77,9 +78,10 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
                 );
                 ctx.buffer.push(cloneDeep(config));
               } catch (error) {
-                error.message = error.message.replace('\n', '');
-                error.stack = '';
-                throw error;
+                const err = error as Error;
+                err.message = err.message.replace('\n', '');
+                err.stack = '';
+                throw err;
               }
             },
           };
@@ -87,7 +89,7 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
         {
           title: 'Write converted OpenAPI file',
           task: (ctx, task) => {
-            ctx.local.services = ctx.buffer.flatMap((item) => item.services);
+            ctx.local.services = ctx.buffer.flatMap((item) => item.services ?? []);
             const yamlStr = dump(ctx.local, { noRefs: true, sortKeys: true });
             writeFileSync(opts.output, yamlStr);
             task.title = `Converted OpenAPI file to "${resolve(

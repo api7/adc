@@ -39,14 +39,14 @@ export const toKVConfiguration = (
         return [
           resourceType,
           Object.fromEntries(
-            configuration.ssls.map((item) => [item.snis.join(','), item]),
+            configuration.ssls!.map((item) => [item.snis.join(','), item]),
           ),
         ];
       } else if (resourceType === 'consumers') {
         return [
           resourceType,
           Object.fromEntries(
-            configuration.consumers.map((item) => [item.username, item]),
+            configuration.consumers!.map((item) => [item.username, item]),
           ),
         ];
       } else if (
@@ -63,7 +63,7 @@ export const toKVConfiguration = (
         return [
           resourceType,
           Object.fromEntries(
-            (Array.isArray(resources) ? resources : []).map((item) => [
+            (Array.isArray(resources) ? resources : []).map((item: any) => [
               item.name,
               item,
             ]),
@@ -100,7 +100,7 @@ export const mergeKVConfigurations = (
   configurations: Record<string, KVConfiguration>,
 ) => {
   const configurationArr = Object.entries(configurations); // [string, KVConfiguration]
-  const baseConfiguration = configurationArr.shift()[1];
+  const baseConfiguration = configurationArr.shift()![1] as Record<string, any>;
   configurationArr.forEach(
     ([fileName, configuration]: [string, KVConfiguration]) => {
       Object.entries(configuration).forEach(
@@ -122,7 +122,7 @@ export const mergeKVConfigurations = (
       );
     },
   );
-  return baseConfiguration;
+  return baseConfiguration as KVConfiguration;
 };
 
 export const filterConfiguration = (
@@ -130,12 +130,13 @@ export const filterConfiguration = (
   rules: Record<string, string>,
 ): [ADCSDK.Configuration, ADCSDK.Configuration] => {
   const removed: ADCSDK.Configuration = {};
-  Object.keys(configuration).forEach((resourceType) => {
+  const cfg = configuration as Record<string, any>;
+  Object.keys(cfg).forEach((resourceType) => {
     if (resourceType === 'plugin_metadata' || resourceType === 'global_rules')
       return;
-    const result = labelFilter(configuration[resourceType], rules);
-    configuration[resourceType] = result.filtered;
-    removed[resourceType] = result.removed;
+    const result = labelFilter(cfg[resourceType], rules);
+    cfg[resourceType] = result.filtered;
+    (removed as Record<string, any>)[resourceType] = result.removed;
   });
 
   return [configuration, removed];
@@ -169,10 +170,11 @@ export const fillLabels = (
       ? Object.assign(labels ?? {}, rules)
       : labels;
 
-  for (const resourceType in configuration) {
+  const fillCfg = configuration as Record<string, any>;
+  for (const resourceType in fillCfg) {
     if (['global_rules', 'plugin_metadata'].includes(resourceType)) continue;
 
-    (configuration[resourceType] as Array<ADCSDK.ResourceFor<any>>).forEach(
+    (fillCfg[resourceType] as Array<ADCSDK.ResourceFor<any>>).forEach(
       (resource) => {
         resource.labels = assignSelector(resource.labels as ADCSDK.Labels);
 
@@ -180,15 +182,15 @@ export const fillLabels = (
         if (resourceType === 'services') {
           const sub = resource as ADCSDK.Service;
           sub?.routes?.forEach((item) => {
-            item.labels = assignSelector(item.labels);
+            item.labels = assignSelector(item.labels!);
           });
           sub?.stream_routes?.forEach((item) => {
-            item.labels = assignSelector(item.labels);
+            item.labels = assignSelector(item.labels!);
           });
         } else if (resourceType === 'consumer_groups') {
           const sub = resource as ADCSDK.ConsumerGroup;
           sub?.consumers?.forEach((item) => {
-            item.labels = assignSelector(item.labels);
+            item.labels = assignSelector(item.labels!);
           });
         }
       },
@@ -203,7 +205,7 @@ export const filterResourceType = (
   includes?: Array<string>,
   excludes?: Array<string>,
 ) => {
-  const key = (item) =>
+  const key = (item: string) =>
     item !== ADCSDK.ResourceType.PLUGIN_METADATA ? item.slice(0, -1) : item;
   return Object.fromEntries(
     Object.entries(config).filter(([resourceType]) => {
@@ -291,16 +293,16 @@ export const resortConfiguration = (
         ];
       return [
         key,
-        (Array.isArray(value) ? value : []).sort((a, b) => {
+        (Array.isArray(value) ? value : []).sort((a: any, b: any) => {
           // sort nested resources
           if (key === 'services') {
-            if (a.routes) a.routes.sort((x, y) => x.name.localeCompare(y.name));
+            if (a.routes) a.routes.sort((x: any, y: any) => x.name.localeCompare(y.name));
             if (a.stream_routes)
-              a.stream_routes.sort((x, y) => x.name.localeCompare(y.name));
+              a.stream_routes.sort((x: any, y: any) => x.name.localeCompare(y.name));
           }
           if (key === 'consumers') {
             if (a.credentials)
-              a.credentials.sort((x, y) => x.name.localeCompare(y.name));
+              a.credentials.sort((x: any, y: any) => x.name.localeCompare(y.name));
           }
           // sort by name or username
           if (a.name && b.name) return a.name.localeCompare(b.name);
@@ -336,7 +338,7 @@ export const buildReqAndRespDebugOutput = (
     messages: [
       `${desc ?? ''}\n`, //TODO time consumption
       // request
-      `${config.method.toUpperCase()} ${axios.getUri(config)}\n`,
+      `${config.method!.toUpperCase()} ${axios.getUri(config)}\n`,
       ...transformHeaders(config.headers),
       config?.data ? `\n${config.data}\n` : '',
       '\n',

@@ -2,16 +2,15 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
 import { lastValueFrom } from 'rxjs';
 
-export const ValidateTask = (): ListrTask<{
-  backend: ADCSDK.Backend;
-  diff: ADCSDK.Event[];
-}> => ({
+import type { TaskContext } from '../command/diff.command';
+
+export const ValidateTask = (): ListrTask<TaskContext> => ({
   title: 'Validate configuration against backend',
   task: async (ctx) => {
-    if (!ctx.backend.validate)
+    if (!ctx.backend!.validate)
       throw new Error(`Validate is not supported by the current backend.`);
 
-    const result = await lastValueFrom(ctx.backend.validate(ctx.diff));
+    const result = await lastValueFrom(ctx.backend!.validate(ctx.diff!));
     if (result.success) return;
 
     throw buildPlainTextError(result);

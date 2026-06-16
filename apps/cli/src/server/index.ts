@@ -65,12 +65,12 @@ export class ADCServer {
         const listen = this.opts.listen;
         if (listen.protocol === 'unix:') {
           if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
-          this.server.listen(listen.pathname, () => {
+          this.server!.listen(listen.pathname, () => {
             fs.chmodSync(listen.pathname, 0o660);
             resolve();
           });
         } else {
-          this.serverStatus = this.server.listen(
+          this.serverStatus = this.server!.listen(
             parseInt(listen.port),
             listen.hostname,
             () => resolve(),

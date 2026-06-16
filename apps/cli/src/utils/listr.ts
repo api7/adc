@@ -63,7 +63,7 @@ export class SignaleRenderer implements ListrRenderer {
     if (err) {
       this.getScopedLogger().fatal(err);
     } else {
-      if (this.options.verbose > 0) {
+      if ((this.options.verbose ?? 0) > 0) {
         this.getScopedLogger().star('All is well, see you next time!');
       }
     }
@@ -84,31 +84,31 @@ export class SignaleRenderer implements ListrRenderer {
         if (!task.hasTitle()) return;
 
         if (state === ListrTaskState.STARTED) {
-          if (rendererOptions?.verbose > 0) {
+          if ((rendererOptions?.verbose ?? 0) > 0) {
             this.getScopedLogger(rendererOptions).start(task.title);
           }
         }
         if (state === ListrTaskState.COMPLETED) {
-          if (rendererOptions?.verbose > 0) {
+          if ((rendererOptions?.verbose ?? 0) > 0) {
             this.getScopedLogger(rendererOptions).success(task.title);
           }
         }
         if (state === ListrTaskState.SKIPPED) {
-          if (rendererOptions?.verbose > 0) {
+          if ((rendererOptions?.verbose ?? 0) > 0) {
             this.getScopedLogger(rendererOptions).info(
               `${task.title} is skipped${task.message.skip ? `: ${task.message.skip}` : ''}`,
             );
           }
         }
         if (state === ListrTaskState.FAILED) {
-          if (rendererOptions?.verbose > 0) {
+          if ((rendererOptions?.verbose ?? 0) > 0) {
             this.getScopedLogger(rendererOptions).error(task.title);
           }
         }
       });
 
       task.on(ListrTaskEventType.OUTPUT, (str) => {
-        if (rendererOptions?.verbose <= 0) return;
+        if ((rendererOptions?.verbose ?? 0) <= 0) return;
         const output = attempt(JSON.parse, str) as SignaleRendererOutput;
         if (isError(output)) return;
         if (!output.type || !output.messages) return;

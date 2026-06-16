@@ -89,10 +89,10 @@ export class BackendCommand<
 
   private addBackendOptions() {
     const parseResourceTypeFilter = (
-      cv: ADCSDK.ResourceType,
+      cv: string,
       pv: Array<string> = [],
     ) => {
-      const resourceTypes = Object.values(ADCSDK.ResourceType);
+      const resourceTypes = Object.values(ADCSDK.ResourceType) as string[];
       if (!resourceTypes.includes(cv))
         throw new InvalidArgumentError(
           `Allowed choices are ${resourceTypes.join(', ')}.`,

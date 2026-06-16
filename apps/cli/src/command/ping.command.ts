@@ -27,7 +27,7 @@ export const PingCommand = new BackendCommand<PingOptions>(
     const tasks = new Listr<TaskContext, typeof SilentRenderer>(
       [
         InitializeBackendTask(opts.backend, opts),
-        { task: async (ctx) => await ctx.backend.ping() },
+        { task: async (ctx) => await ctx.backend!.ping() },
       ],
       { renderer: SilentRenderer },
     );

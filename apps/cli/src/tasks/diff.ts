@@ -11,7 +11,7 @@ export const DiffResourceTask = (
 ): ListrTask<TaskContext> => ({
   title: 'Diff configuration',
   task: async (ctx, task) => {
-    const backend = ctx.backend;
+    const backend = ctx.backend!;
     const defaultValue = await backend.defaultValue();
     const logger = new ListrOutputLogger(task);
     ctx.diff = DifferV3.diff(

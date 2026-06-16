@@ -35,7 +35,7 @@ export const loggerMiddleware: RequestHandler = (req, res, next) => {
   if (req.body)
     logger.log({
       level: 'debug',
-      message: undefined,
+      message: '',
       requestBody: req.body,
       requestId: req.requestId,
     });
