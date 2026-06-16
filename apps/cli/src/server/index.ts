@@ -60,15 +60,17 @@ export class ADCServer {
         this.server = http.createServer(this.express);
         break;
     }
+    if (!this.server) throw new Error('Server not initialized');
+    const server = this.server;
     return Promise.all([
       new Promise<void>((resolve, reject) => {
         const listen = this.opts.listen;
         const onError = (err: Error) => reject(err);
-        this.server!.once('error', onError);
+        server.once('error', onError);
         if (listen.protocol === 'unix:') {
           if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
-          this.server!.listen(listen.pathname, () => {
-            this.server!.removeListener('error', onError);
+          server.listen(listen.pathname, () => {
+            server.removeListener('error', onError);
             fs.chmodSync(listen.pathname, 0o660);
             resolve();
           });
@@ -80,22 +82,23 @@ export class ADCServer {
               : 80;
           if (isNaN(port) || port < 1 || port > 65535)
             throw new Error(`Invalid listen port: "${listen.port}"`);
-          this.server!.listen(port, listen.hostname, () => {
-            this.server!.removeListener('error', onError);
+          server.listen(port, listen.hostname, () => {
+            server.removeListener('error', onError);
             resolve();
           });
         }
       }),
       new Promise<void>((resolve, reject) => {
         const onError = (err: Error) => reject(err);
-        this.serverStatus = this.expressStatus.listen(
+        const statusServer = this.expressStatus.listen(
           this.opts.listenStatus,
           () => {
-            this.serverStatus!.removeListener('error', onError);
+            statusServer.removeListener('error', onError);
             resolve();
           },
         );
-        this.serverStatus.once('error', onError);
+        this.serverStatus = statusServer;
+        statusServer.once('error', onError);
       }),
     ]);
   }

@@ -83,7 +83,9 @@ export const validateHandler: RequestHandler<
         request: {
           method: response.config.method,
           url: response.config.url,
-          headers: response.config.headers,
+          headers:
+            ((response.config.headers['X-API-KEY'] = '*****'),
+            response.config.headers),
           data: response.config.data,
         },
         response: {
