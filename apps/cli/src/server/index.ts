@@ -63,25 +63,39 @@ export class ADCServer {
     return Promise.all([
       new Promise<void>((resolve, reject) => {
         const listen = this.opts.listen;
-        this.server!.once('error', reject);
+        const onError = (err: Error) => reject(err);
+        this.server!.once('error', onError);
         if (listen.protocol === 'unix:') {
           if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
           this.server!.listen(listen.pathname, () => {
+            this.server!.removeListener('error', onError);
             fs.chmodSync(listen.pathname, 0o660);
             resolve();
           });
         } else {
-          this.server!.listen(parseInt(listen.port), listen.hostname, () =>
-            resolve(),
-          );
+          const port = listen.port
+            ? parseInt(listen.port, 10)
+            : listen.protocol === 'https:'
+              ? 443
+              : 80;
+          if (isNaN(port) || port < 1 || port > 65535)
+            throw new Error(`Invalid listen port: "${listen.port}"`);
+          this.server!.listen(port, listen.hostname, () => {
+            this.server!.removeListener('error', onError);
+            resolve();
+          });
         }
       }),
       new Promise<void>((resolve, reject) => {
+        const onError = (err: Error) => reject(err);
         this.serverStatus = this.expressStatus.listen(
           this.opts.listenStatus,
-          () => resolve(),
+          () => {
+            this.serverStatus!.removeListener('error', onError);
+            resolve();
+          },
         );
-        this.serverStatus.once('error', reject);
+        this.serverStatus.once('error', onError);
       }),
     ]);
   }
