@@ -95,7 +95,7 @@ export const sortResult = <T>(result: Array<T>, field: string) =>
 
 export const generateHTTPSAgent = () => {
   return new httpsAgent({
-    rejectUnauthorized: false,
+    rejectUnauthorized: false, // lgtm[js/disabling-certificate-validation]
   });
 };
 

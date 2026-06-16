@@ -668,6 +668,7 @@ export class DifferV3 {
       typeof val === 'object' && !Array.isArray(val);
 
     Object.entries(defaultsClone).forEach(([key, value]) => {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
       // If a specific key does not exist in the resource
       if (isNil(resourceClone[key])) {
         // If the default value to be merged is an object and not an array,
