@@ -61,8 +61,9 @@ export class ADCServer {
         break;
     }
     return Promise.all([
-      new Promise<void>((resolve) => {
+      new Promise<void>((resolve, reject) => {
         const listen = this.opts.listen;
+        this.server!.once('error', reject);
         if (listen.protocol === 'unix:') {
           if (fs.existsSync(listen.pathname)) fs.unlinkSync(listen.pathname);
           this.server!.listen(listen.pathname, () => {
@@ -70,15 +71,17 @@ export class ADCServer {
             resolve();
           });
         } else {
-          this.serverStatus = this.server!.listen(
-            parseInt(listen.port),
-            listen.hostname,
-            () => resolve(),
+          this.server!.listen(parseInt(listen.port), listen.hostname, () =>
+            resolve(),
           );
         }
       }),
-      new Promise<void>((resolve) => {
-        this.expressStatus.listen(this.opts.listenStatus, () => resolve());
+      new Promise<void>((resolve, reject) => {
+        this.serverStatus = this.expressStatus.listen(
+          this.opts.listenStatus,
+          () => resolve(),
+        );
+        this.serverStatus.once('error', reject);
       }),
     ]);
   }

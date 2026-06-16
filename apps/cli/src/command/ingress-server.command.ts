@@ -77,7 +77,9 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
   )
   .handle(
     async ({ listen, listenStatus, tlsCertFile, tlsKeyFile, caCertFile }) => {
-      if (listen!.protocol === 'https:' && (!tlsCertFile || !tlsKeyFile)) {
+      const listenUrl = listen ?? new URL('http://127.0.0.1:3000');
+      const listenStatusPort = listenStatus ?? 3001;
+      if (listenUrl.protocol === 'https:' && (!tlsCertFile || !tlsKeyFile)) {
         console.error(
           chalk.red(
             'Error: When using HTTPS, both --tls-cert-file and --tls-key-file must be provided',
@@ -86,15 +88,15 @@ export const IngressServerCommand = new BaseCommand<IngressServerOptions>(
         return;
       }
       const server = new ADCServer({
-        listen: listen!,
-        listenStatus: listenStatus!,
+        listen: listenUrl,
+        listenStatus: listenStatusPort,
         tlsCert: tlsCertFile ? readFileSync(tlsCertFile, 'utf-8') : undefined,
         tlsKey: tlsKeyFile ? readFileSync(tlsKeyFile, 'utf-8') : undefined,
         tlsCACert: caCertFile ? readFileSync(caCertFile, 'utf-8') : undefined,
       });
       await server.start();
       logger.info(
-        `ADC server is running on: ${listen!.protocol === 'unix:' ? listen!.pathname : listen!.origin}`,
+        `ADC server is running on: ${listenUrl.protocol === 'unix:' ? listenUrl.pathname : listenUrl.origin}`,
       );
       process.on('SIGINT', () => {
         logger.info('Stopping, see you next time!');

@@ -102,6 +102,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
               process.stdout.write(JSON.stringify(output));
             } catch (err) {
               process.stderr.write(toString(err));
+              throw err;
             }
           },
         },

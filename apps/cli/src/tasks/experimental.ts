@@ -1,6 +1,6 @@
-import * as ADCSDK from '@api7/adc-sdk';
 import { readFile } from 'fs/promises';
 import YAML from 'js-yaml';
+import { ConfigurationSchema } from '@api7/adc-sdk/schema';
 
 import type { TaskContext } from '../command/diff.command';
 
@@ -10,6 +10,9 @@ export const ExperimentalRemoteStateFileTask = (file: string) => ({
       (await readFile(file, {
         encoding: 'utf-8',
       })) ?? '';
-    ctx.remote = YAML.load(fileContent) as ADCSDK.Configuration;
+    const parsed = ConfigurationSchema.safeParse(YAML.load(fileContent));
+    if (!parsed.success)
+      throw new Error(`Invalid configuration in "${file}": ${parsed.error.message}`);
+    ctx.remote = parsed.data;
   },
 });

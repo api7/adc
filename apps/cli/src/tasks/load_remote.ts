@@ -28,11 +28,12 @@ export const LoadRemoteConfigurationTask = ({
         title: 'Fetch all configuration',
         task: async (ctx, task) => {
           const cancel = addBackendEventListener(ctx.backend!, task);
-          ctx.remote = await lastValueFrom(
-            ctx.backend!.dump(),
-          );
-          ctx.remote = structuredClone(ctx.remote); //TODO: refactor this to immer produce
-          cancel();
+          try {
+            ctx.remote = await lastValueFrom(ctx.backend!.dump());
+            ctx.remote = structuredClone(ctx.remote); //TODO: refactor this to immer produce
+          } finally {
+            cancel();
+          }
         },
       },
       {

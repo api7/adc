@@ -62,14 +62,18 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
         {
           // Remove output resource metadata fields
           enabled: !opts.withId,
-          task: (ctx) => recursiveRemoveMetadataField(ctx.remote!),
+          task: (ctx) => {
+            if (!ctx.remote) throw new Error('Remote configuration not loaded');
+            recursiveRemoveMetadataField(ctx.remote);
+          },
         },
         {
           title: 'Write to dump file',
           task: async (ctx, task) => {
+            if (!ctx.remote) throw new Error('Remote configuration not loaded');
             await writeFile(
               opts.output,
-              dump(resortConfiguration(ctx.remote!), {
+              dump(resortConfiguration(ctx.remote), {
                 noRefs: true,
                 sortKeys: true,
               }),

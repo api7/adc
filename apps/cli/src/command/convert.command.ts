@@ -78,7 +78,7 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
                 );
                 ctx.buffer.push(cloneDeep(config));
               } catch (error) {
-                const err = error as Error;
+                const err = error instanceof Error ? error : new Error(String(error));
                 err.message = err.message.replace('\n', '');
                 err.stack = '';
                 throw err;
@@ -107,8 +107,8 @@ const OpenAPICommand = new BaseConvertCommand('openapi')
 
     try {
       await tasks.run();
-    } catch (err) {
-      /* ignore */
+    } catch {
+      process.exit(1);
     }
   });
 
