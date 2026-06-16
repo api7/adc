@@ -4,8 +4,8 @@ packages:
 autoInstallPeers: true
 
 catalog:
-  "@types/lodash-es": ^4.17.12
-  "@types/semver": ^7.7.1
+  '@types/lodash-es': ^4.17.12
+  '@types/semver': ^7.7.1
   axios: 1.15.2
   datum-diff: 1.0.4
   esbuild: ^0.28.0
@@ -17,19 +17,19 @@ catalog:
   semver: ^7.7.4
   source-map-support: ^0.5.21
   tslib: ^2.6.2
-  vitest: ^4.1.7
+  vitest: ^4.1.8
   zod: ^4.1.12
 
 catalogMode: manual
 
 minimumReleaseAge: 1440
 publicHoistPattern:
-  - "@types/*"
+  - '@types/*'
 
 strictPeerDependencies: false
 onlyBuiltDependencies:
-  - "@parcel/watcher"
-  - "nx"
+  - '@parcel/watcher'
+  - 'nx'
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': true
