@@ -6,6 +6,7 @@ import { gt, lte } from 'semver';
 import { BackendAPISIXStandalone } from '../src';
 import {
   config as configCache,
+  invalidate as invalidateCache,
   latestVersion as latestVersionCache,
   rawConfig as rawConfigCache,
 } from '../src/cache';
@@ -440,4 +441,102 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
       expect(rawConfig?.ssls_conf_version).toBeLessThan(200);
     },
   );
+});
+
+describe('Cache - bypassCache invalidation', () => {
+  let backend: BackendAPISIXStandalone;
+  const cacheKey = 'default';
+
+  const syncedConfig = {
+    services: [
+      {
+        name: 'service1',
+        upstream: { nodes: [{ host: '127.0.0.1', port: 9180, weight: 100 }] },
+        routes: [{ name: 'route1', uris: ['/'] }],
+      },
+    ],
+  } as ADCSDK.Configuration;
+
+  // Data that does not exist in APISIX, injected directly into the cache to simulate staleness
+  const staleConfig = {
+    services: [
+      {
+        name: 'stale-service',
+        upstream: { nodes: [{ host: '1.2.3.4', port: 80, weight: 100 }] },
+        routes: [{ name: 'stale-route', uris: ['/stale'] }],
+      },
+    ],
+  } as ADCSDK.Configuration;
+
+  beforeAll(async () => {
+    await restartAPISIX();
+    // Previous describe blocks may leave stale entries (e.g. rawConfigCache) that
+    // would cause duplicate-ID errors when the operator builds the PUT payload.
+    invalidateCache(cacheKey);
+    backend = new BackendAPISIXStandalone({
+      server: server1,
+      token: token1,
+      tlsSkipVerify: true,
+      cacheKey,
+      ...defaultBackendOptions,
+    });
+  });
+
+  afterAll(() => (configCache.clear(), rawConfigCache.clear()));
+
+  it('initialize cache and sync config to APISIX', async () => {
+    await dumpConfiguration(backend);
+    mockStableTimestamp.mockReturnValueOnce(Date.now());
+    const events = DifferV3.diff(syncedConfig, {});
+    await syncEvents(backend, events);
+    expect(configCache.get(cacheKey)).toMatchObject(syncedConfig);
+  });
+
+  it('inject stale data into cache', () => {
+    configCache.set(cacheKey, staleConfig);
+    expect(configCache.get(cacheKey)).toMatchObject(staleConfig);
+  });
+
+  it('dump without bypassCache returns stale data (no API call)', async () => {
+    let apiCall = 0;
+    const sub = backend.on('AXIOS_DEBUG', () => apiCall++);
+    const result = await dumpConfiguration(backend);
+    sub.unsubscribe();
+
+    expect(apiCall).toEqual(0);
+    expect(result.services?.[0].name).toEqual('stale-service');
+  });
+
+  it('dump with bypassCache fetches fresh data from APISIX', async () => {
+    const freshBackend = new BackendAPISIXStandalone({
+      server: server1,
+      token: token1,
+      tlsSkipVerify: true,
+      cacheKey,
+      bypassCache: true,
+      ...defaultBackendOptions,
+    });
+
+    let apiCall = 0;
+    const sub = freshBackend.on('AXIOS_DEBUG', () => apiCall++);
+    const result = await dumpConfiguration(freshBackend);
+    sub.unsubscribe();
+
+    expect(apiCall).toBeGreaterThan(0);
+    expect(result).toMatchObject(syncedConfig);
+  });
+
+  it('cache is repopulated with fresh data after bypassCache dump', () => {
+    expect(configCache.get(cacheKey)).toMatchObject(syncedConfig);
+  });
+
+  it('subsequent dump without bypassCache serves repopulated cache (no API call)', async () => {
+    let apiCall = 0;
+    const sub = backend.on('AXIOS_DEBUG', () => apiCall++);
+    const result = await dumpConfiguration(backend);
+    sub.unsubscribe();
+
+    expect(apiCall).toEqual(0);
+    expect(result).toMatchObject(syncedConfig);
+  });
 });

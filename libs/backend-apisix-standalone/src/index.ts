@@ -6,6 +6,7 @@ import semver, { SemVer, eq as semverEQ } from 'semver';
 
 import {
   config as configCache,
+  invalidate as invalidateCache,
   latestVersion as latestVersionCache,
   rawConfig as rawConfigCache,
   version as versionCache,
@@ -13,6 +14,8 @@ import {
 import { Fetcher } from './fetcher';
 import { Operator } from './operator';
 import * as typing from './typing';
+
+type BackendOpts = ADCSDK.BackendOptions & { bypassCache?: boolean };
 
 export class BackendAPISIXStandalone implements ADCSDK.Backend {
   private static logScope = ['APISIX'];
@@ -24,7 +27,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
     string
   >();
 
-  constructor(private readonly opts: ADCSDK.BackendOptions) {
+  constructor(private readonly opts: BackendOpts) {
     const servers = opts.server.split(',');
     const tokens = opts.token.split(',');
     servers.forEach((server, idx) => {
@@ -94,6 +97,7 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
   // 2.2. Find the latest updated server among them and it will be used as the initial cache
   // 3. Transform and return that configuration
   public dump(): Observable<ADCSDK.Configuration> {
+    if (this.opts.bypassCache) invalidateCache(this.opts.cacheKey!);
     return from(this.version()).pipe<ADCSDK.Configuration>(
       switchMap((version) => {
         const cachedConfig = configCache.get(this.opts.cacheKey!);
