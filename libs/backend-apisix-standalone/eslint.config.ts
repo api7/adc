@@ -16,7 +16,14 @@ export default config([
             '{projectRoot}/test/**/*',
             '{projectRoot}/e2e/**/*',
           ],
-          ignoredDependencies: ['tslib'],
+          ignoredDependencies: [
+            'tslib',
+            // lru-cache v11 does not expose ./package.json via its exports map, and its
+            // dist/commonjs/package.json lacks name/version fields. Nx's package resolver
+            // hits that incomplete package.json and returns null instead of walking up to
+            // the real one, so the import in cache.ts is never recorded as an npm dep.
+            'lru-cache',
+          ],
         },
       ],
     },
