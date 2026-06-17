@@ -97,7 +97,13 @@ export class BackendAPISIXStandalone implements ADCSDK.Backend {
   // 2.2. Find the latest updated server among them and it will be used as the initial cache
   // 3. Transform and return that configuration
   public dump(): Observable<ADCSDK.Configuration> {
-    if (this.opts.bypassCache) invalidateCache(this.opts.cacheKey!);
+    if (this.opts.bypassCache) {
+      invalidateCache(this.opts.cacheKey!);
+      this.subject.next({
+        type: ADCSDK.BackendEventType.TASK_START,
+        event: { name: `Cache invalidated for key: "${this.opts.cacheKey!}"` },
+      });
+    }
     return from(this.version()).pipe<ADCSDK.Configuration>(
       switchMap((version) => {
         const cachedConfig = configCache.get(this.opts.cacheKey!);

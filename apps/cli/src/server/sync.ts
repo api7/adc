@@ -77,6 +77,9 @@ export const syncHandler: RequestHandler<
       httpsAgent: (task.opts as any).tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
     });
 
+    backend.on('TASK_START', ({ name }) =>
+      logger.log({ level: 'info', message: name ?? '', requestId: req.requestId }),
+    );
     backend.on('AXIOS_DEBUG', ({ description, response }) =>
       logger.log({
         level: 'debug',
