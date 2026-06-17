@@ -4,8 +4,13 @@ import { type SemVer } from 'semver';
 
 import * as typing from './typing';
 
-const max = Number(process.env.ADC_STANDALONE_CACHE_MAX ?? 16);
-const ttl = Number(process.env.ADC_STANDALONE_CACHE_TTL_MS ?? 3_600_000);
+const parseEnvInt = (value: string | undefined, defaultVal: number): number => {
+  const n = Number(value ?? defaultVal);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : defaultVal;
+};
+
+const max = parseEnvInt(process.env.ADC_STANDALONE_CACHE_MAX, 16);
+const ttl = parseEnvInt(process.env.ADC_STANDALONE_CACHE_TTL_MS, 3_600_000);
 
 export const version = new LRUCache<string, SemVer>({ max, ttl });
 export const latestVersion = new LRUCache<string, number>({ max, ttl });
