@@ -26,6 +26,7 @@
     "axios": "catalog:",
     "rxjs": "catalog:",
     "lodash-es": "catalog:",
+    "lru-cache": "catalog:",
     "zod": "catalog:",
     "tslib": "catalog:",
     "semver": "catalog:"
