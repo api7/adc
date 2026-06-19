@@ -22,7 +22,7 @@
     "@vitest/ui": "^4.1.7",
     "esbuild": "^0.28.1",
     "eslint": "^10.0.0",
-    "eslint-config-prettier": "10.1.5",
+    "eslint-config-prettier": "10.1.8",
     "jiti": "2.4.2",
     "jsonc-eslint-parser": "^3.1.0",
     "nx": "22.7.5",
