@@ -1,11 +1,11 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3.js';
+import { Differ } from '../index.js';
 
 describe('Differ V3 - usecase', () => {
   it('rename service with nested routes', () => {
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -158,7 +158,7 @@ describe('Differ V3 - usecase', () => {
 
   it('should selectively merge the objects in default values, on a service', () => {
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {

@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { ListrTask } from 'listr2';
 
@@ -14,7 +14,7 @@ export const DiffResourceTask = (
     const backend = ctx.backend!;
     const defaultValue = await backend.defaultValue();
     const logger = new ListrOutputLogger(task);
-    ctx.diff = DifferV3.diff(
+    ctx.diff = Differ.diff(
       ctx.local as ADCSDK.InternalConfiguration,
       ctx.remote as ADCSDK.InternalConfiguration,
       defaultValue,

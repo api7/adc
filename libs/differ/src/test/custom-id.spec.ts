@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3.js';
+import { Differ } from '../index.js';
 
 describe('Differ V3 - resources custom id', () => {
   it('should delete and create new resource when update resource id (with nested resource)', () => {
@@ -11,7 +11,7 @@ describe('Differ V3 - resources custom id', () => {
     const customId1 = 'custom-id-1';
     const customId2 = 'custom-id-2';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {

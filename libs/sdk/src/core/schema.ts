@@ -2,6 +2,8 @@ import { isNil } from 'lodash-es';
 import type { ZodRawShape } from 'zod';
 import { z } from 'zod';
 
+import { FieldListType } from './resource';
+
 const idSchema = z
   .string()
   .min(1)
@@ -227,10 +229,11 @@ const routeSchema = z.strictObject({
       }),
     )
     .optional(),
-  plugins: pluginsSchema.optional(),
+  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
   filter_func: z.string().optional(),
 });
 export type Route = z.infer<typeof routeSchema>;
+export { routeSchema };
 
 const streamRouteSchema = z.strictObject({
   id: idSchema.optional(),
@@ -238,7 +241,7 @@ const streamRouteSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema.optional(),
+  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
 
   remote_addr: z.string().optional(),
   server_addr: z.string().optional(),
@@ -246,31 +249,36 @@ const streamRouteSchema = z.strictObject({
   sni: hostSchema.optional(),
 });
 export type StreamRoute = z.infer<typeof streamRouteSchema>;
+export { streamRouteSchema };
 
-const serviceSchema = z
-  .strictObject({
-    id: idSchema.optional(),
-    name: nameSchema,
-    description: descriptionSchema.optional(),
-    labels: labelsSchema.optional(),
+export const serviceBaseSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: nameSchema,
+  description: descriptionSchema.optional(),
+  labels: labelsSchema.optional(),
 
-    upstream: upstreamSchema().optional(),
-    upstreams: z
-      .array(
-        upstreamSchema({
-          id: idSchema.optional(),
-          name: z.string(),
-        }),
-      )
-      .optional(),
-    plugins: pluginsSchema.optional(),
-    path_prefix: z.string().optional(),
-    strip_path_prefix: z.boolean().optional(),
-    hosts: z.array(hostSchema).optional(),
+  upstream: upstreamSchema().optional(),
+  upstreams: z
+    .array(
+      upstreamSchema({
+        id: idSchema.optional(),
+        name: z.string(),
+      }),
+    )
+    .optional()
+    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
+  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
+  path_prefix: z.string().optional(),
+  strip_path_prefix: z.boolean().optional(),
+  hosts: z.array(hostSchema).optional(),
 
-    routes: z.array(routeSchema).optional(),
-    stream_routes: z.array(streamRouteSchema).optional(),
-  })
+  routes: z.array(routeSchema).optional().meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
+  stream_routes: z
+    .array(streamRouteSchema)
+    .optional()
+    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
+});
+const serviceSchema = serviceBaseSchema
   .refine(
     (val) => !(Array.isArray(val.routes) && Array.isArray(val.stream_routes)),
     {
@@ -292,15 +300,18 @@ const sslCertificateSchema = z.strictObject({
   key: certificateKeySchema,
 });
 export type SSLCertificate = z.infer<typeof sslCertificateSchema>;
-const sslSchema = z.strictObject({
+export const sslSchema = z.strictObject({
   id: idSchema.optional(),
   labels: labelsSchema.optional(),
 
   type: z.enum(['server', 'client']).default('server').optional(),
   snis: z.array(hostSchema).min(1),
-  certificates: z.array(sslCertificateSchema).refine((val) => val.length > 0, {
-    error: 'SSL must contain at least one certificate',
-  }),
+  certificates: z
+    .array(sslCertificateSchema)
+    .refine((val) => val.length > 0, {
+      error: 'SSL must contain at least one certificate',
+    })
+    .meta({ listType: FieldListType.ARRAY, stripItemFields: ['key'] }),
   client: z
     .strictObject({
       ca: certificateSchema,
@@ -334,25 +345,31 @@ const consumerCredentialSchema = z.strictObject({
   config: pluginSchema,
 });
 export type ConsumerCredential = z.infer<typeof consumerCredentialSchema>;
-const consumerSchema = z.strictObject({
+export const consumerSchema = z.strictObject({
   username: nameSchema,
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema.optional(),
-  credentials: z.array(consumerCredentialSchema).optional(),
+  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
+  credentials: z
+    .array(consumerCredentialSchema)
+    .optional()
+    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true, configKey: 'consumer_credentials' }),
 });
 export type Consumer = z.infer<typeof consumerSchema>;
 
-const consumerGroupSchema = z.strictObject({
+export const consumerGroupSchema = z.strictObject({
   id: idSchema.optional(),
   name: nameSchema,
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema,
+  plugins: pluginsSchema.meta({ listType: FieldListType.OBJECT_MAP }),
 
-  consumers: z.array(consumerSchema).optional(),
+  consumers: z
+    .array(consumerSchema)
+    .optional()
+    .meta({ listType: FieldListType.MAP, listMapKey: 'username', nested: true }),
 });
 export type ConsumerGroup = z.infer<typeof consumerGroupSchema>;
 

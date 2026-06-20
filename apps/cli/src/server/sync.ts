@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import { AxiosResponse } from 'axios';
@@ -107,7 +107,7 @@ export const syncHandler: RequestHandler<
     [remote] = filterConfiguration(remote, task.opts.labelSelector ?? {});
 
     // diff local and remote configuration
-    const diff = DifferV3.diff(
+    const diff = Differ.diff(
       local,
       remote as ADCSDK.InternalConfiguration,
       await backend.defaultValue(),

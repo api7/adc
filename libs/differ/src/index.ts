@@ -1,1 +1,1 @@
-export { DifferV3, DifferV3 as Differ } from './differv3.js';
+export { DifferV4, DifferV4 as Differ } from './differv4.js';

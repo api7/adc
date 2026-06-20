@@ -1,13 +1,13 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3.js';
+import { Differ } from '../index.js';
 
 describe('Differ V3 - consumer', () => {
   it('should create/update/delete consumer credentials', () => {
     const consumerName = 'jack';
     const changeme = 'changeme';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -127,7 +127,7 @@ describe('Differ V3 - consumer', () => {
     const consumerName = 'jack';
     const changeme = 'changeme';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [],
         },

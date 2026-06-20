@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { globalAgent as httpAgent } from 'node:http';
 import { lastValueFrom } from 'rxjs';
@@ -12,7 +12,7 @@ import {
 } from './support/utils';
 
 const configToEvents = (config: ADCSDK.Configuration): Array<ADCSDK.Event> => {
-  return DifferV3.diff(
+  return Differ.diff(
     config as ADCSDK.InternalConfiguration,
     {} as ADCSDK.InternalConfiguration,
   );

@@ -1,6 +1,6 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3.js';
+import { Differ } from '../index.js';
 
 describe('Differ V3 - service with upstreams', () => {
   it('should be considered unchanged (only upstream)', () => {
@@ -12,7 +12,7 @@ describe('Differ V3 - service with upstreams', () => {
       },
     };
     expect(
-      DifferV3.diff({ services: [service] }, { services: [service] }),
+      Differ.diff({ services: [service] }, { services: [service] }),
     ).toEqual([] as Array<ADCSDK.Event>);
   });
 
@@ -24,7 +24,7 @@ describe('Differ V3 - service with upstreams', () => {
       upstreams: [{ id: 'non-default', name: 'non-default' }],
     };
     expect(
-      DifferV3.diff({ services: [service] }, { services: [service] }),
+      Differ.diff({ services: [service] }, { services: [service] }),
     ).toEqual([] as Array<ADCSDK.Event>);
   });
 
@@ -37,7 +37,7 @@ describe('Differ V3 - service with upstreams', () => {
       upstream: { nodes: [{ host: upstreamName, port: 80, weight: 1 }] },
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         { services: [service] },
         {
           services: [
@@ -72,7 +72,7 @@ describe('Differ V3 - service with upstreams', () => {
       upstream: { nodes: [{ host: upstream1Name, port: 80, weight: 1 }] },
       upstreams: [{ id: upstream2Name, name: upstream2Name }],
     };
-    expect(DifferV3.diff({ services: [service] }, {})).toEqual([
+    expect(Differ.diff({ services: [service] }, {})).toEqual([
       {
         newValue: {
           name: serviceName,
@@ -104,7 +104,7 @@ describe('Differ V3 - service with upstreams', () => {
       upstreams: [{ name: upstreamName }],
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         { services: [service] },
         {
           services: [
@@ -137,7 +137,7 @@ describe('Differ V3 - service with upstreams', () => {
       upstreams: [{ name: upstream1Name }],
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         { services: [service] },
         {
           services: [
@@ -182,7 +182,7 @@ describe('Differ V3 - service with upstreams', () => {
       ],
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         { services: [service] },
         {
           services: [
@@ -240,7 +240,7 @@ describe('Differ V3 - service with upstreams', () => {
       ],
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {

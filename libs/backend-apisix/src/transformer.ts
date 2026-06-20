@@ -167,8 +167,6 @@ export class ToADC {
       server_addr: streamRoute.server_addr,
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
-
-      metadata: { id: streamRoute.id },
     } as ADCSDK.StreamRoute);
   }
 

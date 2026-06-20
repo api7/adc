@@ -9,7 +9,7 @@ import { SignaleRenderer } from '../utils/listr';
 import { TaskContext } from './diff.command';
 import { BackendCommand } from './helper';
 import type { BackendOptions } from './typing';
-import { recursiveRemoveMetadataField, resortConfiguration } from './utils';
+import { recursiveRemoveIdField, resortConfiguration } from './utils';
 
 type DumpOptions = BackendOptions & {
   output: string;
@@ -60,11 +60,11 @@ export const DumpCommand = new BackendCommand<DumpOptions>(
           excludeResourceType: opts.excludeResourceType,
         }),
         {
-          // Remove output resource metadata fields
+          // Remove server-assigned id fields from output
           enabled: !opts.withId,
           task: (ctx) => {
             if (!ctx.remote) throw new Error('Remote configuration not loaded');
-            recursiveRemoveMetadataField(ctx.remote);
+            recursiveRemoveIdField(ctx.remote);
           },
         },
         {
