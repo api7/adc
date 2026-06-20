@@ -359,6 +359,7 @@ export class FromADC {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
+        plugins: consumerGroup.plugins ?? {},
         id: consumerGroupId,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),
