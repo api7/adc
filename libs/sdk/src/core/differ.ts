@@ -1,7 +1,8 @@
 import type { Diff } from 'datum-diff';
-import { z } from 'zod';
+import type { ZodObject, ZodRawShape } from 'zod';
 
 import { FieldListType, ResourceType } from './resource';
+import { type FieldMeta, differFieldRegistry } from './field-registry';
 import {
   consumerGroupSchema,
   consumerSchema,
@@ -65,19 +66,11 @@ export const CollectionKind = {
 } as const;
 export type CollectionKind = (typeof CollectionKind)[keyof typeof CollectionKind];
 
-export type FieldMeta =
-  | { listType: typeof FieldListType.MAP; listMapKey: string; nested?: boolean }
-  | { listType: typeof FieldListType.OBJECT_MAP }
-  | { listType: typeof FieldListType.ATOMIC; strip?: boolean }
-  | { listType: typeof FieldListType.ARRAY; stripItemFields?: string[] };
-
 /** Read all differ-relevant field annotations from a Zod object schema's shape. */
-export function readFieldMeta(schema: z.ZodObject<z.ZodRawShape>): Record<string, FieldMeta> {
+export function readFieldMeta(schema: ZodObject<ZodRawShape>): Record<string, FieldMeta> {
   const result: Record<string, FieldMeta> = {};
   for (const [key, field] of Object.entries(schema.shape)) {
-    const meta = z.globalRegistry.get(field as Parameters<typeof z.globalRegistry.get>[0]) as
-      | FieldMeta
-      | undefined;
+    const meta = differFieldRegistry.get(field as Parameters<typeof differFieldRegistry.get>[0]);
     if (meta?.listType) result[key] = meta;
   }
   return result;

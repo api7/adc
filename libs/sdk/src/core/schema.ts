@@ -3,6 +3,7 @@ import type { ZodRawShape } from 'zod';
 import { z } from 'zod';
 
 import { FieldListType } from './resource';
+import { withDifferMeta } from './field-registry';
 
 const idSchema = z
   .string()
@@ -229,7 +230,7 @@ const routeSchema = z.strictObject({
       }),
     )
     .optional(),
-  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
   filter_func: z.string().optional(),
 });
 export type Route = z.infer<typeof routeSchema>;
@@ -241,7 +242,7 @@ const streamRouteSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
 
   remote_addr: z.string().optional(),
   server_addr: z.string().optional(),
@@ -258,25 +259,20 @@ export const serviceBaseSchema = z.strictObject({
   labels: labelsSchema.optional(),
 
   upstream: upstreamSchema().optional(),
-  upstreams: z
-    .array(
-      upstreamSchema({
-        id: idSchema.optional(),
-        name: z.string(),
-      }),
-    )
-    .optional()
-    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
-  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
+  upstreams: withDifferMeta(
+    z.array(upstreamSchema({ id: idSchema.optional(), name: z.string() })).optional(),
+    { listType: FieldListType.MAP, listMapKey: 'name', nested: true },
+  ),
+  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
   path_prefix: z.string().optional(),
   strip_path_prefix: z.boolean().optional(),
   hosts: z.array(hostSchema).optional(),
 
-  routes: z.array(routeSchema).optional().meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
-  stream_routes: z
-    .array(streamRouteSchema)
-    .optional()
-    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
+  routes: withDifferMeta(z.array(routeSchema).optional(), { listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
+  stream_routes: withDifferMeta(
+    z.array(streamRouteSchema).optional(),
+    { listType: FieldListType.MAP, listMapKey: 'name', nested: true },
+  ),
 });
 const serviceSchema = serviceBaseSchema
   .refine(
@@ -306,12 +302,12 @@ export const sslSchema = z.strictObject({
 
   type: z.enum(['server', 'client']).default('server').optional(),
   snis: z.array(hostSchema).min(1),
-  certificates: z
-    .array(sslCertificateSchema)
-    .refine((val) => val.length > 0, {
+  certificates: withDifferMeta(
+    z.array(sslCertificateSchema).refine((val) => val.length > 0, {
       error: 'SSL must contain at least one certificate',
-    })
-    .meta({ listType: FieldListType.ARRAY, stripItemFields: ['key'] }),
+    }),
+    { listType: FieldListType.ARRAY, stripItemFields: ['key'] },
+  ),
   client: z
     .strictObject({
       ca: certificateSchema,
@@ -350,11 +346,11 @@ export const consumerSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema.optional().meta({ listType: FieldListType.OBJECT_MAP }),
-  credentials: z
-    .array(consumerCredentialSchema)
-    .optional()
-    .meta({ listType: FieldListType.MAP, listMapKey: 'name', nested: true, configKey: 'consumer_credentials' }),
+  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
+  credentials: withDifferMeta(
+    z.array(consumerCredentialSchema).optional(),
+    { listType: FieldListType.MAP, listMapKey: 'name', nested: true, configKey: 'consumer_credentials' },
+  ),
 });
 export type Consumer = z.infer<typeof consumerSchema>;
 
@@ -364,12 +360,12 @@ export const consumerGroupSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: pluginsSchema.meta({ listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema, { listType: FieldListType.OBJECT_MAP }),
 
-  consumers: z
-    .array(consumerSchema)
-    .optional()
-    .meta({ listType: FieldListType.MAP, listMapKey: 'username', nested: true }),
+  consumers: withDifferMeta(
+    z.array(consumerSchema).optional(),
+    { listType: FieldListType.MAP, listMapKey: 'username', nested: true },
+  ),
 });
 export type ConsumerGroup = z.infer<typeof consumerGroupSchema>;
 

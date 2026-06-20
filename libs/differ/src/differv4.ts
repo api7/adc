@@ -392,10 +392,7 @@ export class DifferV4 {
       if (fieldMeta.listType !== FieldListType.MAP || !fieldMeta.nested) continue;
       const value = (item as Record<string, unknown>)?.[fieldName];
       if (value !== undefined) {
-        // Map the resource field name to the corresponding InternalConfiguration key.
-        // 'credentials' on Consumer maps to 'consumer_credentials' in InternalConfiguration.
-        const configKey =
-          fieldName === 'credentials' ? 'consumer_credentials' : fieldName;
+        const configKey = fieldMeta.configKey ?? fieldName;
         (subConfig as Record<string, unknown>)[configKey] = value;
       }
     }
