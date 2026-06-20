@@ -57,7 +57,7 @@ export interface ConsumerGroup {
   description?: string;
   labels?: Labels;
 
-  plugins: Plugins;
+  plugins?: Plugins;
 
   consumers?: Array<Consumer>;
 }

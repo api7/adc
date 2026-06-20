@@ -360,7 +360,7 @@ export const consumerGroupSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: withDifferMeta(pluginsSchema, { listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
 
   consumers: withDifferMeta(
     z.array(consumerSchema).optional(),

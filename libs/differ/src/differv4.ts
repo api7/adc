@@ -489,7 +489,7 @@ export class DifferV4 {
     const defaultsClone = cloneDeep(defaults);
     const resourceClone = cloneDeep(resource) as Record<string, unknown>;
     const isObjectButNotArray = (val: unknown) =>
-      typeof val === 'object' && !Array.isArray(val);
+      val !== null && typeof val === 'object' && !Array.isArray(val);
 
     Object.entries(defaultsClone).forEach(([key, value]) => {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
