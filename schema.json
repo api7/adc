@@ -1580,8 +1580,7 @@
           }
         },
         "required": [
-          "name",
-          "plugins"
+          "name"
         ],
         "additionalProperties": false
       }
