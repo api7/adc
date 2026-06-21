@@ -216,29 +216,28 @@ export const filterResourceType = (
   );
 };
 
-export const recursiveRemoveMetadataField = (c: ADCSDK.Configuration) => {
-  const removeMetadata = (obj: object) => {
+export const recursiveRemoveIdField = (c: ADCSDK.Configuration) => {
+  const removeId = (obj: object) => {
     unset(obj, 'id');
-    unset(obj, 'metadata');
   };
   Object.entries(c).forEach(([key, value]) => {
     if (['global_rules', 'plugin_metadata'].includes(key)) return;
     if (Array.isArray(value))
       value.forEach((item) => {
-        removeMetadata(item);
+        removeId(item);
         if (key === 'services') {
           if ('routes' in item && Array.isArray(item.routes))
-            item.routes.forEach((r) => removeMetadata(r));
+            item.routes.forEach((r) => removeId(r));
           if ('stream_routes' in item && Array.isArray(item.stream_routes))
-            item.stream_routes.forEach((r) => removeMetadata(r));
+            item.stream_routes.forEach((r) => removeId(r));
           if ('upstreams' in item && Array.isArray(item.upstreams))
-            item.upstreams.forEach((u) => removeMetadata(u));
+            item.upstreams.forEach((u) => removeId(u));
         } else if (key === 'consumer_groups') {
           if ('consumers' in item && Array.isArray(item.consumers))
-            item.consumers.forEach((c) => removeMetadata(c));
+            item.consumers.forEach((c) => removeId(c));
         } else if (key === 'consumers') {
           if ('credentials' in item && Array.isArray(item.credentials))
-            item.credentials.forEach((c) => removeMetadata(c));
+            item.credentials.forEach((c) => removeId(c));
         }
       });
   });

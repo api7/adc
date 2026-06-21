@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import type { RequestHandler } from 'express';
@@ -98,7 +98,7 @@ export const validateHandler: RequestHandler<
     );
 
     // generate events by diffing against an empty remote config
-    const events = DifferV3.diff(
+    const events = Differ.diff(
       local,
       {} as ADCSDK.InternalConfiguration,
       await backend.defaultValue(),

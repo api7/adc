@@ -14,6 +14,7 @@ import {
 } from './schema';
 
 export * from './differ';
+export * from './field-registry';
 export * from './resource';
 
 export type {
@@ -56,7 +57,7 @@ export interface ConsumerGroup {
   description?: string;
   labels?: Labels;
 
-  plugins: Plugins;
+  plugins?: Plugins;
 
   consumers?: Array<Consumer>;
 }

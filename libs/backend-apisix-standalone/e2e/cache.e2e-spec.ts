@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import axios from 'axios';
 import { gt, lte } from 'semver';
@@ -111,7 +111,7 @@ describe('Cache - Single APISIX', () => {
   mockStableTimestamp.mockReturnValueOnce(now.getTime());
   it('update config', async () => {
     const oldConfig = await dumpConfiguration(backend);
-    const events = DifferV3.diff(config, oldConfig);
+    const events = Differ.diff(config, oldConfig);
     expect(events).toHaveLength(1 + 1 + 2); // service * 1 + route * 1 + consumer * 2
     expect(
       events
@@ -255,7 +255,7 @@ describe('Cache - Multiple APISIX (completely new instances)', () => {
   } as ADCSDK.Configuration;
   it('update config', async () => {
     const oldConfig = await dumpConfiguration(backend);
-    const events = DifferV3.diff(config, oldConfig);
+    const events = Differ.diff(config, oldConfig);
     expect(events).toHaveLength(1 + 1 + 2); // service * 1 + route * 1 + consumer * 2
     expect(
       events
@@ -332,7 +332,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
         },
       ],
     } as ADCSDK.Configuration;
-    const events = DifferV3.diff(config, {});
+    const events = Differ.diff(config, {});
     latestVersionCache.clear();
     configCache.set(cacheKey, {});
     rawConfigCache.set(cacheKey, {});
@@ -376,7 +376,7 @@ describe('Cache - Multiple APISIX (Partial new instances)', () => {
     } as ADCSDK.Configuration;
     configCache.set(cacheKey, {});
     rawConfigCache.set(cacheKey, {});
-    const events = DifferV3.diff(config, {});
+    const events = Differ.diff(config, {});
     expect(events).toHaveLength(1 + 1); // service * 1 + route * 1
     expect(
       events
@@ -487,7 +487,7 @@ describe('Cache - bypassCache invalidation', () => {
   it('initialize cache and sync config to APISIX', async () => {
     await dumpConfiguration(backend);
     mockStableTimestamp.mockReturnValueOnce(Date.now());
-    const events = DifferV3.diff(syncedConfig, {});
+    const events = Differ.diff(syncedConfig, {});
     await syncEvents(backend, events);
     expect(configCache.get(cacheKey)).toMatchObject(syncedConfig);
   });

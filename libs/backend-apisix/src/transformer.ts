@@ -167,8 +167,6 @@ export class ToADC {
       server_addr: streamRoute.server_addr,
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
-
-      metadata: { id: streamRoute.id },
     } as ADCSDK.StreamRoute);
   }
 
@@ -361,6 +359,7 @@ export class FromADC {
     return [
       ADCSDK.utils.recursiveOmitUndefined<typing.ConsumerGroup>({
         ...consumerGroup,
+        plugins: consumerGroup.plugins ?? {},
         id: consumerGroupId,
         labels: {
           ...FromADC.transformLabels(consumerGroup.labels),

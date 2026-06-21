@@ -1,4 +1,4 @@
-import { DifferV3 } from '@api7/adc-differ';
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 
 import { BackendAPISIXStandalone } from '../../src';
@@ -52,7 +52,7 @@ describe('Service E2E - inline upstream', () => {
   };
   it('Create service', async () => {
     mockStableTimestamp.mockReturnValueOnce(100);
-    const events = DifferV3.diff(config, await dumpConfiguration(backend));
+    const events = Differ.diff(config, await dumpConfiguration(backend));
     return syncEvents(backend, events);
   });
 
@@ -88,7 +88,7 @@ describe('Service E2E - inline upstream', () => {
     const newConfig = structuredClone(config);
     newConfig.services[0].upstream.nodes[0].port = 19080;
 
-    const events = DifferV3.diff(newConfig, await dumpConfiguration(backend));
+    const events = Differ.diff(newConfig, await dumpConfiguration(backend));
     expect(events).toHaveLength(1);
     expect(events[0].type).toEqual(ADCSDK.EventType.UPDATE);
     expect(events[0].resourceType).toEqual(ADCSDK.ResourceType.SERVICE);
@@ -116,7 +116,7 @@ describe('Service E2E - inline upstream', () => {
     const newConfig = structuredClone(config);
     newConfig.services[0].upstream.nodes = [];
 
-    const events = DifferV3.diff(newConfig, await dumpConfiguration(backend));
+    const events = Differ.diff(newConfig, await dumpConfiguration(backend));
     expect(events).toHaveLength(1);
     expect(events[0].type).toEqual(ADCSDK.EventType.UPDATE);
     expect(events[0].resourceType).toEqual(ADCSDK.ResourceType.SERVICE);
@@ -142,7 +142,7 @@ describe('Service E2E - inline upstream', () => {
   it('Delete service', async () => {
     mockStableTimestamp.mockReturnValueOnce(400);
 
-    const events = DifferV3.diff({}, await dumpConfiguration(backend));
+    const events = Differ.diff({}, await dumpConfiguration(backend));
     expect(events).toHaveLength(1);
     expect(events[0].type).toEqual(ADCSDK.EventType.DELETE);
     expect(events[0].resourceType).toEqual(ADCSDK.ResourceType.SERVICE);

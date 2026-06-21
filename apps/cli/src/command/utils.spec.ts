@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 
 import {
   fillLabels,
-  recursiveRemoveMetadataField,
+  recursiveRemoveIdField,
   recursiveReplaceEnvVars,
 } from './utils';
 
@@ -200,40 +200,40 @@ describe('CLI utils', () => {
     });
   });
 
-  it('should remove metadata from dump result', () => {
+  it('should remove id from dump result', () => {
     const config = {
       services: [
         {
+          id: 'test_service1',
           name: 'TestService1',
-          metadata: { id: 'test_service1' },
           routes: [
             {
+              id: 'test_route',
               name: 'TestRoute',
               uris: ['/test'],
-              metadata: { id: 'test_route' },
             },
           ],
         },
         {
+          id: 'test_service2',
           name: 'TestService2',
-          metadata: { id: 'test_service2' },
           stream_routes: [
             {
+              id: 'test_stream_route',
               name: 'TestStreamRoute',
-              metadata: { id: 'test_stream_route' },
             },
           ],
         },
       ],
       ssls: [
         {
+          id: 'test_ssl',
           snis: ['test'],
           certificates: [],
-          metadata: { id: 'test_ssl' },
         },
       ],
     } as unknown as ADCSDK.Configuration;
-    recursiveRemoveMetadataField(config);
+    recursiveRemoveIdField(config);
     expect(config).toEqual({
       services: [
         {

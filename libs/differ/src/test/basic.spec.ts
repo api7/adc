@@ -1,16 +1,16 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { DifferV3 } from '../differv3.js';
+import { Differ } from '../index.js';
 
 describe('Differ V3 - basic', () => {
   it('should output empty when input is empty', () => {
-    expect(DifferV3.diff({}, {})).toEqual([]);
+    expect(Differ.diff({}, {})).toEqual([]);
   });
 
   it('should create resource', () => {
     const consumerName = 'alice';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -36,7 +36,7 @@ describe('Differ V3 - basic', () => {
     const consumerName = 'alice';
     const consumerKey = 'alice-key';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -83,7 +83,7 @@ describe('Differ V3 - basic', () => {
   it('should delete resource', () => {
     const consumerName = 'alice';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {},
         {
           consumers: [
@@ -110,7 +110,7 @@ describe('Differ V3 - basic', () => {
     const updatedConsumer = 'updatedConsumer';
     const deletedConsumer = 'deletedConsumer';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -169,7 +169,7 @@ describe('Differ V3 - basic', () => {
   it('should adapt to default values added on the backend, core', () => {
     const consumerName = 'alice';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [{ username: consumerName, plugins: {} }],
         },
@@ -188,7 +188,7 @@ describe('Differ V3 - basic', () => {
   it('should adapt to default values added on the backend, plugin', () => {
     const consumerName = 'alice';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             { username: consumerName, plugins: { 'key-auth': { key: 'key' } } },
@@ -215,7 +215,7 @@ describe('Differ V3 - basic', () => {
     const consumerName = 'alice';
     const consumerKey = 'alice-key';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -262,7 +262,7 @@ describe('Differ V3 - basic', () => {
     const oldKey = 'old-key';
     const newKey = 'new-key';
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           consumers: [
             {
@@ -322,7 +322,7 @@ describe('Differ V3 - basic', () => {
       certificates: [{ certificate: 'cert', key: 'key' }],
     };
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           ssls: [ssl],
         },
@@ -344,7 +344,7 @@ describe('Differ V3 - basic', () => {
     const routeName = 'Test Route';
 
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -428,7 +428,7 @@ describe('Differ V3 - basic', () => {
     const routeId = ADCSDK.utils.generateId(`${serviceName}.${routeName}`);
 
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -549,7 +549,7 @@ describe('Differ V3 - basic', () => {
     const serviceId = ADCSDK.utils.generateId(serviceName);
 
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -625,7 +625,7 @@ describe('Differ V3 - basic', () => {
     const serviceName = 'Test Service';
     const serviceId = ADCSDK.utils.generateId(serviceName);
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -675,7 +675,7 @@ describe('Differ V3 - basic', () => {
     oldNode.priority = 0;
 
     expect(
-      DifferV3.diff(
+      Differ.diff(
         {
           services: [
             {
@@ -736,7 +736,7 @@ describe('Differ V3 - basic', () => {
       ADCSDK.utils.generateId('Stream.Stream 1');
 
     expect(
-      DifferV3.diff({ services: newServices }, { services: oldServices }, {}),
+      Differ.diff({ services: newServices }, { services: oldServices }, {}),
     ).toEqual([]);
   });
 
@@ -751,7 +751,7 @@ describe('Differ V3 - basic', () => {
     oldService.strip_path_prefix = true;
 
     expect(
-      DifferV3.diff(
+      Differ.diff(
         { services: [service] },
         { services: [oldService] },
         {
