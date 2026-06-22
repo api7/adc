@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
       - uses: pnpm/action-setup@v2
@@ -70,7 +70,7 @@ jobs:
         run: docker compose up -d; sleep 10
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
       - uses: pnpm/action-setup@v2
@@ -112,7 +112,7 @@ jobs:
         run: docker compose up -d; sleep 10; docker ps -a
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
       - uses: pnpm/action-setup@v2
@@ -168,7 +168,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
       - uses: pnpm/action-setup@v4
