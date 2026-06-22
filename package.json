@@ -6,7 +6,7 @@
   "private": true,
   "devDependencies": {
     "@eslint/js": "^10.0.0",
-    "@nx/esbuild": "22.7.5",
+    "@nx/esbuild": "23.0.0",
     "@nx/eslint": "22.7.5",
     "@nx/eslint-plugin": "22.7.5",
     "@nx/js": "22.7.5",
