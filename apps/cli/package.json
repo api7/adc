@@ -13,7 +13,7 @@
     "@types/supertest": "^7.2.0",
     "@types/source-map-support": "^0.5.10",
     "semver": "catalog:",
-    "supertest": "^7.1.4",
+    "supertest": "^7.2.2",
     "vitest": "catalog:"
   },
   "dependencies": {
