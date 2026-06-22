@@ -25,7 +25,7 @@ catalogs:
       specifier: ^10.0.0
       version: 10.2.1
     lru-cache:
-      specifier: ^11.0.0
+      specifier: ^11.5.1
       version: 11.5.1
     rxjs:
       specifier: ^7.8.2
@@ -42,6 +42,9 @@ catalogs:
     vitest:
       specifier: ^4.1.8
       version: 4.1.8
+    zod:
+      specifier: ^4.1.12
+      version: 4.4.3
 
 overrides:
   axios: '>=1.17.0'
