@@ -1,8 +1,12 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { Differ } from '../index.js';
+import { DifferV3 } from '../differv3.js';
+import { DifferV4 } from '../differv4.js';
 
-describe('Differ V3 - resources custom id', () => {
+describe.each([
+  ['V3', DifferV3],
+  ['V4', DifferV4],
+] as const)('Differ %s - resources custom id', (_version, Differ) => {
   it('should delete and create new resource when update resource id (with nested resource)', () => {
     const service1Name = 'Test Service 1';
     const service1Id = ADCSDK.utils.generateId(service1Name);
