@@ -1,8 +1,12 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { Differ } from '../index.js';
+import { DifferV3 } from '../differv3.js';
+import { DifferV4 } from '../differv4.js';
 
-describe('Differ V3 - usecase', () => {
+describe.each([
+  ['V3', DifferV3],
+  ['V4', DifferV4],
+] as const)('Differ %s - usecase', (_version, Differ) => {
   it('rename service with nested routes', () => {
     expect(
       Differ.diff(

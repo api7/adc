@@ -1,8 +1,12 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { Differ } from '../index.js';
+import { DifferV3 } from '../differv3.js';
+import { DifferV4 } from '../differv4.js';
 
-describe('Differ V3 - service with upstreams', () => {
+describe.each([
+  ['V3', DifferV3],
+  ['V4', DifferV4],
+] as const)('Differ %s - service with upstreams', (_version, Differ) => {
   it('should be considered unchanged (only upstream)', () => {
     const service = {
       id: 'service1',

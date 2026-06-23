@@ -1,8 +1,12 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
-import { Differ } from '../index.js';
+import { DifferV3 } from '../differv3.js';
+import { DifferV4 } from '../differv4.js';
 
-describe('Differ V3 - upstream', () => {
+describe.each([
+  ['V3', DifferV3],
+  ['V4', DifferV4],
+] as const)('Differ %s - upstream', (_version, Differ) => {
   it('should create and update ssl before upstream', () => {
     const serviceName = 'test';
     const upstreamName = 'upstream-with-client-cert';
