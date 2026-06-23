@@ -15,7 +15,7 @@ jobs:
   cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Build and test ADC CLI
       - uses: actions/setup-node@v4
@@ -62,7 +62,7 @@ jobs:
             echo "BACKEND_APISIX_IMAGE=${{ matrix.version }}-debian" >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Setup backend environment
       - name: Setup Apache APISIX
@@ -104,7 +104,7 @@ jobs:
             echo "BACKEND_APISIX_IMAGE=${{ matrix.version }}-ubuntu" >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Setup backend environment
       - name: Setup Apache APISIX
@@ -157,7 +157,7 @@ jobs:
             } >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Login to GHCR
         if: matrix.version == 'dev'
