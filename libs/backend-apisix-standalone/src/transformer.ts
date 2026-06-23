@@ -170,17 +170,18 @@ export const toADC = (input: typing.APISIXStandalone) => {
         }))
         .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
     global_rules: Object.fromEntries(
-      input.global_rules
-        ?.map((globalRule) => [globalRule.id, globalRule.plugins![0]])
-        .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
+      input.global_rules?.flatMap((gr) =>
+        Object.entries(gr.plugins ?? {}).map(([k, v]) => [
+          k,
+          ADCSDK.utils.recursiveOmitUndefined(v as Record<string, unknown>),
+        ]),
+      ) ?? [],
     ),
     plugin_metadata: Object.fromEntries(
-      input.plugin_metadata
-        ?.map((pluginMetadata) => {
-          const { id, ...rest } = pluginMetadata;
-          return [id, rest];
-        })
-        .map(ADCSDK.utils.recursiveOmitUndefined) ?? [],
+      input.plugin_metadata?.map((pluginMetadata) => {
+        const { id, ...rest } = pluginMetadata;
+        return [id, ADCSDK.utils.recursiveOmitUndefined(rest)];
+      }) ?? [],
     ),
   } satisfies ADCSDK.Configuration as ADCSDK.Configuration;
 };
