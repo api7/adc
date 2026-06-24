@@ -363,7 +363,7 @@ importers:
         version: 7.7.1
       docker-compose:
         specifier: ^1.2.0
-        version: 1.2.0
+        version: 1.4.2
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@types/node@26.0.0)(@vitest/coverage-v8@4.1.7(vitest@4.1.8))(@vitest/ui@4.1.7(vitest@4.1.8))(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -2460,8 +2460,8 @@ packages:
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
 
-  docker-compose@1.2.0:
-    resolution: {integrity: sha512-wIU1eHk3Op7dFgELRdmOYlPYS4gP8HhH1ZmZa13QZF59y0fblzFDFmKPhyc05phCy2hze9OEvNZAsoljrs+72w==}
+  docker-compose@1.4.2:
+    resolution: {integrity: sha512-rPHigTKGaEHpkUmfd69QgaOp+Os5vGJwG/Ry8lcr8W/382AmI+z/D7qoa9BybKIkqNppaIbs8RYeHSevdQjWww==}
     engines: {node: '>= 6.0.0'}
 
   dotenv-expand@12.0.3:
@@ -6083,7 +6083,7 @@ snapshots:
       asap: 2.0.6
       wrappy: 1.0.2
 
-  docker-compose@1.2.0:
+  docker-compose@1.4.2:
     dependencies:
       yaml: 2.9.0
 
