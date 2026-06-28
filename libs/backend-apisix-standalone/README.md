@@ -29,6 +29,7 @@ This is beyond the scope of the ADC, it needs to be implemented by the client it
 | 3.14.x   | ✅         | Full        |
 | 3.15.x   | ✅         | Full        |
 | 3.16.x   | ✅         | Full        |
+| 3.17.x   | ✅         | Full        |
 
 The standalone Admin API was added after the `3.12.0` release, so it requires at least `3.13.0` to use.
 
