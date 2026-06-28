@@ -19,8 +19,8 @@ catalogs:
       specifier: ^11.0.0
       version: 11.1.8
     js-yaml:
-      specifier: ^4.1.2
-      version: 4.2.0
+      specifier: ^5.2.0
+      version: 5.2.0
     listr2:
       specifier: ^10.0.0
       version: 10.2.1
@@ -42,9 +42,12 @@ catalogs:
     vitest:
       specifier: ^4.1.8
       version: 4.1.8
+    zod:
+      specifier: ^4.1.12
+      version: 4.4.3
 
 overrides:
-  axios: '>=1.17.0'
+  axios: '>=1.18.1'
   tmp: '>=0.2.7'
   form-data: '>=4.0.6'
   lodash-es: '>=4.17.24'
@@ -157,8 +160,8 @@ importers:
         specifier: ^4.6.0
         version: 4.6.0
       axios:
-        specifier: '>=1.17.0'
-        version: 1.18.0(supports-color@7.2.0)
+        specifier: '>=1.18.1'
+        version: 1.18.1(supports-color@7.2.0)
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -176,7 +179,7 @@ importers:
         version: 13.0.6
       js-yaml:
         specifier: 'catalog:'
-        version: 4.2.0
+        version: 5.2.0
       listr2:
         specifier: 'catalog:'
         version: 10.2.1
@@ -211,9 +214,6 @@ importers:
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.6
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -254,8 +254,8 @@ importers:
         specifier: ^7.0.15
         version: 7.0.15
       axios:
-        specifier: '>=1.17.0'
-        version: 1.18.0(supports-color@7.2.0)
+        specifier: '>=1.18.1'
+        version: 1.18.1(supports-color@7.2.0)
       immer:
         specifier: 'catalog:'
         version: 11.1.8
@@ -291,8 +291,8 @@ importers:
         specifier: workspace:*
         version: link:../sdk
       axios:
-        specifier: '>=1.17.0'
-        version: 1.18.0(supports-color@7.2.0)
+        specifier: '>=1.18.1'
+        version: 1.18.1(supports-color@7.2.0)
       immer:
         specifier: 'catalog:'
         version: 11.1.8
@@ -331,8 +331,8 @@ importers:
         specifier: workspace:*
         version: link:../sdk
       axios:
-        specifier: '>=1.17.0'
-        version: 1.18.0(supports-color@7.2.0)
+        specifier: '>=1.18.1'
+        version: 1.18.1(supports-color@7.2.0)
       lodash-es:
         specifier: '>=4.17.24'
         version: 4.18.1
@@ -395,15 +395,12 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
       js-yaml:
         specifier: 'catalog:'
-        version: 4.2.0
+        version: 5.2.0
       listr2:
         specifier: 'catalog:'
         version: 10.2.1
@@ -433,8 +430,8 @@ importers:
   libs/sdk:
     dependencies:
       axios:
-        specifier: '>=1.17.0'
-        version: 1.18.0(supports-color@7.2.0)
+        specifier: '>=1.18.1'
+        version: 1.18.1(supports-color@7.2.0)
       datum-diff:
         specifier: 'catalog:'
         version: 1.0.4
@@ -1872,9 +1869,6 @@ packages:
   '@types/http-errors@2.0.5':
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}
 
-  '@types/js-yaml@4.0.9':
-    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
-
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -2186,8 +2180,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  axios@1.18.0:
-    resolution: {integrity: sha512-E32NzpYKp++W7XRe52rHiXV2ehxmh3wbdgO7MHeFM+vqxLBYHzt0ElkiImtOBxtOmyp0yoC8C6uESVV84Y2/hw==}
+  axios@1.18.1:
+    resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
 
   babel-plugin-const-enum@1.2.0:
     resolution: {integrity: sha512-o1m/6iyyFnp9MRsK1dHF3bneqyf3AlM2q3A/YbgQr2pCat6B6XJVDv2TXqzfY2RYUi4mak6WAksSBPlyYGx9dg==}
@@ -2927,8 +2921,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@4.2.0:
-    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
+  js-yaml@5.2.0:
+    resolution: {integrity: sha512-YeLUMlvR4Ou1B119LIaM0r65JvbOBooJDc9yEu0dClb/uSC5P4FrLU8OCCz/HXWvtPoIrR0dRzABTjo1sTN9Bw==}
     hasBin: true
 
   jsesc@3.1.0:
@@ -5415,8 +5409,6 @@ snapshots:
 
   '@types/http-errors@2.0.5': {}
 
-  '@types/js-yaml@4.0.9': {}
-
   '@types/json-schema@7.0.15': {}
 
   '@types/lodash-es@4.17.12':
@@ -5805,7 +5797,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  axios@1.18.0(supports-color@7.2.0):
+  axios@1.18.1(supports-color@7.2.0):
     dependencies:
       follow-redirects: 1.16.0
       form-data: 4.0.6
@@ -6557,7 +6549,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@4.2.0:
+  js-yaml@5.2.0:
     dependencies:
       argparse: 2.0.1
 
@@ -6799,7 +6791,7 @@ snapshots:
       ansi-styles: 4.3.0
       argparse: 2.0.1
       asynckit: 0.4.0
-      axios: 1.18.0(supports-color@7.2.0)
+      axios: 1.18.1(supports-color@7.2.0)
       balanced-match: 4.0.3
       base64-js: 1.5.1
       bl: 4.1.0
