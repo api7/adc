@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises';
-import YAML from 'js-yaml';
+import * as YAML from 'js-yaml';
 import { ConfigurationSchema } from '@api7/adc-sdk/schema';
 
 import type { TaskContext } from '../command/diff.command';

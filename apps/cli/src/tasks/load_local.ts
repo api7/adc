@@ -2,7 +2,7 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { globSync } from 'glob';
-import YAML from 'js-yaml';
+import * as YAML from 'js-yaml';
 import { ListrTask } from 'listr2';
 import path from 'node:path';
 

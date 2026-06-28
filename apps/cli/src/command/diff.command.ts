@@ -1,5 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
-import YAML from 'js-yaml';
+import * as YAML from 'js-yaml';
 import { Listr } from 'listr2';
 import { writeFile } from 'node:fs/promises';
 
