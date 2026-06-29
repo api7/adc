@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@api7/adc-sdk": "workspace:*",
-    "@scalar/openapi-parser": "0.28.7",
+    "@scalar/openapi-parser": "0.28.8",
     "@scalar/openapi-types": "^0.9.1",
     "slugify": "^1.6.6",
     "lodash-es": "catalog:",
