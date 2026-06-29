@@ -11,15 +11,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup release flow
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "${{ env.NODE_VERSION }}"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - name: Build ADC
         env:
           NODE_VERSION: "${{ env.NODE_VERSION }}"
@@ -47,7 +47,7 @@ jobs:
           zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip ./adc.exe && rm -rf ./adc.exe
 
       - name: Upload ADC to GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -57,19 +57,19 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip
 
   adc-macos:
-    runs-on: macos-14
+    runs-on: macos-26
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup release flow
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
       # Build and test ADC CLI
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "${{ env.NODE_VERSION }}"
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - name: Build ADC
         env:
           NODE_VERSION: "${{ env.NODE_VERSION }}"
@@ -94,7 +94,7 @@ jobs:
           tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz ./adc && rm -rf ./adc
 
       - name: Upload ADC to GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |

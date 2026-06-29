@@ -17,7 +17,7 @@
     "@api7/adc-differ": "workspace:*",
     "@types/lodash-es": "catalog:",
     "@types/semver": "catalog:",
-    "docker-compose": "^1.2.0",
+    "docker-compose": "^1.4.2",
     "vitest": "catalog:"
   },
   "dependencies": {

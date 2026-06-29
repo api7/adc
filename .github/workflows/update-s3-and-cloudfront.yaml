@@ -7,6 +7,13 @@ on:
       - .github/workflows/update-s3-and-cloudfront.yaml
       - libs/tools/project.json
       - libs/tools/src/s3/install
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/update-s3-and-cloudfront.yaml
+      - libs/tools/project.json
+      - libs/tools/src/s3/install
 
 jobs:
   update-s3-and-cloudfront:
@@ -14,29 +21,24 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      S3_BUCKET_REGION: ${{ secrets.S3_BUCKET_REGION }}
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.S3_BUCKET_REGION }}
+          role-to-assume: ${{ secrets.AWS_QUICKSTART_ROLE }}
+          aws-region: us-west-2
 
       - name: Deploy
+        if: github.event_name == 'push'
         # The path to the install script will be /adc/install
-        run: aws s3 sync ./libs/tools/src/s3 s3://${{ secrets.S3_BUCKET }}/adc
+        run: aws s3 sync ./libs/tools/src/s3 s3://api7ai-docs-resources/adc
 
       - name: Invalidate CloudFront
-        uses: chetan/invalidate-cloudfront-action@v2
+        uses: chetan/invalidate-cloudfront-action@6adb1f613f4102ad81cd08a7ba83b8abe490cb8d # v2.4.2
+        if: github.event_name == 'push'
         env:
           DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          PATHS: '/'
-          AWS_REGION: '${{ secrets.S3_BUCKET_REGION }}'
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          PATHS: /adc/install

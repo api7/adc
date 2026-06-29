@@ -30,6 +30,7 @@
 | 3.14.x   | ✅         | Full        |
 | 3.15.x   | ✅         | Full        |
 | 3.16.x   | ✅         | Full        |
+| 3.17.x   | ✅         | Full        |
 
 1. The stream routes will be skipped during synchronization because they cannot be associated to the service on these versions.
 2. The `name` field is lost when the stream route is dumped and synchronized, because it is not defined in the APISIX schema.
