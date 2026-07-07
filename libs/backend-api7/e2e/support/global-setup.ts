@@ -92,6 +92,7 @@ const setupAPI7 = async () => {
   await waitForDashboard();
 };
 
+const newPassword = 'Admin12345!@#$%';
 const initUser = async (
   username = 'admin',
   password = 'admin',
@@ -116,7 +117,7 @@ const initUser = async (
   console.log('Modify password');
   await httpClient.put(`/api/password`, {
     old_password: password,
-    new_password: 'Admin12345!',
+    new_password: newPassword,
   });
 
   //@ts-expect-error forced
@@ -125,7 +126,7 @@ const initUser = async (
   console.log('Log in again');
   await httpClient.post(`/api/login`, {
     username: username,
-    password: 'Admin12345!',
+    password: newPassword,
   });
 
   // If the version is greater than or equal to 3.2.15, the license should
