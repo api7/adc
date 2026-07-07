@@ -100,6 +100,10 @@ The `lint` command verifies the provided ADC configuration file locally.
 adc lint -f adc.yaml
 ```
 
+## Documentation
+
+See the [`docs/`](docs/README.md) folder for the CLI command reference, configuration file reference, and a full ADC workflow guide.
+
 ## Development
 
 To build ADC from source, [install Nx](https://nx.dev/getting-started/installation) and run:
