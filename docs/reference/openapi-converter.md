@@ -4,10 +4,10 @@
 
 | Direction      | Supported |
 | -------------- | --------- |
-| OpenAPI to ADC | ✅        |
-| ADC to OpenAPI | ❎        |
+| OpenAPI to ADC | Yes       |
+| ADC to OpenAPI | No        |
 
-A plain OpenAPI document only describes endpoints — it has no notion of ADC-specific concepts like plugins, labels, or upstream defaults. To configure those on the converted output, annotate the specification with `x-adc-*` extension fields.
+A plain OpenAPI document only describes endpoints. It has no notion of ADC-specific concepts like plugins, labels, or upstream defaults. To configure those on the converted output, annotate the specification with `x-adc-*` extension fields.
 
 ## Supported Extension Fields
 
@@ -16,7 +16,7 @@ Extensions are recognized at up to four levels of a specification:
 - **Root level**: the root of the OAS document. Applies to the entire generated service.
 - **Path level**: on each path object. Applies to every operation (HTTP method) under that path.
 - **Operation level**: on each HTTP method object within a path. Applies to that specific route.
-- **Server level**: on each item of a `servers:` field, which can itself appear at the root, path, or operation level. Applies to the upstream node(s) derived from that server entry. Only meaningful for OpenAPI 3.x — OpenAPI 2.0 (Swagger) has no `servers:` field.
+- **Server level**: on each item of a `servers:` field, which can itself appear at the root, path, or operation level. Applies to the upstream node(s) derived from that server entry. Only meaningful for OpenAPI 3.x. OpenAPI 2.0 (Swagger) has no `servers:` field.
 
 <table>
   <thead>
@@ -95,10 +95,10 @@ Extensions are recognized at up to four levels of a specification:
 
 ```yaml
 servers:
-  - url: "https://httpbin.org"
+  - url: 'https://httpbin.org'
     x-adc-upstream-node-defaults:
       priority: 100
-  - url: "http://httpbin.org"
+  - url: 'http://httpbin.org'
     x-adc-upstream-node-defaults:
       priority: 100
 ```
@@ -217,6 +217,7 @@ The difference between the two:
 <td>
 
 ```yaml
+
 ...
 paths:
   /anything:
@@ -230,6 +231,7 @@ paths:
 <td>
 
 ```yaml
+
 ...
 services:
   - name: demo
@@ -280,6 +282,7 @@ paths:
 <td>
 
 ```yaml
+
 ...
 services:
   - name: demo
@@ -349,11 +352,14 @@ Running `adc convert openapi -f openapi.yaml -o adc.yaml` produces:
 ```yaml title="adc.yaml"
 services:
   - description: httpbin API example.
-    labels:                              # inherited from root x-adc-labels
+    # inherited from root x-adc-labels
+    labels:
       api: httpbin
       server: production
-    name: httpbin-API_anything*_get      # auto-generated from title + path + method
-    plugins:                             # inherited from root x-adc-plugins
+    # auto-generated from title + path + method
+    name: httpbin-API_anything*_get
+    # inherited from root x-adc-plugins
+    plugins:
       key-auth:
         _meta:
           disable: false
@@ -361,18 +367,22 @@ services:
       - description: Returns anything that is passed into the request.
         methods:
           - GET
-        name: httpbin-anything           # from operation x-adc-name
+        # from operation x-adc-name
+        name: httpbin-anything
         uris:
-          - /api/anything/*              # path_prefix from x-adc-service-defaults is
-                                          # inlined into the URI for APISIX compatibility
+          # path_prefix from x-adc-service-defaults is inlined into the URI
+          # for APISIX compatibility
+          - /api/anything/*
     upstream:
       nodes:
-        - host: httpbin.org              # derived from servers[0].url
+        # derived from servers[0].url
+        - host: httpbin.org
           port: 80
           weight: 100
       pass_host: pass
       scheme: http
-      timeout:                           # from operation x-adc-upstream-defaults
+      # from operation x-adc-upstream-defaults
+      timeout:
         connect: 10
         read: 10
         send: 10

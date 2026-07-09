@@ -1,81 +1,111 @@
 # Label Selector
 
-`--label-selector` lets multiple ADC configuration sources — different teams, different CI pipelines, different config files — safely manage disjoint subsets of resources on the **same** backend, without one sync accidentally deleting another's resources.
+`--label-selector` scopes ADC operations to resources with matching labels. Use it when multiple teams, applications, or CI pipelines manage separate parts of the same backend.
 
-## The Problem It Solves
+Without a selector, `adc sync` reconciles all resources in the command scope. If team A and team B sync separate files to the same backend without partitioning, one team can accidentally delete the other team's resources. A selector prevents that by making each run see only its own labeled resources.
 
-`adc sync` and `adc diff` are full reconciliation operations: whatever exists on the backend but is absent from your local file(s) is treated as "should be deleted." That's fine as long as one ADC pipeline owns the entire backend. It breaks down the moment two teams share a backend — team A's `sync` would see team B's resources as unmanaged leftovers and delete them.
-
-`--label-selector` fixes this by scoping both sides of the reconciliation to only the resources that carry a given label:
+## Basic Usage
 
 ```bash
 adc sync -f team-a.yaml --label-selector team=a
 ```
 
-This complements (it doesn't replace) API7 Enterprise's `--gateway-group`, which is a hard, backend-level partition available only for the `api7ee` backend. Label selectors are a soft, convention-based partition that works the same way on every backend, including plain `apisix`.
-
-## Syntax and Matching Rules
+You can provide multiple labels in one flag or repeat the flag:
 
 ```bash
---label-selector team=a
---label-selector team=a,env=prod        # comma-separated pairs in one flag
---label-selector team=a --label-selector env=prod   # or repeat the flag
+adc sync -f catalog.yaml --label-selector team=catalog,env=prod
+adc sync -f catalog.yaml --label-selector team=catalog --label-selector env=prod
 ```
 
-- Matching is **exact string equality**, and multiple pairs are combined with **AND** — a resource must match every key=value pair to be included. There's no "key exists regardless of value," no wildcard, no OR.
-- There is no `ADC_*` environment variable for this option — it's flag-only.
+Matching uses exact string equality. Multiple labels are combined with AND, so a resource must match every key-value pair to be included.
 
-## What Actually Happens on Each Side
+ADC does not support wildcards, OR expressions, or key-exists selectors. There is no `ADC_*` environment variable for label selectors; pass them as command-line flags.
 
-`--label-selector` does two different things depending on whether it's applied to the local file or the remote backend state, and understanding both is necessary to use it correctly.
+## How Remote Filtering Works
 
-### Remote: Filtering
+For `dump`, and for the remote side of `diff` and `sync`, ADC filters remote resources by label.
 
-When ADC fetches the backend configuration (`dump`, and the remote side of `diff`/`sync`), it drops any resource whose `labels` don't match every pair in the selector. This only happens at the **top-level resource** granularity — `services`, `consumers`, `ssls`. `global_rules` and `plugin_metadata` are never filtered (they're global singletons keyed by plugin name, not label-bearing per-resource collections).
+Remote filtering applies to top-level resource collections that carry labels, such as:
 
-Critically, filtering does **not** recurse into nested resources. A service's `routes`/`stream_routes` and a consumer's `credentials` travel with their parent as soon as the parent matches — they are never independently checked against the selector. This is deliberate; `libs/backend-api7/src/fetcher.ts` has an explicit comment about it:
+- `services`
+- `consumers`
+- `consumer_groups`
+- `ssls`
+- other label-bearing top-level resource collections supported by the backend
 
-```
-// In the current design, the consumer's credentials are not filtered
-// using labels because nested labels filters can be misleading. Even
-// if labels set for the consumer, the labels filter is not attached.
-```
+Remote filtering does not apply to `global_rules` or `plugin_metadata`. These resources are keyed by plugin name and are treated as global configuration.
 
-The `api7ee` backend applies this filter server-side (as `labels[key]=value` Admin API query parameters), so a filtered `dump` doesn't transfer the whole backend configuration over the wire. The `apisix` backend has no such API-level filter, so ADC always fetches the entire remote configuration and applies the same filtering client-side afterward. Either way, the CLI performs the same client-side filtering pass again regardless of backend, so behavior is consistent even though the `apisix` path is less efficient.
+Filtering does not independently select nested resources. If a service matches the selector, its routes and stream routes are included with the service. If a consumer group matches the selector, its nested consumers are included with the group.
 
-### Local: Injection
+For API7 Enterprise, ADC passes label filters to the Admin API so the backend can filter matching top-level resources. For Apache APISIX, ADC fetches the remote configuration and applies the same label filtering client-side.
 
-When ADC loads your local file(s) for `sync`/`diff`, it does the opposite of filtering: it **merges** every key=value pair from the selector into the `labels` of every top-level resource, and recurses into a service's `routes`/`stream_routes` to stamp them too (existing label keys with the same name are overwritten by the selector's value). Nothing local is ever dropped or excluded — `--label-selector` only removes resources from the *remote* side of the comparison.
+## How Local Label Injection Works
 
-This injection isn't cosmetic — it's necessary for two different reasons depending on the level:
+ADC also applies the selector to the local file. It merges the selector labels into each local top-level resource and selected nested resources. For `diff` and `sync`, this happens before ADC compares the local file with the backend. For `validate`, this happens before ADC sends the local resources for backend validation.
 
-**On top-level resources, it's required for correctness.** The exact same selector is used to filter the remote side on every future run. If a resource were created without the label, the very next invocation with the same `--label-selector` would no longer see it as "already there" (since remote filtering would exclude it) — the diff would try to create it again against an identical, deterministic id (see [Resource IDs](./resource-ids.md)), producing a conflict or a resource that's permanently invisible to its own partition. Injection guarantees anything synced under a given selector stays discoverable under that same selector.
-
-**On nested routes/stream_routes, it's only about diff stability, not filtering correctness.** Since nested resources are never independently filtered (see above), an unlabeled route wouldn't fall out of scope. But the remote route already carries the label — stamped there when it was first created, as a child of an already-labeled service — so if the local copy doesn't carry the same label, the differ sees a real (if meaningless) field difference every time and reports a spurious `update route` event on every single `sync`/`diff`, forever.
-
-A side effect of both: you don't have to hand-write `labels: { team: a }` on every resource in your file. Declare it once via the flag (or wire it into your CI pipeline per team/environment), and ADC applies it uniformly — removing the chance that a forgotten label on one resource silently drops it out of its partition.
-
-## Example: Two Teams, One Backend
-
-Team A and team B each maintain their own configuration file and CI pipeline against the same `apisix`/`api7ee` instance:
+For example, this command:
 
 ```bash
-# Team A's pipeline
+adc sync -f catalog.yaml --label-selector team=catalog
+```
+
+turns a local service like this:
+
+```yaml
+services:
+  - name: catalog
+    routes:
+      - name: list-products
+        uris:
+          - /products
+```
+
+into an in-memory configuration equivalent to:
+
+```yaml
+services:
+  - name: catalog
+    labels:
+      team: catalog
+    routes:
+      - name: list-products
+        labels:
+          team: catalog
+        uris:
+          - /products
+```
+
+If the file already has the same label key, the selector value wins.
+
+This behavior keeps future runs stable. Resources created under a selector remain visible to that selector, and nested resources do not produce repeated diffs just because the backend copy has labels added by an earlier sync.
+
+## Share One Backend Across Teams
+
+Team A and team B can manage separate files against the same backend:
+
+```bash
+# Team A
 adc sync -f team-a.yaml --label-selector team=a
 
-# Team B's pipeline
+# Team B
 adc sync -f team-b.yaml --label-selector team=b
 ```
 
-Team A's `sync` only ever sees (and can therefore only ever delete or update) resources labeled `team=a`; team B's resources are invisible to it, and vice versa. Neither file needs to mention the `team` label explicitly — ADC stamps it on every resource each pipeline creates.
+Team A sees and reconciles only resources labeled `team=a`. Team B sees and reconciles only resources labeled `team=b`.
 
-To inspect what a given partition currently looks like on the backend:
+To inspect one partition:
 
 ```bash
-adc dump -o team-a-backup.yaml --label-selector team=a
+adc dump -o team-a.yaml --label-selector team=a
 ```
+
+## Important Limits
+
+- Do not use label selectors to split ownership of routes inside one shared service. A service is the top-level unit for filtering, so its nested routes move with it.
+- Use `--gateway-group` for API7 Enterprise gateway group isolation. Use `--label-selector` when teams share a gateway group or when the backend is Apache APISIX.
+- Be careful with `global_rules` and `plugin_metadata`. They are global and are not filtered by label selector.
 
 ## Related
 
-- [CLI Command Reference](../reference/cli.md#common-backend-options)
 - [Resource IDs](./resource-ids.md)
+- [CLI Command Reference](../reference/cli.md#common-backend-options)
