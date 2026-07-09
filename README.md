@@ -1,97 +1,108 @@
 # API Declarative CLI (ADC)
 
-API Declarative CLI (ADC) is a command-line tool for managing Apache APISIX and API7 Enterprise configuration declaratively. ADC reads local YAML or JSON files, compares them with the gateway configuration exposed by the Admin API, and applies the changes needed to make the gateway match the desired state.
-
-Use ADC when you want gateway configuration to be reviewed, versioned, promoted, and restored like application code.
-
-## Features
-
-- Export gateway configuration to an ADC file with `adc dump`.
-- Preview configuration drift with `adc diff`.
-- Apply local configuration with `adc sync`.
-- Validate local files before applying changes with `adc lint` and `adc validate`.
-- Convert OpenAPI specifications to ADC configuration with `adc convert openapi`.
-- Scope ownership by resource type or label so different teams can manage separate parts of a shared backend.
+ADC is a command line utility that interfaces with API7 Enterprise and Apache APISIX Admin APIs.
 
 ## Supported Backends
 
-ADC supports the following backend types:
+The following backend types are supported in ADC:
 
-- [API7 Enterprise](libs/backend-api7/README.md)
-- [Apache APISIX](libs/backend-apisix/README.md)
-- Apache APISIX standalone mode
+1. [API7 Enterprise](libs/backend-api7/README.md)
+2. [Apache APISIX](libs/backend-apisix/README.md)
+
+## Supported Converters
+
+The following converters are supported to convert API specifications to ADC configuration:
+
+1. [OpenAPI Spec 3](libs/converter-openapi/README.md)
 
 ## Installation
 
-Install ADC with the install script:
+The easiest way to install ADC is through the install script:
 
 ```bash
 curl -sL "https://run.api7.ai/adc/install" | sh
 ```
 
-You can also download a pre-built binary for Linux, macOS, or Windows from the [releases page](https://github.com/api7/adc/releases).
+Or, you can download the appropriate binary from the [releases page](https://github.com/api7/adc/releases):
 
-Verify the installation:
+Pre-built binaries for `amd64` and `arm64` on Linux, Windows, and macOS are available now.
 
-```bash
-adc --help
-```
+## Configure ADC
 
-## Quick Start
+You can configure ADC through environment variables or command line flags. Run `adc help [command]` to see the available configuration options for a command.
 
-Configure the backend with environment variables or a `.env` file.
+ADC supports dotenv, so you can store and use your environment variables in a `.env` file. The examples below show how to configure ADC for both API7 Enterprise and Apache APISIX backends.
 
-For API7 Enterprise:
+### Example API7 Enterprise Configuration
 
 ```bash
-export ADC_BACKEND=api7ee
-export ADC_SERVER=https://localhost:7443
-export ADC_TOKEN=<dashboard-token>
-export ADC_GATEWAY_GROUP=default
+ADC_BACKEND=api7ee
+ADC_SERVER=https://localhost:7443
+ADC_TOKEN=<token generated from the dashboard>
 ```
 
-For Apache APISIX:
+### Example Apache APISIX Configuration
 
 ```bash
-export ADC_BACKEND=apisix
-export ADC_SERVER=http://localhost:9180
-export ADC_TOKEN=<admin-api-key>
+ADC_SERVER=http://localhost:9180
+ADC_TOKEN=<APISIX Admin API key>
 ```
 
-Check connectivity:
+## Usage
+
+This section highlights some of the common ADC commands.
+
+### Check Connectivity
+
+The `ping` command verifies the configuration by trying to connect to the configured backend:
 
 ```bash
 adc ping
 ```
 
-Export the current configuration:
+### Dump Configuration in ADC Format
+
+The `dump` command fetches the current configuration of the backend and saves it in the ADC configuration file format:
 
 ```bash
 adc dump -o adc.yaml
 ```
 
-Preview local changes before applying them:
+### Show the Difference between Local and Remote Configuration
+
+The `diff` command compares the configuration in the specified ADC configuration file with the current configuration of the backend:
 
 ```bash
 adc diff -f adc.yaml
 ```
 
-Apply the local configuration:
+### Synchronize Local Configuration
+
+The `sync` command synchronizes the configuration in the specified ADC configuration file with the backend:
 
 ```bash
 adc sync -f adc.yaml
 ```
 
+### Convert API Specifications
+
+The `convert` command converts API specifications to ADC configuration. Currently, it supports converting an OpenAPI 3 specification to ADC configuration.
+
+```bash
+adc convert openapi -f openapi.yaml
+```
+
+### Verify ADC Configuration
+
+The `lint` command verifies the provided ADC configuration file locally.
+
+```bash
+adc lint -f adc.yaml
+```
+
 ## Documentation
 
-See [docs/](docs/README.md) for the workflow guide and reference documentation:
-
-- [Use ADC for Declarative Configuration](docs/guides/workflow.md)
-- [CLI Command Reference](docs/reference/cli.md)
-- [Configuration Reference](docs/reference/configuration.md)
-- [OpenAPI Converter Reference](docs/reference/openapi-converter.md)
-- [Resource IDs](docs/guides/resource-ids.md)
-- [Label Selector](docs/guides/label-selector.md)
+See the [`docs/`](docs/README.md) folder for the CLI command reference, configuration file reference, and a full ADC workflow guide.
 
 ## Development
 
