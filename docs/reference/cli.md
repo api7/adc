@@ -14,6 +14,7 @@ with global options:
 
 - `-v, --version` to check the version
 - `-h, --help` to print the help menu of the command
+- `--verbose <integer>` to set the verbosity level for logs (`0`, `1`, or `2`)
 
 ## Configuring ADC
 
@@ -21,7 +22,7 @@ Configure ADC with environment variables, a `.env` file, or command-line flags. 
 
 ### Using Environment Variables
 
-ADC exposes all configuration options as environment variables. For example, you can configure the backend type and address using the `ADC_BACKEND` and `ADC_SERVER` environment variables, respectively.
+ADC supports environment variables for backend connection and TLS options. For example, you can configure the backend type and address using the `ADC_BACKEND` and `ADC_SERVER` environment variables, respectively.
 
 ```shell
 export ADC_BACKEND=api7ee
@@ -43,11 +44,11 @@ You can pass the same values as command-line flags. For example:
 adc ping --backend api7ee --server "https://localhost:7443"
 ```
 
-Run `adc help [command]` to see all options for a command.
+Other options, such as label selectors, resource type filters, input files, and output files, must be passed as command-line flags. Run `adc help [command]` to see all options for a command.
 
 ## Common Backend Options
 
-The options below are shared by every command that talks to a backend (`ping`, `sync`, `dump`, `diff`, `validate`):
+The options below include global options and backend connection options used by commands that talk to a backend (`ping`, `sync`, `dump`, `diff`, `validate`). Use the Env Variable column to see which options can be configured through the environment.
 
 | Option                                   | Default Value           | Description                                                                                                     | Valid Values                              | Env Variable               |
 | ---------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------- |

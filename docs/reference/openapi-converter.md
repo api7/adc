@@ -58,7 +58,7 @@ Extensions are recognized at up to four levels of a specification:
     <tr>
       <td rowspan="3">x-adc-plugin-[plugin-name]</td>
       <td>Root Level</td>
-      <td rowspan="3">It will be consistent with x-adc-plugins. However, those configured using this format will override plugins of the same name in x-adc-plugins.</td>
+      <td rowspan="3">Add one plugin by name. When the same plugin is also defined in x-adc-plugins at the same level, the x-adc-plugin-[plugin-name] value takes precedence.</td>
     </tr>
     <tr>
       <td>Path Level</td>
