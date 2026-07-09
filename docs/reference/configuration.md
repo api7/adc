@@ -105,7 +105,7 @@ The supported ADC versions vary by syntax:
 | --------- | ----------- | ------------------- |
 | `$env://` | Data plane  | v0.12.1             |
 | `${ENV}`  | ADC         | v0.12.0             |
-| `\${}`    | Data plane  | v0.19.1             |
+| `${...}`  | Data plane  | v0.19.1             |
 
 ### Data Plane Environment Variables (`$env://`)
 
@@ -145,20 +145,22 @@ adc sync -f adc.yaml
 
 Use `\${VAR_NAME}` to escape a literal `${VAR_NAME}` and prevent ADC from interpolating it.
 
-### Built-in Variables (`\${}`)
+### Built-in Variables (`${...}`)
 
-Use `\${}` with an escaped dollar sign to reference built-in variables that the gateway evaluates per request.
+Use `${...}` to reference built-in variables that the gateway evaluates per request.
 
-In YAML double-quoted strings, write the escape sequence as `\\${...}` so that ADC receives `\${...}` after YAML parsing. In single-quoted strings or unquoted values, you can write `\${...}` directly.
+Dotted gateway variables can be written directly because ADC does not treat them as ADC environment variables.
 
 ```yaml
 plugins:
   limit-count:
-    count: "\\${http_x_user_info.low_rate_limit}"
-    key: "\\${http_x_user_info.rate_limit_key}"
+    count: '${http_x_user_info.low_rate_limit}'
+    key: '${http_x_user_info.rate_limit_key}'
     time_window: 60
     key_type: var
 ```
+
+For literal variable names that match the ADC environment variable syntax, such as `${HOST}`, use `\${HOST}` to prevent ADC from interpolating them.
 
 ## Schema Reference
 
