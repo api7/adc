@@ -1,74 +1,90 @@
 # Use ADC for Declarative Configuration
 
-ADC (API Declarative CLI) lets you manage your gateway configuration declaratively using YAML files. This enables GitOps workflows, version-controlled configuration, and reproducible deployments across different environments.
+ADC lets you manage Apache APISIX and API7 Enterprise configuration from local files. A typical workflow is:
 
-Instead of making imperative API calls, you define the desired state in a YAML file and ADC reconciles it with the gateway.
+1. Connect ADC to a backend.
+2. Export or write an `adc.yaml` file.
+3. Lint and validate the file.
+4. Preview the diff.
+5. Sync the expected changes.
+6. Keep the file in version control.
+
+This gives teams a reviewable source of truth for gateway configuration and makes drift visible before changes reach production.
 
 ## Prerequisites
 
-- An Apache APISIX or API7 Enterprise instance is running and its Admin API is reachable.
-- ADC is installed. See the [installation instructions](../../README.md#installation).
-- For API7 Enterprise: a Gateway Group is created, a Gateway instance is running, and you have a token to access the Admin API.
+- ADC is installed. See [Installation](../../README.md#installation).
+- An Apache APISIX or API7 Enterprise Admin API endpoint is reachable from the machine or CI runner that runs ADC.
+- You have an Admin API key or API7 Enterprise dashboard token.
+- For API7 Enterprise, you know the target gateway group.
 
-## Configure ADC
+## Configure the Backend
 
-ADC can be configured through environment variables, a `.env` file, or command-line flags. All three sources expose the same options; flags take precedence over environment variables, which take precedence over `.env` values.
+ADC reads configuration from command-line flags, environment variables, and `.env` files. Command-line flags take precedence over environment variables, and environment variables take precedence over `.env` values.
 
-### Using Environment Variables
-
-For an API7 Enterprise backend:
+For API7 Enterprise:
 
 ```bash
 export ADC_BACKEND=api7ee
 export ADC_SERVER=https://localhost:7443
-export ADC_TOKEN=${API_KEY}
+export ADC_TOKEN=<dashboard-token>
 export ADC_GATEWAY_GROUP=default
 ```
 
-For an Apache APISIX backend:
+For Apache APISIX:
 
 ```bash
 export ADC_BACKEND=apisix
 export ADC_SERVER=http://localhost:9180
-export ADC_TOKEN=${ADMIN_API_KEY}
+export ADC_TOKEN=<admin-api-key>
 ```
 
-### Using a `.env` File
-
-ADC loads a `.env` file in the working directory automatically (via `dotenv`), so you can persist the same variables instead of exporting them in your shell:
+You can store the same values in a `.env` file in the working directory:
 
 ```text title=".env"
 ADC_BACKEND=api7ee
 ADC_SERVER=https://localhost:7443
-ADC_TOKEN=${API_KEY}
+ADC_TOKEN=<dashboard-token>
 ADC_GATEWAY_GROUP=default
 ```
 
-### Using Command-Line Flags
-
-Every option is also available as a flag, which overrides whatever is set via environment variables or `.env` for that single invocation — useful for one-off commands or targeting a different backend without changing your shell state:
+For a one-off command, pass the options as flags:
 
 ```bash
-adc ping --backend apisix --server http://localhost:9180 --token ${ADMIN_API_KEY}
+adc ping --backend apisix --server http://localhost:9180 --token <admin-api-key>
 ```
 
-If you are connecting to a local instance with a self-signed certificate, add `--tls-skip-verify` to the ADC command (or set `ADC_TLS_SKIP_VERIFY=true`).
+If the backend uses a self-signed certificate, use `--ca-cert-file` with a trusted CA certificate. For local testing, you can use `--tls-skip-verify`.
 
-See the [CLI Command Reference](../reference/cli.md#common-backend-options) for the full list of configuration options and their corresponding environment variables.
-
-Verify connectivity:
+Verify the connection:
 
 ```bash
 adc ping
 ```
 
-## Write a Declarative Configuration
+## Create a Configuration File
 
-Define your gateway resources such as services, routes, and consumers in an `adc.yaml` file.
+You can write a configuration file by hand, convert one from OpenAPI, or start from the current backend state.
+
+To export the current backend configuration:
+
+```bash
+adc dump -o adc.yaml
+```
+
+If the backend already has resources that were created outside ADC, export the real backend IDs before adopting them:
+
+```bash
+adc dump --with-id -o adc.yaml
+```
+
+Keeping those IDs prevents ADC from replacing existing resources with newly generated IDs. See [Resource IDs](./resource-ids.md) before adopting UI-created or Admin API-created resources.
+
+An ADC file can define services, routes, consumers, global rules, plugin metadata, and SSL certificates:
 
 ```yaml title="adc.yaml"
 services:
-  - name: adc-workflow-httpbin-service
+  - name: httpbin-service
     upstream:
       name: default
       scheme: http
@@ -78,83 +94,99 @@ services:
           port: 80
           weight: 100
     routes:
-      - name: adc-workflow-route
+      - name: get-ip
         uris:
-          - /anything/adc-workflow
+          - /ip
         methods:
           - GET
         plugins:
-          key-auth:
-            header: apikey
+          key-auth: {}
 
 consumers:
-  - username: adc-workflow-consumer
+  - username: demo-user
     credentials:
-      - name: adc-workflow-key
+      - name: primary-key
         type: key-auth
         config:
-          key: adc-workflow-api-key
+          key: <api-key>
 ```
 
-The configuration file uses top-level keys to organize resources such as `services`, `consumers`, `global_rules`, and `plugin_metadata`. See the [Configuration Reference](../reference/configuration.md) for the full schema.
+See [Configuration Reference](../reference/configuration.md) for the supported fields.
 
-## Validate the Configuration Locally
+## Check the File Locally
 
-Before applying changes, use the `lint` command to check your configuration for syntax errors and schema violations.
+Run `adc lint` before comparing or syncing:
 
 ```bash
 adc lint -f adc.yaml
 ```
 
+`lint` checks local syntax and ADC schema rules. It does not connect to the backend.
+
+## Validate Against the Backend
+
+Run `adc validate` when you want backend-side validation without applying changes:
+
+```bash
+adc validate -f adc.yaml
+```
+
+`validate` asks the backend to validate the resources described by the local file. This is useful in CI because it catches issues that only the target backend can know, such as unsupported plugin configuration.
+
 ## Preview Changes
 
-The `diff` command shows you exactly what changes ADC will make to the gateway configuration to match your local file.
+Run `adc diff` before applying a file:
 
 ```bash
 adc diff -f adc.yaml
 ```
 
-This output helps you avoid accidental deletions or modifications before applying the configuration. A detailed, machine-readable diff is also written to `diff.yaml`.
+Review the output carefully. `adc diff` also writes a machine-readable `diff.yaml` file in the current directory.
 
-## Apply the Configuration
+## Apply Changes
 
-Once you have verified the changes, use the `sync` command to apply the configuration to the gateway.
+After reviewing the diff, sync the file:
 
 ```bash
 adc sync -f adc.yaml
 ```
 
-> **Caution**: `adc sync` is a reconciliation operation. It will create, update, and delete resources to match the desired state in your YAML file. Resources that exist on the gateway but are not in the YAML file will be removed.
+`adc sync` reconciles the backend to match the local file. It can create, update, and delete resources that are in the command scope. A remote resource that is in scope but absent from the local file can be deleted.
 
-If you only want to check whether a sync would succeed — for example in a CI pipeline — without applying it, use `adc validate` instead, which computes the diff and runs backend-side validation without writing any changes.
+The command scope is controlled by:
 
-## Back Up the Current Configuration
+- `--gateway-group` for API7 Enterprise gateway groups.
+- `--label-selector` for label-based ownership.
+- `--include-resource-type` and `--exclude-resource-type` for resource type filters.
 
-You can export the current gateway configuration to a YAML file using the `dump` command. This is useful for creating backups or migrating configurations between environments.
+Use [Label Selector](./label-selector.md) if more than one team or pipeline manages the same backend.
 
-```bash
-adc dump -o backup.yaml
-```
+## Convert OpenAPI to ADC
 
-## Convert from OpenAPI
-
-ADC can generate a declarative configuration from an existing OpenAPI specification file. Both OpenAPI 2.0 (Swagger) and OpenAPI 3.x are accepted, in either JSON or YAML format.
+ADC can generate configuration from OpenAPI 2.0 and OpenAPI 3.x specifications:
 
 ```bash
 adc convert openapi -f openapi.yaml -o adc.yaml
 ```
 
-A plain OpenAPI document only describes endpoints. To configure gateway-specific behavior on the converted output — plugins, labels, upstream defaults, route defaults, and so on — annotate the specification with `x-adc-*` extension fields. See the [OpenAPI Converter Reference](../reference/openapi-converter.md) for the full extension reference, processing rules, and examples.
+Plain OpenAPI documents describe APIs, not gateway-specific behavior. Add `x-adc-*` extensions when you need to control generated service names, route names, plugins, labels, upstream defaults, or route defaults. See [OpenAPI Converter Reference](../reference/openapi-converter.md).
 
-## A Typical ADC Workflow
+## Suggested CI Flow
 
-1. **Lint**: `adc lint -f adc.yaml`
-2. **Diff**: `adc diff -f adc.yaml`
-3. **Sync**: `adc sync -f adc.yaml`
-4. **Dump**: `adc dump -o backup.yaml`
+For a pull request or deployment pipeline, use this order:
 
-## Next Steps
+```bash
+adc lint -f adc.yaml
+adc validate -f adc.yaml
+adc diff -f adc.yaml
+adc sync -f adc.yaml
+```
 
-- [CLI Command Reference](../reference/cli.md) — see all available commands and options.
-- [Configuration Reference](../reference/configuration.md) — full configuration file schema and variable syntax.
-- [Resource IDs](./resource-ids.md) — required reading before pointing ADC at a backend that already has resources created through the Admin API or a UI.
+Run `sync` only after the diff has been reviewed or approved by your release process.
+
+## Related
+
+- [CLI Command Reference](../reference/cli.md)
+- [Configuration Reference](../reference/configuration.md)
+- [Resource IDs](./resource-ids.md)
+- [Label Selector](./label-selector.md)
