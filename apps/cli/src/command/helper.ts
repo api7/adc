@@ -207,6 +207,12 @@ export class BackendCommand<
         )
           .env('ADC_TLS_SKIP_VERIFY')
           .default(false),
+      )
+      .addOption(
+        new Option(
+          '--no-managed-by-label',
+          'disable injecting the "managed-by=adc" label into synced resources',
+        ),
       );
   }
 }

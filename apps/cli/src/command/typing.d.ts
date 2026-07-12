@@ -16,6 +16,7 @@ export type BackendOptions = {
   labelSelector?: Record<string, string>;
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
+  managedByLabel?: boolean;
 } & GlobalOptions;
 
 export interface KVConfiguration {
