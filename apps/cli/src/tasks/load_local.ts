@@ -7,8 +7,9 @@ import { ListrTask } from 'listr2';
 import path from 'node:path';
 
 import type { TaskContext } from '../command/diff.command';
-
 import {
+  MANAGED_BY_LABEL_KEY,
+  MANAGED_BY_LABEL_VALUE,
   fillLabels,
   filterResourceType,
   mergeKVConfigurations,
@@ -22,6 +23,7 @@ export const LoadLocalConfigurationTask = (
   labelSelector?: ADCSDK.BackendOptions['labelSelector'],
   includeResourceType?: Array<ADCSDK.ResourceType>,
   excludeResourceType?: Array<ADCSDK.ResourceType>,
+  managedByLabel = true,
 ): ListrTask<TaskContext> => ({
   title: `Load local configuration`,
   task: async (ctx, task) => {
@@ -87,7 +89,8 @@ export const LoadLocalConfigurationTask = (
         {
           title: 'Filter configuration resource type',
           enabled: () =>
-            (includeResourceType?.length ?? 0) > 0 || (excludeResourceType?.length ?? 0) > 0,
+            (includeResourceType?.length ?? 0) > 0 ||
+            (excludeResourceType?.length ?? 0) > 0,
           task: () => {
             ctx.local = filterResourceType(
               ctx.local,
@@ -102,6 +105,14 @@ export const LoadLocalConfigurationTask = (
           task: async () => {
             // Merge label selectors from CLI inputs to each resource
             fillLabels(ctx.local, labelSelector);
+          },
+        },
+        {
+          enabled: managedByLabel,
+          task: async () => {
+            fillLabels(ctx.local, {
+              [MANAGED_BY_LABEL_KEY]: MANAGED_BY_LABEL_VALUE,
+            });
           },
         },
       ],

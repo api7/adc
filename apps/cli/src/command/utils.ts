@@ -200,6 +200,12 @@ export const fillLabels = (
   return configuration;
 };
 
+// Injected into local resources the same way --label-selector's fillLabels()
+// works, so it flows into every CREATE/UPDATE payload naturally without any
+// special-casing in the differ or the backend.
+export const MANAGED_BY_LABEL_KEY = 'managed-by';
+export const MANAGED_BY_LABEL_VALUE = 'adc';
+
 export const filterResourceType = (
   config: ADCSDK.Configuration = {},
   includes?: Array<string>,
