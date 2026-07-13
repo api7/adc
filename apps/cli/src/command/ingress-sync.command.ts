@@ -31,6 +31,7 @@ export const IngressSyncCommand = new BackendCommand<SyncOption>('sync')
           opts.labelSelector,
           opts.includeResourceType,
           opts.excludeResourceType,
+          opts.managedByLabel,
         ),
         LintTask(),
         !opts.remoteStateFile

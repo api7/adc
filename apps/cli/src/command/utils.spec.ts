@@ -1,6 +1,8 @@
 import * as ADCSDK from '@api7/adc-sdk';
 
 import {
+  MANAGED_BY_LABEL_KEY,
+  MANAGED_BY_LABEL_VALUE,
   fillLabels,
   recursiveRemoveIdField,
   recursiveReplaceEnvVars,
@@ -251,6 +253,31 @@ describe('CLI utils', () => {
         },
       ],
       ssls: [{ certificates: [], snis: ['test'] }],
+    });
+  });
+
+  it('should label local resources as managed by ADC, the same way fillLabels does for --label-selector', () => {
+    expect(
+      fillLabels(
+        {
+          services: [{ name: 'Test Service' }],
+          consumers: [{ username: 'alice', labels: { team: 'a' } }],
+        } as ADCSDK.Configuration,
+        { [MANAGED_BY_LABEL_KEY]: MANAGED_BY_LABEL_VALUE },
+      ),
+    ).toEqual({
+      services: [
+        {
+          name: 'Test Service',
+          labels: { [MANAGED_BY_LABEL_KEY]: MANAGED_BY_LABEL_VALUE },
+        },
+      ],
+      consumers: [
+        {
+          username: 'alice',
+          labels: { team: 'a', [MANAGED_BY_LABEL_KEY]: MANAGED_BY_LABEL_VALUE },
+        },
+      ],
     });
   });
 

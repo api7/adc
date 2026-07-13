@@ -85,6 +85,7 @@ export const SyncCommand = new BackendCommand<SyncOption>(
           opts.labelSelector,
           opts.includeResourceType,
           opts.excludeResourceType,
+          opts.managedByLabel,
         ),
         opts.lint ? LintTask() : { task: () => undefined },
         !opts.remoteStateFile

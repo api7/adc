@@ -5,12 +5,7 @@ import { Observable, Subscription } from 'rxjs';
 import { SemVer } from 'semver';
 
 import * as ADCSDK from '..';
-import {
-  BackendEventSource,
-  MANAGED_BY_LABEL_KEY,
-  MANAGED_BY_LABEL_VALUE,
-  injectManagedByLabel,
-} from './utils';
+import { BackendEventSource } from './utils';
 
 export interface BackendOptions {
   server: string;
@@ -26,7 +21,6 @@ export interface BackendOptions {
   labelSelector?: Record<string, string>;
   includeResourceType?: Array<ADCSDK.ResourceType>;
   excludeResourceType?: Array<ADCSDK.ResourceType>;
-  managedByLabel?: boolean;
 
   cacheKey: string;
   httpAgent: httpAgent;
@@ -127,7 +121,4 @@ export interface Backend {
 export default Backend;
 export const backend = {
   BackendEventSource,
-  injectManagedByLabel,
-  MANAGED_BY_LABEL_KEY,
-  MANAGED_BY_LABEL_VALUE,
 };

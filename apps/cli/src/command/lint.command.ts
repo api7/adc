@@ -28,7 +28,10 @@ export const LintCommand = new BaseCommand('lint')
     const opts = LintCommand.optsWithGlobals();
 
     const tasks = new Listr(
-      [LoadLocalConfigurationTask(opts.file, {}), LintTask()],
+      [
+        LoadLocalConfigurationTask(opts.file, {}, undefined, undefined, false),
+        LintTask(),
+      ],
       {
         renderer: SignaleRenderer,
         rendererOptions: { verbose: opts.verbose },

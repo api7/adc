@@ -87,10 +87,6 @@ export class BackendAPISIX implements ADCSDK.Backend {
     events: Array<ADCSDK.Event>,
     opts: ADCSDK.BackendSyncOptions = { exitOnFailure: true },
   ): Observable<ADCSDK.BackendSyncResult> {
-    events = ADCSDK.backend.injectManagedByLabel(
-      events,
-      this.opts.managedByLabel ?? true,
-    );
     return forkJoin([from(this.version()), from(this.defaultValue())]).pipe(
       switchMap(([version]) => {
         return new Operator({

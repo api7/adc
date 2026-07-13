@@ -56,6 +56,7 @@ export const ValidateCommand = new BackendCommand<ValidateOptions>(
           opts.labelSelector,
           opts.includeResourceType,
           opts.excludeResourceType,
+          opts.managedByLabel,
         ),
         opts.lint ? LintTask() : { task: () => undefined },
         DiffResourceTask(),

@@ -12,7 +12,6 @@ const SyncTask = z.strictObject({
     labelSelector: z.record(z.string(), z.string()).optional(),
     cacheKey: z.string(),
     bypassCache: z.boolean().optional().default(false),
-    managedByLabel: z.boolean().optional().default(false),
   }),
   config: z.looseObject({}),
 });
