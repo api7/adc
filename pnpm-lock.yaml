@@ -12,6 +12,12 @@ catalogs:
     '@types/semver':
       specifier: ^7.7.1
       version: 7.7.1
+    '@vitest/coverage-v8':
+      specifier: ^4.1.9
+      version: 4.1.10
+    '@vitest/ui':
+      specifier: ^4.1.9
+      version: 4.1.10
     datum-diff:
       specifier: 1.0.4
       version: 1.0.4
@@ -24,9 +30,6 @@ catalogs:
     listr2:
       specifier: ^10.0.0
       version: 10.2.2
-    lru-cache:
-      specifier: ^11.0.0
-      version: 11.5.1
     rxjs:
       specifier: ^7.8.2
       version: 7.8.2
@@ -39,6 +42,9 @@ catalogs:
     tslib:
       specifier: ^2.8.1
       version: 2.8.1
+    vitest:
+      specifier: ^4.1.9
+      version: 4.1.10
     zod:
       specifier: ^4.4.3
       version: 4.4.3
@@ -335,7 +341,7 @@ importers:
         version: 4.18.1
       lru-cache:
         specifier: 'catalog:'
-        version: 11.5.1
+        version: 11.5.2
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -3075,6 +3081,10 @@ packages:
 
   lru-cache@11.5.1:
     resolution: {integrity: sha512-RPimw/7aMdv2oqRrxKwvZXcPfwBrn/JZ2xYcY9Hus/6LaS3VOAKVWKWgNLCFSiOm1ESXinjsDlidVU7JlnCN2A==}
+    engines: {node: 20 || >=22}
+
+  lru-cache@11.5.2:
+    resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
     engines: {node: 20 || >=22}
 
   lru-cache@5.1.1:
@@ -6648,6 +6658,8 @@ snapshots:
       triple-beam: 1.4.1
 
   lru-cache@11.5.1: {}
+
+  lru-cache@11.5.2: {}
 
   lru-cache@5.1.1:
     dependencies:
