@@ -12,6 +12,12 @@ catalogs:
     '@types/semver':
       specifier: ^7.7.1
       version: 7.7.1
+    '@vitest/coverage-v8':
+      specifier: ^4.1.9
+      version: 4.1.10
+    '@vitest/ui':
+      specifier: ^4.1.9
+      version: 4.1.10
     datum-diff:
       specifier: 1.0.4
       version: 1.0.4
@@ -39,6 +45,9 @@ catalogs:
     tslib:
       specifier: ^2.8.1
       version: 2.8.1
+    vitest:
+      specifier: ^4.1.9
+      version: 4.1.10
     zod:
       specifier: ^4.4.3
       version: 4.4.3
@@ -185,7 +194,7 @@ importers:
         version: 4.18.1
       parse-duration:
         specifier: ^2.1.5
-        version: 2.1.6
+        version: 2.1.8
       pluralize:
         specifier: ^8.0.0
         version: 8.0.0
@@ -3254,8 +3263,8 @@ packages:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
 
-  parse-duration@2.1.6:
-    resolution: {integrity: sha512-1/A2Exg3NcJGcYdgV/dn4frR7vO2hOW/ohQ4KIgbT4W3raVcpYSszPWiL6I6cKufi4jQM5NbGRXLBj8AoLM4iQ==}
+  parse-duration@2.1.8:
+    resolution: {integrity: sha512-hM72vQ2w/HebbXx2pyUaR+EBjbkPx3Xi2aWAF9SNvJnRbP0p46KLcI8WP/z5ZruCUsJr0L2HWexVtB3PlBf/LA==}
 
   parse-imports-exports@0.2.4:
     resolution: {integrity: sha512-4s6vd6dx1AotCx/RCI2m7t7GCh5bDRUtGNvRfHSP2wbBQdMi67pPe7mtzmgwcaQ8VKK/6IB7Glfyu3qdZJPybQ==}
@@ -6949,7 +6958,7 @@ snapshots:
     dependencies:
       callsites: 3.1.0
 
-  parse-duration@2.1.6: {}
+  parse-duration@2.1.8: {}
 
   parse-imports-exports@0.2.4:
     dependencies:
