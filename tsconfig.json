@@ -1,7 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
   "files": [],
-  "compilerOptions": {},
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  },
   "references": [
     {
       "path": "./apps/cli"
