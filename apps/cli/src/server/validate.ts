@@ -1,34 +1,14 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
-import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import type { RequestHandler } from 'express';
 import { toString } from 'lodash-es';
 import { lastValueFrom } from 'rxjs';
 
 import { fillLabels, filterResourceType, loadBackend } from '../command/utils';
 import { check } from '../linter';
+import { httpAgent, resolveHttpsAgent } from './agents';
 import { logger } from './logger';
 import { ValidateInput, type ValidateInputType } from './schema';
-
-// create connection pool
-const keepAlive: HttpOptions = {
-  keepAlive: true,
-  maxSockets: 256, // per host
-  maxFreeSockets: 16, // per host free
-  freeSocketTimeout:
-    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT ?? '') || 50000,
-};
-const httpAgent = new HttpAgent(keepAlive);
-
-//TODO: dynamic rejectUnauthorized and support mTLS
-const httpsAgent = new HttpsAgent({
-  rejectUnauthorized: true,
-  ...keepAlive,
-});
-const httpsInsecureAgent = new HttpsAgent({
-  rejectUnauthorized: false,
-  ...keepAlive,
-});
 
 export const validateHandler: RequestHandler<
   unknown,
@@ -73,7 +53,7 @@ export const validateHandler: RequestHandler<
         ? task.opts.server.join(',')
         : task.opts.server) as string,
       httpAgent,
-      httpsAgent: (task.opts as any).tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
+      httpsAgent: resolveHttpsAgent(task.opts),
     });
 
     backend.on('AXIOS_DEBUG', ({ description, response }) =>

@@ -13,6 +13,8 @@ export interface BackendOptions {
   gatewayGroup?: string;
   timeout?: number;
   caCertFile?: string;
+  // PEM-encoded CA certificate (or bundle), an inline alternative to caCertFile
+  caCert?: string;
   tlsClientCertFile?: string;
   tlsClientKeyFile?: string;
   tlsSkipVerify?: boolean;

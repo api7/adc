@@ -1,6 +1,18 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { z } from 'zod';
 
+const tlsSkipVerify = z.boolean().optional();
+
+// PEM-encoded CA certificate (or bundle) used to verify the backend,
+// instead of the system trust store.
+const caCert = z
+  .string()
+  .min(1)
+  .refine((cert) => cert.includes('-----BEGIN CERTIFICATE-----'), {
+    error: 'caCert must be a PEM-encoded certificate',
+  })
+  .optional();
+
 const SyncTask = z.strictObject({
   opts: z.looseObject({
     backend: z.string().min(1),
@@ -12,6 +24,8 @@ const SyncTask = z.strictObject({
     labelSelector: z.record(z.string(), z.string()).optional(),
     cacheKey: z.string(),
     bypassCache: z.boolean().optional().default(false),
+    tlsSkipVerify,
+    caCert,
   }),
   config: z.looseObject({}),
 });
@@ -31,6 +45,8 @@ const ValidateTask = z.strictObject({
     excludeResourceType: z.array(z.enum(ADCSDK.ResourceType)).optional(),
     labelSelector: z.record(z.string(), z.string()).optional(),
     cacheKey: z.string(),
+    tlsSkipVerify,
+    caCert,
   }),
   config: z.looseObject({}),
 });

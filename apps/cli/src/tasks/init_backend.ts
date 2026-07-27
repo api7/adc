@@ -25,7 +25,11 @@ export const InitializeBackendTask = (
       httpsAgent: new HttpsAgent({
         rejectUnauthorized: !opts?.tlsSkipVerify,
         ...keepAlive,
-        ...(opts?.caCertFile ? { ca: readFileSync(opts.caCertFile) } : {}),
+        ...(opts?.caCertFile
+          ? { ca: readFileSync(opts.caCertFile) }
+          : opts?.caCert
+            ? { ca: opts.caCert }
+            : {}),
         ...(opts?.tlsClientCertFile
           ? { cert: readFileSync(opts.tlsClientCertFile) }
           : {}),
