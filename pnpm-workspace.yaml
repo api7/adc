@@ -44,14 +44,10 @@ overrides:
   postcss: '>=8.5.18'
   'minimatch@10>brace-expansion': '5.0.8'
   'nx>brace-expansion': '5.0.8'
-  # @trivago/prettier-plugin-sort-imports pins minimatch@^9, which requires brace-expansion@^2.x
-  # (CJS API, incompatible with 5.x's ESM-first build). 2.1.2 is the latest version on
-  # that major line; it patches GHSA-3jxr-9vmj-r5cp but GHSA-mh99-v99m-4gvg's advertised
-  # range (<=5.0.7) still flags it since no 2.x release exists past 5.0.8's cutoff.
-  # Residual risk is theoretical: this brace-expansion instance only expands glob
-  # patterns written by developers in this repo's own prettier config, never
-  # attacker-controlled input.
-  'minimatch@9>brace-expansion': '2.1.2'
+  # @trivago/prettier-plugin-sort-imports pins minimatch@^9, which drags in the
+  # unpatched brace-expansion@2.x line (GHSA-mh99-v99m-4gvg). Force it onto minimatch@10
+  # instead, which already resolves to the patched brace-expansion@5.0.8.
+  '@trivago/prettier-plugin-sort-imports>minimatch': '^10.0.0'
 
 strictPeerDependencies: false
 onlyBuiltDependencies:
