@@ -45,6 +45,10 @@ export default config([
       '**/*.mjs',
     ],
     // Override or add rules here
-    rules: {},
+    rules: {
+      // Newly enabled by the ESLint v9+ "eslint:recommended" set (via @eslint/js);
+      // was not enforced before the ESLint v9/typescript-eslint v8 upgrade.
+      'no-useless-assignment': 'off',
+    },
   },
 ]);

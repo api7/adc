@@ -7,9 +7,10 @@
     "moduleResolution": "bundler",
     "target": "esnext",
     "module": "esnext",
-    "lib": [
-      "esnext"
-    ],
-    "skipLibCheck": true
+    "lib": ["esnext"],
+    "skipLibCheck": true,
+    "strict": false,
+    "noUncheckedSideEffectImports": false,
+    "types": ["*"]
   }
 }

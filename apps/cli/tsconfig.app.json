@@ -2,20 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ESNext"
-    ]
+    "types": ["node"],
+    "lib": ["ESNext"],
+    "rootDir": "."
   },
-  "exclude": [
-    "vitest.config.ts",
-    "src/**/*.spec.ts"
-  ],
-  "include": [
-    "src/**/*.ts"
-  ],
+  "exclude": ["vitest.config.ts", "src/**/*.spec.ts"],
+  "include": ["src/**/*.ts"],
   "references": [
     {
       "path": "../../libs/differ/tsconfig.lib.json"
