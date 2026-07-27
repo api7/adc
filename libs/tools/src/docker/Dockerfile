@@ -13,8 +13,8 @@ RUN pnpm install nx -g \
   && pnpm install \
   && NODE_ENV=production nx build cli
 
-FROM node:lts-bookworm-slim
+FROM gcr.io/distroless/nodejs24-debian13:nonroot
 
 COPY --from=builder /build/dist/apps/cli/main.cjs .
 
-ENTRYPOINT [ "node", "main.cjs" ]
+ENTRYPOINT [ "/nodejs/bin/node", "main.cjs" ]
