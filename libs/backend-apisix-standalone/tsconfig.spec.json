@@ -2,18 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
-    "types": [
-      "vitest/globals",
-      "vitest/importMeta",
-      "node",
-      "vitest"
-    ],
+    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "importHelpers": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "rootDir": "."
   },
   "include": [
     "vite.config.ts",
@@ -21,7 +17,7 @@
     "vitest.config.ts",
     "vitest.config.mts",
     "e2e/**/*.ts",
-    "test/**/*.spec.ts",
+    "test/**/*.spec.ts"
   ],
   "exclude": [],
   "references": [
