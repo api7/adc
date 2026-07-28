@@ -1,4 +1,4 @@
-import { resolveHttpsAgent } from './agents';
+import { MAX_CA_CERT_AGENTS, resolveHttpsAgent } from './agents';
 
 const CA_A = `-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----`;
 const CA_B = `-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----`;
@@ -29,6 +29,30 @@ describe('Server - HTTPS agents', () => {
       resolveHttpsAgent({ caCert: CA_B }),
     );
     expect(resolveHttpsAgent({ caCert: CA_A })).not.toBe(resolveHttpsAgent({}));
+  });
+
+  it('reuses one agent across equivalent bundles', () => {
+    expect(resolveHttpsAgent({ caCert: `  ${CA_A}\n` })).toBe(
+      resolveHttpsAgent({ caCert: CA_A }),
+    );
+    expect(resolveHttpsAgent({ caCert: '   ' })).toBe(resolveHttpsAgent({}));
+  });
+
+  it('caps the cache, evicting the least recently used bundle', () => {
+    const bundle = (i: number) =>
+      `-----BEGIN CERTIFICATE-----\ncap-${i}\n-----END CERTIFICATE-----`;
+
+    const first = resolveHttpsAgent({ caCert: bundle(0) });
+    const second = resolveHttpsAgent({ caCert: bundle(1) });
+
+    // fill the cache, keeping the first bundle in use so the second ages out
+    for (let i = 2; i < MAX_CA_CERT_AGENTS + 2; i++) {
+      resolveHttpsAgent({ caCert: bundle(i) });
+      resolveHttpsAgent({ caCert: bundle(0) });
+    }
+
+    expect(resolveHttpsAgent({ caCert: bundle(0) })).toBe(first);
+    expect(resolveHttpsAgent({ caCert: bundle(1) })).not.toBe(second);
   });
 
   it('tlsSkipVerify takes precedence over the CA bundle', () => {

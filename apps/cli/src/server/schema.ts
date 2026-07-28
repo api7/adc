@@ -1,14 +1,31 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import { X509Certificate } from 'node:crypto';
 import { z } from 'zod';
 
 const tlsSkipVerify = z.boolean().optional();
+
+const PEM_CERTIFICATE =
+  /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
+
+// every certificate in the bundle is parsed: X509Certificate on its own reads
+// only the first one, and tls.createSecureContext accepts anything at all.
+const isCertificateBundle = (pem: string) => {
+  const certificates = pem.match(PEM_CERTIFICATE);
+  if (!certificates) return false;
+  try {
+    certificates.forEach((certificate) => new X509Certificate(certificate));
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // PEM-encoded CA certificate (or bundle) used to verify the backend,
 // instead of the system trust store.
 const caCert = z
   .string()
   .min(1)
-  .refine((cert) => cert.includes('-----BEGIN CERTIFICATE-----'), {
+  .refine(isCertificateBundle, {
     error: 'caCert must be a PEM-encoded certificate',
   })
   .optional();

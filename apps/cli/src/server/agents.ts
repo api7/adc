@@ -20,9 +20,11 @@ const httpsInsecureAgent = new HttpsAgent({
   ...keepAlive,
 });
 
-// one agent per CA bundle, so sockets stay pooled across requests.
-// keyed by the bundle itself; the key space is bounded by the number of
-// distinct backends the server talks to.
+// one agent per CA bundle, so sockets stay pooled across requests. the key is
+// request input, so the cache is capped and evicts least recently used first.
+// evicted agents are dropped rather than destroyed: in-flight requests finish,
+// and freeSocketTimeout reaps the sockets they leave behind.
+export const MAX_CA_CERT_AGENTS = 32;
 const httpsCACertAgents = new Map<string, HttpsAgent>();
 
 export interface TLSOptions {
@@ -39,16 +41,29 @@ export const resolveHttpsAgent = ({
   caCert,
 }: TLSOptions): HttpsAgent => {
   if (tlsSkipVerify) return httpsInsecureAgent;
-  if (!caCert) return httpsAgent;
 
-  const cached = httpsCACertAgents.get(caCert);
-  if (cached) return cached;
+  const ca = caCert?.trim();
+  if (!ca) return httpsAgent;
+
+  const cached = httpsCACertAgents.get(ca);
+  if (cached) {
+    // re-insert to mark it most recently used
+    httpsCACertAgents.delete(ca);
+    httpsCACertAgents.set(ca, cached);
+    return cached;
+  }
 
   const agent = new HttpsAgent({
     rejectUnauthorized: true,
-    ca: caCert,
+    ca,
     ...keepAlive,
   });
-  httpsCACertAgents.set(caCert, agent);
+  httpsCACertAgents.set(ca, agent);
+
+  if (httpsCACertAgents.size > MAX_CA_CERT_AGENTS) {
+    const lruKey = httpsCACertAgents.keys().next().value;
+    if (lruKey !== undefined) httpsCACertAgents.delete(lruKey);
+  }
+
   return agent;
 };

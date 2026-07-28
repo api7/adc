@@ -8,17 +8,15 @@ import { ADCServer } from '../../src/server';
 const readCert = (fileName: string) =>
   readFileSync(join(__dirname, '../assets/tls/', fileName), 'utf-8');
 
-// a backend whose certificate is signed by a CA the system does not trust
-const backendPort = 48570;
-const backendURL = `https://localhost:${backendPort}`;
-
 describe('Server - Backend TLS', () => {
   let server: ADCServer;
+  // a backend whose certificate is signed by a CA the system does not trust
   let backend: https.Server;
+  let backendURL: string;
 
-  const syncTo = (opts: Record<string, unknown>) =>
+  const send = (path: string, opts: Record<string, unknown>) =>
     request(server.TEST_ONLY_getExpress())
-      .put('/sync')
+      .put(path)
       .send({
         task: {
           opts: {
@@ -41,44 +39,68 @@ describe('Server - Backend TLS', () => {
       { cert: readCert('server.cer'), key: readCert('server.key') },
       (_, res) => (res.writeHead(404), res.end('{}')),
     );
-    await new Promise<void>((resolve) =>
-      backend.listen(backendPort, '127.0.0.1', resolve),
-    );
+    await new Promise<void>((resolve, reject) => {
+      const onError = (err: Error) => reject(err);
+      backend.once('error', onError);
+      backend.listen(0, '127.0.0.1', () => {
+        backend.off('error', onError);
+        const address = backend.address();
+        if (!address || typeof address === 'string')
+          return reject(new Error('backend did not bind a TCP port'));
+        // the test certificate is issued for localhost
+        backendURL = `https://localhost:${address.port}`;
+        resolve();
+      });
+    });
   });
 
   afterAll(async () => {
     await new Promise<void>((resolve) => backend.close(() => resolve()));
   });
 
-  it('rejects an untrusted certificate', async () => {
-    const { status, body } = await syncTo({});
+  // once the handshake succeeds the request reaches the backend, and each
+  // endpoint fails on what it finds there instead of on the certificate
+  describe.each([
+    { path: '/sync', reachedBackend: /status code 404/ },
+    { path: '/validate', reachedBackend: /Validate is not supported/ },
+  ])('$path', ({ path, reachedBackend }) => {
+    it('rejects an untrusted certificate', async () => {
+      const { body } = await send(path, {});
 
-    expect(status).toEqual(500);
-    expect(body.message).toMatch(/unable to verify the first certificate/);
-  });
-
-  it('accepts the certificate when its CA is provided', async () => {
-    const { status, body } = await syncTo({ caCert: readCert('ca.cer') });
-
-    // the TLS handshake succeeds, so the backend's HTTP error surfaces instead
-    expect(status).toEqual(500);
-    expect(body.message).toMatch(/status code 404/);
-  });
-
-  it('ignores the CA bundle when verification is off', async () => {
-    const { status, body } = await syncTo({
-      tlsSkipVerify: true,
-      caCert: readCert('ca.cer'),
+      expect(body.message).toMatch(/unable to verify the first certificate/);
     });
 
-    expect(status).toEqual(500);
-    expect(body.message).toMatch(/status code 404/);
-  });
+    it('accepts the certificate when its CA is provided', async () => {
+      const { body } = await send(path, { caCert: readCert('ca.cer') });
 
-  it('rejects a CA bundle that is not PEM encoded', async () => {
-    const { status, body } = await syncTo({ caCert: 'not-a-certificate' });
+      expect(body.message).toMatch(reachedBackend);
+    });
 
-    expect(status).toEqual(400);
-    expect(body.message).toMatch(/caCert must be a PEM-encoded certificate/);
+    it('ignores the CA bundle when verification is off', async () => {
+      const { body } = await send(path, {
+        tlsSkipVerify: true,
+        caCert: readCert('ca.cer'),
+      });
+
+      expect(body.message).toMatch(reachedBackend);
+    });
+
+    it.each([
+      ['not PEM at all', 'not-a-certificate'],
+      ['a header with no certificate', '-----BEGIN CERTIFICATE-----'],
+      [
+        'an unparseable body',
+        '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----',
+      ],
+      [
+        'one good and one broken certificate',
+        `${readCert('ca.cer')}\n-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----`,
+      ],
+    ])('rejects a CA bundle that is %s', async (_, caCert) => {
+      const { status, body } = await send(path, { caCert });
+
+      expect(status).toEqual(400);
+      expect(body.message).toMatch(/caCert must be a PEM-encoded certificate/);
+    });
   });
 });
