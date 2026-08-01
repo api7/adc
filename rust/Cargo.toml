@@ -16,6 +16,9 @@ rust-version = "1.95"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sha1 = "0.10"
+async-trait = "0.1"
+semver = "1"
+thiserror = "2"
 
 [profile.release]
 lto = "fat"
