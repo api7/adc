@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "crates/adc-sdk",
   "crates/adc-differ",
+  "crates/adc-backend-core",
   "crates/adc-sync-bench",
   "crates/adc-mock-server",
 ]
