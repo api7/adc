@@ -1,0 +1,14 @@
+{
+  "local": {
+    "services": [
+      { "id": "custom-id-1", "name": "Test Service 1" },
+      { "name": "Test Service 2" }
+    ]
+  },
+  "remote": {
+    "services": [
+      { "id": "a509f98df50efbf27910dc24c5137ed212562111", "name": "Test Service 1" },
+      { "id": "custom-id-2", "name": "Test Service 2" }
+    ]
+  }
+}

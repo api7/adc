@@ -1,0 +1,69 @@
+{
+  "local": {
+    "services": [{
+      "name": "Test Service",
+      "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }] },
+      "routes": [{ "name": "anything", "uris": ["/anything"] }]
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "5139f1c19641e214d3b9c57949d1578c2482b940",
+      "name": "Test Service",
+      "upstream": {
+        "name": "default",
+        "scheme": "http",
+        "type": "roundrobin",
+        "hash_on": "vars",
+        "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100, "priority": 0 }],
+        "retry_timeout": 0,
+        "pass_host": "pass"
+      },
+      "routes": [{ "id": "179d30b2849b6229d3ffc5786e341b2c1a8054f5", "name": "anything", "uris": ["/anything"] }]
+    }]
+  },
+  "defaultValue": {
+    "core": {
+      "service": {
+        "upstream": {
+          "checks": {
+            "active": {
+              "concurrency": 10,
+              "healthy": { "http_statuses": [200, 302], "interval": 1, "successes": 2 },
+              "http_path": "/",
+              "https_verify_certificate": true,
+              "timeout": 1,
+              "type": "http",
+              "unhealthy": {
+                "http_failures": 5,
+                "http_statuses": [429, 404, 500, 501, 502, 503, 504, 505],
+                "interval": 1,
+                "tcp_failures": 2,
+                "timeouts": 3
+              }
+            },
+            "passive": {
+              "healthy": {
+                "http_statuses": [200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 306, 307, 308],
+                "successes": 5
+              },
+              "type": "http",
+              "unhealthy": { "http_failures": 5, "http_statuses": [429, 500, 503], "tcp_failures": 2, "timeouts": 7 }
+            }
+          },
+          "discovery_args": {},
+          "hash_on": "vars",
+          "keepalive_pool": { "idle_timeout": 60, "requests": 1000, "size": 320 },
+          "name": "default",
+          "pass_host": "pass",
+          "retry_timeout": 0,
+          "scheme": "http",
+          "timeout": { "connect": 60, "read": 60, "send": 60 },
+          "type": "roundrobin",
+          "nodes": [{ "priority": 0 }]
+        }
+      }
+    },
+    "plugins": {}
+  }
+}
