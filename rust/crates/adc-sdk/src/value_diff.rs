@@ -84,6 +84,15 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
             match (l, r) {
                 (Value::Array(la), Value::Array(ra)) => diff_array(la, ra, path, changes),
                 (Value::Object(lo), Value::Object(ro)) => diff_object(lo, ro, path, changes),
+                // JS has a single `number` type, so `1 === 1.0`. serde_json::Number keeps
+                // integer and float representations distinct internally, so a plain `l != r`
+                // here would report a spurious edit between e.g. `100` and `100.0` even
+                // though they're the same JSON number. Compare via as_f64() to match JS.
+                (Value::Number(ln), Value::Number(rn)) => {
+                    if ln.as_f64() != rn.as_f64() {
+                        changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
+                    }
+                }
                 _ => {
                     if l != r {
                         changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
@@ -214,6 +223,11 @@ mod tests {
                 item: Box::new(ValueDiff::Deleted { path: vec![], lhs: json!(3) })
             }])
         );
+    }
+
+    #[test]
+    fn integer_and_float_representations_of_same_number_are_equal() {
+        assert_eq!(diff_value(&json!({"a": 100}), &json!({"a": 100.0})), None);
     }
 
     #[test]

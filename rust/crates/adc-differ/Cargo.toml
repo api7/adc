@@ -3,6 +3,7 @@ name = "adc-differ"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 adc-sdk = { path = "../adc-sdk" }

@@ -56,6 +56,12 @@ impl serde::Serialize for ResourceType {
 }
 
 /// Merge strategies for resource fields, mirroring structured-merge-diff listType semantics.
+///
+/// These four variants intentionally mirror `field_meta::FieldMeta`'s four variants
+/// one-to-one (`Map`/`ObjectMap`/`Atomic`/`Array`) — this enum is the public,
+/// TS-API-compatible vocabulary consumers see, while `FieldMeta` is the internal
+/// representation carrying each variant's actual per-field data (e.g. `list_map_key`,
+/// `strip_item_fields`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldListType {
     /// Array of objects, identity by a declared key field. nested=true triggers sub-event diffing.

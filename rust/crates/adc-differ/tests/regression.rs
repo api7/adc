@@ -62,5 +62,17 @@ fn does_not_apply_stream_service_default_to_http_service() {
 
     let events = DifferV4::diff(&local, &remote, Some(&default_value), None);
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_type, adc_sdk::EventType::Update);
+    let event = &events[0];
+    assert_eq!(event.event_type, adc_sdk::EventType::Update);
+    assert_eq!(event.resource_type, ResourceType::Service);
+    assert_eq!(event.resource_id, generate_id(service_name));
+    // The stream-service-only default must NOT have applied: remote's "description": ""
+    // has no counterpart in local, so it must show up as a deleted field in the diff.
+    assert_eq!(
+        event.diff,
+        Some(vec![adc_sdk::ValueDiff::Deleted {
+            path: vec![adc_sdk::PathSegment::Key("description".into())],
+            lhs: json!(""),
+        }])
+    );
 }

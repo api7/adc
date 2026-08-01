@@ -60,16 +60,22 @@ async fn send_with_retry(client: &Client, base_url: &str, event: &Event) -> Resu
 
     let mut attempt = 0;
     loop {
-        let result = if is_delete {
-            client.delete(&url).send().await
-        } else {
-            client.put(&url).json(&body).send().await
-        };
+        let result = async {
+            let resp = if is_delete {
+                client.delete(&url).send().await?
+            } else {
+                client.put(&url).json(&body).send().await?
+            };
+            // error_for_status() turns 4xx/5xx into retryable errors; bytes() drains
+            // the body (mirrors axios awaiting the full response) and is itself
+            // retried on failure instead of being silently swallowed.
+            resp.error_for_status()?.bytes().await?;
+            Ok::<(), reqwest::Error>(())
+        }
+        .await;
+
         match result {
-            Ok(resp) => {
-                let _ = resp.bytes().await; // drain body, mirrors axios awaiting the full response
-                return Ok(());
-            }
+            Ok(()) => return Ok(()),
             Err(e) => {
                 attempt += 1;
                 if attempt >= 3 {
@@ -138,7 +144,8 @@ fn main() {
     let median = |v: &[f64]| {
         let mut s = v.to_vec();
         s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        s[s.len() / 2]
+        let mid = s.len() / 2;
+        if s.len().is_multiple_of(2) { (s[mid - 1] + s[mid]) / 2.0 } else { s[mid] }
     };
 
     println!(
