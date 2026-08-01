@@ -4,7 +4,7 @@ use serde_json::Value;
 use crate::resource::ResourceType;
 use crate::value_diff::ValueDiff;
 
-/// Mirrors `EventType` in `libs/sdk/src/core/differ.ts`.
+/// The kind of change a differ event represents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
@@ -15,12 +15,12 @@ pub enum EventType {
     OnlySubEvents,
 }
 
-/// Mirrors `Event<T>` in `libs/sdk/src/core/differ.ts`.
+/// A single detected change between local and remote configuration for one resource.
 ///
 /// `sub_events` is populated while the differ is building nested events and is
-/// always cleared (mirroring TS's `unset(event, 'subEvents')`) before the final
-/// flattened list is returned from `DifferV4::diff`, so it is not part of the
-/// crate's public "result" contract even though it stays on the struct.
+/// always cleared before the final flattened list is returned from
+/// `DifferV4::diff`, so it is not part of the crate's public "result" contract
+/// even though it stays on the struct.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Event {
     pub resource_type: ResourceType,
