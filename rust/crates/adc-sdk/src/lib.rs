@@ -14,7 +14,7 @@ pub mod resources;
 pub mod utils;
 pub mod value_diff;
 
-pub use event::{Event, EventType};
+pub use event::{Event, EventKind, EventType};
 pub use resource::{FieldListType, ResourceType};
 pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value};
 

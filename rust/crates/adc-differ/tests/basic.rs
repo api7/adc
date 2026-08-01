@@ -4,15 +4,15 @@
 use std::collections::HashMap;
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, EventType, InternalConfiguration, ResourceType, utils::generate_id};
+use adc_sdk::{DefaultValue, Event, EventKind, InternalConfiguration, ResourceType, utils::generate_id};
 use serde_json::{Value, json};
 
 fn config(v: Value) -> InternalConfiguration {
     v.as_object().cloned().unwrap_or_default()
 }
 
-fn ev(rt: ResourceType, et: EventType, id: &str, name: &str) -> Event {
-    Event::new(rt, et, id, name)
+fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
+    Event::new(rt, kind, id, name)
 }
 
 #[test]
@@ -26,8 +26,8 @@ fn create_resource() {
     let local = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
     let remote = config(json!({}));
 
-    let mut expected = ev(ResourceType::Consumer, EventType::Create, name, name);
-    expected.new_value = Some(json!({ "username": name, "plugins": {} }));
+    let expected =
+        ev(ResourceType::Consumer, EventKind::Create { new_value: json!({ "username": name, "plugins": {} }) }, name, name);
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -39,13 +39,19 @@ fn update_resource() {
     let local = config(json!({ "consumers": [{ "username": name, "plugins": { "key-auth": { "key": key } } }] }));
     let remote = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
 
-    let mut expected = ev(ResourceType::Consumer, EventType::Update, name, name);
-    expected.old_value = Some(json!({ "username": name, "plugins": {} }));
-    expected.new_value = Some(json!({ "username": name, "plugins": { "key-auth": { "key": key } } }));
-    expected.diff = Some(vec![adc_sdk::ValueDiff::New {
-        path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
-        rhs: json!({ "key": key }),
-    }]);
+    let expected = ev(
+        ResourceType::Consumer,
+        EventKind::Update {
+            old_value: json!({ "username": name, "plugins": {} }),
+            new_value: json!({ "username": name, "plugins": { "key-auth": { "key": key } } }),
+            diff: Some(vec![adc_sdk::ValueDiff::New {
+                path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
+                rhs: json!({ "key": key }),
+            }]),
+        },
+        name,
+        name,
+    );
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -56,8 +62,8 @@ fn delete_resource() {
     let local = config(json!({}));
     let remote = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
 
-    let mut expected = ev(ResourceType::Consumer, EventType::Delete, name, name);
-    expected.old_value = Some(json!({ "username": name, "plugins": {} }));
+    let expected =
+        ev(ResourceType::Consumer, EventKind::Delete { old_value: json!({ "username": name, "plugins": {} }) }, name, name);
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -80,19 +86,33 @@ fn sorted_by_event_type() {
         ]
     }));
 
-    let mut deleted_ev = ev(ResourceType::Consumer, EventType::Delete, deleted, deleted);
-    deleted_ev.old_value = Some(json!({ "plugins": {}, "username": deleted }));
+    let deleted_ev = ev(
+        ResourceType::Consumer,
+        EventKind::Delete { old_value: json!({ "plugins": {}, "username": deleted }) },
+        deleted,
+        deleted,
+    );
 
-    let mut updated_ev = ev(ResourceType::Consumer, EventType::Update, updated, updated);
-    updated_ev.old_value = Some(json!({ "plugins": {}, "username": updated }));
-    updated_ev.new_value = Some(json!({ "plugins": { "key-auth": {} }, "username": updated }));
-    updated_ev.diff = Some(vec![adc_sdk::ValueDiff::New {
-        path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
-        rhs: json!({}),
-    }]);
+    let updated_ev = ev(
+        ResourceType::Consumer,
+        EventKind::Update {
+            old_value: json!({ "plugins": {}, "username": updated }),
+            new_value: json!({ "plugins": { "key-auth": {} }, "username": updated }),
+            diff: Some(vec![adc_sdk::ValueDiff::New {
+                path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
+                rhs: json!({}),
+            }]),
+        },
+        updated,
+        updated,
+    );
 
-    let mut created_ev = ev(ResourceType::Consumer, EventType::Create, created, created);
-    created_ev.new_value = Some(json!({ "plugins": {}, "username": created }));
+    let created_ev = ev(
+        ResourceType::Consumer,
+        EventKind::Create { new_value: json!({ "plugins": {}, "username": created }) },
+        created,
+        created,
+    );
 
     // DELETE > UPDATE > CREATE
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![deleted_ev, updated_ev, created_ev]);
@@ -132,13 +152,19 @@ fn update_resource_add_plugin() {
     let local = config(json!({ "consumers": [{ "username": name, "plugins": { "key-auth": { "key": key } } }] }));
     let remote = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
 
-    let mut expected = ev(ResourceType::Consumer, EventType::Update, name, name);
-    expected.diff = Some(vec![adc_sdk::ValueDiff::New {
-        path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
-        rhs: json!({ "key": key }),
-    }]);
-    expected.new_value = Some(json!({ "plugins": { "key-auth": { "key": key } }, "username": name }));
-    expected.old_value = Some(json!({ "plugins": {}, "username": name }));
+    let expected = ev(
+        ResourceType::Consumer,
+        EventKind::Update {
+            old_value: json!({ "plugins": {}, "username": name }),
+            new_value: json!({ "plugins": { "key-auth": { "key": key } }, "username": name }),
+            diff: Some(vec![adc_sdk::ValueDiff::New {
+                path: vec![adc_sdk::PathSegment::Key("plugins".into()), adc_sdk::PathSegment::Key("key-auth".into())],
+                rhs: json!({ "key": key }),
+            }]),
+        },
+        name,
+        name,
+    );
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -157,18 +183,24 @@ fn update_resource_update_plugin_with_default_value() {
         plugins: HashMap::from([("key-auth".to_string(), json!({ "added": "added" }))]),
     };
 
-    let mut expected = ev(ResourceType::Consumer, EventType::Update, name, name);
-    expected.diff = Some(vec![adc_sdk::ValueDiff::Edit {
-        path: vec![
-            adc_sdk::PathSegment::Key("plugins".into()),
-            adc_sdk::PathSegment::Key("key-auth".into()),
-            adc_sdk::PathSegment::Key("key".into()),
-        ],
-        lhs: json!(old_key),
-        rhs: json!(new_key),
-    }]);
-    expected.new_value = Some(json!({ "plugins": { "key-auth": { "key": new_key, "added": "added" } }, "username": name }));
-    expected.old_value = Some(json!({ "plugins": { "key-auth": { "added": "added", "key": old_key } }, "username": name }));
+    let expected = ev(
+        ResourceType::Consumer,
+        EventKind::Update {
+            old_value: json!({ "plugins": { "key-auth": { "added": "added", "key": old_key } }, "username": name }),
+            new_value: json!({ "plugins": { "key-auth": { "key": new_key, "added": "added" } }, "username": name }),
+            diff: Some(vec![adc_sdk::ValueDiff::Edit {
+                path: vec![
+                    adc_sdk::PathSegment::Key("plugins".into()),
+                    adc_sdk::PathSegment::Key("key-auth".into()),
+                    adc_sdk::PathSegment::Key("key".into()),
+                ],
+                lhs: json!(old_key),
+                rhs: json!(new_key),
+            }]),
+        },
+        name,
+        name,
+    );
 
     assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
 }
@@ -183,8 +215,7 @@ fn generates_hashed_resource_id() {
     let local = config(json!({ "ssls": [ssl] }));
     let remote = config(json!({}));
 
-    let mut expected = ev(ResourceType::Ssl, EventType::Create, &generate_id(ssl_name), ssl_name);
-    expected.new_value = Some(ssl);
+    let expected = ev(ResourceType::Ssl, EventKind::Create { new_value: ssl }, &generate_id(ssl_name), ssl_name);
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -215,22 +246,23 @@ fn updates_service_nested_route() {
 
     let mut expected = ev(
         ResourceType::Route,
-        EventType::Update,
+        EventKind::Update {
+            old_value: json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "oldValue" } } }),
+            new_value: json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "newValue" } } }),
+            diff: Some(vec![adc_sdk::ValueDiff::Edit {
+                path: vec![
+                    adc_sdk::PathSegment::Key("plugins".into()),
+                    adc_sdk::PathSegment::Key("test".into()),
+                    adc_sdk::PathSegment::Key("testKey".into()),
+                ],
+                lhs: json!("oldValue"),
+                rhs: json!("newValue"),
+            }]),
+        },
         &generate_id(&format!("{service_name}.{route_name}")),
         route_name,
     );
     expected.parent_id = Some(generate_id(service_name));
-    expected.diff = Some(vec![adc_sdk::ValueDiff::Edit {
-        path: vec![
-            adc_sdk::PathSegment::Key("plugins".into()),
-            adc_sdk::PathSegment::Key("test".into()),
-            adc_sdk::PathSegment::Key("testKey".into()),
-        ],
-        lhs: json!("oldValue"),
-        rhs: json!("newValue"),
-    }]);
-    expected.new_value = Some(json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "newValue" } } }));
-    expected.old_value = Some(json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "oldValue" } } }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -264,36 +296,47 @@ fn updates_service_and_its_nested_route() {
         }]
     }));
 
-    let mut route_ev = ev(ResourceType::Route, EventType::Update, &route_id, route_name);
-    route_ev.parent_id = Some(service_id.clone());
-    route_ev.diff = Some(vec![adc_sdk::ValueDiff::Edit {
-        path: vec![
-            adc_sdk::PathSegment::Key("plugins".into()),
-            adc_sdk::PathSegment::Key("test".into()),
-            adc_sdk::PathSegment::Key("testKey".into()),
-        ],
-        lhs: json!("oldValue"),
-        rhs: json!("newValue"),
-    }]);
-    route_ev.new_value = Some(json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "newValue" } } }));
-    route_ev.old_value = Some(json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "oldValue" } } }));
-
-    let mut service_ev = ev(ResourceType::Service, EventType::Update, &service_id, service_name);
-    service_ev.diff = Some(vec![
-        adc_sdk::ValueDiff::Edit {
-            path: vec![
-                adc_sdk::PathSegment::Key("plugins".into()),
-                adc_sdk::PathSegment::Key("test".into()),
-                adc_sdk::PathSegment::Key("testKey".into()),
-            ],
-            lhs: json!("serviceOldValue"),
-            rhs: json!("serviceNewValue"),
+    let mut route_ev = ev(
+        ResourceType::Route,
+        EventKind::Update {
+            old_value: json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "oldValue" } } }),
+            new_value: json!({ "name": route_name, "uris": ["/test"], "plugins": { "test": { "testKey": "newValue" } } }),
+            diff: Some(vec![adc_sdk::ValueDiff::Edit {
+                path: vec![
+                    adc_sdk::PathSegment::Key("plugins".into()),
+                    adc_sdk::PathSegment::Key("test".into()),
+                    adc_sdk::PathSegment::Key("testKey".into()),
+                ],
+                lhs: json!("oldValue"),
+                rhs: json!("newValue"),
+            }]),
         },
-        adc_sdk::ValueDiff::New { path: vec![adc_sdk::PathSegment::Key("path_prefix".into())], rhs: json!("/test") },
-    ]);
-    service_ev.new_value =
-        Some(json!({ "name": service_name, "path_prefix": "/test", "plugins": { "test": { "testKey": "serviceNewValue" } } }));
-    service_ev.old_value = Some(json!({ "name": service_name, "plugins": { "test": { "testKey": "serviceOldValue" } } }));
+        &route_id,
+        route_name,
+    );
+    route_ev.parent_id = Some(service_id.clone());
+
+    let service_ev = ev(
+        ResourceType::Service,
+        EventKind::Update {
+            old_value: json!({ "name": service_name, "plugins": { "test": { "testKey": "serviceOldValue" } } }),
+            new_value: json!({ "name": service_name, "path_prefix": "/test", "plugins": { "test": { "testKey": "serviceNewValue" } } }),
+            diff: Some(vec![
+                adc_sdk::ValueDiff::Edit {
+                    path: vec![
+                        adc_sdk::PathSegment::Key("plugins".into()),
+                        adc_sdk::PathSegment::Key("test".into()),
+                        adc_sdk::PathSegment::Key("testKey".into()),
+                    ],
+                    lhs: json!("serviceOldValue"),
+                    rhs: json!("serviceNewValue"),
+                },
+                adc_sdk::ValueDiff::New { path: vec![adc_sdk::PathSegment::Key("path_prefix".into())], rhs: json!("/test") },
+            ]),
+        },
+        &service_id,
+        service_name,
+    );
 
     // ROUTE.UPDATE (10) sorts before SERVICE.UPDATE (12).
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![route_ev, service_ev]);
@@ -323,17 +366,23 @@ fn keeps_plugins_when_plugins_not_changed() {
         plugins: HashMap::from([("test".to_string(), json!({ "added": "added" }))]),
     };
 
-    let mut expected = ev(ResourceType::Service, EventType::Update, &service_id, service_name);
-    expected.diff = Some(vec![adc_sdk::ValueDiff::New { path: vec![adc_sdk::PathSegment::Key("path_prefix".into())], rhs: json!("/test") }]);
-    expected.new_value = Some(json!({
-        "name": service_name,
-        "path_prefix": "/test",
-        "plugins": { "test": { "testKey": "testValue", "added": "added" } },
-    }));
-    expected.old_value = Some(json!({
-        "name": service_name,
-        "plugins": { "test": { "testKey": "testValue", "added": "added" } },
-    }));
+    let expected = ev(
+        ResourceType::Service,
+        EventKind::Update {
+            old_value: json!({
+                "name": service_name,
+                "plugins": { "test": { "testKey": "testValue", "added": "added" } },
+            }),
+            new_value: json!({
+                "name": service_name,
+                "path_prefix": "/test",
+                "plugins": { "test": { "testKey": "testValue", "added": "added" } },
+            }),
+            diff: Some(vec![adc_sdk::ValueDiff::New { path: vec![adc_sdk::PathSegment::Key("path_prefix".into())], rhs: json!("/test") }]),
+        },
+        &service_id,
+        service_name,
+    );
 
     assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
 }
@@ -418,14 +467,20 @@ fn boolean_defaults_merged_correctly() {
     let mut expected_old = service.clone();
     expected_old["strip_path_prefix"] = json!(true);
 
-    let mut expected = ev(ResourceType::Service, EventType::Update, &generate_id("HTTP"), "HTTP");
-    expected.diff = Some(vec![adc_sdk::ValueDiff::Edit {
-        path: vec![adc_sdk::PathSegment::Key("strip_path_prefix".into())],
-        lhs: json!(true),
-        rhs: json!(false),
-    }]);
-    expected.new_value = Some(service);
-    expected.old_value = Some(expected_old);
+    let expected = ev(
+        ResourceType::Service,
+        EventKind::Update {
+            old_value: expected_old,
+            new_value: service,
+            diff: Some(vec![adc_sdk::ValueDiff::Edit {
+                path: vec![adc_sdk::PathSegment::Key("strip_path_prefix".into())],
+                lhs: json!(true),
+                rhs: json!(false),
+            }]),
+        },
+        &generate_id("HTTP"),
+        "HTTP",
+    );
 
     assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
 }

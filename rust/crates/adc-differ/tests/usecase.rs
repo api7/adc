@@ -1,7 +1,7 @@
 //! Ported from `libs/differ/src/test/usecase.spec.ts`.
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, EventType, InternalConfiguration, ResourceType, utils::generate_id};
+use adc_sdk::{DefaultValue, Event, EventKind, InternalConfiguration, ResourceType, utils::generate_id};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -9,8 +9,8 @@ fn config(v: Value) -> InternalConfiguration {
     v.as_object().cloned().unwrap_or_default()
 }
 
-fn ev(rt: ResourceType, et: EventType, id: &str, name: &str) -> Event {
-    Event::new(rt, et, id, name)
+fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
+    Event::new(rt, kind, id, name)
 }
 
 #[test]
@@ -41,45 +41,70 @@ fn renames_service_with_nested_routes() {
     let old_service_id = generate_id("HTTPBIN Service");
     let new_service_id = generate_id("HTTPBIN Service1");
 
-    let mut del_route1 = ev(ResourceType::Route, EventType::Delete, &generate_id("HTTPBIN Service.Anything"), "Anything");
+    let mut del_route1 = ev(
+        ResourceType::Route,
+        EventKind::Delete { old_value: json!({ "methods": ["GET"], "name": "Anything", "uris": ["/anything"] }) },
+        &generate_id("HTTPBIN Service.Anything"),
+        "Anything",
+    );
     del_route1.parent_id = Some(old_service_id.clone());
-    del_route1.old_value = Some(json!({ "methods": ["GET"], "name": "Anything", "uris": ["/anything"] }));
 
-    let mut del_route2 =
-        ev(ResourceType::Route, EventType::Delete, &generate_id("HTTPBIN Service.Generate UUID"), "Generate UUID");
+    let mut del_route2 = ev(
+        ResourceType::Route,
+        EventKind::Delete { old_value: json!({ "methods": ["GET"], "name": "Generate UUID", "uris": ["/uuid"] }) },
+        &generate_id("HTTPBIN Service.Generate UUID"),
+        "Generate UUID",
+    );
     del_route2.parent_id = Some(old_service_id.clone());
-    del_route2.old_value = Some(json!({ "methods": ["GET"], "name": "Generate UUID", "uris": ["/uuid"] }));
 
-    let mut del_service = ev(ResourceType::Service, EventType::Delete, &old_service_id, "HTTPBIN Service");
-    del_service.old_value = Some(json!({
-        "description": "",
-        "name": "HTTPBIN Service",
-        "routes": [
-            { "id": generate_id("HTTPBIN Service.Anything"), "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
-            { "id": generate_id("HTTPBIN Service.Generate UUID"), "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
-        ],
-        "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
-    }));
+    let del_service = ev(
+        ResourceType::Service,
+        EventKind::Delete {
+            old_value: json!({
+                "description": "",
+                "name": "HTTPBIN Service",
+                "routes": [
+                    { "id": generate_id("HTTPBIN Service.Anything"), "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
+                    { "id": generate_id("HTTPBIN Service.Generate UUID"), "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
+                ],
+                "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
+            }),
+        },
+        &old_service_id,
+        "HTTPBIN Service",
+    );
 
-    let mut create_service = ev(ResourceType::Service, EventType::Create, &new_service_id, "HTTPBIN Service1");
-    create_service.new_value = Some(json!({
-        "name": "HTTPBIN Service1",
-        "routes": [
-            { "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
-            { "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
-        ],
-        "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
-    }));
+    let create_service = ev(
+        ResourceType::Service,
+        EventKind::Create {
+            new_value: json!({
+                "name": "HTTPBIN Service1",
+                "routes": [
+                    { "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
+                    { "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
+                ],
+                "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
+            }),
+        },
+        &new_service_id,
+        "HTTPBIN Service1",
+    );
 
-    let mut create_route1 =
-        ev(ResourceType::Route, EventType::Create, &generate_id("HTTPBIN Service1.Anything"), "Anything");
+    let mut create_route1 = ev(
+        ResourceType::Route,
+        EventKind::Create { new_value: json!({ "methods": ["GET"], "name": "Anything", "uris": ["/anything"] }) },
+        &generate_id("HTTPBIN Service1.Anything"),
+        "Anything",
+    );
     create_route1.parent_id = Some(new_service_id.clone());
-    create_route1.new_value = Some(json!({ "methods": ["GET"], "name": "Anything", "uris": ["/anything"] }));
 
-    let mut create_route2 =
-        ev(ResourceType::Route, EventType::Create, &generate_id("HTTPBIN Service1.Generate UUID"), "Generate UUID");
+    let mut create_route2 = ev(
+        ResourceType::Route,
+        EventKind::Create { new_value: json!({ "methods": ["GET"], "name": "Generate UUID", "uris": ["/uuid"] }) },
+        &generate_id("HTTPBIN Service1.Generate UUID"),
+        "Generate UUID",
+    );
     create_route2.parent_id = Some(new_service_id.clone());
-    create_route2.new_value = Some(json!({ "methods": ["GET"], "name": "Generate UUID", "uris": ["/uuid"] }));
 
     assert_eq!(
         DifferV4::diff(&local, &remote, None, None),

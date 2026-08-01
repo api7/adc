@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use adc_sdk::{DefaultValue, Event, EventType, InternalConfiguration, ResourceType, diff_value, utils::generate_id};
+use adc_sdk::{DefaultValue, Event, EventKind, EventType, InternalConfiguration, ResourceType, diff_value, utils::generate_id};
 use serde_json::{Map, Value, json};
 
 use crate::differ_meta::{CollectionKind, ResourceDifferMeta, differ_meta};
@@ -12,6 +12,16 @@ use crate::field_meta::FieldMeta;
 
 /// (name, id, item) extracted from one resource's raw JSON representation.
 type ResourceTuple = (String, String, Value);
+
+/// An event paired with the nested sub-events discovered while building it (from
+/// this resource's `{listType: Map, nested: true}` fields). `sub_events` is
+/// build-time-only bookkeeping consumed by `DifferV4::diff`, which lifts each
+/// entry up one level into the final flattened list — it never appears on the
+/// public `Event` type itself.
+struct BuiltEvent {
+    event: Event,
+    sub_events: Vec<Event>,
+}
 
 pub struct DifferV4 {
     default_value: DefaultValue,
@@ -26,7 +36,7 @@ impl DifferV4 {
     ) -> Vec<Event> {
         let differ = DifferV4 { default_value: default_value.cloned().unwrap_or_default() };
 
-        let mut result: Vec<Event> = Vec::new();
+        let mut result: Vec<BuiltEvent> = Vec::new();
         for &resource_type in ResourceType::ALL {
             let meta = differ_meta(resource_type);
             if meta.config_field.is_none() {
@@ -40,15 +50,14 @@ impl DifferV4 {
         // Unwrap one level of subEvents and drop ONLY_SUB_EVENTS placeholder
         // events, which exist only to carry subEvents up to this point.
         let mut unwrapped: Vec<Event> = Vec::new();
-        for mut event in result {
-            let subs = std::mem::take(&mut event.sub_events);
-            if event.event_type != EventType::OnlySubEvents {
+        for BuiltEvent { event, sub_events } in result {
+            if event.event_type() != EventType::OnlySubEvents {
                 unwrapped.push(event);
             }
-            unwrapped.extend(subs);
+            unwrapped.extend(sub_events);
         }
 
-        unwrapped.sort_by_key(|e| order_priority(e.resource_type, e.event_type));
+        unwrapped.sort_by_key(|e| order_priority(e.resource_type, e.event_type()));
         unwrapped
     }
 
@@ -58,7 +67,7 @@ impl DifferV4 {
         meta: &ResourceDifferMeta,
         local: Vec<ResourceTuple>,
         remote: Vec<ResourceTuple>,
-    ) -> Vec<Event> {
+    ) -> Vec<BuiltEvent> {
         let mut result = Vec::new();
         let local_id_map: HashMap<&str, &Value> =
             local.iter().map(|(_, id, item)| (id.as_str(), item)).collect();
@@ -103,7 +112,7 @@ impl DifferV4 {
         remote_id: &str,
         remote_name: &str,
         remote_item: Value,
-    ) -> Event {
+    ) -> BuiltEvent {
         let sub_config = extract_sub_config(meta, &remote_item);
         let empty = InternalConfiguration::new();
         let parent_name = meta.propagates_parent_name.then_some(remote_name);
@@ -112,10 +121,8 @@ impl DifferV4 {
             .map(|e| postprocess_sub_event(remote_name, remote_id, e))
             .collect();
 
-        let mut event = Event::new(resource_type, EventType::Delete, remote_id, remote_name);
-        event.old_value = Some(remote_item);
-        event.sub_events = sub_events;
-        event
+        let event = Event::new(resource_type, EventKind::Delete { old_value: remote_item }, remote_id, remote_name);
+        BuiltEvent { event, sub_events }
     }
 
     fn handle_create(
@@ -125,7 +132,7 @@ impl DifferV4 {
         local_id: &str,
         local_name: &str,
         mut local_item: Value,
-    ) -> Event {
+    ) -> BuiltEvent {
         let sub_config = extract_sub_config(meta, &local_item);
         let empty = InternalConfiguration::new();
         let parent_name = meta.propagates_parent_name.then_some(local_name);
@@ -142,10 +149,8 @@ impl DifferV4 {
         // aliasing here, so the same observable effect is reproduced explicitly.
         strip_nested_ids(meta, &mut local_item);
 
-        let mut event = Event::new(resource_type, EventType::Create, local_id, local_name);
-        event.new_value = Some(local_item);
-        event.sub_events = sub_events;
-        event
+        let event = Event::new(resource_type, EventKind::Create { new_value: local_item }, local_id, local_name);
+        BuiltEvent { event, sub_events }
     }
 
     fn handle_update(
@@ -156,7 +161,7 @@ impl DifferV4 {
         remote_name: &str,
         local_item: Value,
         remote_item: Value,
-    ) -> Option<Event> {
+    ) -> Option<BuiltEvent> {
         let original_local_item = local_item.clone();
         let mut local_item = local_item;
         let mut remote_item = remote_item;
@@ -246,17 +251,13 @@ impl DifferV4 {
 
         let only_sub_events = !sub_events.is_empty() && !plugin_changed && diff.is_none();
 
-        let mut event = Event::new(
-            resource_type,
-            if only_sub_events { EventType::OnlySubEvents } else { EventType::Update },
-            remote_id,
-            remote_name,
-        );
-        event.old_value = Some(output_remote_item);
-        event.new_value = Some(output_local_item);
-        event.diff = diff;
-        event.sub_events = sub_events;
-        Some(event)
+        let kind = if only_sub_events {
+            EventKind::OnlySubEvents
+        } else {
+            EventKind::Update { old_value: output_remote_item, new_value: output_local_item, diff }
+        };
+        let event = Event::new(resource_type, kind, remote_id, remote_name);
+        Some(BuiltEvent { event, sub_events })
     }
 
     fn diff_plugins(&self, local: &Value, remote: &Value) -> (bool, Value) {
