@@ -1,15 +1,15 @@
 //! Ported from `libs/differ/src/test/service-upstream.spec.ts`.
 
 use adc_differ::DifferV4;
-use adc_sdk::{Event, EventType, InternalConfiguration, ResourceType, ValueDiff, utils::generate_id};
+use adc_sdk::{Event, EventKind, InternalConfiguration, ResourceType, ValueDiff, utils::generate_id};
 use serde_json::{Value, json};
 
 fn config(v: Value) -> InternalConfiguration {
     v.as_object().cloned().unwrap_or_default()
 }
 
-fn ev(rt: ResourceType, et: EventType, id: &str, name: &str) -> Event {
-    Event::new(rt, et, id, name)
+fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
+    Event::new(rt, kind, id, name)
 }
 
 #[test]
@@ -50,11 +50,11 @@ fn updates_default_upstream() {
     assert_eq!(events.len(), 1);
     let e = &events[0];
     assert_eq!(e.resource_type, ResourceType::Service);
-    assert_eq!(e.event_type, EventType::Update);
     assert_eq!(e.resource_id, service_name);
     assert_eq!(e.resource_name, service_name);
+    let EventKind::Update { diff, .. } = &e.kind else { panic!("expected an update event, got {:?}", e.kind) };
     assert_eq!(
-        e.diff,
+        *diff,
         Some(vec![ValueDiff::Deleted {
             path: vec![adc_sdk::PathSegment::Key("upstream".into()), adc_sdk::PathSegment::Key("name".into())],
             lhs: json!(upstream_name),
@@ -75,16 +75,22 @@ fn creates_service_and_upstream() {
     let local = config(json!({ "services": [service] }));
     let remote = config(json!({}));
 
-    let mut service_ev = ev(ResourceType::Service, EventType::Create, service_name, service_name);
-    service_ev.new_value = Some(json!({
-        "name": service_name,
-        "upstream": { "nodes": [{ "host": upstream1_name, "port": 80, "weight": 1 }] },
-        "upstreams": [{ "name": upstream2_name }],
-    }));
+    let service_ev = ev(
+        ResourceType::Service,
+        EventKind::Create {
+            new_value: json!({
+                "name": service_name,
+                "upstream": { "nodes": [{ "host": upstream1_name, "port": 80, "weight": 1 }] },
+                "upstreams": [{ "name": upstream2_name }],
+            }),
+        },
+        service_name,
+        service_name,
+    );
 
-    let mut upstream_ev = ev(ResourceType::Upstream, EventType::Create, upstream2_name, upstream2_name);
+    let mut upstream_ev =
+        ev(ResourceType::Upstream, EventKind::Create { new_value: json!({ "name": upstream2_name }) }, upstream2_name, upstream2_name);
     upstream_ev.parent_id = Some(service_name.to_string());
-    upstream_ev.new_value = Some(json!({ "name": upstream2_name }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![service_ev, upstream_ev]);
 }
@@ -102,12 +108,11 @@ fn creates_non_default_upstreams() {
 
     let mut expected = ev(
         ResourceType::Upstream,
-        EventType::Create,
+        EventKind::Create { new_value: json!({ "name": upstream_name }) },
         &generate_id(&format!("{service_name}.{upstream_name}")),
         upstream_name,
     );
     expected.parent_id = Some(service_name.to_string());
-    expected.new_value = Some(json!({ "name": upstream_name }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -124,18 +129,17 @@ fn replaces_non_default_upstreams() {
     let local = config(json!({ "services": [service] }));
     let remote = config(json!({ "services": [remote_service] }));
 
-    let mut del = ev(ResourceType::Upstream, EventType::Delete, upstream2_name, upstream2_name);
+    let mut del =
+        ev(ResourceType::Upstream, EventKind::Delete { old_value: json!({ "name": upstream2_name }) }, upstream2_name, upstream2_name);
     del.parent_id = Some(service_name.to_string());
-    del.old_value = Some(json!({ "name": upstream2_name }));
 
     let mut create = ev(
         ResourceType::Upstream,
-        EventType::Create,
+        EventKind::Create { new_value: json!({ "name": upstream1_name }) },
         &generate_id(&format!("{service_name}.{upstream1_name}")),
         upstream1_name,
     );
     create.parent_id = Some(service_name.to_string());
-    create.new_value = Some(json!({ "name": upstream1_name }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![del, create]);
 }
@@ -160,18 +164,23 @@ fn updates_non_default_upstreams() {
 
     let mut expected = ev(
         ResourceType::Upstream,
-        EventType::Update,
+        EventKind::Update {
+            old_value: json!({ "name": upstream_name, "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] }),
+            new_value: json!({ "name": upstream_name, "nodes": [{ "host": upstream_name, "port": 80, "weight": 1 }] }),
+            diff: Some(vec![ValueDiff::Edit {
+                path: vec![
+                    adc_sdk::PathSegment::Key("nodes".into()),
+                    adc_sdk::PathSegment::Index(0),
+                    adc_sdk::PathSegment::Key("host".into()),
+                ],
+                lhs: json!("1.1.1.1"),
+                rhs: json!(upstream_name),
+            }]),
+        },
         &generate_id(&format!("{service_name}.{upstream_name}")),
         upstream_name,
     );
     expected.parent_id = Some(service_name.to_string());
-    expected.diff = Some(vec![ValueDiff::Edit {
-        path: vec![adc_sdk::PathSegment::Key("nodes".into()), adc_sdk::PathSegment::Index(0), adc_sdk::PathSegment::Key("host".into())],
-        lhs: json!("1.1.1.1"),
-        rhs: json!(upstream_name),
-    }]);
-    expected.new_value = Some(json!({ "name": upstream_name, "nodes": [{ "host": upstream_name, "port": 80, "weight": 1 }] }));
-    expected.old_value = Some(json!({ "name": upstream_name, "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }
@@ -192,12 +201,11 @@ fn deletes_non_default_upstreams() {
 
     let mut expected = ev(
         ResourceType::Upstream,
-        EventType::Delete,
+        EventKind::Delete { old_value: json!({ "name": upstream_name }) },
         &generate_id(&format!("{service_name}.{upstream_name}")),
         upstream_name,
     );
     expected.parent_id = Some(service_name.to_string());
-    expected.old_value = Some(json!({ "name": upstream_name }));
 
     assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
 }

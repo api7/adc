@@ -55,8 +55,8 @@ fn request_path(event: &Event) -> String {
 async fn send_with_retry(client: &Client, base_url: &str, event: &Event) -> Result<(), reqwest::Error> {
     let path = request_path(event);
     let url = format!("{base_url}{path}");
-    let is_delete = event.event_type == EventType::Delete;
-    let body: Value = event.new_value.clone().unwrap_or(Value::Null);
+    let is_delete = event.event_type() == EventType::Delete;
+    let body: Value = event.kind.new_value().cloned().unwrap_or(Value::Null);
 
     let mut attempt = 0;
     loop {

@@ -55,7 +55,7 @@ fn creates_and_updates_ssl_before_upstream() {
 
     let events = DifferV4::diff(&local, &remote, None, None);
     let summary: Vec<(ResourceType, EventType, String)> =
-        events.iter().map(|e| (e.resource_type, e.event_type, e.resource_id.clone())).collect();
+        events.iter().map(|e| (e.resource_type, e.event_type(), e.resource_id.clone())).collect();
 
     assert_eq!(
         summary,

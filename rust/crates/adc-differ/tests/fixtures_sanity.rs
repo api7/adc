@@ -46,7 +46,7 @@ fn few_and_many_scenarios_produce_expected_update_events_at_every_scale() {
             assert_eq!(events.len(), touched * 2, "scale={scale} scenario={scenario}");
 
             for event in &events {
-                assert_eq!(event.event_type, EventType::Update, "scale={scale} scenario={scenario}");
+                assert_eq!(event.event_type(), EventType::Update, "scale={scale} scenario={scenario}");
                 assert!(
                     matches!(event.resource_type, ResourceType::Service | ResourceType::Route),
                     "scale={scale} scenario={scenario}: unexpected resource_type on event {event:?}"
