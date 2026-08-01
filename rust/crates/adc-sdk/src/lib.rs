@@ -1,40 +1,38 @@
-//! Minimal Rust port of `@api7/adc-sdk`, scoped to exactly what `adc-differ`
-//! needs: resource/event type definitions, the differ field-metadata table,
-//! and a generic JSON value-diff utility (replacing the TS side's
-//! `datum-diff` dependency).
+//! ADC's core data model: resource type definitions, the typed resource
+//! layer for parsing declarative configuration (`resources` module), differ
+//! event types shared with backend/CLI consumers, and a generic JSON
+//! value-diff utility.
 //!
-//! What's deliberately not here: input validation (a `validator`-crate
-//! equivalent of `libs/sdk/src/core/schema.ts`'s Zod refinements), a
-//! `Backend` trait, and `schemars` JSON Schema export. Resource bodies are
-//! plain `serde_json::Value` rather than per-resource typed structs — see
-//! the note on `InternalConfiguration` below for why.
+//! Not yet here: semantic validation (cross-field rules, regex, min/max) on
+//! top of the `resources` types, a `Backend` trait, and JSON Schema export.
+//! The differ's own field-metadata table lives in `adc-differ` instead of
+//! here, since nothing outside the differ consumes it.
 
-pub mod differ_meta;
 pub mod event;
-pub mod field_meta;
 pub mod resource;
+pub mod resources;
 pub mod utils;
 pub mod value_diff;
 
-pub use differ_meta::{CollectionKind, ResourceDifferMeta, differ_meta};
 pub use event::{Event, EventType};
-pub use field_meta::FieldMeta;
 pub use resource::{FieldListType, ResourceType};
 pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value};
 
 use serde_json::{Map, Value};
 
-/// Mirrors `InternalConfiguration` in `libs/sdk/src/core/schema.ts`.
+/// The differ's working representation of a full configuration: a plain
+/// `Map<String, Value>` keyed by config field name (`services`, `routes`,
+/// `global_rules`, ...). The differ algorithm treats resource bodies as
+/// opaque structural values rather than strongly-typed ones, since diffing
+/// is a generic structural operation independent of any one resource's shape.
 ///
-/// Unlike the TS side, this is a plain `Map<String, Value>` keyed by config
-/// field name (`services`, `routes`, `global_rules`, ...) rather than a
-/// strongly-typed struct — see the crate-level docs for why: the differ
-/// algorithm itself treats resource bodies as opaque structural values, so a
-/// generic `Value`-based representation is both the lowest-risk and most
-/// faithful translation of `differv4.ts`'s actual (dynamically-typed) behavior.
+/// Distinct from `resources::InternalConfiguration`, the typed counterpart
+/// used to parse and validate declarative configuration.
 pub type InternalConfiguration = Map<String, Value>;
 
-/// Mirrors `DefaultValue` in `libs/sdk/src/core/differ.ts`.
+/// Per-resource-type and per-plugin default values, merged into local
+/// configuration before diffing so that a value matching the backend's
+/// default doesn't show up as a spurious change.
 #[derive(Debug, Clone, Default)]
 pub struct DefaultValue {
     pub core: std::collections::HashMap<ResourceType, Value>,

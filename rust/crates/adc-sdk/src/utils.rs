@@ -1,6 +1,6 @@
 use sha1::{Digest, Sha1};
 
-/// Mirrors `utils.generateId` in `libs/sdk/src/utils.ts` (`sha1` hex digest, not sha256).
+/// Deterministic resource id: the sha1 (not sha256) hex digest of `name`.
 pub fn generate_id(name: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(name.as_bytes());

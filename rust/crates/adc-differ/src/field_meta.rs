@@ -1,11 +1,9 @@
-/// Mirrors the `FieldMeta` union in `libs/sdk/src/core/field-registry.ts`.
+/// Per-field merge/diff strategy: how the differ should compare and combine
+/// a given resource field when computing an update event.
 ///
-/// In TS this is attached to a Zod schema field via `.meta()`/`withDifferMeta()`
-/// and later read back with `readFieldMeta()`. Since this Rust port skips the
-/// full Zod-equivalent schema layer (see adc-sdk crate docs), the per-resource
-/// field tables are hand-written directly in `differ_meta.rs` instead of being
-/// derived from a schema at runtime — the source of truth (schema.ts) is still
-/// the same, just read manually rather than reflected.
+/// These strategies are hand-written into each resource's metadata table in
+/// `differ_meta.rs`, independently of the field definitions in `adc_sdk::resources`
+/// — the two must be kept in sync by hand when a resource's shape changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldMeta {
     Map {
@@ -17,8 +15,10 @@ pub enum FieldMeta {
         config_key: Option<&'static str>,
     },
     ObjectMap,
+    // No resource currently declares an Atomic field — kept for completeness
+    // of the merge-strategy vocabulary, not because anything constructs it.
+    #[allow(dead_code)]
     Atomic {
-        #[allow(dead_code)]
         strip: bool,
     },
     Array {

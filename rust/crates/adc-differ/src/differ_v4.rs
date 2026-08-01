@@ -1,16 +1,16 @@
-//! Port of `libs/differ/src/differv4.ts`'s `DifferV4`. Only v4 is ported;
-//! the TS side also has an older v3 algorithm, gated behind an env var and
-//! kept only as a fallback, which this crate does not implement.
+//! The resource-diffing algorithm: compares local (desired) and remote
+//! (actual) configuration and produces an ordered list of create/update/
+//! delete events describing how to reconcile them.
 
 use std::collections::{HashMap, HashSet};
 
-use adc_sdk::{
-    CollectionKind, DefaultValue, Event, EventType, FieldMeta, InternalConfiguration,
-    ResourceDifferMeta, ResourceType, diff_value, differ_meta, utils::generate_id,
-};
+use adc_sdk::{DefaultValue, Event, EventType, InternalConfiguration, ResourceType, diff_value, utils::generate_id};
 use serde_json::{Map, Value, json};
 
-/// (name, id, item) — mirrors differv4.ts's `ResourceTuple`.
+use crate::differ_meta::{CollectionKind, ResourceDifferMeta, differ_meta};
+use crate::field_meta::FieldMeta;
+
+/// (name, id, item) extracted from one resource's raw JSON representation.
 type ResourceTuple = (String, String, Value);
 
 pub struct DifferV4 {
@@ -37,8 +37,8 @@ impl DifferV4 {
             result.extend(differ.diff_resource(resource_type, &meta, local_tuples, remote_tuples));
         }
 
-        // Unwrap one level of subEvents (mirrors differv4.ts's post-loop flatten) and
-        // drop ONLY_SUB_EVENTS placeholder events, which exist only to carry subEvents up.
+        // Unwrap one level of subEvents and drop ONLY_SUB_EVENTS placeholder
+        // events, which exist only to carry subEvents up to this point.
         let mut unwrapped: Vec<Event> = Vec::new();
         for mut event in result {
             let subs = std::mem::take(&mut event.sub_events);
@@ -443,8 +443,8 @@ fn set_key(v: &mut Value, key: &str, value: Value) {
 }
 
 /// Event ordering table: deletions precede creates, SSL creates precede routes
-/// (SSL may be referenced by upstream mTLS and must exist first).
-/// Mirrors differv4.ts's `order` table. Missing combos sort last (JS `?? Infinity`).
+/// (SSL may be referenced by upstream mTLS and must exist first). Combos not
+/// listed here sort last.
 fn order_priority(resource_type: ResourceType, event_type: EventType) -> u32 {
     use EventType::*;
     use ResourceType::*;

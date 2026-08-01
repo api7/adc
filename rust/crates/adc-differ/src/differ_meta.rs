@@ -1,18 +1,17 @@
-//! Mirrors `libs/sdk/src/core/differ.ts`'s `RESOURCE_DIFFER_META` table.
+//! Per-resource-type metadata the differ needs: which `InternalConfiguration`
+//! field holds the resource's collection, how to derive an id/name for a
+//! local (not-yet-synced) item, and each field's merge/diff strategy.
 //!
-//! In TS, the per-field entries (`fields`) are derived at runtime from Zod
-//! schema `.meta()` annotations via `readFieldMeta()`. This Rust port skips
-//! reflecting over a schema layer (see the crate-level "staged build" note)
-//! and instead hand-transcribes the same annotations directly from
-//! `libs/sdk/src/core/schema.ts`, which remains the single source of truth —
-//! if that file's `withDifferMeta(...)` calls change, this table must be
-//! updated to match.
+//! The per-field entries (`fields`) are hand-transcribed here rather than
+//! derived by reflecting over `adc_sdk::resources`' struct definitions at
+//! runtime — if a resource's shape changes there, this table must be updated
+//! to match by hand.
 
+use adc_sdk::ResourceType;
+use adc_sdk::utils::generate_id;
 use serde_json::Value;
 
 use crate::field_meta::FieldMeta;
-use crate::resource::ResourceType;
-use crate::utils::generate_id;
 
 fn str_field<'a>(item: &'a Value, key: &str) -> &'a str {
     item.get(key).and_then(Value::as_str).unwrap_or_default()
@@ -43,7 +42,8 @@ pub struct ResourceDifferMeta {
     /// Resolve which `ResourceType` to use for default-value lookup.
     /// Only needed for `Service`, which may be a stream service.
     pub resolve_default_type: Option<fn(&Value) -> ResourceType>,
-    /// Per-field merge strategies, hand-transcribed from `schema.ts` (see module docs).
+    /// Per-field merge strategies, hand-transcribed independently of
+    /// `adc_sdk::resources`' struct definitions (see module docs).
     pub fields: &'static [(&'static str, FieldMeta)],
 }
 

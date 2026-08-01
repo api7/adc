@@ -1,4 +1,4 @@
-/// Mirrors `libs/sdk/src/core/resource.ts`.
+/// The kinds of resources ADC manages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ResourceType {
     Route,

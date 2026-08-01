@@ -1,20 +1,15 @@
-//! Self-researched replacement for the TS side's third-party `datum-diff` (a
-//! `deep-diff` fork) dependency — see `libs/differ/src/differv4.ts`'s use of
-//! `objectDiff` from `datum-diff`.
+//! A structural diff between two JSON values: walks both sides depth-first
+//! and emits one entry per changed leaf/key/array-slot. Not content-addressed
+//! or order-independent — object keys are compared in `lhs`-then-`rhs`
+//! insertion order, and arrays are compared positionally, with any length
+//! difference collapsed onto the tail.
 //!
-//! `datum-diff`'s `diff(lhs, rhs)` is a plain recursive structural diff over
-//! JS values: it walks both sides depth-first and emits one entry per changed
-//! leaf/key/array-slot. It is *not* content-addressed or order-independent —
-//! object keys are compared in `lhs`-then-`rhs` insertion order, and arrays
-//! are compared positionally (with any length difference collapsed onto the
-//! tail). ADC configs are always plain trees from deserialized JSON/YAML
-//! (no shared/cyclic references), so the reference-cycle bookkeeping
-//! `datum-diff` does (its `stack` parameter) is intentionally not ported —
-//! it can never trigger here.
+//! ADC configs are always plain trees deserialized from JSON/YAML, with no
+//! shared or cyclic references, so there's no reference-cycle bookkeeping here.
 //!
 //! `serde_json`'s `preserve_order` feature (enabled workspace-wide) is
 //! required for `Value::Object`'s key order to match the source document,
-//! which is what makes `path` order below match the TS/JS output byte-for-byte.
+//! which is what keeps `path` order in diff output stable and predictable.
 
 use serde::Serialize;
 use serde_json::Value;
@@ -29,7 +24,8 @@ pub enum PathSegment {
 
 pub type DiffPath = Vec<PathSegment>;
 
-/// Mirrors `datum-diff`'s `Diff<LHS, RHS>` union (kinds `N`/`D`/`E`/`A`).
+/// A single field-level change, tagged by kind: new, deleted, edited, or an
+/// array-tail change.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum ValueDiff {
@@ -62,9 +58,8 @@ fn real_type_of(v: &Value) -> &'static str {
     }
 }
 
-/// Structural diff of two JSON values, mirroring `datum-diff`'s `diff(lhs, rhs)`.
-/// Returns `None` when there is no difference (matching `datum-diff`'s
-/// `changes.length ? changes : undefined` behavior, which callers rely on).
+/// Structural diff of two JSON values. Returns `None` when there is no
+/// difference — callers rely on this rather than checking for an empty `Vec`.
 pub fn diff_value(lhs: &Value, rhs: &Value) -> Option<Vec<ValueDiff>> {
     let mut changes = Vec::new();
     deep_diff(Some(lhs), Some(rhs), &[], &mut changes);
