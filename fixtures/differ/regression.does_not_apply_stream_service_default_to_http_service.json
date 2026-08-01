@@ -1,0 +1,7 @@
+{
+  "local": { "services": [{ "name": "HTTP Service" }] },
+  "remote": {
+    "services": [{ "id": "714f3ba467787f87b85b144f435e3e58e992fccc", "name": "HTTP Service", "description": "" }]
+  },
+  "defaultValue": { "core": { "stream_service": { "description": "" } }, "plugins": {} }
+}

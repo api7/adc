@@ -1,0 +1,5 @@
+{
+  "local": { "consumers": [{ "username": "alice", "plugins": { "key-auth": { "key": "key" } } }] },
+  "remote": { "consumers": [{ "username": "alice", "plugins": { "key-auth": { "key": "key", "added": "added" } } }] },
+  "defaultValue": { "core": {}, "plugins": { "key-auth": { "added": "added" } } }
+}

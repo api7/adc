@@ -1,0 +1,12 @@
+{
+  "local": { "services": [{ "name": "HTTP", "path_prefix": "/test", "strip_path_prefix": false }] },
+  "remote": {
+    "services": [{
+      "id": "f40b27d6b8b9a4fc3827264c1da16a04ecf4d094",
+      "name": "HTTP",
+      "path_prefix": "/test",
+      "strip_path_prefix": true
+    }]
+  },
+  "defaultValue": { "core": { "service": { "strip_path_prefix": true } }, "plugins": {} }
+}

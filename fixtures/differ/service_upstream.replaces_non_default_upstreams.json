@@ -1,0 +1,8 @@
+{
+  "local": {
+    "services": [{ "id": "service1", "name": "service1", "upstreams": [{ "name": "upstream1" }] }]
+  },
+  "remote": {
+    "services": [{ "id": "service1", "name": "service1", "upstreams": [{ "id": "upstream2", "name": "upstream2" }] }]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "local": {
+    "services": [{
+      "name": "Test Service",
+      "upstream": { "nodes": [{ "host": "0.0.0.0", "port": 443, "weight": 1 }] }
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "5139f1c19641e214d3b9c57949d1578c2482b940",
+      "name": "Test Service",
+      "upstream": { "nodes": [{ "host": "0.0.0.0", "port": 443, "weight": 1, "priority": 0 }] }
+    }]
+  },
+  "defaultValue": {
+    "core": { "service": { "upstream": { "nodes": [{ "priority": 0 }] } } },
+    "plugins": {}
+  }
+}

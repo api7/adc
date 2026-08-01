@@ -1,0 +1,11 @@
+{
+  "local": {
+    "services": [{ "id": "service1", "name": "service1" }]
+  },
+  "remote": {
+    "services": [{
+      "id": "service1", "name": "service1",
+      "upstreams": [{ "id": "0e5284aa9759d2e539945346fa400b04cc746f42", "name": "upstream1" }]
+    }]
+  }
+}
