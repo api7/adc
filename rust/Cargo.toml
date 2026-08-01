@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/adc-sdk",
+  "crates/adc-differ",
+  "crates/adc-sync-bench",
+  "crates/adc-mock-server",
+]
+
+[workspace.package]
+edition = "2024"
+publish = false
+rust-version = "1.95"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.10"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
