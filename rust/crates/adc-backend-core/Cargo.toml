@@ -1,6 +1,6 @@
 [package]
 name = "adc-backend-core"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 publish.workspace = true
 rust-version.workspace = true
@@ -9,9 +9,9 @@ rust-version.workspace = true
 adc-sdk = { path = "../adc-sdk" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 futures = "0.3"
-tokio = { version = "1", features = ["time"] }
+tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time"] }
 axum = "0.8"
 serde_json = { workspace = true }

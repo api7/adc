@@ -1,0 +1,342 @@
+use std::collections::HashMap;
+
+use adc_backend_core::{HttpClient, Method, concurrent_map};
+use adc_sdk::resources::{self as adc, Configuration, LabelValue, Plugins};
+use adc_sdk::{BackendError, ResourceType};
+use indexmap::IndexMap;
+use semver::Version;
+use serde::de::DeserializeOwned;
+
+use crate::typing;
+use crate::utils::resource_type_to_api_name;
+
+/// Fetches an ADC-managed APISIX instance's full resource state, one
+/// resource type at a time, in APISIX's own wire shape (`crate::typing`) —
+/// converting that into ADC's model (`adc_sdk::resources`) and assembling it
+/// into a single `Configuration` is a separate concern, layered on top of
+/// this.
+pub struct Fetcher {
+    client: HttpClient,
+    version: Version,
+}
+
+impl Fetcher {
+    pub fn new(client: HttpClient, version: Version) -> Self {
+        Self { client, version }
+    }
+
+    async fn list<T: DeserializeOwned>(
+        &self,
+        resource_type: ResourceType,
+    ) -> Result<Vec<T>, BackendError> {
+        let path = format!("/apisix/admin/{}", resource_type_to_api_name(resource_type));
+        let builder = self.client.request(Method::GET, &path)?;
+        let response = self.client.send(builder).await?;
+        let body: typing::ListResponse<T> = response.json().await.map_err(|e| {
+            BackendError::Serialization(format!("decoding response from {path}: {e}"))
+        })?;
+        Ok(body.list.into_iter().map(|item| item.value).collect())
+    }
+
+    pub async fn list_services(&self) -> Result<Vec<typing::Service>, BackendError> {
+        self.list(ResourceType::Service).await
+    }
+
+    pub async fn list_routes(&self) -> Result<Vec<typing::Route>, BackendError> {
+        self.list(ResourceType::Route).await
+    }
+
+    pub async fn list_upstreams(&self) -> Result<Vec<typing::Upstream>, BackendError> {
+        self.list(ResourceType::Upstream).await
+    }
+
+    pub async fn list_ssls(&self) -> Result<Vec<typing::Ssl>, BackendError> {
+        self.list(ResourceType::Ssl).await
+    }
+
+    pub async fn list_plugin_configs(&self) -> Result<Vec<typing::PluginConfig>, BackendError> {
+        self.list(ResourceType::PluginConfig).await
+    }
+
+    /// A backend may define several `global_rules` entries; their `plugins`
+    /// maps are merged into one (later entries win on key collision),
+    /// matching how they're consumed — as a single flat set of gateway-wide
+    /// plugins, not as separate rules.
+    pub async fn list_global_rules(&self) -> Result<Plugins, BackendError> {
+        let rules: Vec<typing::GlobalRule> = self.list(ResourceType::GlobalRule).await?;
+        let mut merged = Plugins::new();
+        for rule in rules {
+            merged.extend(rule.plugins);
+        }
+        Ok(merged)
+    }
+
+    /// Plugin metadata isn't returned as a `name` field on each item — the
+    /// name only appears as the last segment of the etcd key
+    /// (`/apisix/plugin_metadata/http-logger`), so it's extracted from
+    /// `ListItem::key` rather than `ListItem::value`.
+    pub async fn list_plugin_metadata(&self) -> Result<Plugins, BackendError> {
+        let path = format!(
+            "/apisix/admin/{}",
+            resource_type_to_api_name(ResourceType::PluginMetadata)
+        );
+        let builder = self.client.request(Method::GET, &path)?;
+        let response = self.client.send(builder).await?;
+        let body: typing::ListResponse<Plugins> = response.json().await.map_err(|e| {
+            BackendError::Serialization(format!("decoding response from {path}: {e}"))
+        })?;
+
+        let mut merged = Plugins::new();
+        for item in body.list {
+            if let Some(name) = item.key.rsplit('/').next() {
+                merged.insert(name.to_string(), item.value.into());
+            }
+        }
+        Ok(merged)
+    }
+
+    /// Stream routes are an optional APISIX feature: on a version/build
+    /// that doesn't support them, the endpoint itself may not exist. Any
+    /// non-2xx response here is treated as "no stream routes" rather than a
+    /// hard failure, deliberately more lenient than [`Fetcher::list`].
+    pub async fn list_stream_routes(&self) -> Result<Vec<typing::StreamRoute>, BackendError> {
+        let builder = self
+            .client
+            .request(Method::GET, "/apisix/admin/stream_routes")?;
+        let response = self.client.execute(builder).await?;
+        if !response.status().is_success() {
+            return Ok(Vec::new());
+        }
+        let body: typing::ListResponse<typing::StreamRoute> =
+            response.json().await.map_err(|e| {
+                BackendError::Serialization(format!(
+                    "decoding response from /apisix/admin/stream_routes: {e}"
+                ))
+            })?;
+        Ok(body.list.into_iter().map(|item| item.value).collect())
+    }
+
+    /// Consumers, plus (from APISIX 3.11.0 onward, where the credentials
+    /// API exists) each consumer's credentials, fetched concurrently. A 404
+    /// on a specific consumer's credentials endpoint means that consumer
+    /// simply has none — anything else (network failure, 5xx) is a real
+    /// error and aborts the whole call, same as any other resource type.
+    pub async fn list_consumers(&self) -> Result<Vec<typing::Consumer>, BackendError> {
+        let consumers: Vec<typing::Consumer> = self.list(ResourceType::Consumer).await?;
+
+        if self.version < Version::new(3, 11, 0) {
+            return Ok(consumers);
+        }
+
+        let results =
+            concurrent_map(consumers, None, |consumer| self.with_credentials(consumer)).await;
+        results.into_iter().collect()
+    }
+
+    async fn with_credentials(
+        &self,
+        consumer: typing::Consumer,
+    ) -> Result<typing::Consumer, BackendError> {
+        let path = format!("/apisix/admin/consumers/{}/credentials", consumer.username);
+        let builder = self.client.request(Method::GET, &path)?;
+        let response = self.client.execute(builder).await?;
+        if response.status().as_u16() == 404 {
+            return Ok(consumer);
+        }
+        let response = HttpClient::require_success(response).await?;
+        let body: typing::ListResponse<typing::ConsumerCredential> =
+            response.json().await.map_err(|e| {
+                BackendError::Serialization(format!("decoding response from {path}: {e}"))
+            })?;
+        Ok(typing::Consumer {
+            credentials: Some(body.list.into_iter().map(|item| item.value).collect()),
+            ..consumer
+        })
+    }
+
+    /// Fetches every resource type (concurrently) and assembles them into a
+    /// single ADC `Configuration`: routes and stream routes nested under
+    /// their owning service, a service's default upstream inlined onto it,
+    /// its named upstreams (matched via
+    /// [`typing::ADC_UPSTREAM_SERVICE_ID_LABEL`]) collected into
+    /// `Service.upstreams`, and a route's `plugin_config_id` resolved into
+    /// its `plugins` — APISIX stores each of those as a link between two
+    /// separate admin-API resources; ADC's model has them nested instead.
+    pub async fn dump(&self) -> Result<Configuration, BackendError> {
+        // Step 1: fetch every resource type concurrently, in APISIX's own wire shape.
+        let (
+            services,
+            mut routes,
+            upstreams,
+            ssls,
+            consumers,
+            plugin_configs,
+            global_rules,
+            plugin_metadata,
+            stream_routes,
+        ) = tokio::try_join!(
+            self.list_services(),
+            self.list_routes(),
+            self.list_upstreams(),
+            self.list_ssls(),
+            self.list_consumers(),
+            self.list_plugin_configs(),
+            self.list_global_rules(),
+            self.list_plugin_metadata(),
+            self.list_stream_routes(),
+        )?;
+
+        // Step 2: resolve the two APISIX-only cross-references that don't
+        // survive as-is in ADC's model — a route's `plugin_config_id`
+        // becomes its resolved `plugins`, and the flat upstream list splits
+        // into "this service's default upstream" and "this service's named
+        // upstreams".
+        resolve_plugin_config_refs(&mut routes, &plugin_configs);
+        let (default_upstream_by_id, named_upstreams_by_service) = index_upstreams(upstreams)?;
+
+        // Step 3: convert each service to ADC's model and attach its
+        // upstream(s) from step 2.
+        let mut services: IndexMap<String, adc::Service> = services
+            .into_iter()
+            .map(|service| {
+                let id = service.id.clone();
+                let mut service: adc::Service =
+                    service.try_into().map_err(BackendError::Serialization)?;
+                if let Some(upstream) = default_upstream_by_id.get(&id) {
+                    let mut upstream = upstream.clone();
+                    upstream.id = None;
+                    upstream.name = None;
+                    service.upstream = Some(upstream);
+                }
+                if let Some(named) = named_upstreams_by_service.get(&id) {
+                    service.upstreams = Some(named.clone());
+                }
+                Ok((id, service))
+            })
+            .collect::<Result<_, BackendError>>()?;
+
+        // Step 4: bucket routes and stream routes by their owning service —
+        // an orphaned one (referencing a service id that wasn't in this
+        // dump, which shouldn't normally happen) is dropped rather than
+        // surfaced as an error.
+        let mut routes_by_service: HashMap<String, Vec<adc::Route>> = HashMap::new();
+        for route in routes {
+            let Some(service_id) = route.service_id.clone() else {
+                continue;
+            };
+            if !services.contains_key(&service_id) {
+                continue;
+            }
+            routes_by_service
+                .entry(service_id)
+                .or_default()
+                .push(route.try_into().map_err(BackendError::Serialization)?);
+        }
+        let mut stream_routes_by_service: HashMap<String, Vec<adc::StreamRoute>> = HashMap::new();
+        for stream_route in stream_routes {
+            let Some(service_id) = stream_route.service_id.clone() else {
+                continue;
+            };
+            if !services.contains_key(&service_id) {
+                continue;
+            }
+            stream_routes_by_service
+                .entry(service_id)
+                .or_default()
+                .push(stream_route.into());
+        }
+
+        // Step 5: attach each service's bucketed routes/stream routes from
+        // step 4. A service is either HTTP or stream, never both — mirrors
+        // `ServiceRoutes`'s own invariant, and matches how APISIX data is
+        // actually shaped (a route and a stream_route never share a
+        // `service_id`).
+        for (id, service) in services.iter_mut() {
+            if let Some(routes) = routes_by_service.remove(id) {
+                service.routes = Some(adc::ServiceRoutes::Http { routes });
+            } else if let Some(stream_routes) = stream_routes_by_service.remove(id) {
+                service.routes = Some(adc::ServiceRoutes::Stream { stream_routes });
+            }
+        }
+
+        // Step 6: assemble the final Configuration — everything not nested
+        // under a service converts independently.
+        Ok(Configuration {
+            services: (!services.is_empty()).then(|| services.into_values().collect()),
+            ssls: (!ssls.is_empty())
+                .then(|| {
+                    ssls.into_iter()
+                        .map(adc::SSL::try_from)
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()
+                .map_err(BackendError::Serialization)?,
+            consumers: (!consumers.is_empty())
+                .then(|| consumers.into_iter().map(Into::into).collect()),
+            consumer_groups: None, // apisix's fetcher doesn't fetch consumer groups at all — see `crate::transformer`'s doc comment.
+            global_rules: (!global_rules.is_empty()).then_some(global_rules),
+            plugin_metadata: (!plugin_metadata.is_empty()).then_some(plugin_metadata),
+        })
+    }
+}
+
+/// Resolves each route's `plugin_config_id` reference into its `plugins`,
+/// in place — APISIX stores a plugin config as its own admin-API resource
+/// and a route merely points at one by id; ADC's `Route` has no equivalent
+/// reference field, only the resolved `plugins`.
+fn resolve_plugin_config_refs(
+    routes: &mut [typing::Route],
+    plugin_configs: &[typing::PluginConfig],
+) {
+    let by_id: HashMap<&str, &typing::PluginConfig> = plugin_configs
+        .iter()
+        .map(|pc| (pc.id.as_str(), pc))
+        .collect();
+    for route in routes {
+        if let Some(plugin_config_id) = &route.plugin_config_id
+            && let Some(plugin_config) = by_id.get(plugin_config_id.as_str())
+        {
+            route.plugins = Some(plugin_config.plugins.clone());
+        }
+    }
+}
+
+type DefaultUpstreamById = HashMap<String, adc::Upstream>;
+type NamedUpstreamsByService = HashMap<String, Vec<adc::Upstream>>;
+
+/// Splits APISIX's flat upstream list into: the default upstream for each
+/// service that has one (keyed by upstream id, which for a service's
+/// default upstream is always the service's own id), and each service's
+/// *named* upstreams (matched via the association label ADC writes on
+/// `Backend::sync` — see `typing::ADC_UPSTREAM_SERVICE_ID_LABEL`).
+fn index_upstreams(
+    upstreams: Vec<typing::Upstream>,
+) -> Result<(DefaultUpstreamById, NamedUpstreamsByService), BackendError> {
+    let mut by_id = HashMap::new();
+    let mut named_by_service: HashMap<String, Vec<adc::Upstream>> = HashMap::new();
+
+    for upstream in upstreams {
+        let id = upstream.id.clone();
+        let service_label = upstream
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get(typing::ADC_UPSTREAM_SERVICE_ID_LABEL))
+            .and_then(|value| match value {
+                LabelValue::Single(name) => Some(name.clone()),
+                LabelValue::Multiple(_) => None,
+            });
+        let upstream: adc::Upstream = upstream.try_into().map_err(BackendError::Serialization)?;
+
+        if let Some(service_id) = service_label {
+            named_by_service
+                .entry(service_id)
+                .or_default()
+                .push(upstream.clone());
+        }
+        if let Some(id) = id {
+            by_id.insert(id, upstream);
+        }
+    }
+
+    Ok((by_id, named_by_service))
+}

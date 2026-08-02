@@ -11,7 +11,7 @@ mod retry;
 mod tls;
 
 pub use client::{HttpClient, HttpClientConfig};
-pub use concurrency::concurrent_map;
+pub use concurrency::{concurrent_map, concurrent_map_until_err};
 pub use retry::RetryPolicy;
 pub use tls::TlsConfig;
 

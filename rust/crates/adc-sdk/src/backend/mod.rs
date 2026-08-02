@@ -1,4 +1,4 @@
-//! The `Backend` trait: the interface every gateway integration (apisix,
+//! The `Backend` trait: the interface every gateway integration (APISIX,
 //! api7, apisix-standalone) implements, and the shared result/error types
 //! that flow across it. `adc-sdk` only defines the contract — concrete
 //! implementations live in their own crates and depend on this one.
@@ -10,10 +10,10 @@ pub use error::BackendError;
 use async_trait::async_trait;
 use semver::Version;
 
-use crate::{DefaultValue, Event, ResourceType, resources::Configuration};
+use crate::{DefaultValue, Event, resources::Configuration};
 
 /// Static, non-behavioral facts about a `Backend` implementation, used by the
-/// CLI to scope log output (e.g. `[apisix]`) without the trait needing a
+/// CLI to scope log output (e.g. `[APISIX]`) without the trait needing a
 /// `name()`-shaped method per concern.
 #[derive(Debug, Clone, Default)]
 pub struct BackendMetadata {
@@ -34,9 +34,14 @@ pub struct BackendSyncResult {
     pub server: Option<String>,
 }
 
+/// `resource_type` stays a raw string, not `ResourceType`: it's whatever the
+/// backend's own validation response echoes back, which isn't guaranteed to
+/// map onto one of our known resource types (an unrecognized value must
+/// degrade gracefully — carry the string through, leave `event`/
+/// `resource_name` unset — rather than fail the whole validate call).
 #[derive(Debug, Clone)]
 pub struct BackendValidationError {
-    pub resource_type: ResourceType,
+    pub resource_type: String,
     pub resource_id: Option<String>,
     pub resource_name: Option<String>,
     pub index: usize,
@@ -81,13 +86,16 @@ pub trait Backend: Send + Sync {
 
     async fn dump(&self) -> Result<Configuration, BackendError>;
 
-    /// Applies `events` and reports one result per event. The overall call
-    /// doesn't fail as a whole — a partial or total failure is expressed as
-    /// individual `BackendSyncResult`s with `success: false`, mirroring how
-    /// sync is inherently a batch of independent operations rather than one
-    /// atomic unit. Concurrency (per `opts.concurrent`) is an implementation
-    /// detail of each backend, not something the trait signature encodes.
-    async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Vec<BackendSyncResult>;
+    /// Applies `events`. Per-event failures are captured as individual
+    /// `BackendSyncResult`s with `success: false` rather than failing the
+    /// whole call — *unless* `opts.exit_on_failure` is set (the default):
+    /// then the first failure aborts the whole call and is returned as
+    /// `Err`, discarding any results accumulated so far, mirroring the TS
+    /// implementation's `Observable` erroring out (via `throwError`) instead
+    /// of completing with a partial list. Concurrency (per
+    /// `opts.concurrent`) is an implementation detail of each backend, not
+    /// something the trait signature encodes.
+    async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError>;
 
     /// Not every backend can pre-validate events against the remote server
     /// before applying them; the default rejects with `Unsupported`,
