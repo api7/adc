@@ -83,8 +83,11 @@ async fn dump(backend: &ApisixBackend) -> Configuration {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_services_lifecycle() {
-    let service1_name = "service1";
-    let service2_name = "service2";
+    // Prefixed to stay unique across the whole e2e suite — several other
+    // files pick their own short, generic resource names too, and every
+    // test file shares one live APISIX/etcd instance within a CI job.
+    let service1_name = "sync-dump-service1";
+    let service2_name = "sync-dump-service2";
     let backend = backend();
     let upstream = json!({ "scheme": "https", "nodes": [{ "host": "httpbin.org", "port": 443, "weight": 100 }] });
 
@@ -133,7 +136,9 @@ async fn syncs_and_dumps_services_lifecycle() {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_service_with_routes_lifecycle() {
-    let service_name = "test";
+    // Not the bare "test" a couple of other e2e files also use as a
+    // service name — see the note in `syncs_and_dumps_services_lifecycle`.
+    let service_name = "sync-dump-routes-svc";
     let route1_name = "route1";
     let route2_name = "route2";
     let backend = backend();
@@ -185,7 +190,7 @@ async fn syncs_and_dumps_service_with_stream_route_lifecycle() {
         return;
     }
 
-    let service_name = "test";
+    let service_name = "sync-dump-stream-svc";
     let stream_route_name = "postgres";
     let backend = backend();
     let upstream = json!({ "scheme": "tcp", "nodes": [{ "host": "1.1.1.1", "port": 5432, "weight": 100 }] });
@@ -205,12 +210,18 @@ async fn syncs_and_dumps_service_with_stream_route_lifecycle() {
     let stream_routes = services[0].routes.as_ref().unwrap().stream().unwrap();
     assert_eq!(stream_routes.len(), 1);
     assert_eq!(stream_routes[0].server_port, Some(54320));
-    // Below 3.8.0 the `__ADC_NAME` label is never written (see
-    // `transformer.rs`), so recovery falls back to the route's own id —
-    // which happens to equal `stream_route_name` too in this fixture, so
-    // the assertion holds either way (matches the TS suite's
-    // `Dump (<3.8.0)` and `Dump (>=3.8.0)` cases both).
-    assert_eq!(stream_routes[0].name, stream_route_name);
+    if apisix_version() >= semver::Version::new(3, 8, 0) {
+        assert_eq!(stream_routes[0].name, stream_route_name);
+    } else {
+        // Below 3.8.0 the `__ADC_NAME` label is never written (see
+        // `transformer.rs`), so recovery falls back to the route's own id
+        // — `generate_id("{parent}.{name}")` per this file's `resource_id`
+        // helper, *not* the literal name (confirmed the hard way: this
+        // fixture's id and name aren't the same string, unlike some other
+        // e2e files' fixtures) — matches the TS suite's `Dump (<3.8.0)`
+        // case.
+        assert_eq!(stream_routes[0].name, generate_id(&format!("{service_name}.{stream_route_name}")));
+    }
 
     sync_ok(&backend, vec![delete_child(ResourceType::StreamRoute, stream_route_name, service_name)]).await;
     let config = dump(&backend).await;
@@ -226,8 +237,11 @@ async fn syncs_and_dumps_service_with_stream_route_lifecycle() {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_consumers_lifecycle() {
-    let consumer1_name = "consumer1";
-    let consumer2_name = "consumer2";
+    // Underscored, not hyphenated: APISIX's `username` pattern is
+    // `^[a-zA-Z0-9_]+$` on older versions. Not the bare "consumer1" another
+    // e2e file also uses — see the note in `syncs_and_dumps_services_lifecycle`.
+    let consumer1_name = "sync_dump_consumer1";
+    let consumer2_name = "sync_dump_consumer2";
     let backend = backend();
 
     sync_ok(
@@ -331,6 +345,14 @@ async fn syncs_and_dumps_ssls_lifecycle() {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_global_rules_lifecycle() {
+    // `GlobalRule`'s id must be a real, registered APISIX plugin name (not
+    // an arbitrary string — confirmed the hard way: APISIX rejects an
+    // unrecognized one with 400 "unknown plugin"), so unlike the other
+    // resource names in this file this can't just be prefixed to
+    // dodge cross-file collisions. `e2e_validate.rs` also uses
+    // "prometheus", but only through `Validator::validate`, which is a
+    // dry run that never actually writes to the server — no real
+    // collision.
     let rule1_name = "prometheus";
     let rule2_name = "file-logger";
     let backend = backend();
