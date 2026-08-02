@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - main
+      - rust-next
   pull_request:
     branches:
       - main
+      - rust-next
     types: [opened, synchronize, reopened, labeled]
 env:
   E2E: "1"
@@ -31,6 +33,7 @@ jobs:
   apisix:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.2.2
@@ -79,10 +82,22 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix:test
+
+      # Run the Rust port's E2E tests against the same live apisix instance
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      - name: Run Rust E2E tests
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-apisix -- --ignored --test-threads=1
   apisix-standalone:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.13.0

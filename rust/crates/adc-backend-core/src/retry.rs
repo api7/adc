@@ -10,7 +10,7 @@ pub struct RetryPolicy {
 }
 
 impl Default for RetryPolicy {
-    /// Matches the apisix operator's hardcoded `retry({ count: 3, delay: 100 })`
+    /// Matches the APISIX operator's hardcoded `retry({ count: 3, delay: 100 })`
     /// for mutating requests (PUT/DELETE against `/apisix/admin/*`).
     fn default() -> Self {
         Self { retries: 3, delay: Duration::from_millis(100) }

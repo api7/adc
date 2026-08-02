@@ -4,7 +4,10 @@ use sha1::{Digest, Sha1};
 pub fn generate_id(name: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(name.as_bytes());
-    format!("{:x}", hasher.finalize())
+    // Manual hex encoding rather than `format!("{:x}", ...)`: sha1 0.11's
+    // `finalize()` output type (`hybrid_array::Array`) doesn't implement
+    // `LowerHex`, unlike the `generic_array::GenericArray` it replaced.
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(test)]

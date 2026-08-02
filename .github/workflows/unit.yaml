@@ -3,9 +3,11 @@ on:
   push:
     branches:
       - main
+      - rust-next
   pull_request:
     branches:
       - main
+      - rust-next
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -35,3 +37,28 @@ jobs:
         run: npx nx run backend-api7:test
       - name: Run OpenAPI Converter unit tests
         run: npx nx run converter-openapi:test
+  rust:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Setup Rust toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+
+      - name: Build
+        working-directory: ./rust
+        run: cargo build --workspace
+      - name: Clippy
+        working-directory: ./rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Run unit tests
+        working-directory: ./rust
+        run: cargo test --workspace
