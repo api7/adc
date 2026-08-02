@@ -28,6 +28,11 @@ use serde_json::Value;
 
 pub const ADC_UPSTREAM_SERVICE_ID_LABEL: &str = "__ADC_UPSTREAM_SERVICE_ID";
 
+/// Label a stream route's ADC name is smuggled through, since APISIX
+/// stream routes have no native `name` field — see `transformer::
+/// transform_stream_route`'s doc comment.
+pub const ADC_NAME_LABEL: &str = "__ADC_NAME";
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Route {
     pub id: String,
@@ -252,7 +257,7 @@ pub struct StreamRoute {
     pub protocol: Option<StreamRouteProtocol>,
 }
 
-/// Apisix accepts (and returns) upstream targets either as a list of node
+/// APISIX accepts (and returns) upstream targets either as a list of node
 /// objects, or as a legacy `"host:port": weight` map — both shapes are live
 /// on real instances, so both need to parse. Sync always writes the list
 /// form.

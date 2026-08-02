@@ -1,10 +1,35 @@
 use std::time::Duration;
 
 use adc_sdk::BackendError;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::{Method, RequestBuilder, Response, Url};
 
 use crate::tls::TlsConfig;
+
+/// RFC 3986's "unreserved" characters left unescaped, matching how path
+/// segments are conventionally percent-encoded (e.g. `encodeURIComponent`);
+/// everything else, including `/`, gets encoded.
+const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.').remove(b'~');
+
+/// Percent-encodes one URL path segment, for backends building an
+/// admin-API path from a user-controlled id (a `Consumer.username`, an
+/// explicit resource `id`, ...) — without this, such a value could inject
+/// a `/`, a query string, or a fragment into the request `Url::parse`
+/// eventually builds from it. `PATH_SEGMENT` leaves `.` unescaped (it's an
+/// RFC 3986 unreserved character), so a segment that's *exactly* `.` or
+/// `..` is rejected outright here instead: `url`'s parser normalizes
+/// dot-segments in *any* path it parses, not just during relative
+/// reference resolution, so an unescaped `.`/`..` segment can still
+/// traverse to a different admin-API path than the one requested even
+/// though [`HttpClient::request`] itself no longer resolves paths via
+/// `Url::join`.
+pub fn encode_path_segment(segment: &str) -> Result<String, BackendError> {
+    if segment == "." || segment == ".." {
+        return Err(BackendError::Other(format!("{segment:?} is not a valid resource id").into()));
+    }
+    Ok(utf8_percent_encode(segment, PATH_SEGMENT).to_string())
+}
 
 /// Everything needed to stand up a backend's HTTP client: where it lives,
 /// how to authenticate, and how to connect. Doesn't include backend-specific
@@ -61,10 +86,21 @@ impl HttpClient {
         Ok(Self { inner, base_url })
     }
 
-    /// Starts a request against `path`, resolved relative to the configured
-    /// server URL (e.g. `/apisix/admin/routes`).
+    /// Starts a request against `path` (e.g. `/apisix/admin/routes`),
+    /// appended onto the configured server URL. Plain string concatenation
+    /// (trimming exactly one `/` at the join point) rather than
+    /// `Url::join`: a root-anchored `path` handed to `Url::join` replaces
+    /// the base URL's path outright per RFC 3986, which would silently
+    /// drop any path prefix the server URL carries (e.g. APISIX's admin
+    /// API exposed behind a reverse-proxy prefix like
+    /// `https://host/gateway/`) — matching the TS backend's own
+    /// axios-based client, which combines `baseURL` and a request path the
+    /// same simple way.
     pub fn request(&self, method: Method, path: &str) -> Result<RequestBuilder, BackendError> {
-        let url = self.base_url.join(path).map_err(|e| {
+        let base = self.base_url.as_str().trim_end_matches('/');
+        let path = path.trim_start_matches('/');
+        let combined = format!("{base}/{path}");
+        let url = Url::parse(&combined).map_err(|e| {
             BackendError::Other(format!("invalid request path {path:?}: {e}").into())
         })?;
         Ok(self.inner.request(method, url))
@@ -148,4 +184,40 @@ fn with_source(error: &dyn std::error::Error) -> String {
         source = cause.source();
     }
     message
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leaves_unreserved_characters_alone() {
+        assert_eq!(encode_path_segment("my-consumer_1.local~x").unwrap(), "my-consumer_1.local~x");
+    }
+
+    #[test]
+    fn encodes_a_path_separator_so_it_cant_split_the_url() {
+        assert_eq!(encode_path_segment("a/b").unwrap(), "a%2Fb");
+    }
+
+    #[test]
+    fn encodes_query_and_fragment_delimiters() {
+        assert_eq!(encode_path_segment("a?b=c#d").unwrap(), "a%3Fb%3Dc%23d");
+    }
+
+    #[test]
+    fn rejects_a_single_dot_segment() {
+        assert!(encode_path_segment(".").is_err());
+    }
+
+    #[test]
+    fn rejects_a_double_dot_segment() {
+        assert!(encode_path_segment("..").is_err());
+    }
+
+    #[test]
+    fn a_dot_elsewhere_in_the_segment_is_fine() {
+        assert_eq!(encode_path_segment("..a").unwrap(), "..a");
+        assert_eq!(encode_path_segment("a..").unwrap(), "a..");
+    }
 }

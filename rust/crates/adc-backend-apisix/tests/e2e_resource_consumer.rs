@@ -3,27 +3,13 @@
 //! suite's own version gate) — see `e2e_apisix.rs`'s module doc for how to
 //! bring one up and run this file.
 
-use adc_backend_apisix::Backend as ApisixBackend;
 use adc_backend_apisix::tests::Fetcher;
-use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 use adc_sdk::Backend as _;
 use adc_sdk::{BackendSyncOptions, Event, EventKind, ResourceType};
 use serde_json::json;
 
-const SERVER: &str = "http://localhost:19180";
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
-
-fn client() -> HttpClient {
-    HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap()
-}
-
-fn backend() -> ApisixBackend {
-    ApisixBackend::new(client())
-}
-
-fn apisix_version() -> semver::Version {
-    std::env::var("BACKEND_APISIX_VERSION").ok().and_then(|v| semver::Version::parse(&v).ok()).unwrap_or(semver::Version::new(999, 999, 999))
-}
+mod common;
+use common::{apisix_version, backend, client};
 
 fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
     Event::new(rt, EventKind::Create { new_value }, id, id)
@@ -57,7 +43,7 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
         credential_id,
         json!({ "name": credential_id, "type": "key-auth", "config": { "key": credential_id } }),
     );
-    // Apisix keys a credential's parent consumer by literal username in
+    // APISIX keys a credential's parent consumer by literal username in
     // the URL path, not a content hash — matches `main_path`'s special
     // case for `ConsumerCredential` in `operator.rs`.
     credential.parent_id = Some(consumer_username.to_string());

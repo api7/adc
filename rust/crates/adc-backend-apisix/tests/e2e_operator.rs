@@ -26,29 +26,28 @@ use std::time::Duration;
 
 use adc_backend_apisix::Backend as ApisixBackend;
 use adc_backend_apisix::tests::Operator;
-use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
+use adc_backend_core::Method;
 use adc_sdk::Backend as _;
 use adc_sdk::{BackendSyncOptions, Event, EventKind, PathSegment, ResourceType, ValueDiff};
 use serde_json::{Value, json};
 
-const SERVER: &str = "http://localhost:19180";
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
-
-fn client() -> HttpClient {
-    HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap()
-}
-
-fn backend() -> ApisixBackend {
-    ApisixBackend::new(client())
-}
+mod common;
+use common::{backend, client};
 
 /// A PUT bumps `update_time` unconditionally, even for byte-identical
 /// content (confirmed against a real instance) — so comparing it before and
 /// after an operation directly answers "was this resource actually
 /// written to", without needing to record wire traffic.
+///
+/// `None` specifically means "the resource doesn't currently exist / has no
+/// `update_time`" (a non-success status, or an unparsable body) — a real
+/// transport failure panics with context instead of silently becoming
+/// `None` too, so a broken docker-compose stack fails loudly here rather
+/// than surfacing as a confusing `unwrap()` panic at the call site.
 async fn update_time(path: &str) -> Option<i64> {
-    let request = client().request(Method::GET, path).ok()?;
-    let response = client().execute(request).await.ok()?;
+    let client = client();
+    let request = client.request(Method::GET, path).expect("building the update_time request should never fail for a well-formed path");
+    let response = client.execute(request).await.expect("transport failure while polling update_time");
     if !response.status().is_success() {
         return None;
     }

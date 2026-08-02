@@ -142,14 +142,28 @@ fn parse_discovery_map_nodes(
 ) -> Result<Vec<adc::UpstreamNode>, String> {
     map.into_iter()
         .map(|(node, weight)| {
-            let parts: Vec<&str> = node.split(':').collect();
-            let (host, port) = if parts.len() == 2 {
-                let port = parts[1]
-                    .parse::<u32>()
-                    .map_err(|_| format!("invalid upstream node port in {node:?}"))?;
-                (parts[0].to_string(), port)
+            let (host, port) = if let Some(rest) = node.strip_prefix('[') {
+                // Bracketed IPv6, e.g. "[::1]:9000" or "[::1]" — the host
+                // itself contains colons, so unlike an IPv4/hostname:port
+                // pair it can't be split on ':' directly.
+                let (host, after_bracket) = rest
+                    .split_once(']')
+                    .ok_or_else(|| format!("unterminated \"[\" in upstream node {node:?}"))?;
+                let port = match after_bracket.strip_prefix(':') {
+                    Some(port) => port.parse::<u32>().map_err(|_| format!("invalid upstream node port in {node:?}"))?,
+                    None => default_upstream_port(scheme),
+                };
+                (host.to_string(), port)
             } else {
-                (parts[0].to_string(), default_upstream_port(scheme))
+                let parts: Vec<&str> = node.split(':').collect();
+                if parts.len() == 2 {
+                    let port = parts[1]
+                        .parse::<u32>()
+                        .map_err(|_| format!("invalid upstream node port in {node:?}"))?;
+                    (parts[0].to_string(), port)
+                } else {
+                    (parts[0].to_string(), default_upstream_port(scheme))
+                }
             };
             Ok(adc::UpstreamNode {
                 host,
@@ -325,12 +339,12 @@ impl From<typing::StreamRoute> for adc::StreamRoute {
         // APISIX's stream routes have no `name` field at all; ADC smuggles
         // one through a magic label when writing, and recovers it here when
         // reading back, falling back to `id` if it was never set that way.
-        let name = extract_name_label(&route.labels, "__ADC_NAME")
+        let name = extract_name_label(&route.labels, typing::ADC_NAME_LABEL)
             .unwrap_or_else(|| route.id.clone().unwrap_or_default());
         let labels = route
             .labels
             .map(|mut labels| {
-                labels.remove("__ADC_NAME");
+                labels.remove(typing::ADC_NAME_LABEL);
                 labels
             })
             .filter(|labels| !labels.is_empty());
@@ -389,20 +403,15 @@ fn transform_route_labels_to_apisix(
     })
 }
 
+/// Derived from `adc::HttpMethod`'s own `#[serde(rename = ...)]` names
+/// rather than a hand-written match, so this can't drift from
+/// [`parse_http_method`]'s (the read-direction counterpart) idea of what
+/// each variant's wire string is.
 fn http_method_to_string(method: adc::HttpMethod) -> String {
-    match method {
-        adc::HttpMethod::Get => "GET",
-        adc::HttpMethod::Post => "POST",
-        adc::HttpMethod::Put => "PUT",
-        adc::HttpMethod::Delete => "DELETE",
-        adc::HttpMethod::Patch => "PATCH",
-        adc::HttpMethod::Head => "HEAD",
-        adc::HttpMethod::Options => "OPTIONS",
-        adc::HttpMethod::Connect => "CONNECT",
-        adc::HttpMethod::Trace => "TRACE",
-        adc::HttpMethod::Purge => "PURGE",
+    match serde_json::to_value(method).expect("HttpMethod serialization is infallible") {
+        Value::String(s) => s,
+        other => unreachable!("HttpMethod must serialize to a JSON string, got {other:?}"),
     }
-    .to_string()
 }
 
 /// Builds a route's wire body. Takes `parent_id` (the owning service's id)
@@ -584,7 +593,7 @@ pub fn transform_stream_route(
 ) -> typing::StreamRoute {
     let mut labels = transform_labels_to_apisix(route.labels).unwrap_or_default();
     if inject_name {
-        labels.insert("__ADC_NAME".to_string(), LabelValue::Single(route.name));
+        labels.insert(typing::ADC_NAME_LABEL.to_string(), LabelValue::Single(route.name));
     }
 
     typing::StreamRoute {

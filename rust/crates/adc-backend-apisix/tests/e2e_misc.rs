@@ -6,19 +6,12 @@
 //! files cover — everything else so far only checks the flat, unassembled
 //! `Fetcher::list_*` results.
 
-use adc_backend_apisix::Backend as ApisixBackend;
-use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 use adc_sdk::Backend as _;
 use adc_sdk::{Event, EventKind, ResourceType};
 use serde_json::json;
 
-const SERVER: &str = "http://localhost:19180";
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
-
-fn backend() -> ApisixBackend {
-    let client = HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap();
-    ApisixBackend::new(client)
-}
+mod common;
+use common::backend;
 
 fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
     Event::new(rt, EventKind::Create { new_value }, id, id)

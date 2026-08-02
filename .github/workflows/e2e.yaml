@@ -84,6 +84,9 @@ jobs:
         run: npx nx run backend-apisix:test
 
       # Run the Rust port's E2E tests against the same live apisix instance
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
       - name: Run Rust E2E tests
         working-directory: ./rust
         run: |

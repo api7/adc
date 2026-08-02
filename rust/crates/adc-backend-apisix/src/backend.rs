@@ -28,7 +28,7 @@ impl Backend {
         }
     }
 
-    /// Apisix has no dedicated "get version" endpoint; every admin API
+    /// APISIX has no dedicated "get version" endpoint; every admin API
     /// response carries it in the `Server` response header instead
     /// (`APISIX/3.9.0`, confirmed strict `MAJOR.MINOR.PATCH` against a real
     /// instance). Falls back to a version high enough to unlock every
@@ -66,7 +66,12 @@ impl adc_sdk::Backend for Backend {
     }
 
     async fn ping(&self) -> Result<(), BackendError> {
-        let request = self.client.request(Method::GET, "/apisix/admin/routes")?;
+        // Bounds the response to a handful of routes rather than the
+        // server's entire route table — a lighter probe on route-heavy
+        // deployments. Unrecognized query params are ignored by APISIX
+        // versions that predate pagination support, so this is safe across
+        // the whole supported version range.
+        let request = self.client.request(Method::GET, "/apisix/admin/routes?page=1&page_size=10")?;
         self.client.send(request).await?;
         Ok(())
     }

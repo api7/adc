@@ -14,7 +14,8 @@ use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 // own `Backend` type (its concrete implementation of this trait).
 use adc_sdk::Backend as _;
 
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
+mod common;
+use common::TOKEN;
 
 fn read_asset(name: &str) -> Vec<u8> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../libs/backend-apisix/e2e/assets/apisix_conf/mtls").join(name);

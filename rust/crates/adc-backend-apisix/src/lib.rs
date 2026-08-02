@@ -16,7 +16,12 @@ mod validator;
 pub use backend::Backend;
 
 /// Internal building blocks, exposed only for tests — see the crate-level
-/// doc comment. Not part of the supported API.
+/// doc comment. Not part of the supported API: gated behind the
+/// `test-utils` feature (on by default only via this crate's own
+/// self-referencing dev-dependency), so it doesn't leak into a normal
+/// build's public surface.
+#[cfg(feature = "test-utils")]
+#[doc(hidden)]
 pub mod tests {
     pub use crate::fetcher::Fetcher;
     pub use crate::operator::Operator;

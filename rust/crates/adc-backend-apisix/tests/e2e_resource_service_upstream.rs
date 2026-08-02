@@ -4,19 +4,13 @@
 //! for how to bring one up and run this file.
 
 use adc_backend_apisix::Backend as ApisixBackend;
-use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 use adc_sdk::Backend as _;
 use adc_sdk::utils::generate_id;
 use adc_sdk::{BackendSyncOptions, Event, EventKind, ResourceType};
 use serde_json::json;
 
-const SERVER: &str = "http://localhost:19180";
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
-
-fn backend() -> ApisixBackend {
-    let client = HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap();
-    ApisixBackend::new(client)
-}
+mod common;
+use common::backend;
 
 fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
     Event::new(rt, EventKind::Create { new_value }, id, id)
@@ -106,7 +100,11 @@ async fn service_inline_upstream_lifecycle() {
 #[tokio::test]
 #[ignore]
 async fn service_named_upstreams_lifecycle() {
-    let service_name = "test";
+    // A distinct name, not the bare "test" several other e2e files also use
+    // — those all currently run as separate sequential test binaries
+    // against the one shared APISIX instance, so this doesn't collide
+    // today, but a differently-named service here avoids relying on that.
+    let service_name = "test-named-upstreams";
     let upstream1_name = "nd-upstream1";
     let upstream2_name = "nd-upstream2";
     let backend = backend();

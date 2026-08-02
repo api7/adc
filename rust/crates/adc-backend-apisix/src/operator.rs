@@ -20,7 +20,7 @@
 //!   while still letting e.g. all SSL creates happen before any upstream
 //!   creates, matching the differ's own topological ordering.
 
-use adc_backend_core::{HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err};
+use adc_backend_core::{HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err, encode_path_segment};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, ValueDiff};
 use semver::Version;
@@ -154,11 +154,15 @@ fn to_request_body<T: Serialize>(value: T) -> Result<Value, BackendError> {
 }
 
 fn main_path(event: &Event) -> Result<String, BackendError> {
+    let resource_id = encode_path_segment(&event.resource_id)?;
     if event.resource_type == ResourceType::ConsumerCredential {
         let parent_id = event.parent_id.as_deref().ok_or_else(|| missing_parent(event))?;
-        return Ok(format!("/apisix/admin/consumers/{parent_id}/credentials/{}", event.resource_id));
+        let parent_id = encode_path_segment(parent_id)?;
+        return Ok(format!("/apisix/admin/consumers/{parent_id}/credentials/{resource_id}"));
     }
-    Ok(format!("/apisix/admin/{}/{}", resource_type_to_api_name(event.resource_type), event.resource_id))
+    let api_name = resource_type_to_api_name(event.resource_type)
+        .expect("ConsumerCredential is the only resource type with no api name, and it's handled above");
+    Ok(format!("/apisix/admin/{api_name}/{resource_id}"))
 }
 
 fn diff_path_is_upstream(diff: &ValueDiff) -> bool {
@@ -168,20 +172,41 @@ fn diff_path_is_upstream(diff: &ValueDiff) -> bool {
     matches!(path.first(), Some(PathSegment::Key(key)) if key == "upstream")
 }
 
+/// Which of a `SERVICE` event's (up to two) request paths a given
+/// (method, path, body) triple is for — replaces sniffing the path string
+/// for `"/upstreams/"` with an explicit tag threaded alongside it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RequestKind {
+    Main,
+    Upstream,
+}
+
 /// Builds the ordered (method, path, body) triples for one event. A
 /// non-`SERVICE` event always produces exactly one request; a `SERVICE`
 /// event produces one or two (see the module doc comment).
 fn build_requests(event: &Event, version: &Version) -> Result<Vec<(Method, String, Option<Value>)>, BackendError> {
     let is_delete = event.event_type() == EventType::Delete;
-    let mut paths = vec![main_path(event)?];
+    let mut paths = vec![(main_path(event)?, RequestKind::Main)];
 
     if event.resource_type == ResourceType::Service {
-        let upstream_path = format!("/apisix/admin/upstreams/{}", event.resource_id);
+        let upstream_path = (format!("/apisix/admin/upstreams/{}", encode_path_segment(&event.resource_id)?), RequestKind::Upstream);
         match event.event_type() {
             EventType::Delete => paths.push(upstream_path),
-            EventType::Create => paths.insert(0, upstream_path),
+            EventType::Create => {
+                // A service create with no `upstream` field at all has
+                // nothing to write there — `transform_service` would
+                // return `None` for it, which `request_body` would
+                // otherwise have to reject as an error for a case that
+                // isn't actually one.
+                let has_upstream = event.kind.new_value().and_then(|v| v.get("upstream")).is_some_and(|v| !v.is_null());
+                if has_upstream {
+                    paths.insert(0, upstream_path);
+                }
+            }
             EventType::Update => {
-                let diff = event.kind.diff().unwrap_or(&[]);
+                let diff = event.kind.diff().filter(|d| !d.is_empty()).ok_or_else(|| {
+                    BackendError::Other(format!("service {:?} update event is missing diff info", event.resource_id).into())
+                })?;
                 let touches_non_upstream = diff.iter().any(|d| !diff_path_is_upstream(d));
                 let touches_upstream = diff.iter().any(diff_path_is_upstream);
                 if !touches_non_upstream {
@@ -197,29 +222,32 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<(Method, Strin
 
     paths
         .into_iter()
-        .map(|path| {
+        .map(|(path, kind)| {
             let method = if is_delete { Method::DELETE } else { Method::PUT };
-            let body = if is_delete { None } else { Some(request_body(event, &path, version)?) };
+            let body = if is_delete { None } else { Some(request_body(event, kind, version)?) };
             Ok((method, path, body))
         })
         .collect()
 }
 
 /// Builds the JSON body for one request. For a `SERVICE` event this is
-/// called once per request path, and returns a different body depending on
-/// which of the (up to two) paths it's building for.
-fn request_body(event: &Event, path: &str, version: &Version) -> Result<Value, BackendError> {
+/// called once per request path, and `kind` says which of the (up to two)
+/// it's building for.
+fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<Value, BackendError> {
     let new_value = event.kind.new_value().ok_or_else(|| BackendError::Other("create/update event is missing new_value".into()))?;
 
     match event.resource_type {
         ResourceType::Consumer => to_request_body(typing::Consumer::from(deserialize_event_value::<adc::Consumer>(new_value)?)),
         ResourceType::ConsumerGroup => {
-            // `transform_consumer_group` derives its own id from the group's
-            // name and ignores whatever's here, but set it anyway for
-            // parity with the other resource types that do rely on it.
-            let mut group: adc::ConsumerGroup = deserialize_event_value(new_value)?;
-            group.id = Some(event.resource_id.clone());
-            let (wire, _consumers) = transformer::transform_consumer_group(group);
+            let group: adc::ConsumerGroup = deserialize_event_value(new_value)?;
+            let (mut wire, _consumers) = transformer::transform_consumer_group(group);
+            // `transform_consumer_group` derives its id from the group's
+            // name, but `main_path` builds the request URL from
+            // `event.resource_id` — APISIX rejects a PUT whose body id
+            // doesn't match the URL, so they must match exactly, including
+            // when the differ assigned an explicit id independent of the
+            // name (`ConsumerGroup` supports a user-specified `id`).
+            wire.id = event.resource_id.clone();
             to_request_body(wire)
         }
         ResourceType::ConsumerCredential => {
@@ -244,13 +272,14 @@ fn request_body(event: &Event, path: &str, version: &Version) -> Result<Value, B
             let mut service: adc::Service = deserialize_event_value(new_value)?;
             service.id = Some(event.resource_id.clone());
             let (wire_service, wire_upstream) = transformer::transform_service(service);
-            if path.contains("/upstreams/") {
-                let upstream = wire_upstream.ok_or_else(|| {
-                    BackendError::Other(format!("service {:?} has no default upstream to write", event.resource_id).into())
-                })?;
-                to_request_body(upstream)
-            } else {
-                to_request_body(wire_service)
+            match kind {
+                RequestKind::Upstream => {
+                    let upstream = wire_upstream.ok_or_else(|| {
+                        BackendError::Other(format!("service {:?} has no default upstream to write", event.resource_id).into())
+                    })?;
+                    to_request_body(upstream)
+                }
+                RequestKind::Main => to_request_body(wire_service),
             }
         }
         ResourceType::Ssl => {
@@ -333,5 +362,65 @@ mod tests {
     #[test]
     fn empty_input_produces_no_groups() {
         assert!(group_events(vec![]).is_empty());
+    }
+
+    #[test]
+    fn consumer_group_request_body_id_matches_the_event_resource_id_not_the_name() {
+        // The differ can assign a ConsumerGroup an explicit, stable id
+        // independent of its name; `transform_consumer_group` derives its
+        // own id from the name alone, so the request body must be
+        // overridden back to the event's id or it'll mismatch the URL
+        // path (built from `event.resource_id`) and APISIX will reject it.
+        let group_event = Event::new(
+            ResourceType::ConsumerGroup,
+            EventKind::Create { new_value: json!({ "name": "renamed-group" }) },
+            "stable-id",
+            "renamed-group",
+        );
+        let requests = build_requests(&group_event, &Version::new(3, 17, 0)).unwrap();
+        assert_eq!(requests.len(), 1);
+        let (_, path, body) = &requests[0];
+        assert!(path.ends_with("/stable-id"), "{path}");
+        assert_eq!(body.as_ref().unwrap()["id"], "stable-id");
+    }
+
+    #[test]
+    fn service_create_without_an_upstream_produces_only_the_main_request() {
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Create { new_value: json!({ "name": "svc-no-upstream" }) },
+            "svc-no-upstream",
+        );
+        let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
+        assert_eq!(requests.len(), 1, "no upstream request should be generated for a service with no upstream");
+        assert!(requests[0].1.ends_with("/services/svc-no-upstream"), "{}", requests[0].1);
+    }
+
+    #[test]
+    fn service_update_with_no_diff_is_rejected_instead_of_silently_sending_nothing() {
+        let service_event = Event::new(
+            ResourceType::Service,
+            EventKind::Update { old_value: json!({}), new_value: json!({}), diff: None },
+            "svc1",
+            "svc1",
+        );
+        assert!(build_requests(&service_event, &Version::new(3, 17, 0)).is_err());
+    }
+
+    #[test]
+    fn resource_id_containing_a_path_separator_is_percent_encoded_not_split() {
+        let route_event = {
+            let mut e = event(
+                ResourceType::Route,
+                EventKind::Create { new_value: json!({ "name": "r1", "uris": ["/x"] }) },
+                "a/../b",
+            );
+            e.parent_id = Some("svc1".to_string());
+            e
+        };
+        let requests = build_requests(&route_event, &Version::new(3, 17, 0)).unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].1.starts_with("/apisix/admin/routes/"), "{}", requests[0].1);
+        assert!(!requests[0].1.contains("/../"), "{}", requests[0].1);
     }
 }

@@ -2,20 +2,13 @@
 //! Real network calls against a live APISIX — see `e2e_apisix.rs`'s module
 //! doc for how to bring one up and run this file.
 
-use adc_backend_apisix::Backend as ApisixBackend;
-use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 use adc_sdk::Backend as _;
 use adc_sdk::utils::generate_id;
 use adc_sdk::{BackendSyncOptions, Event, EventKind, ResourceType};
 use serde_json::json;
 
-const SERVER: &str = "http://localhost:19180";
-const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
-
-fn backend() -> ApisixBackend {
-    let client = HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap();
-    ApisixBackend::new(client)
-}
+mod common;
+use common::backend;
 
 #[tokio::test]
 #[ignore]

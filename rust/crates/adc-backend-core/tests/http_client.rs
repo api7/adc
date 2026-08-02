@@ -26,6 +26,10 @@ async fn spawn_server() -> String {
             ),
         )
         .route(
+            "/gateway/apisix/admin/routes",
+            get(|| async { Json(json!({ "list": [], "prefixed": true })) }),
+        )
+        .route(
             "/slow",
             get(|| async {
                 tokio::time::sleep(Duration::from_secs(5)).await;
@@ -61,6 +65,21 @@ async fn injects_auth_header_and_decodes_success_response() {
     let resp = client.send(req).await.unwrap();
     let body: Value = resp.json().await.unwrap();
     assert_eq!(body, json!({ "list": [] }));
+}
+
+#[tokio::test]
+async fn preserves_a_path_prefix_on_the_configured_server_url() {
+    let server = spawn_server().await;
+    // A trailing slash on the server URL, matching how a reverse-proxied
+    // admin API would typically be configured — the request path itself is
+    // still root-anchored (`/apisix/admin/routes`), which is exactly the
+    // case `Url::join` would otherwise resolve by discarding `/gateway`.
+    let client = client(format!("{server}/gateway/"), None);
+
+    let req = client.request(Method::GET, "/apisix/admin/routes").unwrap();
+    let resp = client.send(req).await.unwrap();
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body, json!({ "list": [], "prefixed": true }));
 }
 
 #[tokio::test]

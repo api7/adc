@@ -166,6 +166,29 @@ fn upstream_discovery_map_nodes_without_a_port_fall_back_to_scheme_default() {
 }
 
 #[test]
+fn upstream_discovery_map_nodes_parse_bracketed_ipv6_host_and_port() {
+    let mut upstream = upstream();
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("[::1]:9000".to_string(), 5)])));
+    let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
+    let nodes = adc_upstream.nodes.unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].host, "::1");
+    assert_eq!(nodes[0].port, 9000);
+    assert_eq!(nodes[0].weight, 5);
+}
+
+#[test]
+fn upstream_discovery_map_nodes_bracketed_ipv6_without_a_port_fall_back_to_scheme_default() {
+    let mut upstream = upstream();
+    upstream.scheme = Some(adc::UpstreamScheme::Https);
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("[::1]".to_string(), 1)])));
+    let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
+    let nodes = adc_upstream.nodes.unwrap();
+    assert_eq!(nodes[0].host, "::1");
+    assert_eq!(nodes[0].port, 443);
+}
+
+#[test]
 fn upstream_strips_the_service_association_label_but_keeps_others() {
     let mut upstream = upstream();
     upstream.labels = Some(HashMap::from([
@@ -251,7 +274,7 @@ fn ssl_missing_a_certificate_is_rejected() {
 
 #[test]
 fn ssl_with_a_redacted_key_degrades_to_an_empty_placeholder_instead_of_failing() {
-    // Apisix never echoes a private key back on any read (list or
+    // APISIX never echoes a private key back on any read (list or
     // single-resource GET), confirmed against a real instance — a missing
     // `key` here means "redacted by the server", not "broken resource".
     let ssl = typing::Ssl {

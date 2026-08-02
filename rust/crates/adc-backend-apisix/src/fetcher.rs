@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method, concurrent_map};
+use adc_backend_core::{HttpClient, Method, concurrent_map_until_err};
 use adc_sdk::resources::{self as adc, Configuration, LabelValue, Plugins};
 use adc_sdk::{BackendError, ResourceType};
 use indexmap::IndexMap;
@@ -9,6 +9,11 @@ use serde::de::DeserializeOwned;
 
 use crate::typing;
 use crate::utils::resource_type_to_api_name;
+
+/// Bounds how many consumers' credentials `list_consumers` fetches at once,
+/// so a large consumer list doesn't fan out unboundedly against the admin
+/// API.
+const CREDENTIAL_FETCH_CONCURRENCY: usize = 16;
 
 /// Fetches an ADC-managed APISIX instance's full resource state, one
 /// resource type at a time, in APISIX's own wire shape (`crate::typing`) —
@@ -29,7 +34,9 @@ impl Fetcher {
         &self,
         resource_type: ResourceType,
     ) -> Result<Vec<T>, BackendError> {
-        let path = format!("/apisix/admin/{}", resource_type_to_api_name(resource_type));
+        let api_name = resource_type_to_api_name(resource_type)
+            .ok_or_else(|| BackendError::Unsupported(format!("{resource_type:?} has no top-level admin API collection")))?;
+        let path = format!("/apisix/admin/{api_name}");
         let builder = self.client.request(Method::GET, &path)?;
         let response = self.client.send(builder).await?;
         let body: typing::ListResponse<T> = response.json().await.map_err(|e| {
@@ -78,7 +85,7 @@ impl Fetcher {
     pub async fn list_plugin_metadata(&self) -> Result<Plugins, BackendError> {
         let path = format!(
             "/apisix/admin/{}",
-            resource_type_to_api_name(ResourceType::PluginMetadata)
+            resource_type_to_api_name(ResourceType::PluginMetadata).expect("PluginMetadata always has an api name")
         );
         let builder = self.client.request(Method::GET, &path)?;
         let response = self.client.send(builder).await?;
@@ -96,17 +103,19 @@ impl Fetcher {
     }
 
     /// Stream routes are an optional APISIX feature: on a version/build
-    /// that doesn't support them, the endpoint itself may not exist. Any
-    /// non-2xx response here is treated as "no stream routes" rather than a
-    /// hard failure, deliberately more lenient than [`Fetcher::list`].
+    /// that doesn't support them, the endpoint itself may not exist. Only a
+    /// 404 here is treated as "no stream routes" — anything else
+    /// (authentication/authorization failure, a 5xx) is a real error, same
+    /// as [`Fetcher::list`].
     pub async fn list_stream_routes(&self) -> Result<Vec<typing::StreamRoute>, BackendError> {
         let builder = self
             .client
             .request(Method::GET, "/apisix/admin/stream_routes")?;
         let response = self.client.execute(builder).await?;
-        if !response.status().is_success() {
+        if response.status().as_u16() == 404 {
             return Ok(Vec::new());
         }
+        let response = HttpClient::require_success(response).await?;
         let body: typing::ListResponse<typing::StreamRoute> =
             response.json().await.map_err(|e| {
                 BackendError::Serialization(format!(
@@ -128,9 +137,7 @@ impl Fetcher {
             return Ok(consumers);
         }
 
-        let results =
-            concurrent_map(consumers, None, |consumer| self.with_credentials(consumer)).await;
-        results.into_iter().collect()
+        concurrent_map_until_err(consumers, Some(CREDENTIAL_FETCH_CONCURRENCY), |consumer| self.with_credentials(consumer)).await
     }
 
     async fn with_credentials(
@@ -283,7 +290,11 @@ impl Fetcher {
 /// Resolves each route's `plugin_config_id` reference into its `plugins`,
 /// in place — APISIX stores a plugin config as its own admin-API resource
 /// and a route merely points at one by id; ADC's `Route` has no equivalent
-/// reference field, only the resolved `plugins`.
+/// reference field, only the resolved `plugins`. A route can carry its own
+/// inline `plugins` alongside a `plugin_config_id` at the same time; APISIX
+/// merges the two at request-serving time with the route's own entries
+/// winning on a name collision, so the reconstructed `plugins` here does
+/// the same rather than letting the plugin config clobber the route's own.
 fn resolve_plugin_config_refs(
     routes: &mut [typing::Route],
     plugin_configs: &[typing::PluginConfig],
@@ -296,7 +307,9 @@ fn resolve_plugin_config_refs(
         if let Some(plugin_config_id) = &route.plugin_config_id
             && let Some(plugin_config) = by_id.get(plugin_config_id.as_str())
         {
-            route.plugins = Some(plugin_config.plugins.clone());
+            let mut plugins = plugin_config.plugins.clone();
+            plugins.extend(route.plugins.clone().unwrap_or_default());
+            route.plugins = Some(plugins);
         }
     }
 }
