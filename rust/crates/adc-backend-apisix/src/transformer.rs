@@ -132,10 +132,12 @@ fn default_upstream_port(scheme: Option<adc::UpstreamScheme>) -> u32 {
 }
 
 /// Parses APISIX's legacy `"host:port": weight` node map into ADC's node
-/// list. Mirrors the TS transformer's own naive `host.split(':')`: a host
-/// containing more than one colon (bracket-less IPv6) falls through to the
-/// "no port" branch rather than being parsed correctly — not fixed here, to
-/// stay behaviorally identical to the TS implementation this is replacing.
+/// list. The TS transformer's own naive `host.split(':')` mishandles any
+/// host with more than one colon, including a *bracketed* IPv6 address
+/// (`"[::1]:9000"`) — unlike TS, that specific case is recognized and
+/// parsed correctly here (see the `strip_prefix('[')` branch below). A
+/// bare, bracket-less IPv6 host is inherently ambiguous with a
+/// `host:port` pair and still falls through to the "no port" branch.
 fn parse_discovery_map_nodes(
     map: HashMap<String, i64>,
     scheme: Option<adc::UpstreamScheme>,
@@ -150,7 +152,9 @@ fn parse_discovery_map_nodes(
                     .split_once(']')
                     .ok_or_else(|| format!("unterminated \"[\" in upstream node {node:?}"))?;
                 let port = match after_bracket.strip_prefix(':') {
-                    Some(port) => port.parse::<u32>().map_err(|_| format!("invalid upstream node port in {node:?}"))?,
+                    Some(port) => port
+                        .parse::<u32>()
+                        .map_err(|_| format!("invalid upstream node port in {node:?}"))?,
                     None => default_upstream_port(scheme),
                 };
                 (host.to_string(), port)
@@ -513,7 +517,12 @@ pub fn transform_service(service: adc::Service) -> (typing::Service, Option<typi
 
         hosts: service.hosts,
         upstream: None,
-        upstream_id: Some(id),
+        // Only reference an upstream_id when there's actually an upstream
+        // resource to reference — APISIX validates this at write time and
+        // rejects a service pointing at a nonexistent upstream (confirmed
+        // against a real instance), which a service with no `upstream`
+        // field at all would otherwise always hit.
+        upstream_id: upstream.as_ref().map(|_| id.clone()),
         plugins: service.plugins,
         script: None,
         enable_websocket: None,
@@ -593,7 +602,10 @@ pub fn transform_stream_route(
 ) -> typing::StreamRoute {
     let mut labels = transform_labels_to_apisix(route.labels).unwrap_or_default();
     if inject_name {
-        labels.insert(typing::ADC_NAME_LABEL.to_string(), LabelValue::Single(route.name));
+        labels.insert(
+            typing::ADC_NAME_LABEL.to_string(),
+            LabelValue::Single(route.name),
+        );
     }
 
     typing::StreamRoute {

@@ -254,3 +254,20 @@ async fn syncs_a_stream_route_then_reads_it_back() {
     let stream_routes = fetcher().list_stream_routes().await.unwrap();
     assert!(stream_routes.iter().all(|r| r.id.as_deref() != Some(stream_route_id)));
 }
+
+#[tokio::test]
+#[ignore]
+async fn deleting_a_service_that_never_had_an_upstream_still_succeeds() {
+    // A service with no `upstream` field never gets a
+    // `/apisix/admin/upstreams/{id}` resource created for it (see
+    // `operator.rs`'s `build_requests`), so deleting it must not depend on
+    // that resource existing — `operate` tolerates a 404 specifically for
+    // this delete rather than failing the whole event.
+    let service_id = "e2e-svc-no-upstream";
+    sync_ok(vec![create(ResourceType::Service, service_id, json!({ "name": "e2e service with no upstream" }))]).await;
+
+    sync_ok(vec![delete(ResourceType::Service, service_id)]).await;
+
+    let services = fetcher().list_services().await.unwrap();
+    assert!(services.iter().all(|s| s.id != service_id));
+}

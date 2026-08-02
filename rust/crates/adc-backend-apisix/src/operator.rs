@@ -106,15 +106,31 @@ impl Operator {
     }
 
     /// Runs one event's requests sequentially, each with a retry policy.
+    ///
+    /// A `DELETE` on the upstream sub-resource specifically tolerates a
+    /// 404: a service's default upstream only exists when the service was
+    /// actually created with one (see `build_requests`'s `Create` branch),
+    /// so deleting a service that never had one would otherwise fail this
+    /// whole event on a request for a resource that was never there to
+    /// begin with. Depending on `event.kind.old_value()` accurately
+    /// recording that instead would work for the differ's own real Delete
+    /// events (which do carry the full prior state) but not for a
+    /// hand-built one with an incomplete `old_value` — treating "already
+    /// gone" as success here doesn't depend on that being reliable.
     async fn operate(&self, event: &Event) -> Result<(), BackendError> {
-        for (method, path, body) in build_requests(event, &self.version)? {
+        for (method, path, body, kind) in build_requests(event, &self.version)? {
+            let tolerate_missing = method == Method::DELETE && kind == RequestKind::Upstream;
             self.retry_policy
                 .run(|| async {
                     let mut builder = self.client.request(method.clone(), &path)?;
                     if let Some(body) = &body {
                         builder = builder.json(body);
                     }
-                    self.client.send(builder).await
+                    let response = self.client.execute(builder).await?;
+                    if tolerate_missing && response.status().as_u16() == 404 {
+                        return Ok(());
+                    }
+                    HttpClient::require_success(response).await.map(|_| ())
                 })
                 .await?;
         }
@@ -181,10 +197,17 @@ enum RequestKind {
     Upstream,
 }
 
-/// Builds the ordered (method, path, body) triples for one event. A
-/// non-`SERVICE` event always produces exactly one request; a `SERVICE`
-/// event produces one or two (see the module doc comment).
-fn build_requests(event: &Event, version: &Version) -> Result<Vec<(Method, String, Option<Value>)>, BackendError> {
+/// One request `build_requests` produced: method, path, body (`None` for a
+/// `DELETE`), and which of a `SERVICE` event's (up to two) requests it is.
+type BuiltRequest = (Method, String, Option<Value>, RequestKind);
+
+/// Builds the ordered requests for one event. A non-`SERVICE` event always
+/// produces exactly one; a `SERVICE` event produces one or two (see the
+/// module doc comment). The `RequestKind` on each is carried through to
+/// [`Operator::operate`], which needs it to know whether a `DELETE` is for
+/// the upstream sub-resource specifically (see its doc comment for why
+/// that one tolerates a 404).
+fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>, BackendError> {
     let is_delete = event.event_type() == EventType::Delete;
     let mut paths = vec![(main_path(event)?, RequestKind::Main)];
 
@@ -225,7 +248,7 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<(Method, Strin
         .map(|(path, kind)| {
             let method = if is_delete { Method::DELETE } else { Method::PUT };
             let body = if is_delete { None } else { Some(request_body(event, kind, version)?) };
-            Ok((method, path, body))
+            Ok((method, path, body, kind))
         })
         .collect()
 }
@@ -379,7 +402,7 @@ mod tests {
         );
         let requests = build_requests(&group_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 1);
-        let (_, path, body) = &requests[0];
+        let (_, path, body, _) = &requests[0];
         assert!(path.ends_with("/stable-id"), "{path}");
         assert_eq!(body.as_ref().unwrap()["id"], "stable-id");
     }

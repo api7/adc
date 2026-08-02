@@ -439,8 +439,12 @@ fn write_service_splits_into_service_and_matching_upstream() {
 #[test]
 fn write_service_without_a_default_upstream_returns_none() {
     let service = adc_service("svc1");
-    let (_wire_service, wire_upstream) = transform_service(service);
+    let (wire_service, wire_upstream) = transform_service(service);
     assert!(wire_upstream.is_none());
+    // Must not reference an upstream_id that doesn't exist — APISIX
+    // rejects a service PUT whose upstream_id points at a nonexistent
+    // upstream (confirmed against a real instance).
+    assert!(wire_service.upstream_id.is_none());
 }
 
 #[test]
