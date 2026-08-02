@@ -62,11 +62,12 @@ async fn sync_ok(backend: &ApisixBackend, events: Vec<Event>) {
 #[tokio::test]
 #[ignore]
 async fn service_inline_upstream_lifecycle() {
+    let service_name = "test-inline-upstream";
     let backend = backend();
-    let service_id = generate_id("test-inline-upstream");
+    let service_id = generate_id(service_name);
     let upstream_v1 = json!({ "type": "roundrobin", "nodes": [{ "host": "httpbin.org", "port": 443, "weight": 100 }] });
 
-    sync_ok(&backend, vec![create(ResourceType::Service, &service_id, json!({ "name": "test-inline-upstream", "upstream": upstream_v1 }))]).await;
+    sync_ok(&backend, vec![create(ResourceType::Service, &service_id, json!({ "name": service_name, "upstream": upstream_v1 }))]).await;
 
     let config = backend.dump().await.unwrap();
     let service = config.services.unwrap().into_iter().find(|s| s.id.as_deref() == Some(&service_id)).unwrap();
@@ -84,8 +85,8 @@ async fn service_inline_upstream_lifecycle() {
         vec![update(
             ResourceType::Service,
             &service_id,
-            json!({ "name": "test-inline-upstream", "upstream": upstream_v1 }),
-            json!({ "name": "test-inline-upstream", "upstream": upstream_v2 }),
+            json!({ "name": service_name, "upstream": upstream_v1 }),
+            json!({ "name": service_name, "upstream": upstream_v2 }),
         )],
     )
     .await;
@@ -105,15 +106,18 @@ async fn service_inline_upstream_lifecycle() {
 #[tokio::test]
 #[ignore]
 async fn service_named_upstreams_lifecycle() {
+    let service_name = "test";
+    let upstream1_name = "nd-upstream1";
+    let upstream2_name = "nd-upstream2";
     let backend = backend();
-    let service_id = generate_id("test");
+    let service_id = generate_id(service_name);
 
     sync_ok(
         &backend,
         vec![
-            create(ResourceType::Service, &service_id, json!({ "name": "test", "upstream": { "type": "roundrobin", "nodes": [{ "host": "httpbin.org", "port": 443, "weight": 100 }] } })),
-            create_child(ResourceType::Upstream, "nd-upstream1", json!({ "name": "nd-upstream1", "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.1.1.1", "port": 443, "weight": 100 }] }), "test"),
-            create_child(ResourceType::Upstream, "nd-upstream2", json!({ "name": "nd-upstream2", "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.0.0.1", "port": 443, "weight": 100 }] }), "test"),
+            create(ResourceType::Service, &service_id, json!({ "name": service_name, "upstream": { "type": "roundrobin", "nodes": [{ "host": "httpbin.org", "port": 443, "weight": 100 }] } })),
+            create_child(ResourceType::Upstream, upstream1_name, json!({ "name": upstream1_name, "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.1.1.1", "port": 443, "weight": 100 }] }), service_name),
+            create_child(ResourceType::Upstream, upstream2_name, json!({ "name": upstream2_name, "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.0.0.1", "port": 443, "weight": 100 }] }), service_name),
         ],
     )
     .await;
@@ -123,30 +127,30 @@ async fn service_named_upstreams_lifecycle() {
     assert_eq!(services.len(), 1);
     let upstreams = services[0].upstreams.as_ref().expect("service should have its named upstreams");
     assert_eq!(upstreams.len(), 2);
-    assert!(upstreams.iter().any(|u| u.name.as_deref() == Some("nd-upstream1")));
-    assert!(upstreams.iter().any(|u| u.name.as_deref() == Some("nd-upstream2")));
+    assert!(upstreams.iter().any(|u| u.name.as_deref() == Some(upstream1_name)));
+    assert!(upstreams.iter().any(|u| u.name.as_deref() == Some(upstream2_name)));
 
     sync_ok(
         &backend,
         vec![update_child(
             ResourceType::Upstream,
-            "nd-upstream1",
-            json!({ "name": "nd-upstream1", "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.1.1.1", "port": 443, "weight": 100 }], "retry_timeout": 100 }),
-            "test",
+            upstream1_name,
+            json!({ "name": upstream1_name, "type": "roundrobin", "scheme": "https", "nodes": [{ "host": "1.1.1.1", "port": 443, "weight": 100 }], "retry_timeout": 100 }),
+            service_name,
         )],
     )
     .await;
 
     let config = backend.dump().await.unwrap();
     let upstreams = config.services.unwrap()[0].upstreams.clone().unwrap();
-    let updated = upstreams.iter().find(|u| u.name.as_deref() == Some("nd-upstream1")).unwrap();
+    let updated = upstreams.iter().find(|u| u.name.as_deref() == Some(upstream1_name)).unwrap();
     assert_eq!(updated.retry_timeout, Some(100.0));
 
-    sync_ok(&backend, vec![delete_child(ResourceType::Upstream, "nd-upstream2", "test")]).await;
+    sync_ok(&backend, vec![delete_child(ResourceType::Upstream, upstream2_name, service_name)]).await;
     let config = backend.dump().await.unwrap();
     let upstreams = config.services.unwrap()[0].upstreams.clone().unwrap();
     assert_eq!(upstreams.len(), 1);
-    assert_eq!(upstreams[0].name.as_deref(), Some("nd-upstream1"));
+    assert_eq!(upstreams[0].name.as_deref(), Some(upstream1_name));
 
     sync_ok(&backend, vec![delete(ResourceType::Service, &service_id)]).await;
     let config = backend.dump().await.unwrap();

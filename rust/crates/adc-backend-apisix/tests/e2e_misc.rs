@@ -31,18 +31,20 @@ fn delete(rt: ResourceType, id: &str) -> Event {
 #[tokio::test]
 #[ignore]
 async fn syncs_resources_with_custom_ids_and_dump_nests_the_route_under_its_service() {
+    let service_id = "custom-service";
+    let route_id = "custom-route";
     let backend = backend();
 
     let service = create(
         ResourceType::Service,
-        "custom-service",
+        service_id,
         json!({
             "name": "Test Service",
             "upstream": { "scheme": "https", "nodes": [{ "host": "httpbin.org", "port": 443, "weight": 100 }] },
         }),
     );
-    let mut route = create(ResourceType::Route, "custom-route", json!({ "name": "Test Route", "uris": ["/test"] }));
-    route.parent_id = Some("custom-service".to_string());
+    let mut route = create(ResourceType::Route, route_id, json!({ "name": "Test Route", "uris": ["/test"] }));
+    route.parent_id = Some(service_id.to_string());
 
     let results = backend.sync(vec![service, route], adc_sdk::BackendSyncOptions::default()).await.unwrap();
     for result in &results {
@@ -53,20 +55,20 @@ async fn syncs_resources_with_custom_ids_and_dump_nests_the_route_under_its_serv
     let services = config.services.expect("dump should have returned services");
     assert_eq!(services.len(), 1);
     let service = &services[0];
-    assert_eq!(service.id.as_deref(), Some("custom-service"));
+    assert_eq!(service.id.as_deref(), Some(service_id));
     assert_eq!(service.name, "Test Service");
 
     let routes = service.routes.as_ref().expect("service should have its route nested under it").http().expect("an HTTP route list");
     assert_eq!(routes.len(), 1);
-    assert_eq!(routes[0].id.as_deref(), Some("custom-route"));
+    assert_eq!(routes[0].id.as_deref(), Some(route_id));
     assert_eq!(routes[0].uris, vec!["/test".to_string()]);
 
     let delete_route = {
-        let mut e = delete(ResourceType::Route, "custom-route");
-        e.parent_id = Some("custom-service".to_string());
+        let mut e = delete(ResourceType::Route, route_id);
+        e.parent_id = Some(service_id.to_string());
         e
     };
-    let results = backend.sync(vec![delete_route, delete(ResourceType::Service, "custom-service")], adc_sdk::BackendSyncOptions::default()).await.unwrap();
+    let results = backend.sync(vec![delete_route, delete(ResourceType::Service, service_id)], adc_sdk::BackendSyncOptions::default()).await.unwrap();
     for result in &results {
         assert!(result.success, "{:?}", result.error);
     }

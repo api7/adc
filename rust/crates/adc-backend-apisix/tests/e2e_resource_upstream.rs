@@ -20,19 +20,21 @@ fn backend() -> ApisixBackend {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_a_discovery_based_upstream_with_no_nodes() {
+    let service_name = "service1";
+    let discovery_service_name = "test";
     let backend = backend();
-    let service_id = generate_id("service1");
+    let service_id = generate_id(service_name);
 
     let service = Event::new(
         ResourceType::Service,
         EventKind::Create {
             new_value: json!({
-                "name": "service1",
-                "upstream": { "scheme": "https", "discovery_type": "kubernetes", "service_name": "test" },
+                "name": service_name,
+                "upstream": { "scheme": "https", "discovery_type": "kubernetes", "service_name": discovery_service_name },
             }),
         },
         service_id.clone(),
-        "service1",
+        service_name,
     );
     let results = backend.sync(vec![service], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
@@ -43,9 +45,9 @@ async fn syncs_and_dumps_a_discovery_based_upstream_with_no_nodes() {
     let upstream = services[0].upstream.as_ref().expect("service should have its (nodeless) default upstream");
     assert!(upstream.nodes.is_none());
     assert_eq!(upstream.discovery_type.as_deref(), Some("kubernetes"));
-    assert_eq!(upstream.service_name.as_deref(), Some("test"));
+    assert_eq!(upstream.service_name.as_deref(), Some(discovery_service_name));
 
-    let delete = Event::new(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, service_id, "service1");
+    let delete = Event::new(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, service_id, service_name);
     let results = backend.sync(vec![delete], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 

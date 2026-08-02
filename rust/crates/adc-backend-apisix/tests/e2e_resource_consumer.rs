@@ -48,20 +48,25 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
         return;
     }
 
+    let consumer_username = "consumer1";
+    let credential_id = "consumer1-key";
     let backend = backend();
 
     let mut credential = create(
         ResourceType::ConsumerCredential,
-        "consumer1-key",
-        json!({ "name": "consumer1-key", "type": "key-auth", "config": { "key": "consumer1-key" } }),
+        credential_id,
+        json!({ "name": credential_id, "type": "key-auth", "config": { "key": credential_id } }),
     );
     // Apisix keys a credential's parent consumer by literal username in
     // the URL path, not a content hash — matches `main_path`'s special
     // case for `ConsumerCredential` in `operator.rs`.
-    credential.parent_id = Some("consumer1".to_string());
+    credential.parent_id = Some(consumer_username.to_string());
 
     let results = backend
-        .sync(vec![create(ResourceType::Consumer, "consumer1", json!({ "username": "consumer1" })), credential], BackendSyncOptions::default())
+        .sync(
+            vec![create(ResourceType::Consumer, consumer_username, json!({ "username": consumer_username })), credential],
+            BackendSyncOptions::default(),
+        )
         .await
         .unwrap();
     for result in &results {
@@ -73,11 +78,11 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
     assert_eq!(consumers.len(), 1);
     let credentials = consumers[0].credentials.as_ref().expect("consumer should have its credential");
     assert_eq!(credentials.len(), 1);
-    assert_eq!(credentials[0].config.get("key"), Some(&json!("consumer1-key")));
+    assert_eq!(credentials[0].config.get("key"), Some(&json!(credential_id)));
 
     let mut updated_credential =
-        update(ResourceType::ConsumerCredential, "consumer1-key", json!({ "name": "consumer1-key", "type": "key-auth", "config": { "key": "new-key" } }));
-    updated_credential.parent_id = Some("consumer1".to_string());
+        update(ResourceType::ConsumerCredential, credential_id, json!({ "name": credential_id, "type": "key-auth", "config": { "key": "new-key" } }));
+    updated_credential.parent_id = Some(consumer_username.to_string());
     let results = backend.sync(vec![updated_credential], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
@@ -85,8 +90,8 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
     let credentials = config.consumers.unwrap()[0].credentials.clone().unwrap();
     assert_eq!(credentials[0].config.get("key"), Some(&json!("new-key")));
 
-    let mut delete_credential = delete(ResourceType::ConsumerCredential, "consumer1-key");
-    delete_credential.parent_id = Some("consumer1".to_string());
+    let mut delete_credential = delete(ResourceType::ConsumerCredential, credential_id);
+    delete_credential.parent_id = Some(consumer_username.to_string());
     let results = backend.sync(vec![delete_credential], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
@@ -95,7 +100,7 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
     assert_eq!(consumers.len(), 1);
     assert!(consumers[0].credentials.is_none());
 
-    let results = backend.sync(vec![delete(ResourceType::Consumer, "consumer1")], BackendSyncOptions::default()).await.unwrap();
+    let results = backend.sync(vec![delete(ResourceType::Consumer, consumer_username)], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
     let config = backend.dump().await.unwrap();
@@ -110,16 +115,18 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
         return;
     }
 
+    let consumer_username = "gated_consumer";
+    let credential_id = "gated-key";
     let backend = backend();
     let mut credential = create(
         ResourceType::ConsumerCredential,
-        "gated-key",
-        json!({ "name": "gated-key", "type": "key-auth", "config": { "key": "gated-key" } }),
+        credential_id,
+        json!({ "name": credential_id, "type": "key-auth", "config": { "key": credential_id } }),
     );
-    credential.parent_id = Some("gated-consumer".to_string());
+    credential.parent_id = Some(consumer_username.to_string());
     let results = backend
         .sync(
-            vec![create(ResourceType::Consumer, "gated-consumer", json!({ "username": "gated-consumer" })), credential],
+            vec![create(ResourceType::Consumer, consumer_username, json!({ "username": consumer_username })), credential],
             BackendSyncOptions::default(),
         )
         .await
@@ -135,13 +142,13 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
     // could actually return.
     let old_fetcher = Fetcher::new(client(), semver::Version::new(3, 10, 0));
     let consumers = old_fetcher.list_consumers().await.unwrap();
-    let consumer = consumers.iter().find(|c| c.username == "gated-consumer").expect("consumer was not found");
+    let consumer = consumers.iter().find(|c| c.username == consumer_username).expect("consumer was not found");
     assert!(consumer.credentials.is_none(), "credentials must not be fetched when the fetcher believes the server predates 3.11.0");
 
-    let mut delete_credential = delete(ResourceType::ConsumerCredential, "gated-key");
-    delete_credential.parent_id = Some("gated-consumer".to_string());
+    let mut delete_credential = delete(ResourceType::ConsumerCredential, credential_id);
+    delete_credential.parent_id = Some(consumer_username.to_string());
     let results =
-        backend.sync(vec![delete_credential, delete(ResourceType::Consumer, "gated-consumer")], BackendSyncOptions::default()).await.unwrap();
+        backend.sync(vec![delete_credential, delete(ResourceType::Consumer, consumer_username)], BackendSyncOptions::default()).await.unwrap();
     for result in &results {
         assert!(result.success, "{:?}", result.error);
     }

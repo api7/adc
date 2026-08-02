@@ -199,7 +199,8 @@ async fn stream_route_below_minimum_version_is_rejected_without_a_request() {
     // version check is entirely client-side, so this doesn't need an
     // actual old apisix to prove it never sends the request.
     let operator = Operator::new(client(), semver::Version::new(3, 5, 0));
-    let mut event = create(ResourceType::StreamRoute, "e2e-op-sr1", json!({ "name": "e2e-op-sr1", "server_port": 34000 }));
+    let stream_route_id = "e2e-op-sr1";
+    let mut event = create(ResourceType::StreamRoute, stream_route_id, json!({ "name": stream_route_id, "server_port": 34000 }));
     event.parent_id = Some("nonexistent-service".to_string());
 
     let results = operator.sync(vec![event], BackendSyncOptions::default()).await.unwrap();
@@ -211,7 +212,8 @@ async fn stream_route_below_minimum_version_is_rejected_without_a_request() {
 #[ignore]
 async fn consumer_credential_below_minimum_version_is_rejected_without_a_request() {
     let operator = Operator::new(client(), semver::Version::new(3, 10, 0));
-    let mut event = create(ResourceType::ConsumerCredential, "e2e-op-cred1", json!({ "name": "e2e-op-cred1", "type": "key-auth", "config": {} }));
+    let credential_id = "e2e-op-cred1";
+    let mut event = create(ResourceType::ConsumerCredential, credential_id, json!({ "name": credential_id, "type": "key-auth", "config": {} }));
     event.parent_id = Some("nonexistent-consumer".to_string());
 
     let results = operator.sync(vec![event], BackendSyncOptions::default()).await.unwrap();
@@ -230,13 +232,15 @@ async fn stops_starting_new_groups_after_a_failure_by_default() {
     // `Err` rather than a partial result list — matching the TS
     // implementation's `Observable` erroring out instead of completing.
     let backend = backend();
-    let bad_route = create(ResourceType::Route, "e2e-op-bad-route", json!({ "name": "e2e-op-bad-route", "uris": ["/x"] }));
-    let consumer = create(ResourceType::Consumer, "e2e-op-should-not-run", json!({ "username": "e2e-op-should-not-run" }));
+    let bad_route_id = "e2e-op-bad-route";
+    let consumer_username = "e2e_op_should_not_run";
+    let bad_route = create(ResourceType::Route, bad_route_id, json!({ "name": bad_route_id, "uris": ["/x"] }));
+    let consumer = create(ResourceType::Consumer, consumer_username, json!({ "username": consumer_username }));
 
     let result = backend.sync(vec![bad_route, consumer], BackendSyncOptions::default()).await;
     assert!(result.is_err(), "{result:?}");
 
     let config = backend.dump().await.unwrap();
     let consumers = config.consumers.unwrap_or_default();
-    assert!(consumers.iter().all(|c| c.username != "e2e-op-should-not-run"), "the consumer from the second group must not have been created");
+    assert!(consumers.iter().all(|c| c.username != consumer_username), "the consumer from the second group must not have been created");
 }

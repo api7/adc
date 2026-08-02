@@ -135,7 +135,11 @@ async fn syncs_a_consumer_with_a_key_auth_credential_then_reads_it_back() {
         return;
     }
 
-    let username = "e2e-consumer-1";
+    // APISIX's consumer `username` pattern is stricter than most other id
+    // fields on older versions (`^[a-zA-Z0-9_]+$`, no hyphens) — 3.17.0
+    // happens to accept hyphens too, but keep this hyphen-free so the test
+    // passes across the whole version matrix.
+    let username = "e2e_consumer_1";
     let credential_id = "e2e-cred-1";
 
     let mut credential_event =
@@ -178,12 +182,19 @@ async fn syncs_a_stream_route_then_reads_it_back() {
     let stream_routes = fetcher().list_stream_routes().await.unwrap();
     let route = stream_routes.iter().find(|r| r.id.as_deref() == Some(stream_route_id)).expect("stream route was not written");
     assert_eq!(route.server_port, Some(33061));
-    // Recovered from the __ADC_NAME label injected on write (APISIX stream
-    // routes have no native `name` field) — proves the read/write round trip
-    // for that trick actually works against a real server, not just our
-    // own mock.
     let adc_route: adc_sdk::resources::StreamRoute = route.clone().into();
-    assert_eq!(adc_route.name, "e2e-stream-route");
+    if apisix_version() >= Version::new(3, 8, 0) {
+        // Recovered from the __ADC_NAME label injected on write (APISIX
+        // stream routes have no native `name` field, and that label is only
+        // written from 3.8.0 on) — proves the read/write round trip for
+        // that trick actually works against a real server, not just our
+        // own mock. Matches the TS suite's own `Dump (>=3.8.0)` case.
+        assert_eq!(adc_route.name, "e2e-stream-route");
+    } else {
+        // Below 3.8.0 no label is ever written, so recovery falls back to
+        // the route's own id — matches the TS suite's `Dump (<3.8.0)` case.
+        assert_eq!(adc_route.name, stream_route_id);
+    }
 
     sync_ok(vec![delete(ResourceType::StreamRoute, stream_route_id), delete(ResourceType::Service, service_id)]).await;
     let stream_routes = fetcher().list_stream_routes().await.unwrap();

@@ -24,14 +24,15 @@ fn backend() -> ApisixBackend {
 #[tokio::test]
 #[ignore]
 async fn creating_a_service_with_an_inline_upstream_splits_it_into_a_separate_resource() {
+    let service_name = "test";
     let backend = backend();
-    let service_id = generate_id("test");
+    let service_id = generate_id(service_name);
 
     let service = Event::new(
         ResourceType::Service,
-        EventKind::Create { new_value: json!({ "name": "test", "upstream": { "type": "roundrobin", "nodes": [{ "host": "127.0.0.1", "port": 8080, "weight": 1 }] } }) },
+        EventKind::Create { new_value: json!({ "name": service_name, "upstream": { "type": "roundrobin", "nodes": [{ "host": "127.0.0.1", "port": 8080, "weight": 1 }] } }) },
         service_id.clone(),
-        "test",
+        service_name,
     );
     let results = backend.sync(vec![service], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
@@ -42,7 +43,7 @@ async fn creating_a_service_with_an_inline_upstream_splits_it_into_a_separate_re
     assert!(wire_service.upstream_id.is_some(), "service should reference a separate upstream resource by id");
     assert!(wire_service.upstream.is_none(), "the upstream must not be inlined into the service's own wire body");
 
-    let delete = Event::new(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, service_id, "test");
+    let delete = Event::new(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, service_id, service_name);
     let results = backend.sync(vec![delete], BackendSyncOptions::default()).await.unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 }

@@ -86,10 +86,11 @@ async fn succeeds_with_a_valid_consumer() {
         return;
     }
 
+    let consumer_username = "validate_test_consumer";
     let events = vec![create(
         ResourceType::Consumer,
-        "validate-test-consumer",
-        json!({ "username": "validate-test-consumer", "plugins": { "key-auth": { "key": "test-key-123" } } }),
+        consumer_username,
+        json!({ "username": consumer_username, "plugins": { "key-auth": { "key": "test-key-123" } } }),
     )];
 
     let result = validator().validate(&events).await.unwrap();
@@ -104,10 +105,12 @@ async fn fails_with_an_invalid_plugin_configuration() {
         return;
     }
 
+    let service_id = "e2e-validate-svc2";
+    let route_id = "e2e-validate-route2";
     // limit-count requires `count`/`time_window`; both are missing.
     let events = service_with_route(
-        "e2e-validate-svc2",
-        "e2e-validate-route2",
+        service_id,
+        route_id,
         json!({ "name": "validate-bad-plugin-route", "uris": ["/bad-plugin"], "plugins": { "limit-count": {} } }),
     );
 
@@ -117,11 +120,11 @@ async fn fails_with_an_invalid_plugin_configuration() {
     assert_eq!(result.errors[0].resource_type, "routes");
     // The error is mapped back to the specific Event that produced it, not
     // just its position in apisix's response.
-    assert_eq!(result.errors[0].resource_name.as_deref(), Some("e2e-validate-route2"));
+    assert_eq!(result.errors[0].resource_name.as_deref(), Some(route_id));
     let matched_event = result.errors[0].event.as_ref().expect("event should have been matched from the request index");
     assert_eq!(matched_event.resource_type, ResourceType::Route);
-    assert_eq!(matched_event.resource_id, "e2e-validate-route2");
-    assert_eq!(matched_event.parent_id.as_deref(), Some("e2e-validate-svc2"));
+    assert_eq!(matched_event.resource_id, route_id);
+    assert_eq!(matched_event.parent_id.as_deref(), Some(service_id));
 }
 
 #[tokio::test]
@@ -132,23 +135,26 @@ async fn collects_multiple_errors() {
         return;
     }
 
+    let service_id = "e2e-validate-svc3";
+    let route1_id = "e2e-validate-route3a";
+    let route2_id = "e2e-validate-route3b";
     let service = create(
         ResourceType::Service,
-        "e2e-validate-svc3",
+        service_id,
         json!({ "name": "validate-multi-err-svc", "upstream": { "scheme": "http", "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }] } }),
     );
     let mut route1 = create(
         ResourceType::Route,
-        "e2e-validate-route3a",
+        route1_id,
         json!({ "name": "validate-multi-err-route1", "uris": ["/multi-err-1"], "plugins": { "limit-count": {} } }),
     );
-    route1.parent_id = Some("e2e-validate-svc3".to_string());
+    route1.parent_id = Some(service_id.to_string());
     let mut route2 = create(
         ResourceType::Route,
-        "e2e-validate-route3b",
+        route2_id,
         json!({ "name": "validate-multi-err-route2", "uris": ["/multi-err-2"], "plugins": { "limit-count": {} } }),
     );
-    route2.parent_id = Some("e2e-validate-svc3".to_string());
+    route2.parent_id = Some(service_id.to_string());
 
     let result = validator().validate(&[service, route1, route2]).await.unwrap();
     assert!(!result.success);
@@ -156,8 +162,8 @@ async fn collects_multiple_errors() {
     // Each route's error maps back to *its own* name, not a mix-up between
     // the two routes sharing a parent service.
     let names: Vec<&str> = result.errors.iter().filter_map(|e| e.resource_name.as_deref()).collect();
-    assert!(names.contains(&"e2e-validate-route3a"), "{names:?}");
-    assert!(names.contains(&"e2e-validate-route3b"), "{names:?}");
+    assert!(names.contains(&route1_id), "{names:?}");
+    assert!(names.contains(&route2_id), "{names:?}");
 }
 
 #[tokio::test]
@@ -173,10 +179,11 @@ async fn succeeds_with_mixed_resource_types() {
         "e2e-validate-route4",
         json!({ "name": "validate-mixed-route", "uris": ["/mixed-test"], "methods": ["GET", "POST"] }),
     );
+    let consumer_username = "validate_mixed_consumer";
     events.push(create(
         ResourceType::Consumer,
-        "validate-mixed-consumer",
-        json!({ "username": "validate-mixed-consumer", "plugins": { "key-auth": { "key": "mixed-key-456" } } }),
+        consumer_username,
+        json!({ "username": consumer_username, "plugins": { "key-auth": { "key": "mixed-key-456" } } }),
     ));
     events.push(create(ResourceType::GlobalRule, "prometheus", json!({ "prefer_name": false })));
 
