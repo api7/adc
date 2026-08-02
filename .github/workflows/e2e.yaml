@@ -33,6 +33,7 @@ jobs:
   apisix:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.2.2
@@ -93,6 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.13.0
