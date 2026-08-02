@@ -17,6 +17,13 @@ use serde_json::json;
 const SERVER: &str = "http://localhost:19180";
 const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
 
+/// `/apisix/admin/configs/validate` doesn't exist before 3.17.0 (a request
+/// gets a 404, surfaced as `BackendError::Unsupported`) — matches the TS
+/// suite's own `conditionalDescribe(semverCondition(gte, '3.17.0'))` gate.
+fn apisix_version() -> semver::Version {
+    std::env::var("BACKEND_APISIX_VERSION").ok().and_then(|v| semver::Version::parse(&v).ok()).unwrap_or(semver::Version::new(999, 999, 999))
+}
+
 fn validator() -> Validator {
     let client = HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap();
     Validator::new(client)
@@ -42,6 +49,11 @@ fn service_with_route(service_id: &str, route_id: &str, route: serde_json::Value
 #[tokio::test]
 #[ignore]
 async fn succeeds_with_an_empty_configuration() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let result = validator().validate(&[]).await.unwrap();
     assert!(result.success);
     assert!(result.errors.is_empty());
@@ -50,6 +62,11 @@ async fn succeeds_with_an_empty_configuration() {
 #[tokio::test]
 #[ignore]
 async fn succeeds_with_a_valid_service_and_route() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let events = service_with_route(
         "e2e-validate-svc1",
         "e2e-validate-route1",
@@ -64,6 +81,11 @@ async fn succeeds_with_a_valid_service_and_route() {
 #[tokio::test]
 #[ignore]
 async fn succeeds_with_a_valid_consumer() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let events = vec![create(
         ResourceType::Consumer,
         "validate-test-consumer",
@@ -77,6 +99,11 @@ async fn succeeds_with_a_valid_consumer() {
 #[tokio::test]
 #[ignore]
 async fn fails_with_an_invalid_plugin_configuration() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     // limit-count requires `count`/`time_window`; both are missing.
     let events = service_with_route(
         "e2e-validate-svc2",
@@ -100,6 +127,11 @@ async fn fails_with_an_invalid_plugin_configuration() {
 #[tokio::test]
 #[ignore]
 async fn collects_multiple_errors() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let service = create(
         ResourceType::Service,
         "e2e-validate-svc3",
@@ -131,6 +163,11 @@ async fn collects_multiple_errors() {
 #[tokio::test]
 #[ignore]
 async fn succeeds_with_mixed_resource_types() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let mut events = service_with_route(
         "e2e-validate-svc4",
         "e2e-validate-route4",
@@ -151,6 +188,11 @@ async fn succeeds_with_mixed_resource_types() {
 #[tokio::test]
 #[ignore]
 async fn is_a_dry_run_with_no_side_effects_on_the_server() {
+    if apisix_version() < semver::Version::new(3, 17, 0) {
+        eprintln!("skipping: validate requires apisix >= 3.17.0");
+        return;
+    }
+
     let service_id = "e2e-validate-dryrun-svc";
     let events = service_with_route(
         service_id,
