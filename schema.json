@@ -128,7 +128,7 @@
                         "default": true,
                         "type": "boolean"
                       },
-                      "http_request_headers": {
+                      "req_headers": {
                         "minItems": 1,
                         "type": "array",
                         "items": {
@@ -560,7 +560,7 @@
                           "default": true,
                           "type": "boolean"
                         },
-                        "http_request_headers": {
+                        "req_headers": {
                           "minItems": 1,
                           "type": "array",
                           "items": {

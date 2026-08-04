@@ -147,7 +147,7 @@ const UpstreamSchema = z.strictObject({
         port: z.coerce.number().int().min(1).max(65535).optional(),
         http_path: z.string().default('/').optional(),
         https_verify_certificate: z.boolean().default(true).optional(),
-        http_request_headers: z.array(z.string()).min(1).optional(),
+        req_headers: z.array(z.string()).min(1).optional(),
         healthy: z
           .strictObject({
             ...upstreamHealthCheckPassiveHealthy.shape,

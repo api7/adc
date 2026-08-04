@@ -129,6 +129,41 @@ describe('Upstream Linter', () => {
       expect: true,
     },
     {
+      name: 'should accept req_headers on active health check',
+      input: {
+        services: [
+          {
+            name: 'HealthCheck_RequestHeaders',
+            upstream: {
+              nodes: [
+                {
+                  host: '1.1.1.1',
+                  port: 443,
+                  weight: 100,
+                },
+              ],
+              checks: {
+                active: {
+                  type: 'https',
+                  http_path: '/',
+                  req_headers: ['User-Agent: adc-health-check'],
+                  healthy: {
+                    interval: 2,
+                    successes: 1,
+                  },
+                  unhealthy: {
+                    interval: 1,
+                    timeouts: 3,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      } as ADCSDK.Configuration,
+      expect: true,
+    },
+    {
       name: 'should only allow upstream mtls in client_cert and client_key',
       input: {
         services: [
