@@ -140,12 +140,45 @@ async fn activate_license(session: &DashboardSession, license: &Option<String>) 
     }
 }
 
+/// Ports `global-setup.ts`'s `initUser`: log in, then rotate the password —
+/// a fresh account rejects everything else (including, it turns out,
+/// minting an API token) until this happens, *even* for the throwaway
+/// invited user `bootstrap_token` creates below, not just the built-in
+/// `admin` account. `first_time` gates license activation only (TS's
+/// `fisrtTime` param); the password rotation itself always runs.
+async fn init_user(
+    session: &DashboardSession,
+    username: &str,
+    password: &str,
+    first_time: bool,
+    version: &semver::Version,
+    license: &Option<String>,
+) {
+    session.login(username, password).await;
+    // Mirrors the TS suite: on dashboards older than 3.2.15 the license
+    // must be uploaded before the password can be changed at all.
+    if first_time && *version < semver::Version::new(3, 2, 15) {
+        activate_license(session, license).await;
+    }
+    session
+        .put(
+            "/api/password",
+            json!({ "old_password": password, "new_password": BOOTSTRAP_PASSWORD }),
+        )
+        .await;
+    session.login(username, BOOTSTRAP_PASSWORD).await;
+    if first_time && *version >= semver::Version::new(3, 2, 15) {
+        activate_license(session, license).await;
+    }
+}
+
 /// Ports `global-setup.ts`'s `initUser` + `generateToken`: log in as the
 /// default admin, rotate the password (a fresh dashboard rejects most
 /// endpoints until this happens), activate the license, then provision a
-/// throwaway super-admin user and mint an API token from it — exactly the
-/// TS suite's own bootstrap, so a fresh dashboard behaves identically
-/// regardless of which suite talks to it first.
+/// throwaway super-admin user (also password-rotated) and mint an API
+/// token from it — exactly the TS suite's own bootstrap, so a fresh
+/// dashboard behaves identically regardless of which suite talks to it
+/// first.
 async fn bootstrap_token() -> String {
     let session = DashboardSession::new(server());
     session.wait_ready().await;
@@ -158,22 +191,7 @@ async fn bootstrap_token() -> String {
         .ok()
         .filter(|v| !v.is_empty());
 
-    session.login("admin", "admin").await;
-    // Mirrors the TS suite: on dashboards older than 3.2.15 the license
-    // must be uploaded before the password can be changed at all.
-    if version < semver::Version::new(3, 2, 15) {
-        activate_license(&session, &license).await;
-    }
-    session
-        .put(
-            "/api/password",
-            json!({ "old_password": "admin", "new_password": BOOTSTRAP_PASSWORD }),
-        )
-        .await;
-    session.login("admin", BOOTSTRAP_PASSWORD).await;
-    if version >= semver::Version::new(3, 2, 15) {
-        activate_license(&session, &license).await;
-    }
+    init_user(&session, "admin", "admin", true, &version, &license).await;
 
     let username = unique_name("adc-rust-e2e");
     let invite = session
@@ -193,7 +211,8 @@ async fn bootstrap_token() -> String {
         )
         .await;
 
-    session.login(&username, "test").await;
+    init_user(&session, &username, "test", false, &version, &license).await;
+
     let token = session
         .post(
             "/api/tokens",
