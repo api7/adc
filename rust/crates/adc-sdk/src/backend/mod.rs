@@ -12,6 +12,18 @@ use semver::Version;
 
 use crate::{DefaultValue, Event, resources::Configuration};
 
+/// The `tracing` span name a `Backend::sync` implementation should wrap
+/// each individual event's application in — a real span (entered for that
+/// event's whole lifetime, closed when it's done), not a synthetic
+/// start/finish pair faked out of two plain events. This is the contract
+/// callers (the CLI's progress display, and eventually any
+/// `tracing-opentelemetry` export) rely on to find "one synced event" in
+/// the trace: match on this exact span name, don't rely on a private
+/// convention re-typed at each call site. Fields are left to each
+/// implementation to declare (this crate doesn't prescribe a schema for
+/// them), but should be plain data — no pre-formatted display text.
+pub const SYNC_EVENT_SPAN_NAME: &str = "sync_event";
+
 /// Static, non-behavioral facts about a `Backend` implementation, used by the
 /// CLI to scope log output (e.g. `[APISIX]`) without the trait needing a
 /// `name()`-shaped method per concern.

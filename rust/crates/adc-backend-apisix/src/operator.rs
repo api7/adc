@@ -22,7 +22,10 @@
 
 use adc_backend_core::{HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err, encode_path_segment};
 use adc_sdk::resources::{self as adc};
-use adc_sdk::{BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, ValueDiff};
+use adc_sdk::{
+    BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, SYNC_EVENT_SPAN_NAME,
+    ValueDiff,
+};
 use semver::Version;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -80,8 +83,45 @@ impl Operator {
     /// `Ok` is always a normal outcome (including a version-gate
     /// rejection); `Err` is specifically an `operate` (HTTP) failure, which
     /// `sync` treats differently depending on `exit_on_failure`.
+    ///
+    /// Wrapped in a real `SYNC_EVENT_SPAN_NAME` span for the event's whole
+    /// lifetime, not a synthetic start/finish pair — `success`/`error` are
+    /// recorded just before it closes.
+    #[tracing::instrument(
+        name = SYNC_EVENT_SPAN_NAME,
+        skip_all,
+        fields(
+            resource_type = %event.resource_type.as_str(),
+            resource_name = %event.resource_name,
+            event_type = ?event.event_type(),
+            success = tracing::field::Empty,
+            error = tracing::field::Empty,
+        )
+    )]
     async fn apply(&self, event: Event) -> Result<BackendSyncResult, (Event, BackendError)> {
+        let outcome = self.apply_inner(event).await;
+
+        let error_text = match &outcome {
+            Ok(result) if !result.success => result.error.as_ref().map(BackendError::to_string),
+            Err((_, error)) => Some(error.to_string()),
+            _ => None,
+        };
+        let span = tracing::Span::current();
+        match &error_text {
+            Some(error) => {
+                span.record("success", false);
+                span.record("error", error.as_str());
+            }
+            None => {
+                span.record("success", true);
+            }
+        }
+        outcome
+    }
+
+    async fn apply_inner(&self, event: Event) -> Result<BackendSyncResult, (Event, BackendError)> {
         if let Err(error) = self.check_version_support(&event) {
+            log::warn!("skipping {:?} {:?} \"{}\": {error}", event.event_type(), event.resource_type, event.resource_name);
             return Ok(BackendSyncResult { success: false, event, error: Some(error), server: None });
         }
 
@@ -121,7 +161,7 @@ impl Operator {
         for (method, path, body, kind) in build_requests(event, &self.version)? {
             let tolerate_missing = method == Method::DELETE && kind == RequestKind::Upstream;
             self.retry_policy
-                .run(|| async {
+                .run(is_retriable, || async {
                     let mut builder = self.client.request(method.clone(), &path)?;
                     if let Some(body) = &body {
                         builder = builder.json(body);
@@ -135,6 +175,48 @@ impl Operator {
                 .await?;
         }
         Ok(())
+    }
+}
+
+/// [`BackendError::is_retriable`] plus APISIX's own retriable case: deleting
+/// a resource that's still referenced by another (e.g. an upstream a service
+/// still points at) is rejected with a 400 and a message like "can not
+/// delete this upstream, service [id] is still using it now". During a
+/// sync, the referencing resource is often deleted moments later by a
+/// concurrent or later request, so this settles once ordering catches up —
+/// unlike other 4xx errors, it isn't final.
+fn is_retriable(err: &BackendError) -> bool {
+    err.is_retriable()
+        || matches!(
+            err,
+            BackendError::Api { message, .. } if message.contains("is still using it now")
+        )
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+
+    #[test]
+    fn a_dependency_conflict_4xx_is_retriable() {
+        let err = BackendError::Api {
+            status: 400,
+            message: "can not delete this upstream, service [34195131] is still using it now"
+                .into(),
+        };
+        assert!(is_retriable(&err));
+    }
+
+    #[test]
+    fn a_plain_4xx_api_error_is_not_retriable() {
+        let err = BackendError::Api { status: 400, message: "bad config".into() };
+        assert!(!is_retriable(&err));
+    }
+
+    #[test]
+    fn a_5xx_api_error_is_still_retriable() {
+        let err = BackendError::Api { status: 502, message: "bad gateway".into() };
+        assert!(is_retriable(&err));
     }
 }
 
