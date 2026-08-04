@@ -176,15 +176,19 @@ pub fn compact_duration(d: std::time::Duration) -> String {
 /// `sync_report`'s progress rendering, which otherwise duplicated this same
 /// arithmetic. `0` completed reports a `0` ETA rather than dividing by it;
 /// `total == 0` reports `100%` rather than dividing by that instead.
+/// `completed * 100` is done in `u128` so it can't overflow before the
+/// divide, and the result is clamped to `100` in case `completed` ever ends
+/// up above `total`.
 pub fn percent_and_eta(
     completed: u64,
     total: u64,
     elapsed: std::time::Duration,
 ) -> (u64, std::time::Duration) {
-    let percent = completed
-        .checked_mul(100)
-        .and_then(|n| n.checked_div(total))
-        .unwrap_or(100);
+    let percent = if total == 0 {
+        100
+    } else {
+        ((u128::from(completed) * 100) / u128::from(total)).min(100) as u64
+    };
     let eta = if completed > 0 {
         let secs_per_event = elapsed.as_secs_f64() / completed as f64;
         std::time::Duration::from_secs_f64(secs_per_event * total.saturating_sub(completed) as f64)
@@ -197,6 +201,20 @@ pub fn percent_and_eta(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percent_and_eta_does_not_overflow_when_completed_times_100_exceeds_u64() {
+        let completed = 200_000_000_000_000_000;
+        let total = 400_000_000_000_000_000;
+        let (percent, _eta) = percent_and_eta(completed, total, std::time::Duration::ZERO);
+        assert_eq!(percent, 50);
+    }
+
+    #[test]
+    fn percent_and_eta_clamps_to_100_when_completed_exceeds_total() {
+        let (percent, _eta) = percent_and_eta(150, 100, std::time::Duration::ZERO);
+        assert_eq!(percent, 100);
+    }
 
     #[test]
     fn spinner_style_ends_on_a_green_checkmark() {
