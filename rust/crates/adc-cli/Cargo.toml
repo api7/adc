@@ -1,0 +1,30 @@
+[package]
+name = "adc-cli"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "adc"
+path = "src/main.rs"
+
+[dependencies]
+adc-sdk = { path = "../adc-sdk" }
+adc-differ = { path = "../adc-differ" }
+adc-backend-core = { path = "../adc-backend-core" }
+adc-backend-apisix = { path = "../adc-backend-apisix" }
+clap = { version = "4", features = ["derive", "env"] }
+humantime = "2"
+serde_json = { workspace = true }
+serde_yaml_ng = "0.10"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs"] }
+glob = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+tracing-indicatif = "0.3"
+tracing = { workspace = true }
+indicatif = "0.18"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+http = "1"

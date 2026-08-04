@@ -23,7 +23,7 @@ pub struct Backend {
 impl Backend {
     pub fn new(client: HttpClient) -> Self {
         Self {
-            client,
+            client: client.with_log_scope(vec!["APISIX".to_string()]),
             version: OnceCell::new(),
         }
     }
@@ -71,7 +71,9 @@ impl adc_sdk::Backend for Backend {
         // deployments. Unrecognized query params are ignored by APISIX
         // versions that predate pagination support, so this is safe across
         // the whole supported version range.
-        let request = self.client.request(Method::GET, "/apisix/admin/routes?page=1&page_size=10")?;
+        let request = self
+            .client
+            .request(Method::GET, "/apisix/admin/routes?page=1&page_size=10")?;
         self.client.send(request).await?;
         Ok(())
     }
@@ -89,9 +91,15 @@ impl adc_sdk::Backend for Backend {
         Fetcher::new(self.client.clone(), version).dump().await
     }
 
-    async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError> {
+    async fn sync(
+        &self,
+        events: Vec<Event>,
+        opts: BackendSyncOptions,
+    ) -> Result<Vec<BackendSyncResult>, BackendError> {
         let version = self.resolved_version().await?;
-        Operator::new(self.client.clone(), version).sync(events, opts).await
+        Operator::new(self.client.clone(), version)
+            .sync(events, opts)
+            .await
     }
 
     async fn validate(&self, events: &[Event]) -> Result<BackendValidateResult, BackendError> {

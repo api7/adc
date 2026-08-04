@@ -7,6 +7,7 @@ members = [
   "crates/adc-backend-apisix",
   "crates/adc-sync-bench",
   "crates/adc-mock-server",
+  "crates/adc-cli",
 ]
 
 [workspace.package]
@@ -23,6 +24,8 @@ async-trait = "0.1"
 semver = "1"
 thiserror = "2"
 tokio = "1"
+log = "0.4"
+tracing = "0.1"
 
 [profile.release]
 lto = "fat"

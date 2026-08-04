@@ -10,7 +10,7 @@ mod concurrency;
 mod retry;
 mod tls;
 
-pub use client::{HttpClient, HttpClientConfig, encode_path_segment};
+pub use client::{HTTP_REQUEST_SPAN_NAME, HttpClient, HttpClientConfig, encode_path_segment};
 pub use concurrency::{concurrent_map, concurrent_map_until_err};
 pub use retry::RetryPolicy;
 pub use tls::TlsConfig;

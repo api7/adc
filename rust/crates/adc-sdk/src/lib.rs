@@ -18,7 +18,7 @@ pub mod value_diff;
 
 pub use backend::{
     Backend, BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
-    BackendValidationError,
+    BackendValidationError, SYNC_EVENT_SPAN_NAME,
 };
 pub use default_value::DefaultValue;
 pub use event::{Event, EventKind, EventType};

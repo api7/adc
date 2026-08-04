@@ -34,3 +34,47 @@ pub enum BackendError {
     #[error(transparent)]
     Other(#[from] Box<dyn StdError + Send + Sync>),
 }
+
+impl BackendError {
+    /// Whether retrying the same request again could plausibly succeed,
+    /// judging only by what every backend has in common. `Transport`
+    /// (timeout, connection refused, ...) and a 5xx `Api` response are — the
+    /// backend or network had a transient problem, not an objection to the
+    /// request itself. A 4xx `Api` response (bad payload, unsupported
+    /// config, ...) won't change on a retry: the backend already looked at
+    /// the request and rejected it.
+    ///
+    /// A concrete backend may know its own additional retriable cases (an
+    /// APISIX dependency-ordering conflict, say) that don't fit this
+    /// general rule — this is a floor for retry policies to build on, not
+    /// the full classification for every backend.
+    pub fn is_retriable(&self) -> bool {
+        match self {
+            BackendError::Transport(_) => true,
+            BackendError::Api { status, .. } => *status >= 500,
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_5xx_api_error_is_retriable() {
+        let err = BackendError::Api { status: 502, message: "bad gateway".into() };
+        assert!(err.is_retriable());
+    }
+
+    #[test]
+    fn a_plain_4xx_api_error_is_not_retriable() {
+        let err = BackendError::Api { status: 400, message: "bad config".into() };
+        assert!(!err.is_retriable());
+    }
+
+    #[test]
+    fn transport_errors_are_always_retriable() {
+        assert!(BackendError::Transport("connection refused".into()).is_retriable());
+    }
+}

@@ -38,10 +38,7 @@ impl Fetcher {
             .ok_or_else(|| BackendError::Unsupported(format!("{resource_type:?} has no top-level admin API collection")))?;
         let path = format!("/apisix/admin/{api_name}");
         let builder = self.client.request(Method::GET, &path)?;
-        let response = self.client.send(builder).await?;
-        let body: typing::ListResponse<T> = response.json().await.map_err(|e| {
-            BackendError::Serialization(format!("decoding response from {path}: {e}"))
-        })?;
+        let body: typing::ListResponse<T> = self.client.send_json(builder).await?;
         Ok(body.list.into_iter().map(|item| item.value).collect())
     }
 
@@ -88,10 +85,7 @@ impl Fetcher {
             resource_type_to_api_name(ResourceType::PluginMetadata).expect("PluginMetadata always has an api name")
         );
         let builder = self.client.request(Method::GET, &path)?;
-        let response = self.client.send(builder).await?;
-        let body: typing::ListResponse<Plugins> = response.json().await.map_err(|e| {
-            BackendError::Serialization(format!("decoding response from {path}: {e}"))
-        })?;
+        let body: typing::ListResponse<Plugins> = self.client.send_json(builder).await?;
 
         let mut merged = Plugins::new();
         for item in body.list {
@@ -146,7 +140,12 @@ impl Fetcher {
     ) -> Result<typing::Consumer, BackendError> {
         let path = format!("/apisix/admin/consumers/{}/credentials", consumer.username);
         let builder = self.client.request(Method::GET, &path)?;
-        let response = self.client.execute(builder).await?;
+        // Purpose isn't obvious from the URL alone in a `--verbose 2` dump
+        // of N concurrent credential fetches.
+        let response = self
+            .client
+            .execute_described(builder, &format!("Get credentials of consumer \"{}\"", consumer.username))
+            .await?;
         if response.status().as_u16() == 404 {
             return Ok(consumer);
         }
