@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use adc_sdk::BackendError;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
+use reqwest::header::{
+    AUTHORIZATION, CONTENT_TYPE, COOKIE, HeaderMap, HeaderName, HeaderValue, SET_COOKIE,
+};
 use reqwest::{Method, RequestBuilder, Response, ResponseBuilderExt, Url};
 use serde::de::DeserializeOwned;
 use tracing::Instrument;
@@ -266,8 +268,7 @@ impl HttpClient {
 }
 
 /// Best-effort unwrap of APISIX's `{"error_msg": "..."}` error body down to
-/// just the message, matching the TS CLI's `formatAxiosErrorMessage`. Falls
-/// back to the raw body when it isn't that shape.
+/// just the message. Falls back to the raw body when it isn't that shape.
 fn extract_error_message(body: &str) -> String {
     match serde_json::from_str::<serde_json::Value>(body) {
         Ok(serde_json::Value::Object(map)) => match map.get("error_msg") {
@@ -278,8 +279,7 @@ fn extract_error_message(body: &str) -> String {
     }
 }
 
-/// `Header-Name: value\n`-per-line, matching the TS CLI's `transformHeaders`.
-/// Sensitive values print as `*****` — either because the crate that set
+/// `Header-Name: value\n`-per-line. Sensitive values print as `*****` — either because the crate that set
 /// them marked them so (`X-API-KEY`, via `HeaderValue::set_sensitive`), or
 /// because the name itself is always credential-bearing regardless of who
 /// set it (`is_sensitive_header_name`).

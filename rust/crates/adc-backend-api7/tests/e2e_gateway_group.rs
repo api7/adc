@@ -12,7 +12,7 @@
 //! Ignored by default (`cargo test` never touches the network); run with
 //! `cargo test -p adc-backend-api7 --test e2e_gateway_group -- --ignored --test-threads=1`.
 
-use adc_backend_api7::GatewayGroupResolver;
+use adc_backend_api7::tests::GatewayGroupResolver;
 use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 
 mod common;

@@ -191,20 +191,39 @@ fn singular(array_key: &'static str) -> &'static str {
     }
 }
 
-/// Stamps `managed-by: adc` onto every resource's `labels`, including the
-/// nested spots a resource can be authored under (`services[].routes`,
-/// `services[].stream_routes`, `consumer_groups[].consumers`) — mirrors the
-/// TS CLI's `fillLabels` scope exactly, including its gaps (it does not
-/// reach `services[].upstreams` or `consumers[].credentials`).
+/// Stamps `managed-by: adc` onto every resource's `labels`. Thin wrapper
+/// around [`fill_labels`] for this one fixed key/value pair.
 pub fn inject_managed_by_label(config: &mut Value) {
+    fill_labels(
+        config,
+        &HashMap::from([(
+            MANAGED_BY_LABEL_KEY.to_string(),
+            MANAGED_BY_LABEL_VALUE.to_string(),
+        )]),
+    );
+}
+
+/// Merges `labels` into every resource's own `labels` map (`labels` wins on
+/// key conflict, so callers can force a value), including the nested spots
+/// a resource can be authored under (`services[].routes`,
+/// `services[].stream_routes`, `consumer_groups[].consumers`). Does not
+/// reach `services[].upstreams` or `consumers[].credentials` — neither
+/// carries its own independent identity worth labeling separately from its
+/// parent.
+pub fn fill_labels(config: &mut Value, labels: &HashMap<String, String>) {
+    if labels.is_empty() {
+        return;
+    }
     let Value::Object(root) = config else { return };
-    for key in ["services", "ssls", "consumers", "consumer_groups"] {
-        let Some(Value::Array(items)) = root.get_mut(key) else {
+    for key in ARRAY_KEYS {
+        let Some(Value::Array(items)) = root.get_mut(*key) else {
             continue;
         };
         for item in items.iter_mut() {
-            set_label(item, MANAGED_BY_LABEL_KEY, MANAGED_BY_LABEL_VALUE);
-            let nested_keys: &[&str] = match key {
+            for (label_key, label_value) in labels {
+                set_label(item, label_key, label_value);
+            }
+            let nested_keys: &[&str] = match *key {
                 "services" => &["routes", "stream_routes"],
                 "consumer_groups" => &["consumers"],
                 _ => &[],
@@ -212,7 +231,9 @@ pub fn inject_managed_by_label(config: &mut Value) {
             for nested_key in nested_keys {
                 if let Some(Value::Array(nested)) = item.get_mut(*nested_key) {
                     for nested_item in nested.iter_mut() {
-                        set_label(nested_item, MANAGED_BY_LABEL_KEY, MANAGED_BY_LABEL_VALUE);
+                        for (label_key, label_value) in labels {
+                            set_label(nested_item, label_key, label_value);
+                        }
                     }
                 }
             }
@@ -231,9 +252,9 @@ fn set_label(item: &mut Value, key: &str, value: &str) {
 }
 
 /// Strips `id` fields before writing a `dump` (unless `--with-id` was
-/// given) — mirrors the TS CLI's `recursiveRemoveIdField` scope, which is
-/// wider than `inject_managed_by_label`'s: it also reaches
-/// `services[].upstreams` and `consumers[].credentials`.
+/// given). Wider in scope than [`fill_labels`]: `id` is meaningful on
+/// `services[].upstreams` and `consumers[].credentials` too, even though
+/// neither gets its own labels.
 pub fn strip_ids(config: &mut Value) {
     let Value::Object(root) = config else { return };
     for key in ["services", "ssls", "consumers", "consumer_groups"] {
@@ -266,10 +287,9 @@ fn remove_id(item: &mut Value) {
 }
 
 /// Drops whole top-level resource-type buckets that don't match
-/// `--include-resource-type`/`--exclude-resource-type` — mirrors the TS
-/// CLI's `filterResourceType`, bucket-level rather than per-item (a
-/// `Configuration` has no top-level `routes`/`upstreams` key to filter on;
-/// those only exist nested under `services`).
+/// `--include-resource-type`/`--exclude-resource-type`. Bucket-level rather
+/// than per-item: a `Configuration` has no top-level `routes`/`upstreams`
+/// key to filter on, since those only exist nested under `services`.
 pub fn filter_resource_types(
     config: &mut Configuration,
     include: &HashSet<ResourceType>,
@@ -303,5 +323,228 @@ pub fn filter_resource_types(
     }
     if !keep(ResourceType::PluginMetadata) {
         config.plugin_metadata = None;
+    }
+}
+
+/// Drops resources whose `labels` don't carry every key/value pair in
+/// `labels`. Delegates to `adc_backend_core`, which both backends' own
+/// fetchers also call on their `dump()` output — this call here is a
+/// second, backend-agnostic pass, not the only place this runs: a fetcher's
+/// server-side `labels[key]=value` query filter isn't guaranteed to have
+/// actually narrowed anything (the admin API might silently ignore an
+/// unrecognized query param), so nothing upstream of this can be trusted to
+/// have already done the job.
+pub fn filter_by_labels(config: &mut Configuration, labels: &HashMap<String, String>) {
+    adc_backend_core::filter_configuration_by_labels(config, labels);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use adc_sdk::resources::{Consumer, ConsumerGroup, LabelValue, Labels, SSL, Service};
+    use serde_json::json;
+
+    fn labels(pairs: &[(&str, &str)]) -> Labels {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), LabelValue::Single(v.to_string())))
+            .collect()
+    }
+
+    fn service(name: &str, labels: Option<Labels>) -> Service {
+        Service {
+            id: None,
+            name: name.to_string(),
+            description: None,
+            labels,
+            upstream: None,
+            upstreams: None,
+            plugins: None,
+            path_prefix: None,
+            strip_path_prefix: None,
+            hosts: None,
+            routes: None,
+        }
+    }
+
+    fn ssl(sni: &str, labels: Option<Labels>) -> SSL {
+        SSL {
+            id: None,
+            labels,
+            r#type: Default::default(),
+            snis: vec![sni.to_string()],
+            certificates: vec![],
+            client: None,
+            ssl_protocols: None,
+        }
+    }
+
+    fn consumer(username: &str, labels: Option<Labels>) -> Consumer {
+        Consumer {
+            username: username.to_string(),
+            description: None,
+            labels,
+            plugins: None,
+            credentials: None,
+        }
+    }
+
+    fn consumer_group(name: &str, labels: Option<Labels>) -> ConsumerGroup {
+        ConsumerGroup {
+            id: None,
+            name: name.to_string(),
+            description: None,
+            labels,
+            plugins: None,
+            consumers: None,
+        }
+    }
+
+    mod filter_resource_types_tests {
+        use super::*;
+
+        fn sample_config() -> Configuration {
+            Configuration {
+                services: Some(vec![service("s1", None)]),
+                ssls: Some(vec![ssl("example.com", None)]),
+                consumers: Some(vec![consumer("c1", None)]),
+                consumer_groups: Some(vec![consumer_group("g1", None)]),
+                global_rules: None,
+                plugin_metadata: None,
+            }
+        }
+
+        #[test]
+        fn no_include_and_no_exclude_is_a_no_op() {
+            let mut config = sample_config();
+            filter_resource_types(&mut config, &HashSet::new(), &HashSet::new());
+            assert!(config.services.is_some());
+            assert!(config.ssls.is_some());
+            assert!(config.consumers.is_some());
+            assert!(config.consumer_groups.is_some());
+        }
+
+        #[test]
+        fn an_include_list_drops_every_bucket_not_on_it() {
+            let mut config = sample_config();
+            let include = HashSet::from([ResourceType::Service]);
+            filter_resource_types(&mut config, &include, &HashSet::new());
+            assert!(config.services.is_some());
+            assert!(config.ssls.is_none());
+            assert!(config.consumers.is_none());
+            assert!(config.consumer_groups.is_none());
+        }
+
+        #[test]
+        fn an_exclude_list_drops_only_the_buckets_on_it() {
+            let mut config = sample_config();
+            let exclude = HashSet::from([ResourceType::Ssl]);
+            filter_resource_types(&mut config, &HashSet::new(), &exclude);
+            assert!(config.services.is_some());
+            assert!(config.ssls.is_none());
+            assert!(config.consumers.is_some());
+            assert!(config.consumer_groups.is_some());
+        }
+    }
+
+    mod fill_labels_tests {
+        use super::*;
+
+        #[test]
+        fn stamps_the_given_labels_onto_top_level_and_nested_resources() {
+            let mut config = json!({
+                "services": [{
+                    "name": "s1",
+                    "routes": [{"name": "r1", "uris": ["/foo"]}],
+                    "stream_routes": [],
+                }],
+                "consumer_groups": [{
+                    "name": "g1",
+                    "consumers": [{"username": "c1"}],
+                }],
+            });
+            fill_labels(
+                &mut config,
+                &HashMap::from([("env".to_string(), "prod".to_string())]),
+            );
+
+            assert_eq!(config["services"][0]["labels"]["env"], "prod");
+            assert_eq!(config["services"][0]["routes"][0]["labels"]["env"], "prod");
+            assert_eq!(config["consumer_groups"][0]["labels"]["env"], "prod");
+            assert_eq!(
+                config["consumer_groups"][0]["consumers"][0]["labels"]["env"],
+                "prod"
+            );
+        }
+
+        #[test]
+        fn does_not_touch_service_upstreams_or_consumer_credentials() {
+            let mut config = json!({
+                "services": [{"name": "s1", "upstreams": [{"name": "u1"}]}],
+                "consumers": [{"username": "c1", "credentials": [{"name": "cred1", "type": "key-auth", "config": {}}]}],
+            });
+            fill_labels(
+                &mut config,
+                &HashMap::from([("env".to_string(), "prod".to_string())]),
+            );
+
+            assert!(
+                config["services"][0]["upstreams"][0]
+                    .get("labels")
+                    .is_none()
+            );
+            assert!(
+                config["consumers"][0]["credentials"][0]
+                    .get("labels")
+                    .is_none()
+            );
+        }
+
+        #[test]
+        fn an_empty_label_map_is_a_no_op() {
+            let mut config = json!({"services": [{"name": "s1"}]});
+            let before = config.clone();
+            fill_labels(&mut config, &HashMap::new());
+            assert_eq!(config, before);
+        }
+
+        #[test]
+        fn given_labels_overwrite_a_resources_existing_value_for_the_same_key() {
+            let mut config = json!({
+                "services": [{"name": "s1", "labels": {"env": "dev"}}],
+            });
+            fill_labels(
+                &mut config,
+                &HashMap::from([("env".to_string(), "prod".to_string())]),
+            );
+            assert_eq!(config["services"][0]["labels"]["env"], "prod");
+        }
+    }
+
+    mod filter_by_labels_tests {
+        use super::*;
+
+        // The actual matching logic (include/exclude label combinations,
+        // `LabelValue::Multiple`, unlabeled resources) is implemented and
+        // tested in `adc_backend_core::filter_configuration_by_labels`,
+        // which this function delegates to. This just confirms the
+        // delegation itself is wired up correctly.
+        #[test]
+        fn delegates_to_the_shared_label_filter() {
+            let mut config = Configuration {
+                services: Some(vec![
+                    service("matches", Some(labels(&[("env", "prod")]))),
+                    service("does_not_match", Some(labels(&[("env", "dev")]))),
+                ]),
+                ssls: None,
+                consumers: None,
+                consumer_groups: None,
+                global_rules: None,
+                plugin_metadata: None,
+            };
+            filter_by_labels(&mut config, &HashMap::from([("env".to_string(), "prod".to_string())]));
+            let names: Vec<&str> = config.services.as_ref().unwrap().iter().map(|s| s.name.as_str()).collect();
+            assert_eq!(names, vec!["matches"]);
+        }
     }
 }

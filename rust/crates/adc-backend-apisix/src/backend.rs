@@ -1,7 +1,7 @@
 //! Ties the fetcher, operator, and validator together behind
 //! `adc_sdk::Backend` — the interface the CLI actually dispatches through.
 
-use adc_backend_core::{HttpClient, Method};
+use adc_backend_core::{HttpClient, Method, ResourceFilter};
 use adc_sdk::resources::Configuration;
 use adc_sdk::{
     BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
@@ -17,13 +17,15 @@ use crate::validator::Validator;
 
 pub struct Backend {
     client: HttpClient,
+    filter: ResourceFilter,
     version: OnceCell<Version>,
 }
 
 impl Backend {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: HttpClient, filter: ResourceFilter) -> Self {
         Self {
             client: client.with_log_scope(vec!["APISIX".to_string()]),
+            filter,
             version: OnceCell::new(),
         }
     }
@@ -88,7 +90,9 @@ impl adc_sdk::Backend for Backend {
 
     async fn dump(&self) -> Result<Configuration, BackendError> {
         let version = self.resolved_version().await?;
-        Fetcher::new(self.client.clone(), version).dump().await
+        Fetcher::new(self.client.clone(), version, self.filter.clone())
+            .dump()
+            .await
     }
 
     async fn sync(

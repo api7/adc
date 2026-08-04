@@ -19,11 +19,27 @@ fn update(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
     // Consumer credential updates aren't SERVICE events, so the operator
     // doesn't need diff info to decide what to touch — an empty diff is
     // fine here (contrast `e2e_sync_and_dump.rs`'s `update()` helper).
-    Event::new(rt, EventKind::Update { old_value: json!({}), new_value, diff: None }, id, id)
+    Event::new(
+        rt,
+        EventKind::Update {
+            old_value: json!({}),
+            new_value,
+            diff: None,
+        },
+        id,
+        id,
+    )
 }
 
 fn delete(rt: ResourceType, id: &str) -> Event {
-    Event::new(rt, EventKind::Delete { old_value: json!({}) }, id, id)
+    Event::new(
+        rt,
+        EventKind::Delete {
+            old_value: json!({}),
+        },
+        id,
+        id,
+    )
 }
 
 #[tokio::test]
@@ -50,7 +66,14 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
 
     let results = backend
         .sync(
-            vec![create(ResourceType::Consumer, consumer_username, json!({ "username": consumer_username })), credential],
+            vec![
+                create(
+                    ResourceType::Consumer,
+                    consumer_username,
+                    json!({ "username": consumer_username }),
+                ),
+                credential,
+            ],
             BackendSyncOptions::default(),
         )
         .await
@@ -62,14 +85,26 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
     let config = backend.dump().await.unwrap();
     let consumers = config.consumers.unwrap();
     assert_eq!(consumers.len(), 1);
-    let credentials = consumers[0].credentials.as_ref().expect("consumer should have its credential");
+    let credentials = consumers[0]
+        .credentials
+        .as_ref()
+        .expect("consumer should have its credential");
     assert_eq!(credentials.len(), 1);
-    assert_eq!(credentials[0].config.get("key"), Some(&json!(credential_id)));
+    assert_eq!(
+        credentials[0].config.get("key"),
+        Some(&json!(credential_id))
+    );
 
-    let mut updated_credential =
-        update(ResourceType::ConsumerCredential, credential_id, json!({ "name": credential_id, "type": "key-auth", "config": { "key": "new-key" } }));
+    let mut updated_credential = update(
+        ResourceType::ConsumerCredential,
+        credential_id,
+        json!({ "name": credential_id, "type": "key-auth", "config": { "key": "new-key" } }),
+    );
     updated_credential.parent_id = Some(consumer_username.to_string());
-    let results = backend.sync(vec![updated_credential], BackendSyncOptions::default()).await.unwrap();
+    let results = backend
+        .sync(vec![updated_credential], BackendSyncOptions::default())
+        .await
+        .unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
     let config = backend.dump().await.unwrap();
@@ -78,7 +113,10 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
 
     let mut delete_credential = delete(ResourceType::ConsumerCredential, credential_id);
     delete_credential.parent_id = Some(consumer_username.to_string());
-    let results = backend.sync(vec![delete_credential], BackendSyncOptions::default()).await.unwrap();
+    let results = backend
+        .sync(vec![delete_credential], BackendSyncOptions::default())
+        .await
+        .unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
     let config = backend.dump().await.unwrap();
@@ -86,7 +124,13 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
     assert_eq!(consumers.len(), 1);
     assert!(consumers[0].credentials.is_none());
 
-    let results = backend.sync(vec![delete(ResourceType::Consumer, consumer_username)], BackendSyncOptions::default()).await.unwrap();
+    let results = backend
+        .sync(
+            vec![delete(ResourceType::Consumer, consumer_username)],
+            BackendSyncOptions::default(),
+        )
+        .await
+        .unwrap();
     assert!(results[0].success, "{:?}", results[0].error);
 
     let config = backend.dump().await.unwrap();
@@ -97,7 +141,9 @@ async fn syncs_and_dumps_a_consumer_with_a_credential_lifecycle() {
 #[ignore]
 async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
     if apisix_version() < semver::Version::new(3, 11, 0) {
-        eprintln!("skipping: needs a real >= 3.11.0 server to prove the client-side gate is what's skipping the fetch, not the server lacking the feature");
+        eprintln!(
+            "skipping: needs a real >= 3.11.0 server to prove the client-side gate is what's skipping the fetch, not the server lacking the feature"
+        );
         return;
     }
 
@@ -112,7 +158,14 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
     credential.parent_id = Some(consumer_username.to_string());
     let results = backend
         .sync(
-            vec![create(ResourceType::Consumer, consumer_username, json!({ "username": consumer_username })), credential],
+            vec![
+                create(
+                    ResourceType::Consumer,
+                    consumer_username,
+                    json!({ "username": consumer_username }),
+                ),
+                credential,
+            ],
             BackendSyncOptions::default(),
         )
         .await
@@ -126,15 +179,33 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
     // pre-3.11.0 apisix. `list_consumers` must not even attempt the
     // credentials sub-fetch in that case, regardless of what the server
     // could actually return.
-    let old_fetcher = Fetcher::new(client(), semver::Version::new(3, 10, 0));
+    let old_fetcher = Fetcher::new(
+        client(),
+        semver::Version::new(3, 10, 0),
+        adc_backend_core::ResourceFilter::default(),
+    );
     let consumers = old_fetcher.list_consumers().await.unwrap();
-    let consumer = consumers.iter().find(|c| c.username == consumer_username).expect("consumer was not found");
-    assert!(consumer.credentials.is_none(), "credentials must not be fetched when the fetcher believes the server predates 3.11.0");
+    let consumer = consumers
+        .iter()
+        .find(|c| c.username == consumer_username)
+        .expect("consumer was not found");
+    assert!(
+        consumer.credentials.is_none(),
+        "credentials must not be fetched when the fetcher believes the server predates 3.11.0"
+    );
 
     let mut delete_credential = delete(ResourceType::ConsumerCredential, credential_id);
     delete_credential.parent_id = Some(consumer_username.to_string());
-    let results =
-        backend.sync(vec![delete_credential, delete(ResourceType::Consumer, consumer_username)], BackendSyncOptions::default()).await.unwrap();
+    let results = backend
+        .sync(
+            vec![
+                delete_credential,
+                delete(ResourceType::Consumer, consumer_username),
+            ],
+            BackendSyncOptions::default(),
+        )
+        .await
+        .unwrap();
     for result in &results {
         assert!(result.success, "{:?}", result.error);
     }

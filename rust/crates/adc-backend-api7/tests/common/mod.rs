@@ -9,10 +9,17 @@
 #![allow(dead_code)]
 
 use std::env;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
+use adc_sdk::resources::Configuration;
+use adc_sdk::utils::generate_id;
+use adc_sdk::{
+    BackendError, BackendSyncOptions, BackendSyncResult, DefaultValue, Event, EventKind,
+    ResourceType,
+};
 use serde_json::{Value, json};
 use tokio::sync::OnceCell;
 
@@ -24,6 +31,19 @@ pub fn server() -> String {
 
 pub fn gateway_group() -> String {
     env::var("GATEWAY_GROUP").unwrap_or_else(|_| "default".to_string())
+}
+
+/// The dashboard version under test, from the same env var the CI matrix
+/// sets — used to skip a test scenario that only applies above/below a
+/// given release, the same role `semverCondition` plays in the TS suite.
+/// Unset (a local run against whatever's in the compose file) is treated
+/// as "newest", so every version-gated scenario runs by default.
+pub fn server_version() -> semver::Version {
+    match env::var("BACKEND_API7_VERSION") {
+        Ok(v) => semver::Version::parse(&v)
+            .unwrap_or_else(|e| panic!("BACKEND_API7_VERSION={v:?} is not a valid semver: {e}")),
+        Err(_) => semver::Version::new(999, 999, 999),
+    }
 }
 
 fn unique_name(prefix: &str) -> String {
@@ -248,4 +268,298 @@ pub async fn client() -> HttpClient {
         },
     })
     .unwrap()
+}
+
+pub async fn backend() -> adc_backend_api7::Backend {
+    adc_backend_api7::Backend::new(
+        client().await,
+        gateway_group(),
+        &token().await,
+        adc_backend_core::ResourceFilter::default(),
+    )
+}
+
+pub async fn sync_events(
+    backend: &adc_backend_api7::Backend,
+    events: Vec<Event>,
+) -> Result<Vec<BackendSyncResult>, BackendError> {
+    sync_events_with_opts(backend, events, BackendSyncOptions::default()).await
+}
+
+pub async fn sync_events_with_opts(
+    backend: &adc_backend_api7::Backend,
+    events: Vec<Event>,
+    opts: BackendSyncOptions,
+) -> Result<Vec<BackendSyncResult>, BackendError> {
+    use adc_sdk::Backend as _;
+    backend.sync(events, opts).await
+}
+
+pub async fn dump_configuration(
+    backend: &adc_backend_api7::Backend,
+) -> Result<Configuration, BackendError> {
+    use adc_sdk::Backend as _;
+    backend.dump().await
+}
+
+pub async fn get_default_value(
+    backend: &adc_backend_api7::Backend,
+) -> Result<DefaultValue, BackendError> {
+    use adc_sdk::Backend as _;
+    backend.default_value().await
+}
+
+/// Runs the real differ (not a stand-in) between a desired `local`
+/// configuration and the `remote` one a dump just returned, the same way
+/// `adc-cli`'s own `pipeline::diff` does — so a test can build events by
+/// stating the shape it wants rather than hand-assembling each `Event`.
+pub fn diff(
+    local: &Configuration,
+    remote: &Configuration,
+    default_value: Option<&DefaultValue>,
+) -> Vec<Event> {
+    fn to_diff_map(configuration: &Configuration) -> adc_sdk::InternalConfiguration {
+        match serde_json::to_value(configuration).expect("Configuration always serializes") {
+            Value::Object(map) => map,
+            _ => unreachable!("Configuration always serializes to a JSON object"),
+        }
+    }
+    adc_differ::DifferV4::diff(
+        &to_diff_map(local),
+        &to_diff_map(remote),
+        default_value,
+        None,
+    )
+}
+
+/// A resource's id is derived from its name (and parent, where nested) via
+/// the same content hash the differ itself uses — an SSL's id is derived
+/// from its SNIs instead, since `resource_name` for an SSL is, by this
+/// whole suite's own convention, already the comma-joined SNI list (see
+/// e.g. `sslName` in the test files that build one).
+pub fn create_event(
+    resource_type: ResourceType,
+    resource_name: &str,
+    resource: Value,
+    parent_name: Option<&str>,
+) -> Event {
+    let resource_id = derive_resource_id(resource_type, resource_name, parent_name);
+    let mut event = Event::new(
+        resource_type,
+        EventKind::Create {
+            new_value: resource,
+        },
+        resource_id,
+        resource_name,
+    );
+    event.parent_id = derive_parent_id(resource_type, parent_name);
+    event
+}
+
+/// Same id derivation as [`create_event`], but carrying an `Update` — the
+/// differ itself always attaches a real `old_value`/`diff`, but nothing
+/// downstream of event construction in these tests reads either, so an
+/// empty placeholder `old_value` stands in.
+pub fn update_event(
+    resource_type: ResourceType,
+    resource_name: &str,
+    resource: Value,
+    parent_name: Option<&str>,
+) -> Event {
+    let created = create_event(resource_type, resource_name, resource.clone(), parent_name);
+    Event {
+        kind: EventKind::Update {
+            old_value: json!({}),
+            new_value: resource,
+            diff: None,
+        },
+        ..created
+    }
+}
+
+pub fn delete_event(
+    resource_type: ResourceType,
+    resource_name: &str,
+    parent_name: Option<&str>,
+) -> Event {
+    let resource_id = derive_resource_id_for_delete(resource_type, resource_name, parent_name);
+    let mut event = Event::new(
+        resource_type,
+        EventKind::Delete {
+            old_value: json!({}),
+        },
+        resource_id,
+        resource_name,
+    );
+    event.parent_id = derive_parent_id(resource_type, parent_name);
+    event
+}
+
+pub fn override_event_resource_id(
+    mut event: Event,
+    resource_id: &str,
+    parent_id: Option<&str>,
+) -> Event {
+    event.resource_id = resource_id.to_string();
+    if let Some(parent_id) = parent_id {
+        event.parent_id = Some(parent_id.to_string());
+    }
+    event
+}
+
+fn derive_resource_id(
+    resource_type: ResourceType,
+    resource_name: &str,
+    parent_name: Option<&str>,
+) -> String {
+    match resource_type {
+        ResourceType::Consumer | ResourceType::GlobalRule | ResourceType::PluginMetadata => {
+            resource_name.to_string()
+        }
+        ResourceType::Ssl => generate_id(resource_name),
+        _ => derive_resource_id_for_delete(resource_type, resource_name, parent_name),
+    }
+}
+
+fn derive_resource_id_for_delete(
+    resource_type: ResourceType,
+    resource_name: &str,
+    parent_name: Option<&str>,
+) -> String {
+    match resource_type {
+        ResourceType::Consumer | ResourceType::GlobalRule | ResourceType::PluginMetadata => {
+            resource_name.to_string()
+        }
+        _ => generate_id(&match parent_name {
+            Some(parent) => format!("{parent}.{resource_name}"),
+            None => resource_name.to_string(),
+        }),
+    }
+}
+
+fn derive_parent_id(resource_type: ResourceType, parent_name: Option<&str>) -> Option<String> {
+    parent_name.map(|parent| {
+        if resource_type == ResourceType::ConsumerCredential {
+            parent.to_string()
+        } else {
+            generate_id(parent)
+        }
+    })
+}
+
+fn assets_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../libs/backend-api7/e2e/assets")
+}
+
+pub fn read_asset(name: &str) -> String {
+    let path = assets_dir().join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
+}
+
+fn resource_type_from_fixture_str(value: &str) -> ResourceType {
+    match value {
+        "route" => ResourceType::Route,
+        "service" => ResourceType::Service,
+        "upstream" => ResourceType::Upstream,
+        "ssl" => ResourceType::Ssl,
+        "global_rule" => ResourceType::GlobalRule,
+        "plugin_config" => ResourceType::PluginConfig,
+        "plugin_metadata" => ResourceType::PluginMetadata,
+        "consumer" => ResourceType::Consumer,
+        "consumer_group" => ResourceType::ConsumerGroup,
+        "consumer_credential" => ResourceType::ConsumerCredential,
+        "stream_route" => ResourceType::StreamRoute,
+        other => panic!("unrecognized resourceType {other:?} in fixture"),
+    }
+}
+
+/// Loads a `testdata/*.json` fixture — a plain JSON array of events in the
+/// TS suite's own camelCase field names (`resourceType`/`resourceId`/...),
+/// not `Event`'s own (deliberately snake_case, `Serialize`-only) wire
+/// shape — so this reads the raw JSON structurally instead of deriving
+/// `Deserialize` on `Event` just for this one fixture-loading path.
+pub fn load_events_fixture(name: &str) -> Vec<Event> {
+    let raw: Value = serde_json::from_str(&read_asset(&format!("testdata/{name}")))
+        .unwrap_or_else(|e| panic!("parsing fixture {name}: {e}"));
+    raw.as_array()
+        .unwrap_or_else(|| panic!("fixture {name} is not a JSON array"))
+        .iter()
+        .map(|item| {
+            let resource_type = resource_type_from_fixture_str(
+                item["resourceType"]
+                    .as_str()
+                    .expect("event missing resourceType"),
+            );
+            let resource_id = item["resourceId"]
+                .as_str()
+                .expect("event missing resourceId")
+                .to_string();
+            let resource_name = item["resourceName"]
+                .as_str()
+                .expect("event missing resourceName")
+                .to_string();
+            let kind = match item["type"].as_str().expect("event missing type") {
+                "create" => EventKind::Create {
+                    new_value: item["newValue"].clone(),
+                },
+                "update" => EventKind::Update {
+                    old_value: item.get("oldValue").cloned().unwrap_or(Value::Null),
+                    new_value: item["newValue"].clone(),
+                    diff: None,
+                },
+                "delete" => EventKind::Delete {
+                    old_value: item.get("oldValue").cloned().unwrap_or(Value::Null),
+                },
+                other => panic!("unrecognized event type {other:?}"),
+            };
+            let mut event = Event::new(resource_type, kind, resource_id, resource_name);
+            event.parent_id = item
+                .get("parentId")
+                .and_then(Value::as_str)
+                .map(String::from);
+            event
+        })
+        .collect()
+}
+
+/// A `serde_json::Value`-based stand-in for Jest's `toMatchObject`: every
+/// key `expected` declares must be present in `actual` and itself match
+/// (recursively, for nested objects); an array in `expected` must have the
+/// same length as `actual`'s, with each element matching positionally by
+/// the same rule; any other value must be exactly equal. Extra keys/object
+/// fields in `actual` that `expected` doesn't mention are ignored.
+pub fn assert_matches_object(actual: &Value, expected: &Value) {
+    assert_matches_object_at(actual, expected, "$");
+}
+
+fn assert_matches_object_at(actual: &Value, expected: &Value, path: &str) {
+    match expected {
+        Value::Object(expected_map) => {
+            let Value::Object(actual_map) = actual else {
+                panic!("at {path}: expected an object matching {expected}, got {actual}");
+            };
+            for (key, expected_value) in expected_map {
+                let actual_value = actual_map.get(key).unwrap_or_else(|| {
+                    panic!("at {path}.{key}: key missing from actual value {actual}")
+                });
+                assert_matches_object_at(actual_value, expected_value, &format!("{path}.{key}"));
+            }
+        }
+        Value::Array(expected_items) => {
+            let Value::Array(actual_items) = actual else {
+                panic!("at {path}: expected an array matching {expected}, got {actual}");
+            };
+            assert_eq!(
+                actual_items.len(),
+                expected_items.len(),
+                "at {path}: array length mismatch (actual {actual_items:?} vs expected {expected_items:?})"
+            );
+            for (index, (actual_item, expected_item)) in
+                actual_items.iter().zip(expected_items).enumerate()
+            {
+                assert_matches_object_at(actual_item, expected_item, &format!("{path}[{index}]"));
+            }
+        }
+        _ => assert_eq!(actual, expected, "at {path}"),
+    }
 }
