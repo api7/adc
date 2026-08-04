@@ -27,14 +27,30 @@ const parseEnvInt = (value: string | undefined, defaultVal: number): number => {
 };
 const maxPoolSize = parseEnvInt(process.env.ADC_INGRESS_TLS_AGENT_POOL_MAX, 16);
 
-// key: sha256 fingerprint of the TLS material -> value: a pooled HttpsAgent
-const httpsAgentPool = new LRUCache<string, HttpsAgent>({
+interface PooledAgent {
+  agent: HttpsAgent;
+  activeRequests: number;
+  evicted: boolean;
+}
+
+// only safe to close an evicted agent's sockets once nothing is still using
+// it for an in-flight request
+const destroyIfIdle = (entry: PooledAgent) => {
+  if (entry.evicted && entry.activeRequests === 0) entry.agent.destroy();
+};
+
+// key: sha256 fingerprint of the TLS material -> value: a pooled agent entry
+const httpsAgentPool = new LRUCache<string, PooledAgent>({
   max: maxPoolSize,
-  // an evicted agent may still hold open keep-alive sockets; nothing else
-  // references it once it leaves the pool, so it must be destroyed here or
-  // its sockets/fds would leak
-  dispose: (agent) => agent.destroy(),
+  dispose: (entry) => {
+    entry.evicted = true;
+    destroyIfIdle(entry);
+  },
 });
+
+// reverse lookup so releaseHttpsAgent can find an agent's bookkeeping entry
+// even after it has been evicted from httpsAgentPool
+const entriesByAgent = new WeakMap<HttpsAgent, PooledAgent>();
 
 // Fingerprint the TLS material into a fixed-size cache key instead of using
 // the raw PEM strings as the Map key. `\0` separators avoid ambiguous
@@ -55,19 +71,34 @@ export const fingerprintTlsMaterial = (tls: TlsMaterial = {}): string =>
  * identical material share (and thus keep-alive-reuse) the same agent and
  * connection pool; different material gets an isolated agent so certs/keys
  * are never cross-contaminated between backends.
+ *
+ * Every call must be paired with a `releaseHttpsAgent` call once the request
+ * using the returned agent has finished, so an agent evicted from the pool
+ * while still in flight isn't destroyed out from under that request.
  */
 export const getHttpsAgent = (tls: TlsMaterial = {}): HttpsAgent => {
   const key = fingerprintTlsMaterial(tls);
-  const cached = httpsAgentPool.get(key); // also refreshes LRU recency
-  if (cached) return cached;
+  let entry = httpsAgentPool.get(key); // also refreshes LRU recency
+  if (!entry) {
+    const agent = new HttpsAgent({
+      ...keepAlive,
+      rejectUnauthorized: !tls.tlsSkipVerify,
+      ...(tls.caCert ? { ca: tls.caCert } : {}),
+      ...(tls.tlsClientCert ? { cert: tls.tlsClientCert } : {}),
+      ...(tls.tlsClientKey ? { key: tls.tlsClientKey } : {}),
+    });
+    entry = { agent, activeRequests: 0, evicted: false };
+    httpsAgentPool.set(key, entry);
+    entriesByAgent.set(agent, entry);
+  }
+  entry.activeRequests++;
+  return entry.agent;
+};
 
-  const agent = new HttpsAgent({
-    ...keepAlive,
-    rejectUnauthorized: !tls.tlsSkipVerify,
-    ...(tls.caCert ? { ca: tls.caCert } : {}),
-    ...(tls.tlsClientCert ? { cert: tls.tlsClientCert } : {}),
-    ...(tls.tlsClientKey ? { key: tls.tlsClientKey } : {}),
-  });
-  httpsAgentPool.set(key, agent);
-  return agent;
+/** Releases an agent obtained from `getHttpsAgent` once its request is done. */
+export const releaseHttpsAgent = (agent: HttpsAgent): void => {
+  const entry = entriesByAgent.get(agent);
+  if (!entry) return;
+  entry.activeRequests = Math.max(0, entry.activeRequests - 1);
+  destroyIfIdle(entry);
 };

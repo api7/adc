@@ -1,12 +1,13 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
+import type { HttpsAgent } from 'agentkeepalive';
 import type { RequestHandler } from 'express';
 import { toString } from 'lodash-es';
 import { lastValueFrom } from 'rxjs';
 
 import { fillLabels, filterResourceType, loadBackend } from '../command/utils';
 import { check } from '../linter';
-import { getHttpsAgent, httpAgent } from './agent-pool';
+import { getHttpsAgent, httpAgent, releaseHttpsAgent } from './agent-pool';
 import { logger } from './logger';
 import { ValidateInput, type ValidateInputType } from './schema';
 
@@ -15,6 +16,10 @@ export const validateHandler: RequestHandler<
   unknown,
   ValidateInputType
 > = async (req, res) => {
+  // checked out from the TLS agent pool once the backend is initialized below,
+  // and released in `finally` so an agent evicted mid-request isn't destroyed
+  // while this request is still using it
+  let httpsAgent: HttpsAgent | undefined;
   try {
     const parsedInput = ValidateInput.safeParse(req.body);
     if (!parsedInput.success)
@@ -47,19 +52,16 @@ export const validateHandler: RequestHandler<
     fillLabels(local, task.opts.labelSelector);
 
     // initialize backend
-    const { caCert, tlsClientCert, tlsClientKey, ...restOpts } = task.opts;
+    const { tlsSkipVerify, caCert, tlsClientCert, tlsClientKey, ...restOpts } =
+      task.opts;
+    httpsAgent = getHttpsAgent({ tlsSkipVerify, caCert, tlsClientCert, tlsClientKey });
     const backend = loadBackend(task.opts.backend, {
       ...restOpts,
       server: (Array.isArray(task.opts.server)
         ? task.opts.server.join(',')
         : task.opts.server) as string,
       httpAgent,
-      httpsAgent: getHttpsAgent({
-        tlsSkipVerify: task.opts.tlsSkipVerify,
-        caCert,
-        tlsClientCert,
-        tlsClientKey,
-      }),
+      httpsAgent,
     });
 
     backend.on('AXIOS_DEBUG', ({ description, response }) =>
@@ -135,5 +137,7 @@ export const validateHandler: RequestHandler<
       message: toString(err),
       errors: [],
     });
+  } finally {
+    if (httpsAgent) releaseHttpsAgent(httpsAgent);
   }
 };

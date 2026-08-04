@@ -103,9 +103,48 @@ describe('Server - Backend TLS', () => {
     const httpsAgents = loadBackendSpy.mock.calls.map(
       ([, opts]) => (opts as { httpsAgent: unknown }).httpsAgent,
     );
+    expect(httpsAgents[0]).toBeDefined();
+    expect(httpsAgents[2]).toBeDefined();
     expect(httpsAgents[0]).toBe(httpsAgents[1]);
     expect(httpsAgents[0]).not.toBe(httpsAgents[2]);
   });
+
+  it.each(['/sync', '/validate'] as const)(
+    'does not forward raw TLS material to loadBackend for %s',
+    async (route) => {
+      const loadBackendSpy = vi
+        .spyOn(commandUtils, 'loadBackend')
+        .mockImplementation(() => mockBackend());
+
+      await request(server.TEST_ONLY_getExpress())
+        .put(route)
+        .send({
+          task: {
+            opts: {
+              backend: 'mock',
+              server: 'http://1.1.1.1:3000',
+              token: 'mock',
+              cacheKey: 'default',
+              caCert: readCert('ca.cer'),
+              tlsClientCert: readCert('client.cer'),
+              tlsClientKey: readCert('client.key'),
+            },
+            config: {},
+          },
+        });
+
+      expect(loadBackendSpy).toHaveBeenCalledTimes(1);
+      const [, opts] = loadBackendSpy.mock.calls[0];
+      expect(opts).not.toHaveProperty('caCert');
+      expect(opts).not.toHaveProperty('tlsClientCert');
+      expect(opts).not.toHaveProperty('tlsClientKey');
+      expect(opts).not.toHaveProperty('tlsSkipVerify');
+      // secure default: no tlsSkipVerify means the pooled agent must still verify
+      expect((opts as { httpsAgent: https.Agent }).httpsAgent.options.rejectUnauthorized).toBe(
+        true,
+      );
+    },
+  );
 
   describe('real backend connection', () => {
     let backendServer: https.Server;
@@ -142,11 +181,11 @@ describe('Server - Backend TLS', () => {
         });
 
       expect(status).toEqual(500);
-      expect(body.message).toMatch(/self.signed certificate|unable to verify/i);
+      expect(body.message).toMatch(/self-signed certificate|unable to verify/i);
     });
 
     it('does not fail on certificate verification once the signing caCert is provided', async () => {
-      const { status, body } = await request(server.TEST_ONLY_getExpress())
+      const { body } = await request(server.TEST_ONLY_getExpress())
         .put('/sync')
         .send({
           task: {
@@ -162,10 +201,9 @@ describe('Server - Backend TLS', () => {
         });
 
       // the fake backend doesn't implement the real Admin API, so the request
-      // may still fail for unrelated reasons; the point of this assertion is
-      // that it no longer fails on TLS certificate verification
-      expect(status).toEqual(500);
-      expect(body.message).not.toMatch(/self.signed certificate|unable to verify/i);
+      // may still fail (with any status) for unrelated reasons; the point of
+      // this assertion is that it no longer fails on TLS certificate verification
+      expect(body.message).not.toMatch(/self-signed certificate|unable to verify/i);
     });
   });
 });

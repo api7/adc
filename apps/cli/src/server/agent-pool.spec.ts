@@ -39,6 +39,12 @@ describe('agent-pool fingerprintTlsMaterial', () => {
         tlsClientCert: 'cert',
       }),
     ).not.toEqual(base);
+    expect(
+      fingerprintTlsMaterial({
+        caCert: 'ca-content',
+        tlsClientKey: 'key',
+      }),
+    ).not.toEqual(base);
   });
 });
 
@@ -60,6 +66,15 @@ describe('agent-pool getHttpsAgent pooling', () => {
     expect(agent).toBeInstanceOf(HttpsAgent);
     expect(agent.options.rejectUnauthorized).toBe(false);
     expect(agent.options.ca).toEqual('ca-c');
+  });
+
+  it('builds an agent with the requested mTLS client cert and key', () => {
+    const agent = getHttpsAgent({
+      tlsClientCert: 'client-cert',
+      tlsClientKey: 'client-key',
+    });
+    expect(agent.options.cert).toEqual('client-cert');
+    expect(agent.options.key).toEqual('client-key');
   });
 
   it('defaults to rejectUnauthorized: true when no TLS material is given', () => {
@@ -85,7 +100,9 @@ describe('agent-pool getHttpsAgent real TLS handshake', () => {
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve, reject) =>
+      server.close((err) => (err ? reject(err) : resolve())),
+    );
   });
 
   // server.cer's CN is "localhost" (no IP SAN), so pin SNI/hostname
@@ -124,15 +141,38 @@ describe('agent-pool LRU eviction', () => {
     vi.unstubAllEnvs();
   });
 
-  it('destroys the least-recently-used agent once the pool exceeds its max size', async () => {
+  it('evicts and destroys the least-recently-used agent, not merely the first-inserted one', async () => {
     const pool = await import('./agent-pool');
 
     const agentA = pool.getHttpsAgent({ caCert: 'a' });
-    const destroySpy = vi.spyOn(agentA, 'destroy');
-    pool.getHttpsAgent({ caCert: 'b' });
-    // exceeding max size (2) evicts the least-recently-used entry (a)
+    const agentB = pool.getHttpsAgent({ caCert: 'b' });
+    pool.releaseHttpsAgent(agentB); // b has no active request by the time it's evicted
+    // re-fetching "a" refreshes its recency, so "b" (not "a") becomes the
+    // least-recently-used entry despite "a" having been inserted first
+    pool.getHttpsAgent({ caCert: 'a' });
+    const destroySpyA = vi.spyOn(agentA, 'destroy');
+    const destroySpyB = vi.spyOn(agentB, 'destroy');
+
+    // exceeding max size (2) evicts the least-recently-used entry (b)
     pool.getHttpsAgent({ caCert: 'c' });
 
+    expect(destroySpyB).toHaveBeenCalledTimes(1);
+    expect(destroySpyA).not.toHaveBeenCalled();
+  });
+
+  it('defers destroying an evicted agent until its active request finishes', async () => {
+    const pool = await import('./agent-pool');
+
+    const agentA = pool.getHttpsAgent({ caCert: 'a' }); // simulates a request still in flight
+    pool.getHttpsAgent({ caCert: 'b' });
+    const destroySpy = vi.spyOn(agentA, 'destroy');
+
+    // evicts "a" (LRU) while its request is still active; must not destroy yet
+    pool.getHttpsAgent({ caCert: 'c' });
+    expect(destroySpy).not.toHaveBeenCalled();
+
+    // the in-flight request using "a" now completes
+    pool.releaseHttpsAgent(agentA);
     expect(destroySpy).toHaveBeenCalledTimes(1);
   });
 });
