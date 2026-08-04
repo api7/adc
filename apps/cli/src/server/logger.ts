@@ -23,6 +23,17 @@ export const logger = winston.createLogger({
   transports: [new winston.transports.Console({})],
 });
 
+// task.opts.tlsClientKey carries a raw mTLS private key; never let it reach
+// the debug request-body log
+export const redactRequestBody = (body: unknown) => {
+  const opts = (body as { task?: { opts?: { tlsClientKey?: unknown } } })?.task
+    ?.opts;
+  if (typeof opts !== 'object' || opts === null || !('tlsClientKey' in opts))
+    return body;
+  const { task, ...rest } = body as { task: { opts: object } };
+  return { ...rest, task: { ...task, opts: { ...task.opts, tlsClientKey: '***' } } };
+};
+
 export const loggerMiddleware: RequestHandler = (req, res, next) => {
   req.requestId = randomUUID();
 
@@ -36,7 +47,7 @@ export const loggerMiddleware: RequestHandler = (req, res, next) => {
     logger.log({
       level: 'debug',
       message: '',
-      requestBody: req.body,
+      requestBody: redactRequestBody(req.body),
       requestId: req.requestId,
     });
 
