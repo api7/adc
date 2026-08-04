@@ -20,12 +20,15 @@ use crate::error::CliError;
 pub async fn init_backend(args: &BackendArgs) -> Result<Box<dyn Backend>, CliError> {
     match args.backend {
         BackendKind::Apisix => {
+            let token = args.token.clone().ok_or_else(|| {
+                CliError::msg("a backend token is required: pass --token or set ADC_TOKEN")
+            })?;
             let ca_cert_pem = read_optional(&args.ca_cert_file).await?;
             let client_cert_pem = read_optional(&args.tls_client_cert_file).await?;
             let client_key_pem = read_optional(&args.tls_client_key_file).await?;
             let client = HttpClient::new(HttpClientConfig {
                 server: args.server.clone(),
-                token: args.token.clone().unwrap_or_default(),
+                token,
                 timeout: Some(args.timeout),
                 tls: TlsConfig {
                     ca_cert_pem,

@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use adc_sdk::BackendError;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
-use reqwest::{Method, RequestBuilder, Response, Url};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
+use reqwest::{Method, RequestBuilder, Response, ResponseBuilderExt, Url};
 use serde::de::DeserializeOwned;
 use tracing::Instrument;
 
@@ -170,16 +170,32 @@ impl HttpClient {
                 Ok(response) if !disabled => {
                     let status = response.status();
                     let version = response.version();
+                    let response_url = response.url().clone();
                     let headers = response.headers().clone();
-                    let body = response.bytes().await.unwrap_or_default();
+                    let body = match response.bytes().await {
+                        Ok(body) => body,
+                        Err(e) => {
+                            recording_span.record("error.type", transport_error_type(&e));
+                            let error = classify_transport_error(&e, &method, &url);
+                            recording_span.record("error_message", error.to_string());
+                            return Err(error);
+                        }
+                    };
                     recording_span.record("http.response.status_code", status.as_u16() as i64);
                     recording_span.record("network.protocol.version", protocol_version(version));
                     recording_span.record("response_headers", format_headers(&headers));
                     recording_span.record("response_body", String::from_utf8_lossy(&body).as_ref());
 
                     // Rebuild a Response from the buffered bytes so the
-                    // caller can still `.json()`/`.text()` normally.
-                    let mut rebuilt = http::Response::builder().status(status);
+                    // caller can still `.json()`/`.text()` normally — `url`
+                    // and `version` need to be carried over explicitly, or
+                    // `Response::from` falls back to a placeholder URL and
+                    // HTTP/1.1, breaking callers that read `response.url()`
+                    // (e.g. `require_success`'s 404 message).
+                    let mut rebuilt = http::Response::builder()
+                        .status(status)
+                        .version(version)
+                        .url(response_url);
                     for (name, value) in headers.iter() {
                         rebuilt = rebuilt.header(name, value);
                     }
@@ -263,12 +279,15 @@ fn extract_error_message(body: &str) -> String {
 }
 
 /// `Header-Name: value\n`-per-line, matching the TS CLI's `transformHeaders`.
-/// Sensitive values print as `*****`.
+/// Sensitive values print as `*****` — either because the crate that set
+/// them marked them so (`X-API-KEY`, via `HeaderValue::set_sensitive`), or
+/// because the name itself is always credential-bearing regardless of who
+/// set it (`is_sensitive_header_name`).
 fn format_headers(headers: &HeaderMap) -> String {
     headers
         .iter()
         .map(|(name, value)| {
-            let value = if value.is_sensitive() {
+            let value = if value.is_sensitive() || is_sensitive_header_name(name) {
                 "*****".to_string()
             } else {
                 String::from_utf8_lossy(value.as_bytes()).into_owned()
@@ -277,6 +296,10 @@ fn format_headers(headers: &HeaderMap) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn is_sensitive_header_name(name: &HeaderName) -> bool {
+    name == AUTHORIZATION || name == COOKIE || name == SET_COOKIE
 }
 
 /// OTel's `url.full` requires credentials to be redacted. Our own auth
@@ -402,5 +425,20 @@ mod tests {
         );
         assert_eq!(extract_error_message("not json"), "not json");
         assert_eq!(extract_error_message(""), "");
+    }
+
+    #[test]
+    fn redacts_credential_bearing_headers_by_name_even_when_not_marked_sensitive() {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer secret"));
+        headers.insert(COOKIE, HeaderValue::from_static("session=secret"));
+        headers.insert(SET_COOKIE, HeaderValue::from_static("session=secret"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        let formatted = format_headers(&headers);
+        assert!(formatted.contains("authorization: *****"));
+        assert!(formatted.contains("cookie: *****"));
+        assert!(formatted.contains("set-cookie: *****"));
+        assert!(formatted.contains("content-type: application/json"));
     }
 }

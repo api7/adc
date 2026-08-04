@@ -126,22 +126,26 @@ pub fn print_scoped_line(scope: &str, icon: char, label: &str, message: &str) {
 /// (each keeping its own timestamp) and flushes a whole event's block in
 /// one write instead of interleaving with concurrent events.
 pub fn format_scoped_line(scope: &str, icon: char, label: &str, message: &str) -> String {
+    let is_terminal = std::io::stderr().is_terminal();
     let now = chrono::Local::now().format("%I:%M:%S %p");
     let meta = format!("[{now}] [{scope}] \u{203a}");
-    let meta = if std::io::stderr().is_terminal() {
+    let meta = if is_terminal {
         format!("\u{1b}[90m{meta}\u{1b}[0m")
     } else {
         meta
     };
-    format!("{meta} {}{message}", colored_icon_and_label(icon, label))
+    format!(
+        "{meta} {}{message}",
+        colored_icon_and_label(icon, label, is_terminal)
+    )
 }
 
 /// Matches `node_modules/signale/types.js`'s palette: `start`/`success`
 /// green, `error`/`debug` red, `star` yellow, everything else (`info`,
 /// `progress` — no TS counterpart) blue.
-fn colored_icon_and_label(icon: char, label: &str) -> String {
+fn colored_icon_and_label(icon: char, label: &str, is_terminal: bool) -> String {
     let padded = format!("{label:<10}");
-    if !std::io::stderr().is_terminal() {
+    if !is_terminal {
         return format!("{icon}  {padded}");
     }
     let color = match label {
@@ -167,6 +171,29 @@ pub fn compact_duration(d: std::time::Duration) -> String {
     }
 }
 
+/// `(percent, eta)` for a `completed`/`total` sync in progress, given how
+/// long `elapsed` has taken so far — shared by `sync_slots` and
+/// `sync_report`'s progress rendering, which otherwise duplicated this same
+/// arithmetic. `0` completed reports a `0` ETA rather than dividing by it;
+/// `total == 0` reports `100%` rather than dividing by that instead.
+pub fn percent_and_eta(
+    completed: u64,
+    total: u64,
+    elapsed: std::time::Duration,
+) -> (u64, std::time::Duration) {
+    let percent = completed
+        .checked_mul(100)
+        .and_then(|n| n.checked_div(total))
+        .unwrap_or(100);
+    let eta = if completed > 0 {
+        let secs_per_event = elapsed.as_secs_f64() / completed as f64;
+        std::time::Duration::from_secs_f64(secs_per_event * total.saturating_sub(completed) as f64)
+    } else {
+        std::time::Duration::ZERO
+    };
+    (percent, eta)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +208,35 @@ mod tests {
         assert!(
             final_frame.contains("\u{1b}[32m"),
             "{final_frame:?} should be green"
+        );
+    }
+
+    #[test]
+    fn compact_duration_formats_seconds() {
+        assert_eq!(compact_duration(std::time::Duration::from_secs(0)), "0s");
+        assert_eq!(compact_duration(std::time::Duration::from_secs(12)), "12s");
+        assert_eq!(compact_duration(std::time::Duration::from_secs(59)), "59s");
+    }
+
+    #[test]
+    fn compact_duration_formats_minutes_with_zero_padded_seconds() {
+        assert_eq!(compact_duration(std::time::Duration::from_secs(60)), "1m00s");
+        assert_eq!(
+            compact_duration(std::time::Duration::from_secs(185)),
+            "3m05s"
+        );
+        assert_eq!(
+            compact_duration(std::time::Duration::from_secs(3599)),
+            "59m59s"
+        );
+    }
+
+    #[test]
+    fn compact_duration_formats_hours_with_zero_padded_minutes() {
+        assert_eq!(compact_duration(std::time::Duration::from_secs(3600)), "1h00m");
+        assert_eq!(
+            compact_duration(std::time::Duration::from_secs(3600 * 3 + 60 * 2 + 5)),
+            "3h02m"
         );
     }
 }

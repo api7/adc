@@ -33,10 +33,13 @@ pub enum Command {
     /// validate the local configuration against the backend
     Validate(ValidateArgs),
     /// convert OpenAPI specifications to ADC configuration
+    #[command(hide = true)]
     Convert,
     /// synchronize configuration via the ingress controller
+    #[command(hide = true)]
     IngressSync,
     /// run the local ingress server
+    #[command(hide = true)]
     IngressServer,
 }
 
@@ -223,8 +226,8 @@ fn parse_timeout(raw: &str) -> Result<Duration, String> {
 
 fn existing_file(raw: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(raw);
-    if !path.exists() {
-        return Err(format!("path does not exist: {raw}"));
+    if !path.is_file() {
+        return Err(format!("path does not exist or is not a file: {raw}"));
     }
     Ok(path)
 }

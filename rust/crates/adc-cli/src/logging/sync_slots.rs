@@ -13,7 +13,7 @@
 //! same span a future OTel export layer would use unmodified.
 
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use adc_sdk::SYNC_EVENT_SPAN_NAME;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -98,34 +98,42 @@ pub fn finish() {
     state.counts.finish();
 }
 
-fn render(state: &mut State) {
+/// A snapshot of what `render_frame` needs, copied out of `State` while
+/// `ACTIVE`'s lock is held — `multi`/`header`/`counts` are cheap,
+/// `Arc`-backed clones, so the actual redraw (real terminal I/O) then
+/// happens without holding the lock, which would otherwise stall any
+/// concurrent `active_multi_progress()` caller for the duration of a paint.
+struct Frame {
+    multi: MultiProgress,
+    header: ProgressBar,
+    counts: ProgressBar,
+    started_at: Instant,
+    total: u64,
+    completed: u64,
+    created: u64,
+    updated: u64,
+    deleted: u64,
+    failed: u64,
+}
+
+fn render_frame(frame: &Frame) {
     // Header has no steady-tick thread anymore; this is its only tick.
-    state.header.tick();
+    frame.header.tick();
 
-    let elapsed = state.started_at.elapsed();
-    let percent = state
-        .completed
-        .checked_mul(100)
-        .and_then(|n| n.checked_div(state.total))
-        .unwrap_or(100);
-    let eta = if state.completed > 0 {
-        let secs_per_event = elapsed.as_secs_f64() / state.completed as f64;
-        Duration::from_secs_f64(secs_per_event * state.total.saturating_sub(state.completed) as f64)
-    } else {
-        Duration::ZERO
-    };
+    let elapsed = frame.started_at.elapsed();
+    let (percent, eta) = crate::progress::percent_and_eta(frame.completed, frame.total, elapsed);
 
-    state.counts.set_message(format!(
+    frame.counts.set_message(format!(
         "created {}, updated {}, deleted {}, failed {}, {}/{} ({percent}%) eta {}",
-        state.created,
-        state.updated,
-        state.deleted,
-        state.failed,
-        state.completed,
-        state.total,
+        frame.created,
+        frame.updated,
+        frame.deleted,
+        frame.failed,
+        frame.completed,
+        frame.total,
         crate::progress::compact_duration(eta),
     ));
-    state.counts.tick();
+    frame.counts.tick();
 }
 
 pub struct SyncSlotsLayer;
@@ -162,26 +170,42 @@ where
             return;
         }
         let fields = span.extensions_mut().remove::<SpanFields>();
-
-        let mut guard = ACTIVE.lock().expect("not poisoned");
-        let Some(state) = guard.as_mut() else { return };
-        state.completed += 1;
         let error = fields.as_ref().and_then(|f| f.error.as_deref());
-        if error.is_none() {
-            match fields.as_ref().map(|f| f.event_type.as_str()) {
-                Some("Create") => state.created += 1,
-                Some("Update") => state.updated += 1,
-                Some("Delete") => state.deleted += 1,
-                _ => {}
+
+        let frame = {
+            let mut guard = ACTIVE.lock().expect("not poisoned");
+            let Some(state) = guard.as_mut() else { return };
+            state.completed += 1;
+            if error.is_none() {
+                match fields.as_ref().map(|f| f.event_type.as_str()) {
+                    Some("Create") => state.created += 1,
+                    Some("Update") => state.updated += 1,
+                    Some("Delete") => state.deleted += 1,
+                    _ => {}
+                }
+            } else {
+                state.failed += 1;
             }
-        }
+            Frame {
+                multi: state.multi.clone(),
+                header: state.header.clone(),
+                counts: state.counts.clone(),
+                started_at: state.started_at,
+                total: state.total,
+                completed: state.completed,
+                created: state.created,
+                updated: state.updated,
+                deleted: state.deleted,
+                failed: state.failed,
+            }
+        };
+
         if let Some(error) = error {
-            state.failed += 1;
             let message = fields.as_ref().map(SpanFields::display).unwrap_or_default();
-            let _ = state
+            let _ = frame
                 .multi
                 .println(format!("\u{1b}[31m\u{2716}  {message}: {error}\u{1b}[0m"));
         }
-        render(state);
+        render_frame(&frame);
     }
 }

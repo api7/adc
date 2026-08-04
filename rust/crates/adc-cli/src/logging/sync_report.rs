@@ -107,19 +107,7 @@ where
 
 fn print_progress(report: &Report) {
     let elapsed = report.started_at.elapsed();
-    let percent = report
-        .completed
-        .checked_mul(100)
-        .and_then(|n| n.checked_div(report.total))
-        .unwrap_or(100);
-    let eta = if report.completed > 0 {
-        let secs_per_event = elapsed.as_secs_f64() / report.completed as f64;
-        Duration::from_secs_f64(
-            secs_per_event * report.total.saturating_sub(report.completed) as f64,
-        )
-    } else {
-        Duration::ZERO
-    };
+    let (percent, eta) = crate::progress::percent_and_eta(report.completed, report.total, elapsed);
 
     print_line(
         '\u{2026}',

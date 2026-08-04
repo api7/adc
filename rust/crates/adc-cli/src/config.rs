@@ -37,7 +37,9 @@ pub async fn read_files(patterns: &[PathBuf]) -> Result<Vec<(PathBuf, Value)>, C
         // ecosystem worth pulling in for this); only the per-file read below
         // goes through tokio.
         let matched: Vec<PathBuf> = glob::glob(&pattern.to_string_lossy())?
-            .filter_map(Result::ok)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| CliError::msg(format!("{}: {e}", pattern.display())))?
+            .into_iter()
             .filter(|p| p.is_file())
             .collect();
         if matched.is_empty() {
@@ -96,7 +98,12 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
 
         for (key, val) in obj {
             if let Some(&array_key) = ARRAY_KEYS.iter().find(|k| **k == key) {
-                let items = val.as_array().cloned().unwrap_or_default();
+                let Some(items) = val.as_array().cloned() else {
+                    return Err(CliError::msg(format!(
+                        "{}: \"{key}\" must be an array",
+                        path.display()
+                    )));
+                };
                 let entry = merged
                     .entry(array_key)
                     .or_insert_with(|| Value::Array(vec![]));
@@ -116,7 +123,12 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
                     entry.push(item);
                 }
             } else if let Some(&map_key) = MAP_KEYS.iter().find(|k| **k == key) {
-                let items = val.as_object().cloned().unwrap_or_default();
+                let Some(items) = val.as_object().cloned() else {
+                    return Err(CliError::msg(format!(
+                        "{}: \"{key}\" must be an object",
+                        path.display()
+                    )));
+                };
                 let entry = merged
                     .entry(map_key)
                     .or_insert_with(|| Value::Object(Default::default()));
@@ -151,10 +163,9 @@ fn resource_key(array_key: &str, item: &Value) -> String {
             .get("snis")
             .and_then(Value::as_array)
             .map(|snis| {
-                snis.iter()
-                    .filter_map(Value::as_str)
-                    .collect::<Vec<_>>()
-                    .join(",")
+                let mut snis: Vec<&str> = snis.iter().filter_map(Value::as_str).collect();
+                snis.sort_unstable();
+                snis.join(",")
             })
             .unwrap_or_default(),
         "consumers" => item

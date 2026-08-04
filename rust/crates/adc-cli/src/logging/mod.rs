@@ -94,7 +94,10 @@ pub fn init(verbose: u8) {
                 .with_target(false)
                 .without_time()
                 .with_ansi(interactive)
-                .with_filter(EnvFilter::new(log_filter)),
+                .with_filter(
+                    EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| EnvFilter::new(log_filter)),
+                ),
         )
         .with(sync_debug_layer)
         .with(sync_slots_layer)

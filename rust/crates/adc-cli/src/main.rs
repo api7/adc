@@ -103,7 +103,7 @@ async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
 
     print_diff_summary(&events);
     tokio::fs::write("diff.yaml", serde_yaml_ng::to_string(&events)?).await?;
-    println!("Detail diff result has been wrote to diff.yaml");
+    println!("Detail diff result has been written to diff.yaml");
     Ok(())
 }
 
@@ -171,7 +171,8 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
         }
     }
     // `progress::info`, not `stage`: a fact, not a start/finish task.
-    let summary = format!("Sync completed: {} applied, {failed} failed", results.len());
+    let applied = results.len() - failed;
+    let summary = format!("Sync completed: {applied} applied, {failed} failed");
     progress::info(&summary);
     if failed > 0 {
         return Err(CliError::msg("sync completed with failures"));

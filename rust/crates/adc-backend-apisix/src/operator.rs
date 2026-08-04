@@ -189,7 +189,7 @@ fn is_retriable(err: &BackendError) -> bool {
     err.is_retriable()
         || matches!(
             err,
-            BackendError::Api { message, .. } if message.contains("is still using it now")
+            BackendError::Api { status: 400, message } if message.contains("is still using it now")
         )
 }
 
@@ -217,6 +217,16 @@ mod retry_tests {
     fn a_5xx_api_error_is_still_retriable() {
         let err = BackendError::Api { status: 502, message: "bad gateway".into() };
         assert!(is_retriable(&err));
+    }
+
+    #[test]
+    fn a_dependency_conflict_message_on_a_non_400_status_is_not_retriable() {
+        let err = BackendError::Api {
+            status: 409,
+            message: "can not delete this upstream, service [34195131] is still using it now"
+                .into(),
+        };
+        assert!(!is_retriable(&err));
     }
 }
 
