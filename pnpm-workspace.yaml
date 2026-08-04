@@ -42,7 +42,7 @@ overrides:
   qs: '>=6.14.2'
   fast-uri: '>=4.1.1'
   postcss: '>=8.5.18'
-  'minimatch@10>brace-expansion': '5.0.8'
+  'minimatch@10>brace-expansion': '5.0.9'
   'nx>brace-expansion': '5.0.8'
   # @trivago/prettier-plugin-sort-imports pins minimatch@^9, which drags in the
   # unpatched brace-expansion@2.x line (GHSA-mh99-v99m-4gvg). Force it onto minimatch@10
@@ -59,3 +59,6 @@ allowBuilds:
   esbuild: true
   less: false
   nx: true
+minimumReleaseAgeExclude:
+  # Renovate security update: brace-expansion@5.0.9
+  - brace-expansion@5.0.9
