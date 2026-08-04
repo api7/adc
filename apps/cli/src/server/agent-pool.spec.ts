@@ -145,16 +145,19 @@ describe('agent-pool LRU eviction', () => {
     const pool = await import('./agent-pool');
 
     const agentA = pool.getHttpsAgent({ caCert: 'a' });
+    pool.releaseHttpsAgent(agentA); // a's modeled request completes
     const agentB = pool.getHttpsAgent({ caCert: 'b' });
-    pool.releaseHttpsAgent(agentB); // b has no active request by the time it's evicted
+    pool.releaseHttpsAgent(agentB); // b's modeled request completes
     // re-fetching "a" refreshes its recency, so "b" (not "a") becomes the
     // least-recently-used entry despite "a" having been inserted first
     pool.getHttpsAgent({ caCert: 'a' });
+    pool.releaseHttpsAgent(agentA);
     const destroySpyA = vi.spyOn(agentA, 'destroy');
     const destroySpyB = vi.spyOn(agentB, 'destroy');
 
     // exceeding max size (2) evicts the least-recently-used entry (b)
-    pool.getHttpsAgent({ caCert: 'c' });
+    const agentC = pool.getHttpsAgent({ caCert: 'c' });
+    pool.releaseHttpsAgent(agentC); // c's modeled request completes
 
     expect(destroySpyB).toHaveBeenCalledTimes(1);
     expect(destroySpyA).not.toHaveBeenCalled();
@@ -163,12 +166,17 @@ describe('agent-pool LRU eviction', () => {
   it('defers destroying an evicted agent until its active request finishes', async () => {
     const pool = await import('./agent-pool');
 
-    const agentA = pool.getHttpsAgent({ caCert: 'a' }); // simulates a request still in flight
-    pool.getHttpsAgent({ caCert: 'b' });
+    // "a" is kept checked out (simulating a request still in flight) until
+    // the final assertion below; every other checkout is released as soon as
+    // its modeled request completes
+    const agentA = pool.getHttpsAgent({ caCert: 'a' });
+    const agentB = pool.getHttpsAgent({ caCert: 'b' });
+    pool.releaseHttpsAgent(agentB);
     const destroySpy = vi.spyOn(agentA, 'destroy');
 
     // evicts "a" (LRU) while its request is still active; must not destroy yet
-    pool.getHttpsAgent({ caCert: 'c' });
+    const agentC = pool.getHttpsAgent({ caCert: 'c' });
+    pool.releaseHttpsAgent(agentC);
     expect(destroySpy).not.toHaveBeenCalled();
 
     // the in-flight request using "a" now completes

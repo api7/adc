@@ -25,10 +25,11 @@ export const logger = winston.createLogger({
 
 // task.opts.tlsClientKey carries a raw mTLS private key; never let it reach
 // the debug request-body log
-const redactRequestBody = (body: unknown) => {
+export const redactRequestBody = (body: unknown) => {
   const opts = (body as { task?: { opts?: { tlsClientKey?: unknown } } })?.task
     ?.opts;
-  if (!opts || !('tlsClientKey' in opts)) return body;
+  if (typeof opts !== 'object' || opts === null || !('tlsClientKey' in opts))
+    return body;
   const { task, ...rest } = body as { task: { opts: object } };
   return { ...rest, task: { ...task, opts: { ...task.opts, tlsClientKey: '***' } } };
 };
