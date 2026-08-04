@@ -1,6 +1,5 @@
 import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
-import { HttpAgent, HttpOptions, HttpsAgent } from 'agentkeepalive';
 import { AxiosResponse } from 'axios';
 import type { RequestHandler } from 'express';
 import { omit, toString } from 'lodash-es';
@@ -13,28 +12,9 @@ import {
   loadBackend,
 } from '../command/utils';
 import { check } from '../linter';
+import { getHttpsAgent, httpAgent } from './agent-pool';
 import { logger } from './logger';
 import { SyncInput, type SyncInputType } from './schema';
-
-// create connection pool
-const keepAlive: HttpOptions = {
-  keepAlive: true,
-  maxSockets: 256, // per host
-  maxFreeSockets: 16, // per host free
-  freeSocketTimeout:
-    parseInt(process.env.ADC_INGRESS_FREE_SOCKET_TIMEOUT ?? '') || 50000, // free socket keepalive for 50 seconds, and if the ADC_INGRESS_FREE_SOCKET_TIMEOUT environment variable is provided, it takes precedence.
-};
-const httpAgent = new HttpAgent(keepAlive);
-
-//TODO: dynamic rejectUnauthorized and support mTLS
-const httpsAgent = new HttpsAgent({
-  rejectUnauthorized: true,
-  ...keepAlive,
-});
-const httpsInsecureAgent = new HttpsAgent({
-  rejectUnauthorized: false,
-  ...keepAlive,
-});
 
 export const syncHandler: RequestHandler<
   unknown,
@@ -68,13 +48,19 @@ export const syncHandler: RequestHandler<
     fillLabels(local, task.opts.labelSelector);
 
     // load and filter remote configuration
+    const { caCert, tlsClientCert, tlsClientKey, ...restOpts } = task.opts;
     const backend = loadBackend(task.opts.backend, {
-      ...task.opts,
+      ...restOpts,
       server: (Array.isArray(task.opts.server)
         ? task.opts.server.join(',')
         : task.opts.server) as string,
       httpAgent,
-      httpsAgent: (task.opts as any).tlsSkipVerify ? httpsInsecureAgent : httpsAgent,
+      httpsAgent: getHttpsAgent({
+        tlsSkipVerify: task.opts.tlsSkipVerify,
+        caCert,
+        tlsClientCert,
+        tlsClientKey,
+      }),
     });
 
     backend.on('TASK_START', ({ name }) =>

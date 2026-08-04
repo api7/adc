@@ -15,6 +15,10 @@ export default config([
             '{projectRoot}/vitest.config.{js,ts,mjs,mts}',
             '{projectRoot}/e2e/**/*',
           ],
+          // false positive: this workspace also resolves an unrelated,
+          // transitive lru-cache@5.1.1 (via @babel/helper-compilation-targets),
+          // which confuses the rule's usage detection for our direct dependency
+          ignoredDependencies: ['lru-cache'],
         },
       ],
     },
