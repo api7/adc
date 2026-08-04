@@ -15,4 +15,4 @@ pub use concurrency::{concurrent_map, concurrent_map_until_err};
 pub use retry::RetryPolicy;
 pub use tls::TlsConfig;
 
-pub use reqwest::{Method, Response};
+pub use reqwest::{Method, RequestBuilder, Response};
