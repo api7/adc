@@ -480,7 +480,28 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
       keepalive_pool: res.keepalive_pool,
       pass_host: res.pass_host,
       upstream_host: res.upstream_host,
-      checks: res.checks,
+      // ADC's "http_req_headers" maps to APISIX config file's "req_headers";
+      // every other active health check field is named the same.
+      checks: res.checks
+        ? {
+            active: {
+              type: res.checks.active.type,
+              timeout: res.checks.active.timeout,
+              concurrency: res.checks.active.concurrency,
+              host: res.checks.active.host,
+              port: res.checks.active.port,
+              http_method: res.checks.active.http_method,
+              http_path: res.checks.active.http_path,
+              req_headers: res.checks.active.http_req_headers,
+              http_req_body: res.checks.active.http_req_body,
+              https_verify_certificate:
+                res.checks.active.https_verify_certificate,
+              healthy: res.checks.active.healthy,
+              unhealthy: res.checks.active.unhealthy,
+            },
+            passive: res.checks.passive,
+          }
+        : undefined,
       discovery_type: res.discovery_type,
       service_name: res.service_name,
       discovery_args: res.discovery_args,

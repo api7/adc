@@ -28,7 +28,28 @@ export const toADC = (input: typing.APISIXStandalone) => {
     pass_host: upstream.pass_host,
     upstream_host: upstream.upstream_host,
 
-    checks: upstream.checks,
+    // APISIX config file's "req_headers" maps to ADC's "http_req_headers";
+    // every other active health check field is named the same.
+    checks: upstream.checks
+      ? {
+          active: {
+            type: upstream.checks.active.type,
+            timeout: upstream.checks.active.timeout,
+            concurrency: upstream.checks.active.concurrency,
+            host: upstream.checks.active.host,
+            port: upstream.checks.active.port,
+            http_method: upstream.checks.active.http_method,
+            http_path: upstream.checks.active.http_path,
+            http_req_headers: upstream.checks.active.req_headers,
+            http_req_body: upstream.checks.active.http_req_body,
+            https_verify_certificate:
+              upstream.checks.active.https_verify_certificate,
+            healthy: upstream.checks.active.healthy,
+            unhealthy: upstream.checks.active.unhealthy,
+          },
+          passive: upstream.checks.passive,
+        }
+      : undefined,
     discovery_type: upstream.discovery_type,
     service_name: upstream.service_name,
     discovery_args: upstream.discovery_args,

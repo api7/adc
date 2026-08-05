@@ -77,6 +77,18 @@ const upstreamHealthCheckPassiveUnhealthy = z.strictObject({
 const upstreamHealthCheckType = z
   .union([z.literal('http'), z.literal('https'), z.literal('tcp')])
   .default('http');
+const methodSchema = z.enum([
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'HEAD',
+  'OPTIONS',
+  'CONNECT',
+  'TRACE',
+  'PURGE',
+]);
 const UpstreamSchema = z.strictObject({
   ...ModifiedIndex,
   ...Metadata,
@@ -145,9 +157,13 @@ const UpstreamSchema = z.strictObject({
         concurrency: z.coerce.number().default(10).optional(),
         host: z.string().min(1).optional(),
         port: z.coerce.number().int().min(1).max(65535).optional(),
+        http_method: methodSchema.default('GET').optional(),
         http_path: z.string().default('/').optional(),
+        // APISIX config file field, mapped from/to ADC's "http_req_headers"
+        // in transformer.ts.
+        req_headers: z.array(z.string()).min(1).optional(),
+        http_req_body: z.string().default('').optional(),
         https_verify_certificate: z.boolean().default(true).optional(),
-        http_request_headers: z.array(z.string()).min(1).optional(),
         healthy: z
           .strictObject({
             ...upstreamHealthCheckPassiveHealthy.shape,

@@ -78,7 +78,29 @@ export class ToADC {
       type: upstream.type,
       hash_on: upstream.hash_on,
       key: upstream.key,
-      checks: upstream.checks,
+      // API7 Gateway Admin API's "req_headers" maps to ADC's
+      // "http_req_headers"; every other active health check field is named
+      // the same.
+      checks: upstream.checks
+        ? {
+            active: {
+              type: upstream.checks.active.type,
+              timeout: upstream.checks.active.timeout,
+              concurrency: upstream.checks.active.concurrency,
+              host: upstream.checks.active.host,
+              port: upstream.checks.active.port,
+              http_method: upstream.checks.active.http_method,
+              http_path: upstream.checks.active.http_path,
+              http_req_headers: upstream.checks.active.req_headers,
+              http_req_body: upstream.checks.active.http_req_body,
+              https_verify_certificate:
+                upstream.checks.active.https_verify_certificate,
+              healthy: upstream.checks.active.healthy,
+              unhealthy: upstream.checks.active.unhealthy,
+            },
+            passive: upstream.checks.passive,
+          }
+        : undefined,
       nodes: upstream.nodes,
       scheme: upstream.scheme,
       retries: upstream.retries,
@@ -211,7 +233,9 @@ export class FromADC {
       name: service.name,
       desc: service.description,
       labels: FromADC.transformLabels(service.labels),
-      upstream: service.upstream as typing.Upstream,
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
       plugins: service.plugins,
       path_prefix: service.path_prefix,
       strip_path_prefix: service.strip_path_prefix,
@@ -233,7 +257,29 @@ export class FromADC {
       type: upstream.type,
       hash_on: upstream.hash_on,
       key: upstream.key,
-      checks: upstream.checks,
+      // ADC's "http_req_headers" maps to API7 Gateway Admin API's
+      // "req_headers"; every other active health check field is named the
+      // same.
+      checks: upstream.checks
+        ? {
+            active: {
+              type: upstream.checks.active.type,
+              timeout: upstream.checks.active.timeout,
+              concurrency: upstream.checks.active.concurrency,
+              host: upstream.checks.active.host,
+              port: upstream.checks.active.port,
+              http_method: upstream.checks.active.http_method,
+              http_path: upstream.checks.active.http_path,
+              req_headers: upstream.checks.active.http_req_headers,
+              http_req_body: upstream.checks.active.http_req_body,
+              https_verify_certificate:
+                upstream.checks.active.https_verify_certificate,
+              healthy: upstream.checks.active.healthy,
+              unhealthy: upstream.checks.active.unhealthy,
+            },
+            passive: upstream.checks.passive,
+          }
+        : undefined,
       nodes: upstream.nodes,
       scheme: upstream.scheme,
       retries: upstream.retries,
