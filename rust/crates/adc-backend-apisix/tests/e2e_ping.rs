@@ -18,13 +18,21 @@ mod common;
 use common::TOKEN;
 
 fn read_asset(name: &str) -> Vec<u8> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../libs/backend-apisix/e2e/assets/apisix_conf/mtls").join(name);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../libs/backend-apisix/e2e/assets/apisix_conf/mtls")
+        .join(name);
     std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
 fn backend(server: &str, tls: TlsConfig) -> ApisixBackend {
-    let client = HttpClient::new(HttpClientConfig { server: server.to_string(), token: TOKEN.to_string(), timeout: None, tls }).unwrap();
-    ApisixBackend::new(client)
+    let client = HttpClient::new(HttpClientConfig {
+        server: server.to_string(),
+        token: TOKEN.to_string(),
+        timeout: None,
+        tls,
+    })
+    .unwrap();
+    ApisixBackend::new(client, adc_backend_core::ResourceFilter::default())
 }
 
 #[tokio::test]
@@ -52,7 +60,10 @@ async fn succeeds_over_mtls() {
 async fn fails_against_an_unreachable_server() {
     let backend = backend("http://0.0.0.0:1", TlsConfig::default());
     let err = backend.ping().await.unwrap_err();
-    assert!(matches!(err, adc_sdk::BackendError::Transport(_)), "got {err:?}");
+    assert!(
+        matches!(err, adc_sdk::BackendError::Transport(_)),
+        "got {err:?}"
+    );
 }
 
 #[tokio::test]
@@ -62,13 +73,21 @@ async fn fails_when_the_server_certificate_is_not_trusted() {
     // supplying the CA to trust it must fail the TLS handshake.
     let backend = backend("https://localhost:29180", TlsConfig::default());
     let err = backend.ping().await.unwrap_err();
-    assert!(matches!(err, adc_sdk::BackendError::Transport(_)), "got {err:?}");
+    assert!(
+        matches!(err, adc_sdk::BackendError::Transport(_)),
+        "got {err:?}"
+    );
 }
 
 #[tokio::test]
 #[ignore]
 async fn fails_when_the_client_certificate_is_missing() {
-    let tls = TlsConfig { ca_cert_pem: Some(read_asset("ca.cer")), client_cert_pem: None, client_key_pem: None, skip_verify: false };
+    let tls = TlsConfig {
+        ca_cert_pem: Some(read_asset("ca.cer")),
+        client_cert_pem: None,
+        client_key_pem: None,
+        skip_verify: false,
+    };
     let backend = backend("https://localhost:29180", tls);
     // APISIX's mTLS listener requires a client cert; without one the TLS
     // handshake itself is refused before any HTTP response comes back.

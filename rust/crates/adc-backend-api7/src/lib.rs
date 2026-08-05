@@ -1,5 +1,7 @@
 mod backend;
+mod default_value;
 mod fetcher;
+mod gateway_group;
 mod operator;
 mod transformer;
 mod typing;
@@ -12,6 +14,7 @@ pub use backend::Backend;
 #[doc(hidden)]
 pub mod tests {
     pub use crate::fetcher::Fetcher;
+    pub use crate::gateway_group::GatewayGroupResolver;
     pub use crate::operator::Operator;
     pub use crate::validator::Validator;
 

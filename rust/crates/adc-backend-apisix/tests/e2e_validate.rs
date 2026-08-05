@@ -114,7 +114,10 @@ async fn fails_with_an_invalid_plugin_configuration() {
     // The error is mapped back to the specific Event that produced it, not
     // just its position in apisix's response.
     assert_eq!(result.errors[0].resource_name.as_deref(), Some(route_id));
-    let matched_event = result.errors[0].event.as_ref().expect("event should have been matched from the request index");
+    let matched_event = result.errors[0]
+        .event
+        .as_ref()
+        .expect("event should have been matched from the request index");
     assert_eq!(matched_event.resource_type, ResourceType::Route);
     assert_eq!(matched_event.resource_id, route_id);
     assert_eq!(matched_event.parent_id.as_deref(), Some(service_id));
@@ -146,12 +149,19 @@ async fn collects_multiple_errors() {
     );
     route2.parent_id = Some(service_id.to_string());
 
-    let result = validator().validate(&[service, route1, route2]).await.unwrap();
+    let result = validator()
+        .validate(&[service, route1, route2])
+        .await
+        .unwrap();
     assert!(!result.success);
     assert!(result.errors.len() >= 2, "{:?}", result.errors);
     // Each route's error maps back to *its own* name, not a mix-up between
     // the two routes sharing a parent service.
-    let names: Vec<&str> = result.errors.iter().filter_map(|e| e.resource_name.as_deref()).collect();
+    let names: Vec<&str> = result
+        .errors
+        .iter()
+        .filter_map(|e| e.resource_name.as_deref())
+        .collect();
     assert!(names.contains(&route1_id), "{names:?}");
     assert!(names.contains(&route2_id), "{names:?}");
 }
@@ -172,7 +182,11 @@ async fn succeeds_with_mixed_resource_types() {
         consumer_username,
         json!({ "username": consumer_username, "plugins": { "key-auth": { "key": "mixed-key-456" } } }),
     ));
-    events.push(create(ResourceType::GlobalRule, "prometheus", json!({ "prefer_name": false })));
+    events.push(create(
+        ResourceType::GlobalRule,
+        "prometheus",
+        json!({ "prefer_name": false }),
+    ));
 
     let result = validator().validate(&events).await.unwrap();
     assert!(result.success, "{:?}", result.errors);
@@ -194,7 +208,14 @@ async fn is_a_dry_run_with_no_side_effects_on_the_server() {
     let result = validator().validate(&events).await.unwrap();
     assert!(result.success, "{:?}", result.errors);
 
-    let fetcher = adc_backend_apisix::tests::Fetcher::new(client(), semver::Version::new(3, 17, 0));
+    let fetcher = adc_backend_apisix::tests::Fetcher::new(
+        client(),
+        semver::Version::new(3, 17, 0),
+        adc_backend_core::ResourceFilter::default(),
+    );
     let services = fetcher.list_services().await.unwrap();
-    assert!(services.iter().all(|s| s.id != service_id), "validate must not have created anything on the server");
+    assert!(
+        services.iter().all(|s| s.id != service_id),
+        "validate must not have created anything on the server"
+    );
 }

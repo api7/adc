@@ -17,7 +17,9 @@ mod common;
 use common::{apisix_version, client};
 
 fn read_asset(name: &str) -> String {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../libs/backend-apisix/e2e/assets").join(name);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../libs/backend-apisix/e2e/assets")
+        .join(name);
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
@@ -26,7 +28,11 @@ fn operator() -> Operator {
 }
 
 fn fetcher() -> Fetcher {
-    Fetcher::new(client(), apisix_version())
+    Fetcher::new(
+        client(),
+        apisix_version(),
+        adc_backend_core::ResourceFilter::default(),
+    )
 }
 
 fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
@@ -34,7 +40,14 @@ fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
 }
 
 fn delete(rt: ResourceType, id: &str) -> Event {
-    Event::new(rt, EventKind::Delete { old_value: json!({}) }, id, id)
+    Event::new(
+        rt,
+        EventKind::Delete {
+            old_value: json!({}),
+        },
+        id,
+        id,
+    )
 }
 
 fn delete_child(rt: ResourceType, id: &str, parent_id: &str) -> Event {
@@ -44,9 +57,16 @@ fn delete_child(rt: ResourceType, id: &str, parent_id: &str) -> Event {
 }
 
 async fn sync_ok(events: Vec<Event>) {
-    let results = operator().sync(events, BackendSyncOptions::default()).await.unwrap();
+    let results = operator()
+        .sync(events, BackendSyncOptions::default())
+        .await
+        .unwrap();
     for result in &results {
-        assert!(result.success, "sync failed for {:?} {}: {:?}", result.event.resource_type, result.event.resource_id, result.error);
+        assert!(
+            result.success,
+            "sync failed for {:?} {}: {:?}",
+            result.event.resource_type, result.event.resource_id, result.error
+        );
     }
 }
 
@@ -92,7 +112,10 @@ impl Drop for Cleanup {
             Ok(Ok(results)) => {
                 for result in &results {
                     if !result.success {
-                        eprintln!("cleanup failed for {:?} {}: {:?}", result.event.resource_type, result.event.resource_id, result.error);
+                        eprintln!(
+                            "cleanup failed for {:?} {}: {:?}",
+                            result.event.resource_type, result.event.resource_id, result.error
+                        );
                     }
                 }
             }
@@ -109,7 +132,11 @@ async fn syncs_a_service_with_upstream_and_route_then_reads_them_back() {
     let service_id = "e2e-svc-1";
     let route_id = "e2e-route-1";
 
-    let mut route_event = create(ResourceType::Route, route_id, json!({ "name": "e2e route", "uris": ["/e2e-1"] }));
+    let mut route_event = create(
+        ResourceType::Route,
+        route_id,
+        json!({ "name": "e2e route", "uris": ["/e2e-1"] }),
+    );
     route_event.parent_id = Some(service_id.to_string());
 
     sync_ok(vec![
@@ -121,29 +148,50 @@ async fn syncs_a_service_with_upstream_and_route_then_reads_them_back() {
     cleanup.push(delete(ResourceType::Service, service_id));
 
     let services = fetcher().list_services().await.unwrap();
-    let service = services.iter().find(|s| s.id == service_id).expect("service was not written");
+    let service = services
+        .iter()
+        .find(|s| s.id == service_id)
+        .expect("service was not written");
     assert_eq!(service.name.as_deref(), Some("e2e service"));
     assert_eq!(service.upstream_id.as_deref(), Some(service_id));
 
     let upstreams = fetcher().list_upstreams().await.unwrap();
-    let upstream = upstreams.iter().find(|u| u.id.as_deref() == Some(service_id)).expect("upstream was not written");
+    let upstream = upstreams
+        .iter()
+        .find(|u| u.id.as_deref() == Some(service_id))
+        .expect("upstream was not written");
     let adc_upstream: adc_sdk::resources::Upstream = upstream.clone().try_into().unwrap();
     let nodes = adc_upstream.nodes.unwrap();
     assert_eq!(nodes[0].host, "127.0.0.1");
     assert_eq!(nodes[0].port, 1980);
 
     let routes = fetcher().list_routes().await.unwrap();
-    let route = routes.iter().find(|r| r.id == route_id).expect("route was not written");
+    let route = routes
+        .iter()
+        .find(|r| r.id == route_id)
+        .expect("route was not written");
     assert_eq!(route.uris, Some(vec!["/e2e-1".to_string()]));
     assert_eq!(route.service_id.as_deref(), Some(service_id));
 
-    sync_ok(vec![delete(ResourceType::Route, route_id), delete(ResourceType::Service, service_id)]).await;
+    sync_ok(vec![
+        delete(ResourceType::Route, route_id),
+        delete(ResourceType::Service, service_id),
+    ])
+    .await;
     cleanup.disarm();
 
     let routes = fetcher().list_routes().await.unwrap();
-    assert!(routes.iter().all(|r| r.id != route_id), "route should have been deleted");
+    assert!(
+        routes.iter().all(|r| r.id != route_id),
+        "route should have been deleted"
+    );
     let upstreams = fetcher().list_upstreams().await.unwrap();
-    assert!(upstreams.iter().all(|u| u.id.as_deref() != Some(service_id)), "upstream should have been deleted alongside its service");
+    assert!(
+        upstreams
+            .iter()
+            .all(|u| u.id.as_deref() != Some(service_id)),
+        "upstream should have been deleted alongside its service"
+    );
 }
 
 #[tokio::test]
@@ -163,8 +211,14 @@ async fn syncs_an_ssl_certificate_then_reads_it_back() {
     cleanup.push(delete(ResourceType::Ssl, ssl_id));
 
     let ssls = fetcher().list_ssls().await.unwrap();
-    let ssl = ssls.iter().find(|s| s.id == ssl_id).expect("ssl was not written");
-    assert_eq!(ssl.snis.as_deref(), Some(&["e2e.example.com".to_string()][..]));
+    let ssl = ssls
+        .iter()
+        .find(|s| s.id == ssl_id)
+        .expect("ssl was not written");
+    assert_eq!(
+        ssl.snis.as_deref(),
+        Some(&["e2e.example.com".to_string()][..])
+    );
     assert!(ssl.cert.is_some());
 
     sync_ok(vec![delete(ResourceType::Ssl, ssl_id)]).await;
@@ -189,20 +243,49 @@ async fn syncs_a_consumer_with_a_key_auth_credential_then_reads_it_back() {
     let username = "e2e_consumer_1";
     let credential_id = "e2e-cred-1";
 
-    let mut credential_event =
-        create(ResourceType::ConsumerCredential, credential_id, json!({ "name": credential_id, "type": "key-auth", "config": { "key": "e2e-secret" } }));
+    let mut credential_event = create(
+        ResourceType::ConsumerCredential,
+        credential_id,
+        json!({ "name": credential_id, "type": "key-auth", "config": { "key": "e2e-secret" } }),
+    );
     credential_event.parent_id = Some(username.to_string());
 
-    sync_ok(vec![create(ResourceType::Consumer, username, json!({ "username": username })), credential_event]).await;
-    cleanup.push(delete_child(ResourceType::ConsumerCredential, credential_id, username));
+    sync_ok(vec![
+        create(
+            ResourceType::Consumer,
+            username,
+            json!({ "username": username }),
+        ),
+        credential_event,
+    ])
+    .await;
+    cleanup.push(delete_child(
+        ResourceType::ConsumerCredential,
+        credential_id,
+        username,
+    ));
     cleanup.push(delete(ResourceType::Consumer, username));
 
     let consumers = fetcher().list_consumers().await.unwrap();
-    let consumer = consumers.iter().find(|c| c.username == username).expect("consumer was not written");
-    let credentials = consumer.credentials.as_ref().expect("credentials should have been fetched (version-gated above)");
-    assert!(credentials.iter().any(|c| c.id.as_deref() == Some(credential_id)));
+    let consumer = consumers
+        .iter()
+        .find(|c| c.username == username)
+        .expect("consumer was not written");
+    let credentials = consumer
+        .credentials
+        .as_ref()
+        .expect("credentials should have been fetched (version-gated above)");
+    assert!(
+        credentials
+            .iter()
+            .any(|c| c.id.as_deref() == Some(credential_id))
+    );
 
-    sync_ok(vec![delete_child(ResourceType::ConsumerCredential, credential_id, username), delete(ResourceType::Consumer, username)]).await;
+    sync_ok(vec![
+        delete_child(ResourceType::ConsumerCredential, credential_id, username),
+        delete(ResourceType::Consumer, username),
+    ])
+    .await;
     cleanup.disarm();
     let consumers = fetcher().list_consumers().await.unwrap();
     assert!(consumers.iter().all(|c| c.username != username));
@@ -220,8 +303,11 @@ async fn syncs_a_stream_route_then_reads_it_back() {
     let service_id = "e2e-svc-stream-1";
     let stream_route_id = "e2e-stream-route-1";
 
-    let mut stream_route_event =
-        create(ResourceType::StreamRoute, stream_route_id, json!({ "name": "e2e-stream-route", "server_port": 33061 }));
+    let mut stream_route_event = create(
+        ResourceType::StreamRoute,
+        stream_route_id,
+        json!({ "name": "e2e-stream-route", "server_port": 33061 }),
+    );
     stream_route_event.parent_id = Some(service_id.to_string());
 
     sync_ok(vec![
@@ -233,7 +319,10 @@ async fn syncs_a_stream_route_then_reads_it_back() {
     cleanup.push(delete(ResourceType::Service, service_id));
 
     let stream_routes = fetcher().list_stream_routes().await.unwrap();
-    let route = stream_routes.iter().find(|r| r.id.as_deref() == Some(stream_route_id)).expect("stream route was not written");
+    let route = stream_routes
+        .iter()
+        .find(|r| r.id.as_deref() == Some(stream_route_id))
+        .expect("stream route was not written");
     assert_eq!(route.server_port, Some(33061));
     let adc_route: adc_sdk::resources::StreamRoute = route.clone().into();
     if apisix_version() >= Version::new(3, 8, 0) {
@@ -249,10 +338,18 @@ async fn syncs_a_stream_route_then_reads_it_back() {
         assert_eq!(adc_route.name, stream_route_id);
     }
 
-    sync_ok(vec![delete(ResourceType::StreamRoute, stream_route_id), delete(ResourceType::Service, service_id)]).await;
+    sync_ok(vec![
+        delete(ResourceType::StreamRoute, stream_route_id),
+        delete(ResourceType::Service, service_id),
+    ])
+    .await;
     cleanup.disarm();
     let stream_routes = fetcher().list_stream_routes().await.unwrap();
-    assert!(stream_routes.iter().all(|r| r.id.as_deref() != Some(stream_route_id)));
+    assert!(
+        stream_routes
+            .iter()
+            .all(|r| r.id.as_deref() != Some(stream_route_id))
+    );
 }
 
 #[tokio::test]
@@ -264,7 +361,12 @@ async fn deleting_a_service_that_never_had_an_upstream_still_succeeds() {
     // that resource existing — `operate` tolerates a 404 specifically for
     // this delete rather than failing the whole event.
     let service_id = "e2e-svc-no-upstream";
-    sync_ok(vec![create(ResourceType::Service, service_id, json!({ "name": "e2e service with no upstream" }))]).await;
+    sync_ok(vec![create(
+        ResourceType::Service,
+        service_id,
+        json!({ "name": "e2e service with no upstream" }),
+    )])
+    .await;
 
     sync_ok(vec![delete(ResourceType::Service, service_id)]).await;
 

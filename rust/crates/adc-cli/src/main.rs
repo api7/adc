@@ -5,7 +5,7 @@ mod logging;
 mod pipeline;
 mod progress;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use adc_sdk::{BackendSyncOptions, Event, EventType, ResourceType};
 use clap::Parser;
@@ -58,9 +58,10 @@ async fn cmd_ping(args: BackendArgs) -> Result<(), CliError> {
 async fn cmd_dump(args: DumpArgs) -> Result<(), CliError> {
     let backend = pipeline::init_backend(&args.backend).await?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
+    let label_selector = pipeline::label_selector_map(&args.backend)?;
     let remote = progress::stage(
         "Fetching remote configuration...",
-        pipeline::load_remote(backend.as_ref(), &include, &exclude),
+        pipeline::load_remote(backend.as_ref(), &include, &exclude, &label_selector),
     )
     .await?;
 
@@ -79,6 +80,7 @@ async fn cmd_dump(args: DumpArgs) -> Result<(), CliError> {
 async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
     let backend = pipeline::init_backend(&args.backend).await?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
+    let label_selector = pipeline::label_selector_map(&args.backend)?;
 
     let local = progress::stage(
         "Loading local configuration...",
@@ -86,13 +88,14 @@ async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
             &args.files,
             &include,
             &exclude,
+            &label_selector,
             args.backend.managed_by_label,
         ),
     )
     .await?;
     let remote = progress::stage(
         "Fetching remote configuration...",
-        pipeline::load_remote(backend.as_ref(), &include, &exclude),
+        pipeline::load_remote(backend.as_ref(), &include, &exclude, &label_selector),
     )
     .await?;
     let events = progress::stage(
@@ -110,6 +113,7 @@ async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
 async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
     let backend = pipeline::init_backend(&args.backend).await?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
+    let label_selector = pipeline::label_selector_map(&args.backend)?;
 
     let local = progress::stage(
         "Loading local configuration...",
@@ -117,13 +121,14 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
             &args.files,
             &include,
             &exclude,
+            &label_selector,
             args.backend.managed_by_label,
         ),
     )
     .await?;
     let remote = progress::stage(
         "Fetching remote configuration...",
-        pipeline::load_remote(backend.as_ref(), &include, &exclude),
+        pipeline::load_remote(backend.as_ref(), &include, &exclude, &label_selector),
     )
     .await?;
     let events = progress::stage(
@@ -181,10 +186,17 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
 }
 
 async fn cmd_lint(args: LintArgs) -> Result<(), CliError> {
-    let empty: HashSet<ResourceType> = HashSet::new();
+    let empty_types: HashSet<ResourceType> = HashSet::new();
+    let empty_labels = HashMap::new();
     progress::stage(
         "Linting configuration...",
-        pipeline::load_local(&args.files, &empty, &empty, false),
+        pipeline::load_local(
+            &args.files,
+            &empty_types,
+            &empty_types,
+            &empty_labels,
+            false,
+        ),
     )
     .await?;
     println!("Configuration is structurally valid.");
@@ -194,6 +206,7 @@ async fn cmd_lint(args: LintArgs) -> Result<(), CliError> {
 async fn cmd_validate(args: ValidateArgs) -> Result<(), CliError> {
     let backend = pipeline::init_backend(&args.backend).await?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
+    let label_selector = pipeline::label_selector_map(&args.backend)?;
 
     let local = progress::stage(
         "Loading local configuration...",
@@ -201,13 +214,14 @@ async fn cmd_validate(args: ValidateArgs) -> Result<(), CliError> {
             &args.files,
             &include,
             &exclude,
+            &label_selector,
             args.backend.managed_by_label,
         ),
     )
     .await?;
     let remote = progress::stage(
         "Fetching remote configuration...",
-        pipeline::load_remote(backend.as_ref(), &include, &exclude),
+        pipeline::load_remote(backend.as_ref(), &include, &exclude, &label_selector),
     )
     .await?;
     let events = progress::stage(

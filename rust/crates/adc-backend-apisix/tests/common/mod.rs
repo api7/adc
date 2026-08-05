@@ -12,11 +12,17 @@ pub const SERVER: &str = "http://localhost:19180";
 pub const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
 
 pub fn client() -> HttpClient {
-    HttpClient::new(HttpClientConfig { server: SERVER.to_string(), token: TOKEN.to_string(), timeout: None, tls: TlsConfig::default() }).unwrap()
+    HttpClient::new(HttpClientConfig {
+        server: SERVER.to_string(),
+        token: TOKEN.to_string(),
+        timeout: None,
+        tls: TlsConfig::default(),
+    })
+    .unwrap()
 }
 
 pub fn backend() -> ApisixBackend {
-    ApisixBackend::new(client())
+    ApisixBackend::new(client(), adc_backend_core::ResourceFilter::default())
 }
 
 /// The CI matrix runs this suite against every supported APISIX release
@@ -28,7 +34,8 @@ pub fn backend() -> ApisixBackend {
 /// silently falling back the same way "unset" does.
 pub fn apisix_version() -> semver::Version {
     match std::env::var("BACKEND_APISIX_VERSION") {
-        Ok(v) => semver::Version::parse(&v).unwrap_or_else(|e| panic!("BACKEND_APISIX_VERSION={v:?} is not a valid semver: {e}")),
+        Ok(v) => semver::Version::parse(&v)
+            .unwrap_or_else(|e| panic!("BACKEND_APISIX_VERSION={v:?} is not a valid semver: {e}")),
         Err(_) => semver::Version::new(999, 999, 999),
     }
 }

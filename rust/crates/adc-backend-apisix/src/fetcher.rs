@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method, concurrent_map_until_err};
+use adc_backend_core::{HttpClient, Method, ResourceFilter, concurrent_map_until_err};
 use adc_sdk::resources::{self as adc, Configuration, LabelValue, Plugins};
 use adc_sdk::{BackendError, ResourceType};
 use indexmap::IndexMap;
@@ -23,21 +23,34 @@ const CREDENTIAL_FETCH_CONCURRENCY: usize = 16;
 pub struct Fetcher {
     client: HttpClient,
     version: Version,
+    filter: ResourceFilter,
 }
 
 impl Fetcher {
-    pub fn new(client: HttpClient, version: Version) -> Self {
-        Self { client, version }
+    pub fn new(client: HttpClient, version: Version, filter: ResourceFilter) -> Self {
+        Self {
+            client,
+            version,
+            filter,
+        }
     }
 
     async fn list<T: DeserializeOwned>(
         &self,
         resource_type: ResourceType,
     ) -> Result<Vec<T>, BackendError> {
-        let api_name = resource_type_to_api_name(resource_type)
-            .ok_or_else(|| BackendError::Unsupported(format!("{resource_type:?} has no top-level admin API collection")))?;
+        if self.filter.is_skip(resource_type) {
+            return Ok(Vec::new());
+        }
+        let api_name = resource_type_to_api_name(resource_type).ok_or_else(|| {
+            BackendError::Unsupported(format!(
+                "{resource_type:?} has no top-level admin API collection"
+            ))
+        })?;
         let path = format!("/apisix/admin/{api_name}");
-        let builder = self.client.request(Method::GET, &path)?;
+        let builder = self
+            .filter
+            .attach_label_selector(self.client.request(Method::GET, &path)?);
         let body: typing::ListResponse<T> = self.client.send_json(builder).await?;
         Ok(body.list.into_iter().map(|item| item.value).collect())
     }
@@ -80,11 +93,17 @@ impl Fetcher {
     /// (`/apisix/plugin_metadata/http-logger`), so it's extracted from
     /// `ListItem::key` rather than `ListItem::value`.
     pub async fn list_plugin_metadata(&self) -> Result<Plugins, BackendError> {
+        if self.filter.is_skip(ResourceType::PluginMetadata) {
+            return Ok(Plugins::new());
+        }
         let path = format!(
             "/apisix/admin/{}",
-            resource_type_to_api_name(ResourceType::PluginMetadata).expect("PluginMetadata always has an api name")
+            resource_type_to_api_name(ResourceType::PluginMetadata)
+                .expect("PluginMetadata always has an api name")
         );
-        let builder = self.client.request(Method::GET, &path)?;
+        let builder = self
+            .filter
+            .attach_label_selector(self.client.request(Method::GET, &path)?);
         let body: typing::ListResponse<Plugins> = self.client.send_json(builder).await?;
 
         let mut merged = Plugins::new();
@@ -102,9 +121,13 @@ impl Fetcher {
     /// (authentication/authorization failure, a 5xx) is a real error, same
     /// as [`Fetcher::list`].
     pub async fn list_stream_routes(&self) -> Result<Vec<typing::StreamRoute>, BackendError> {
-        let builder = self
-            .client
-            .request(Method::GET, "/apisix/admin/stream_routes")?;
+        if self.filter.is_skip(ResourceType::StreamRoute) {
+            return Ok(Vec::new());
+        }
+        let builder = self.filter.attach_label_selector(
+            self.client
+                .request(Method::GET, "/apisix/admin/stream_routes")?,
+        );
         let response = self.client.execute(builder).await?;
         if response.status().as_u16() == 404 {
             return Ok(Vec::new());
@@ -131,7 +154,10 @@ impl Fetcher {
             return Ok(consumers);
         }
 
-        concurrent_map_until_err(consumers, Some(CREDENTIAL_FETCH_CONCURRENCY), |consumer| self.with_credentials(consumer)).await
+        concurrent_map_until_err(consumers, Some(CREDENTIAL_FETCH_CONCURRENCY), |consumer| {
+            self.with_credentials(consumer)
+        })
+        .await
     }
 
     async fn with_credentials(
@@ -144,7 +170,10 @@ impl Fetcher {
         // of N concurrent credential fetches.
         let response = self
             .client
-            .execute_described(builder, &format!("Get credentials of consumer \"{}\"", consumer.username))
+            .execute_described(
+                builder,
+                &format!("Get credentials of consumer \"{}\"", consumer.username),
+            )
             .await?;
         if response.status().as_u16() == 404 {
             return Ok(consumer);
@@ -267,7 +296,7 @@ impl Fetcher {
 
         // Step 6: assemble the final Configuration — everything not nested
         // under a service converts independently.
-        Ok(Configuration {
+        let mut configuration = Configuration {
             services: (!services.is_empty()).then(|| services.into_values().collect()),
             ssls: (!ssls.is_empty())
                 .then(|| {
@@ -282,7 +311,18 @@ impl Fetcher {
             consumer_groups: None, // apisix's fetcher doesn't fetch consumer groups at all — see `crate::transformer`'s doc comment.
             global_rules: (!global_rules.is_empty()).then_some(global_rules),
             plugin_metadata: (!plugin_metadata.is_empty()).then_some(plugin_metadata),
-        })
+        };
+
+        // Step 7: re-check every resource against the label selector
+        // client-side. The `labels[key]=value` query params attached to
+        // each request above (`Fetcher::list`) are a request to the server
+        // to narrow its response, not a guarantee that it did — nothing
+        // here can tell whether an unrecognized query param was silently
+        // ignored, so the result can't be trusted as filtered until this
+        // runs.
+        self.filter.filter_configuration(&mut configuration);
+
+        Ok(configuration)
     }
 }
 
@@ -351,4 +391,183 @@ fn index_upstreams(
     }
 
     Ok((by_id, named_by_service))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use adc_backend_core::{HttpClientConfig, TlsConfig};
+
+    use super::*;
+
+    /// Never resolves a connection, so any request made through it fails
+    /// immediately — used below to prove `is_skip` short-circuits *before*
+    /// a request is built, not just that the response gets discarded.
+    fn unreachable_client() -> HttpClient {
+        HttpClient::new(HttpClientConfig {
+            server: "http://0.0.0.0".to_string(),
+            token: "test-token".to_string(),
+            timeout: None,
+            tls: TlsConfig::default(),
+        })
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn dump_makes_no_request_at_all_once_every_resource_type_is_excluded() {
+        let exclude = HashSet::from([
+            ResourceType::Service,
+            ResourceType::Route,
+            ResourceType::Upstream,
+            ResourceType::Ssl,
+            ResourceType::PluginConfig,
+            ResourceType::GlobalRule,
+            ResourceType::PluginMetadata,
+            ResourceType::StreamRoute,
+            ResourceType::Consumer,
+        ]);
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude,
+            label_selector: HashMap::new(),
+        };
+        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter);
+
+        let configuration = fetcher.dump().await.unwrap();
+        assert_eq!(
+            configuration,
+            Configuration {
+                services: None,
+                ssls: None,
+                consumers: None,
+                consumer_groups: None,
+                global_rules: None,
+                plugin_metadata: None,
+            }
+        );
+    }
+
+    /// A local server that records every path it's asked for and answers
+    /// generically (an empty `list` satisfies every resource type's
+    /// envelope without needing per-type fixtures) — used to prove a
+    /// specific endpoint was *never requested*, not just that its response
+    /// was discarded.
+    async fn spawn_recording_server() -> (String, std::sync::Arc<tokio::sync::Mutex<Vec<String>>>) {
+        let seen = std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let seen_for_handler = seen.clone();
+        let router = axum::Router::new().fallback(axum::routing::any(
+            move |request: axum::extract::Request| {
+                let seen = seen_for_handler.clone();
+                async move {
+                    seen.lock().await.push(request.uri().path().to_string());
+                    axum::Json(serde_json::json!({ "list": [] }))
+                }
+            },
+        ));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        (format!("http://{addr}"), seen)
+    }
+
+    #[tokio::test]
+    async fn excluding_a_resource_type_means_its_endpoint_is_never_requested() {
+        let (server, seen) = spawn_recording_server().await;
+        let client = HttpClient::new(HttpClientConfig {
+            server,
+            token: "test-token".to_string(),
+            timeout: None,
+            tls: TlsConfig::default(),
+        })
+        .unwrap();
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude: HashSet::from([ResourceType::Service]),
+            label_selector: HashMap::new(),
+        };
+        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter);
+
+        fetcher.dump().await.unwrap();
+
+        let seen = seen.lock().await;
+        assert!(
+            !seen.iter().any(|path| path == "/apisix/admin/services"),
+            "{seen:?}"
+        );
+        assert!(
+            seen.iter().any(|path| path == "/apisix/admin/routes"),
+            "{seen:?}"
+        );
+    }
+
+    #[test]
+    fn a_top_level_collection_request_carries_the_label_selector() {
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude: HashSet::new(),
+            label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
+        };
+        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter);
+
+        let builder = fetcher.filter.attach_label_selector(
+            fetcher
+                .client
+                .request(Method::GET, "/apisix/admin/services")
+                .unwrap(),
+        );
+        let request = builder.build().unwrap();
+        assert_eq!(request.url().query(), Some("labels%5Benv%5D=prod"));
+    }
+
+    /// A server that ignores the `labels[...]` query param entirely and
+    /// always returns every service — standing in for an admin API that
+    /// doesn't actually support server-side label filtering (unverified for
+    /// APISIX; the query param is sent on a best-effort basis).
+    async fn spawn_server_that_ignores_the_label_query() -> String {
+        let router = axum::Router::new()
+            .route(
+                "/apisix/admin/services",
+                axum::routing::get(|| async {
+                    axum::Json(serde_json::json!({
+                        "list": [
+                            {"key": "/apisix/admin/services/1", "value": {"id": "1", "name": "matches", "labels": {"env": "prod"}}},
+                            {"key": "/apisix/admin/services/2", "value": {"id": "2", "name": "no-match", "labels": {"env": "dev"}}},
+                        ]
+                    }))
+                }),
+            )
+            .fallback(axum::routing::any(|| async { axum::Json(serde_json::json!({ "list": [] })) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn dump_filters_by_label_client_side_even_when_the_server_ignores_the_query() {
+        let server = spawn_server_that_ignores_the_label_query().await;
+        let client = HttpClient::new(HttpClientConfig {
+            server,
+            token: "test-token".to_string(),
+            timeout: None,
+            tls: TlsConfig::default(),
+        })
+        .unwrap();
+        let filter = ResourceFilter {
+            include: HashSet::from([ResourceType::Service]),
+            exclude: HashSet::new(),
+            label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
+        };
+        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter);
+
+        let configuration = fetcher.dump().await.unwrap();
+
+        let names: Vec<String> = configuration.services.unwrap().into_iter().map(|s| s.name).collect();
+        assert_eq!(names, vec!["matches"]);
+    }
 }
