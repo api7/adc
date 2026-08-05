@@ -551,6 +551,37 @@ fn assert_matches_object_at(actual: &Value, expected: &Value, path: &str) {
                 assert_matches_object_at(actual_item, expected_item, &format!("{path}[{index}]"));
             }
         }
+        // `serde_json::Number`'s `PartialEq` is representation-sensitive
+        // (`Number(60.0)` != `Number(60)` even though they're the same
+        // value) — a real dashboard's JSON response and a hand-written
+        // `json!(60)` literal in a test frequently disagree on exactly
+        // this, for a field that's numerically identical either way, so
+        // this compares as f64 instead of relying on `Value`'s own `==`.
+        Value::Number(expected_number) => match actual {
+            Value::Number(actual_number) => assert_eq!(
+                actual_number.as_f64(),
+                expected_number.as_f64(),
+                "at {path}"
+            ),
+            _ => panic!("at {path}: expected a number matching {expected}, got {actual}"),
+        },
         _ => assert_eq!(actual, expected, "at {path}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_float_and_an_integer_representation_of_the_same_number_match() {
+        assert_matches_object(&json!({ "timeout": 60.0 }), &json!({ "timeout": 60 }));
+        assert_matches_object(&json!({ "timeout": 60 }), &json!({ "timeout": 60.0 }));
+    }
+
+    #[test]
+    #[should_panic]
+    fn genuinely_different_numbers_still_fail() {
+        assert_matches_object(&json!({ "timeout": 61 }), &json!({ "timeout": 60 }));
     }
 }
