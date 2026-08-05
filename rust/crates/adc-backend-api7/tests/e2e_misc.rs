@@ -132,6 +132,10 @@ async fn syncs_resources_with_a_user_supplied_custom_id() {
     assert!(dump.services.is_none_or(|s| s.is_empty()));
 }
 
+/// `service2`'s `path_prefix` is a number, not a string, so its event fails
+/// to deserialize into `adc_sdk::resources::Service` client-side — a
+/// `BackendError::Serialization` — before any request reaches the server at
+/// all, rather than the dashboard's own schema validation rejecting it.
 #[tokio::test]
 #[ignore]
 async fn sync_options_exit_on_failure() {
@@ -140,10 +144,7 @@ async fn sync_options_exit_on_failure() {
     let service1_name = "service1";
     let service1 = json!({ "name": service1_name, "upstream": upstream });
     let service2_name = "service2";
-    // `path_prefix` must be a string; a number should fail server-side
-    // validation on write.
     let service2 = json!({ "name": service2_name, "path_prefix": 12345, "upstream": upstream });
-    let error_pattern = "Error at \"/path_prefix\": value must be a string";
 
     let error = sync_events(
         &backend,
@@ -154,7 +155,10 @@ async fn sync_options_exit_on_failure() {
     )
     .await
     .unwrap_err();
-    assert!(error.to_string().contains(error_pattern), "{error}");
+    assert!(
+        matches!(error, adc_sdk::BackendError::Serialization(_)),
+        "{error:?}"
+    );
 
     // No cleanup needed between the two sync attempts: syncing the same
     // service again is a `PUT` on the same deterministic id, an idempotent
@@ -179,12 +183,12 @@ async fn sync_options_exit_on_failure() {
         .find(|r| !r.success)
         .expect("one result should have failed");
     assert!(
-        failed
-            .error
-            .as_ref()
-            .unwrap()
-            .to_string()
-            .contains(error_pattern)
+        matches!(
+            failed.error.as_ref().unwrap(),
+            adc_sdk::BackendError::Serialization(_)
+        ),
+        "{:?}",
+        failed.error
     );
 
     sync_events(

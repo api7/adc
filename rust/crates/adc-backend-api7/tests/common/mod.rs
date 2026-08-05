@@ -103,6 +103,16 @@ impl DashboardSession {
     }
 
     async fn login(&self, username: &str, password: &str) {
+        assert!(
+            self.try_login(username, password).await,
+            "login as {username:?} failed"
+        );
+    }
+
+    /// Like [`Self::login`], but reports success/failure instead of
+    /// panicking — used where a non-2xx response is an expected, handled
+    /// outcome rather than a bootstrap failure.
+    async fn try_login(&self, username: &str, password: &str) -> bool {
         let response = self
             .client
             .post(format!("{}/api/login", self.base))
@@ -110,11 +120,7 @@ impl DashboardSession {
             .send()
             .await
             .unwrap_or_else(|e| panic!("POST /api/login: {e}"));
-        assert!(
-            response.status().is_success(),
-            "login as {username:?} failed: {}",
-            response.status()
-        );
+        response.status().is_success()
     }
 
     async fn put(&self, path: &str, body: Value) {
@@ -168,7 +174,19 @@ async fn init_user(
     version: &semver::Version,
     license: &Option<String>,
 ) {
-    session.login(username, password).await;
+    // Unlike the TS suite (a single Jest `globalSetup` run shared by every
+    // spec file), each of this crate's e2e test binaries is its own
+    // process and independently bootstraps against the same live
+    // dashboard. Whichever binary runs first rotates `admin`'s password
+    // for real; every one after that finds the original password already
+    // rejected — not a bootstrap failure, just evidence this already ran.
+    // In that case, skip straight to logging in with the already-rotated
+    // password (and skip re-activating the license) instead of repeating
+    // the dance a previous binary already completed.
+    if !session.try_login(username, password).await {
+        session.login(username, BOOTSTRAP_PASSWORD).await;
+        return;
+    }
     // Mirrors the TS suite: on dashboards older than 3.2.15 the license
     // must be uploaded before the password can be changed at all.
     if first_time && *version < semver::Version::new(3, 2, 15) {

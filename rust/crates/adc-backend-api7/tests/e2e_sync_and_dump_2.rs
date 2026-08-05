@@ -10,9 +10,8 @@ use serde_json::json;
 mod common;
 use common::{assert_matches_object, dump_configuration, load_events_fixture, sync_events};
 
-/// Syncs a real, fairly large mixed-resource-type fixture (the exact same
-/// one the TS suite's own equivalent test uses) and checks the dump back
-/// against it, then cleans up with a matching "clean" fixture.
+/// Syncs a real, fairly large mixed-resource-type fixture and checks the
+/// dump back against it, then cleans up with a matching "clean" fixture.
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_a_mixed_configuration() {

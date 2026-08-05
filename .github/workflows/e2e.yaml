@@ -251,9 +251,29 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> target
+      # Each test file below is its own process with no state shared
+      # between them, but they all talk to the one dashboard instance
+      # started above — so the admin login / password rotation / license
+      # activation / token minting dance runs here exactly once, and its
+      # result is shared with every other test file as `TOKEN` (see
+      # tests/e2e_init.rs), instead of each independently repeating it
+      # against a dashboard the first one to run already mutated.
+      - name: Bootstrap a shared API7 token
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-api7 --test e2e_init -- --ignored
       - name: Run Rust E2E tests
         working-directory: ./rust
         run: |
           rustup update stable
           rustup default stable
           cargo test -p adc-backend-api7 -- --ignored --test-threads=1
+      # Only useful when the step above fails: `BackendError::Api`'s
+      # message is empty for a 500 with no response body, which the
+      # dashboard's own logs can actually explain.
+      - name: Dump API7 dashboard logs
+        if: failure()
+        working-directory: ./libs/backend-api7/e2e/assets
+        run: docker compose logs --no-color

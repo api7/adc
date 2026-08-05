@@ -3,12 +3,9 @@
 //! a timed-out request surfaces a message identifying which request it
 //! was. Doesn't need `docker compose up`, so it isn't `#[ignore]`d.
 //!
-//! One difference from the TS suite's equivalent worth calling out: `sync`
-//! here resolves only the gateway_group id before handing off to the
-//! operator (`Operator` doesn't use a version or default-value at all),
-//! whereas the TS `Backend.sync` resolves version, gateway_group id, *and*
-//! default value concurrently first — so which request's timeout surfaces
-//! there is a race between three endpoints, while here it's always
+//! `sync` resolves only the gateway_group id before handing off to the
+//! operator (`Operator` doesn't use a version or default-value at all), so
+//! which request's timeout surfaces below is always deterministic:
 //! `/api/gateway_groups` specifically.
 
 use std::time::Duration;

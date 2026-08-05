@@ -45,10 +45,9 @@ fn client(server: String) -> HttpClient {
 
 /// A minimal but *structurally valid* `adc_sdk::resources::X` payload for
 /// each resource type this file exercises — `Validator::build_request`
-/// deserializes into the strongly-typed ADC shape before transforming, so
-/// (unlike the TS suite's own untyped `{name: resourceName}` stub, which a
-/// dynamically-typed `fromADC` tolerates regardless of shape) a genuinely
-/// incomplete object fails before ever reaching the mocked server.
+/// deserializes into the strongly-typed ADC shape before transforming, so a
+/// genuinely incomplete object fails before ever reaching the mocked
+/// server.
 fn create_event(
     resource_type: ResourceType,
     resource_name: &str,

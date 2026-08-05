@@ -18,8 +18,8 @@ fn config(json: serde_json::Value) -> Configuration {
 }
 
 /// `Differ::diff` against an empty remote config: every resource in
-/// `config` becomes a `Create` event, the same shortcut the TS suite's own
-/// `configToEvents` uses.
+/// `config` becomes a `Create` event, a shortcut for building test events
+/// without hand-writing each one.
 fn config_to_events(cfg: &Configuration) -> Vec<Event> {
     common::diff(cfg, &config(json!({})), None)
 }
@@ -115,13 +115,10 @@ async fn fails_with_an_invalid_plugin_configuration() {
     assert_eq!(result.errors[0].resource_type, "routes");
 }
 
-/// Unlike the TS suite: a route whose `uris` isn't an array of strings
-/// fails to deserialize into `adc_sdk::resources::Route` client-side,
-/// before any request reaches the server — `validate` surfaces this as an
-/// `Err`, not an `Ok` result with `success: false`. TS's dynamically-typed
-/// `fromADC` has no equivalent client-side shape check, so the same
-/// malformed input there only fails once the server's own schema
-/// validation rejects it.
+/// A route whose `uris` isn't an array of strings fails to deserialize into
+/// `adc_sdk::resources::Route` client-side, before any request reaches the
+/// server — `validate` surfaces this as an `Err`, not an `Ok` result with
+/// `success: false`.
 #[tokio::test]
 #[ignore]
 async fn rejects_a_route_with_a_malformed_uri_client_side() {
