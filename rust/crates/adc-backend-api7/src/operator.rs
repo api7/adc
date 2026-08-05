@@ -54,7 +54,7 @@ impl Operator {
     /// `Err` when `exit_on_failure` is set (the default), discarding
     /// results accumulated so far. Events already dispatched within that
     /// group still run to completion (no cheap way to cancel an in-flight
-    /// request), but anything still queued behind `opts.concurrent`'s
+    /// request), but anything still queued behind the group's concurrency
     /// limit is dropped and never dispatched.
     pub async fn sync(
         &self,
@@ -65,15 +65,16 @@ impl Operator {
 
         let mut results = Vec::new();
         for group in group_events(preprocess_events(events)) {
+            let concurrent = group_concurrency(&group, opts.concurrent);
             if exit_on_failure {
                 let group_results =
-                    concurrent_map_until_err(group, opts.concurrent, |event| self.apply(event))
+                    concurrent_map_until_err(group, concurrent, |event| self.apply(event))
                         .await
                         .map_err(|(_, error)| error)?;
                 results.extend(group_results);
             } else {
                 let group_results =
-                    concurrent_map(group, opts.concurrent, |event| self.apply(event)).await;
+                    concurrent_map(group, concurrent, |event| self.apply(event)).await;
                 for outcome in group_results {
                     match outcome {
                         Ok(result) => results.push(result),
@@ -172,6 +173,24 @@ fn group_events(events: Vec<Event>) -> Vec<Vec<Event>> {
         groups.push((key.0, key.1, vec![event]));
     }
     groups.into_iter().map(|(_, _, events)| events).collect()
+}
+
+/// The concurrency to run one group's events at. Normally just passes
+/// `requested` (`opts.concurrent`) straight through, except for
+/// `GlobalRule`: some dashboard versions store a gateway group's entire
+/// global-rules collection as one shared etcd document, read-modify-written
+/// on every PUT — two concurrent global-rule writes race on that document's
+/// revision and one of them gets rejected outright. Capping this one
+/// resource type to 1 makes syncing multiple global rules in the same
+/// batch reliable regardless of dashboard version, at the cost of losing
+/// any parallelism between them (a batch is typically small enough that
+/// this doesn't matter in practice).
+fn group_concurrency(group: &[Event], requested: Option<usize>) -> Option<usize> {
+    if group.first().is_some_and(|event| event.resource_type == ResourceType::GlobalRule) {
+        Some(1)
+    } else {
+        requested
+    }
 }
 
 /// Drops a route/stream_route/upstream `DELETE` whose parent service is
@@ -383,6 +402,25 @@ mod tests {
         assert_eq!(groups[1][0].resource_type, ResourceType::Consumer);
         assert_eq!(groups[2].len(), 1);
         assert_eq!(groups[2][0].event_type(), EventType::Delete);
+    }
+
+    #[test]
+    fn global_rule_groups_are_forced_to_a_concurrency_of_one() {
+        let group = vec![create(ResourceType::GlobalRule, "g1"), create(ResourceType::GlobalRule, "g2")];
+        assert_eq!(group_concurrency(&group, None), Some(1));
+        assert_eq!(group_concurrency(&group, Some(10)), Some(1));
+    }
+
+    #[test]
+    fn other_resource_types_pass_the_requested_concurrency_through_unchanged() {
+        let group = vec![create(ResourceType::Route, "r1"), create(ResourceType::Route, "r2")];
+        assert_eq!(group_concurrency(&group, None), None);
+        assert_eq!(group_concurrency(&group, Some(10)), Some(10));
+    }
+
+    #[test]
+    fn an_empty_group_passes_the_requested_concurrency_through_unchanged() {
+        assert_eq!(group_concurrency(&[], Some(5)), Some(5));
     }
 
     #[test]
