@@ -4,12 +4,25 @@ import {
   Labels,
   Plugins,
   UpstreamBalancer,
-  UpstreamHealthCheck,
+  UpstreamHealthCheck as ADCUpstreamHealthCheck,
   UpstreamNode,
   UpstreamPassHost,
   UpstreamScheme,
   UpstreamTimeout,
 } from '@api7/adc-sdk';
+
+// API7 Gateway's Admin API is APISIX Admin API compatible, so it uses
+// "req_headers" on the wire, while ADC exposes it as "http_req_headers";
+// every other active health check field is named the same.
+export type UpstreamHealthCheckActive = Omit<
+  ADCUpstreamHealthCheck['active'],
+  'http_req_headers'
+> & {
+  req_headers?: Array<string>;
+};
+export type UpstreamHealthCheck = Omit<ADCUpstreamHealthCheck, 'active'> & {
+  active: UpstreamHealthCheckActive;
+};
 
 export interface Route {
   id?: string;

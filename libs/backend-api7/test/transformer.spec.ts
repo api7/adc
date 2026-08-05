@@ -40,4 +40,46 @@ describe('Transformer', () => {
       expect(out.plugins).toEqual(plugins);
     });
   });
+
+  describe('active health check req_headers round-trip', () => {
+    it('ToADC.transformUpstream maps req_headers to ADC http_req_headers', () => {
+      const out = new ToADC().transformUpstream({
+        name: 'ups1',
+        checks: {
+          active: {
+            type: 'http',
+            req_headers: ['X-Foo: bar'],
+            http_req_body: 'ping',
+          },
+        },
+      } as typing.Upstream);
+      expect(out.checks).toEqual({
+        active: {
+          type: 'http',
+          http_req_headers: ['X-Foo: bar'],
+          http_req_body: 'ping',
+        },
+      });
+    });
+
+    it('FromADC.transformUpstream maps ADC http_req_headers back to req_headers', () => {
+      const out = new FromADC().transformUpstream({
+        name: 'ups1',
+        checks: {
+          active: {
+            type: 'http',
+            http_req_headers: ['X-Foo: bar'],
+            http_req_body: 'ping',
+          },
+        },
+      } as ADCSDK.Upstream);
+      expect(out.checks).toEqual({
+        active: {
+          type: 'http',
+          req_headers: ['X-Foo: bar'],
+          http_req_body: 'ping',
+        },
+      });
+    });
+  });
 });
