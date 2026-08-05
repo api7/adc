@@ -91,8 +91,8 @@ fn default_interval() -> u32 {
 fn default_active_timeout() -> f64 {
     1.0
 }
-fn default_concurrency() -> f64 {
-    10.0
+fn default_concurrency() -> i64 {
+    10
 }
 fn default_http_path() -> String {
     "/".to_string()
@@ -114,9 +114,10 @@ pub struct UpstreamNode {
     pub host: String,
     pub port: u32,
     pub weight: i64,
-    // Not `f64`: the gateway's own admin API rejects `0.0` for this field
-    // outright (its underlying type is a plain integer), even though it's
-    // numerically the same value `0` would be.
+    // A count, not a duration: unlike `Timeout`/`retry_timeout`, there's no
+    // real-world fractional priority — matches the gateway's own schema
+    // (`nodes[].priority` is `type = "integer"`), even though ADC's own Zod
+    // schema doesn't bother declaring `.int()` here.
     #[serde(default)]
     pub priority: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -184,10 +185,13 @@ pub struct UpstreamHealthCheckActiveUnhealthy {
 pub struct UpstreamHealthCheckActive {
     #[serde(rename = "type", default)]
     pub r#type: UpstreamHealthCheckType,
-    #[serde(default = "default_active_timeout")]
+    #[serde(default = "default_active_timeout", serialize_with = "super::common::serialize_whole_number_as_integer")]
     pub timeout: f64,
+    // A count, not a duration: matches the gateway's own schema
+    // (`concurrency` is `type = "integer"` there), even though ADC's own
+    // Zod schema doesn't bother declaring `.int()` here.
     #[serde(default = "default_concurrency")]
-    pub concurrency: f64,
+    pub concurrency: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,7 +241,7 @@ pub struct UpstreamHealthCheck {
 pub struct UpstreamKeepalivePool {
     #[serde(default = "default_keepalive_pool_size")]
     pub size: u32,
-    #[serde(default = "default_keepalive_idle_timeout")]
+    #[serde(default = "default_keepalive_idle_timeout", serialize_with = "super::common::serialize_whole_number_as_integer")]
     pub idle_timeout: f64,
     #[serde(default = "default_keepalive_requests")]
     pub requests: u32,
@@ -287,7 +291,10 @@ pub struct Upstream {
     pub scheme: UpstreamScheme,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retries: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "super::common::serialize_optional_whole_number_as_integer"
+    )]
     pub retry_timeout: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Timeout>,

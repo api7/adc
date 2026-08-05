@@ -313,7 +313,11 @@ pub struct Upstream {
     pub upstream_host: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retries: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "adc_sdk::resources::serialize_optional_whole_number_as_integer"
+    )]
     pub retry_timeout: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Timeout>,

@@ -75,7 +75,7 @@ fn deserializes_full_health_check_block() {
     let checks_patch = f["defaultValue"]["core"]["service"]["upstream"]["checks"].clone();
     let checks: UpstreamHealthCheck = serde_json::from_value(checks_patch).expect("deserialize checks");
 
-    assert_eq!(checks.active.concurrency, 10.0);
+    assert_eq!(checks.active.concurrency, 10);
     let active_healthy = checks.active.healthy.expect("active.healthy");
     assert_eq!(active_healthy.successes, 2);
     let passive = checks.passive.expect("passive");
