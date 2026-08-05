@@ -296,9 +296,10 @@ async fn syncs_and_dumps_ssls() {
     .await
     .unwrap();
 
+    // Not sorted, unlike the dump above: the just-updated ssl1 comes back
+    // first in the dashboard's own natural order.
     let dump = dump_configuration(&backend).await.unwrap();
-    let mut ssls = dump.ssls.unwrap();
-    ssls.sort_by(|a, b| a.id.cmp(&b.id));
+    let ssls = dump.ssls.unwrap();
     let mut expected = ssl1.clone();
     expected["certificates"][0]
         .as_object_mut()
