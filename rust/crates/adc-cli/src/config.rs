@@ -18,7 +18,7 @@ use crate::error::CliError;
 const ARRAY_KEYS: &[&str] = &["services", "ssls", "consumers", "consumer_groups"];
 const MAP_KEYS: &[&str] = &["global_rules", "plugin_metadata"];
 
-const MANAGED_BY_LABEL_KEY: &str = "managed-by";
+pub(crate) const MANAGED_BY_LABEL_KEY: &str = "managed-by";
 const MANAGED_BY_LABEL_VALUE: &str = "adc";
 
 /// Expands glob patterns (defaulting to `adc.yaml` when none are given) and

@@ -87,11 +87,23 @@ pub fn resource_type_sets(args: &BackendArgs) -> (HashSet<ResourceType>, HashSet
     (include, exclude)
 }
 
-/// Parses `--label-selector key=value` entries into a map. Rejects an entry
-/// without a `=` rather than silently dropping it — a typo here should fail
-/// loudly, not quietly select nothing.
+/// Parses `--label-selector key=value` entries into a map. Unconditionally
+/// rejects `managed-by` as a key.
 pub fn label_selector_map(args: &BackendArgs) -> Result<HashMap<String, String>, CliError> {
-    args.label_selector
+    let selector = parse_label_selector(&args.label_selector)?;
+    if selector.contains_key(config::MANAGED_BY_LABEL_KEY) {
+        return Err(CliError::msg(format!(
+            "--label-selector cannot filter on \"{}\"",
+            config::MANAGED_BY_LABEL_KEY
+        )));
+    }
+    Ok(selector)
+}
+
+/// Rejects an entry without a `=` rather than silently dropping it — a typo
+/// here should fail loudly, not quietly select nothing.
+fn parse_label_selector(entries: &[String]) -> Result<HashMap<String, String>, CliError> {
+    entries
         .iter()
         .map(|entry| {
             entry
@@ -177,5 +189,66 @@ fn to_diff_map(configuration: &Configuration) -> Result<InternalConfiguration, C
     match serde_json::to_value(configuration)? {
         serde_json::Value::Object(map) => Ok(map),
         _ => unreachable!("Configuration always serializes to a JSON object"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::cli::BackendKind;
+
+    use super::*;
+
+    #[test]
+    fn parses_key_value_entries_into_a_map() {
+        let selector = parse_label_selector(&["env=prod".to_string(), "team=core".to_string()]).unwrap();
+        assert_eq!(selector.get("env"), Some(&"prod".to_string()));
+        assert_eq!(selector.get("team"), Some(&"core".to_string()));
+    }
+
+    #[test]
+    fn rejects_an_entry_with_no_equals_sign() {
+        assert!(parse_label_selector(&["not-a-pair".to_string()]).is_err());
+    }
+
+    #[test]
+    fn an_empty_selector_is_fine() {
+        assert!(parse_label_selector(&[]).unwrap().is_empty());
+    }
+
+    fn backend_args(label_selector: Vec<String>) -> BackendArgs {
+        BackendArgs {
+            backend: BackendKind::Apisix,
+            server: "http://localhost:9180".to_string(),
+            token: None,
+            gateway_group: "default".to_string(),
+            label_selector,
+            include_resource_type: vec![],
+            exclude_resource_type: vec![],
+            timeout: Duration::from_secs(10),
+            ca_cert_file: None,
+            tls_client_cert_file: None,
+            tls_client_key_file: None,
+            tls_skip_verify: false,
+            managed_by_label: true,
+        }
+    }
+
+    #[test]
+    fn rejects_managed_by_as_a_selector_key_regardless_of_the_value_supplied() {
+        let args = backend_args(vec!["managed-by=custom".to_string()]);
+        let error = label_selector_map(&args).unwrap_err();
+        assert!(error.to_string().contains("managed-by"), "{error}");
+    }
+
+    #[test]
+    fn a_managed_by_label_selector_regression_is_rejected_outright() {
+        // --managed-by-label (the default) together with
+        // --label-selector managed-by=<value> — this used to let the
+        // automatic stamp silently win over the selector's value; now it's
+        // rejected outright instead.
+        let args = backend_args(vec!["managed-by=custom".to_string()]);
+        assert!(label_selector_map(&args).is_err());
     }
 }

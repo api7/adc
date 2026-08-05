@@ -23,6 +23,7 @@ struct GatewayGroupListResponse {
 #[derive(Deserialize)]
 struct GatewayGroupSummary {
     id: String,
+    name: String,
 }
 
 pub struct GatewayGroupResolver {
@@ -58,14 +59,49 @@ impl GatewayGroupResolver {
                     .query(&[("search", self.name.as_str()), ("name", self.name.as_str())]);
                 let response: GatewayGroupListResponse = self.client.send_json(request).await?;
 
-                let group = response.list.into_iter().next().ok_or_else(|| {
-                    BackendError::Other(
-                        format!("Gateway group \"{}\" does not exist", self.name).into(),
-                    )
-                })?;
-                Ok(Some(group.id))
+                find_exact_match(response.list, &self.name)
+                    .ok_or_else(|| {
+                        BackendError::Other(
+                            format!("Gateway group \"{}\" does not exist", self.name).into(),
+                        )
+                    })
+                    .map(|group| Some(group.id))
             })
             .await?;
         Ok(id.clone())
+    }
+}
+
+/// `search`/`name` on `/api/gateway_groups` is a substring/fuzzy filter,
+/// not an exact-match lookup — a request for `"prod"` can come back with
+/// `"prod"`, `"prod-2"`, and `"non-prod"` all in the same `list`. Picks the
+/// one entry whose `name` matches exactly, rather than assuming the first
+/// result returned is the one that was asked for.
+fn find_exact_match(groups: Vec<GatewayGroupSummary>, name: &str) -> Option<GatewayGroupSummary> {
+    groups.into_iter().find(|group| group.name == name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn group(id: &str, name: &str) -> GatewayGroupSummary {
+        GatewayGroupSummary {
+            id: id.to_string(),
+            name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn picks_the_entry_whose_name_matches_exactly() {
+        let groups = vec![group("id-1", "prod-2"), group("id-2", "prod"), group("id-3", "non-prod")];
+        let matched = find_exact_match(groups, "prod").unwrap();
+        assert_eq!(matched.id, "id-2");
+    }
+
+    #[test]
+    fn no_exact_match_among_fuzzy_results_returns_none() {
+        let groups = vec![group("id-1", "prod-2"), group("id-3", "non-prod")];
+        assert!(find_exact_match(groups, "prod").is_none());
     }
 }
