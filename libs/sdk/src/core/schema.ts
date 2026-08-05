@@ -2,8 +2,8 @@ import { isNil } from 'lodash-es';
 import type { ZodRawShape } from 'zod';
 import { z } from 'zod';
 
-import { FieldListType } from './resource';
 import { withDifferMeta } from './field-registry';
+import { FieldListType } from './resource';
 
 const idSchema = z
   .string()
@@ -40,6 +40,18 @@ export type UpstreamHealthCheck = NonNullable<
 export type UpstreamTimeout = z.infer<typeof timeoutSchema>;
 const hostSchema = z.string().min(1);
 const portSchema = z.coerce.number().int().min(1).max(65535);
+const methodSchema = z.enum([
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'HEAD',
+  'OPTIONS',
+  'CONNECT',
+  'TRACE',
+  'PURGE',
+]);
 const secretRefSchema = z.string().regex(/^\$(secret|env):\/\//);
 const certificateSchema = z.union(
   [
@@ -121,9 +133,11 @@ const upstreamSchema = (extend?: ZodRawShape) =>
             concurrency: z.coerce.number().default(10).optional(),
             host: hostSchema.optional(),
             port: portSchema.optional(),
+            http_method: methodSchema.default('GET').optional(),
             http_path: z.string().default('/').optional(),
+            http_req_headers: z.array(z.string()).min(1).optional(),
+            http_req_body: z.string().default('').optional(),
             https_verify_certificate: z.boolean().default(true).optional(),
-            http_request_headers: z.array(z.string()).min(1).optional(),
             healthy: z
               .strictObject({
                 ...upstreamHealthCheckPassiveHealthy.shape,
@@ -205,23 +219,7 @@ const routeSchema = z.strictObject({
   priority: z.coerce.number().int().optional(),
   timeout: timeoutSchema.optional(),
   vars: exprSchema.optional(),
-  methods: z
-    .array(
-      z.enum([
-        'GET',
-        'POST',
-        'PUT',
-        'DELETE',
-        'PATCH',
-        'HEAD',
-        'OPTIONS',
-        'CONNECT',
-        'TRACE',
-        'PURGE',
-      ]),
-    )
-    .nonempty()
-    .optional(),
+  methods: z.array(methodSchema).nonempty().optional(),
   enable_websocket: z.boolean().optional(),
   remote_addrs: z
     .array(
@@ -230,7 +228,9 @@ const routeSchema = z.strictObject({
       }),
     )
     .optional(),
-  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), {
+    listType: FieldListType.OBJECT_MAP,
+  }),
   filter_func: z.string().optional(),
 });
 export type Route = z.infer<typeof routeSchema>;
@@ -242,7 +242,9 @@ const streamRouteSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), {
+    listType: FieldListType.OBJECT_MAP,
+  }),
 
   remote_addr: z.string().optional(),
   server_addr: z.string().optional(),
@@ -260,19 +262,28 @@ export const serviceBaseSchema = z.strictObject({
 
   upstream: upstreamSchema().optional(),
   upstreams: withDifferMeta(
-    z.array(upstreamSchema({ id: idSchema.optional(), name: z.string() })).optional(),
+    z
+      .array(upstreamSchema({ id: idSchema.optional(), name: z.string() }))
+      .optional(),
     { listType: FieldListType.MAP, listMapKey: 'name', nested: true },
   ),
-  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), {
+    listType: FieldListType.OBJECT_MAP,
+  }),
   path_prefix: z.string().optional(),
   strip_path_prefix: z.boolean().optional(),
   hosts: z.array(hostSchema).optional(),
 
-  routes: withDifferMeta(z.array(routeSchema).optional(), { listType: FieldListType.MAP, listMapKey: 'name', nested: true }),
-  stream_routes: withDifferMeta(
-    z.array(streamRouteSchema).optional(),
-    { listType: FieldListType.MAP, listMapKey: 'name', nested: true },
-  ),
+  routes: withDifferMeta(z.array(routeSchema).optional(), {
+    listType: FieldListType.MAP,
+    listMapKey: 'name',
+    nested: true,
+  }),
+  stream_routes: withDifferMeta(z.array(streamRouteSchema).optional(), {
+    listType: FieldListType.MAP,
+    listMapKey: 'name',
+    nested: true,
+  }),
 });
 const serviceSchema = serviceBaseSchema
   .refine(
@@ -346,11 +357,15 @@ export const consumerSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
-  credentials: withDifferMeta(
-    z.array(consumerCredentialSchema).optional(),
-    { listType: FieldListType.MAP, listMapKey: 'name', nested: true, configKey: 'consumer_credentials' },
-  ),
+  plugins: withDifferMeta(pluginsSchema.optional(), {
+    listType: FieldListType.OBJECT_MAP,
+  }),
+  credentials: withDifferMeta(z.array(consumerCredentialSchema).optional(), {
+    listType: FieldListType.MAP,
+    listMapKey: 'name',
+    nested: true,
+    configKey: 'consumer_credentials',
+  }),
 });
 export type Consumer = z.infer<typeof consumerSchema>;
 
@@ -360,12 +375,15 @@ export const consumerGroupSchema = z.strictObject({
   description: descriptionSchema.optional(),
   labels: labelsSchema.optional(),
 
-  plugins: withDifferMeta(pluginsSchema.optional(), { listType: FieldListType.OBJECT_MAP }),
+  plugins: withDifferMeta(pluginsSchema.optional(), {
+    listType: FieldListType.OBJECT_MAP,
+  }),
 
-  consumers: withDifferMeta(
-    z.array(consumerSchema).optional(),
-    { listType: FieldListType.MAP, listMapKey: 'username', nested: true },
-  ),
+  consumers: withDifferMeta(z.array(consumerSchema).optional(), {
+    listType: FieldListType.MAP,
+    listMapKey: 'username',
+    nested: true,
+  }),
 });
 export type ConsumerGroup = z.infer<typeof consumerGroupSchema>;
 

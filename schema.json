@@ -120,20 +120,40 @@
                         "minimum": 1,
                         "maximum": 65535
                       },
+                      "http_method": {
+                        "default": "GET",
+                        "type": "string",
+                        "enum": [
+                          "GET",
+                          "POST",
+                          "PUT",
+                          "DELETE",
+                          "PATCH",
+                          "HEAD",
+                          "OPTIONS",
+                          "CONNECT",
+                          "TRACE",
+                          "PURGE"
+                        ]
+                      },
                       "http_path": {
                         "default": "/",
                         "type": "string"
                       },
-                      "https_verify_certificate": {
-                        "default": true,
-                        "type": "boolean"
-                      },
-                      "http_request_headers": {
+                      "http_req_headers": {
                         "minItems": 1,
                         "type": "array",
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "http_req_body": {
+                        "default": "",
+                        "type": "string"
+                      },
+                      "https_verify_certificate": {
+                        "default": true,
+                        "type": "boolean"
                       },
                       "healthy": {
                         "type": "object",
@@ -552,20 +572,40 @@
                           "minimum": 1,
                           "maximum": 65535
                         },
+                        "http_method": {
+                          "default": "GET",
+                          "type": "string",
+                          "enum": [
+                            "GET",
+                            "POST",
+                            "PUT",
+                            "DELETE",
+                            "PATCH",
+                            "HEAD",
+                            "OPTIONS",
+                            "CONNECT",
+                            "TRACE",
+                            "PURGE"
+                          ]
+                        },
                         "http_path": {
                           "default": "/",
                           "type": "string"
                         },
-                        "https_verify_certificate": {
-                          "default": true,
-                          "type": "boolean"
-                        },
-                        "http_request_headers": {
+                        "http_req_headers": {
                           "minItems": 1,
                           "type": "array",
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "http_req_body": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "https_verify_certificate": {
+                          "default": true,
+                          "type": "boolean"
                         },
                         "healthy": {
                           "type": "object",
