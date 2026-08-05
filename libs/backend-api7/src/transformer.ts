@@ -233,7 +233,9 @@ export class FromADC {
       name: service.name,
       desc: service.description,
       labels: FromADC.transformLabels(service.labels),
-      upstream: service.upstream as typing.Upstream,
+      upstream: service.upstream
+        ? this.transformUpstream(service.upstream)
+        : undefined,
       plugins: service.plugins,
       path_prefix: service.path_prefix,
       strip_path_prefix: service.strip_path_prefix,

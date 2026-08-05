@@ -81,5 +81,33 @@ describe('Transformer', () => {
         },
       });
     });
+
+    // Regression: FromADC.transformService used to cast service.upstream
+    // directly to typing.Upstream instead of routing it through
+    // transformUpstream, so an inline upstream's http_req_headers never got
+    // mapped to API7's req_headers.
+    it('FromADC.transformService maps inline upstream http_req_headers to req_headers', () => {
+      const out = new FromADC().transformService({
+        id: 'svc1',
+        name: 'svc1',
+        upstream: {
+          name: 'ups1',
+          checks: {
+            active: {
+              type: 'http',
+              http_req_headers: ['X-Foo: bar'],
+              http_req_body: 'ping',
+            },
+          },
+        },
+      } as ADCSDK.Service);
+      expect(out.upstream?.checks).toEqual({
+        active: {
+          type: 'http',
+          req_headers: ['X-Foo: bar'],
+          http_req_body: 'ping',
+        },
+      });
+    });
   });
 });
