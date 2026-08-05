@@ -40,13 +40,13 @@ overrides:
   path-to-regexp: '>=8.4.0'
   body-parser: '>=2.2.1'
   qs: '>=6.14.2'
-  fast-uri: '>=4.1.1'
+  fast-uri: '>=4.1.2'
   postcss: '>=8.5.18'
-  'minimatch@10>brace-expansion': '5.0.8'
-  'nx>brace-expansion': '5.0.8'
+  'minimatch@10>brace-expansion': '5.0.9'
+  'nx>brace-expansion': '5.0.9'
   # @trivago/prettier-plugin-sort-imports pins minimatch@^9, which drags in the
   # unpatched brace-expansion@2.x line (GHSA-mh99-v99m-4gvg). Force it onto minimatch@10
-  # instead, which already resolves to the patched brace-expansion@5.0.8.
+  # instead, which already resolves to the patched brace-expansion@5.0.9.
   '@trivago/prettier-plugin-sort-imports>minimatch': '^10.0.0'
 
 strictPeerDependencies: false
