@@ -219,6 +219,47 @@ fn repair_upstream_nodes(upstream: &mut Value) {
     }
 }
 
+/// A schema-derived default `client` entry commonly declares only `depth`
+/// (`{"depth": 1}`) — there's no sensible universal default for `ca` (a CA
+/// certificate). `adc_sdk::resources::SslClient` requires it (deliberately,
+/// for real fetched/authored data), so deserializing straight into it fails
+/// on exactly this partial shape. This lenient stand-in exists only to
+/// absorb that one gap: real fetched SSL data always has a complete
+/// `client` block and never needs it.
+#[derive(Deserialize)]
+struct LenientSslClient {
+    #[serde(default)]
+    ca: String,
+    #[serde(default)]
+    depth: u32,
+    #[serde(default)]
+    skip_mtls_uri_regex: Option<Vec<String>>,
+}
+
+impl From<LenientSslClient> for adc::SslClient {
+    fn from(client: LenientSslClient) -> Self {
+        adc::SslClient {
+            ca: client.ca,
+            depth: client.depth,
+            skip_mtls_uri_regex: client.skip_mtls_uri_regex,
+        }
+    }
+}
+
+/// Rewrites `ssl["client"]` in place through [`LenientSslClient`], the same
+/// way [`repair_upstream_nodes`] does for a partial upstream node.
+fn repair_ssl_client(ssl: &mut Value) {
+    let Some(client) = ssl.get("client") else {
+        return;
+    };
+    let Ok(lenient) = serde_json::from_value::<LenientSslClient>(client.clone()) else {
+        return;
+    };
+    if let Ok(repaired) = serde_json::to_value(adc::SslClient::from(lenient)) {
+        ssl["client"] = repaired;
+    }
+}
+
 /// Runs an extracted default object through the same read-direction
 /// transform the fetcher applies to a real fetched resource, by treating
 /// it as a (partial) API7 wire-shape object.
@@ -243,6 +284,7 @@ fn transform_default(resource_type: ResourceType, mut data: Value) -> Option<Val
             serde_json::to_value(adc::Service::try_from(service).ok()?).ok()
         }
         ResourceType::Ssl => {
+            repair_ssl_client(&mut data);
             let ssl: typing::Ssl = serde_json::from_value(data).ok()?;
             serde_json::to_value(adc::SSL::from(ssl)).ok()
         }
@@ -401,5 +443,26 @@ mod tests {
         let transformed = transform_default(ResourceType::Service, data).unwrap();
         assert_eq!(transformed["upstream"]["nodes"][0]["host"], "");
         assert_eq!(transformed["strip_path_prefix"], true);
+    }
+
+    #[test]
+    fn repair_ssl_client_fills_in_a_partial_client_with_zero_values() {
+        let mut ssl = json!({ "client": { "depth": 1 } });
+        repair_ssl_client(&mut ssl);
+        assert_eq!(ssl["client"], json!({ "ca": "", "depth": 1 }));
+    }
+
+    #[test]
+    fn repair_ssl_client_is_a_no_op_with_no_client_field() {
+        let mut ssl = json!({ "type": "server" });
+        repair_ssl_client(&mut ssl);
+        assert_eq!(ssl, json!({ "type": "server" }));
+    }
+
+    #[test]
+    fn an_ssl_with_only_a_partial_default_client_still_produces_a_default() {
+        let data = json!({ "client": { "depth": 1 } });
+        let transformed = transform_default(ResourceType::Ssl, data).unwrap();
+        assert_eq!(transformed["client"]["depth"], 1);
     }
 }
