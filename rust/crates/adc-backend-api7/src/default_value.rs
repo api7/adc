@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use adc_backend_core::{HttpClient, Method};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{BackendError, DefaultValue, ResourceType};
+use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::typing;
@@ -162,6 +163,62 @@ fn resource_type_from_str(value: &str) -> Option<ResourceType> {
     })
 }
 
+/// A schema-derived default `nodes` entry commonly declares only
+/// `priority` (`{"priority": 0}`) — there's no sensible universal default
+/// for `host`/`port`/`weight`, so the schema never populates them.
+/// `adc_sdk::resources::UpstreamNode` requires all three (deliberately, for
+/// real fetched/authored data), so deserializing straight into it fails on
+/// exactly this partial shape. This lenient stand-in exists only to absorb
+/// that one gap: real fetched upstream data always has complete nodes and
+/// never needs it.
+#[derive(Deserialize)]
+struct LenientUpstreamNode {
+    #[serde(default)]
+    host: String,
+    #[serde(default)]
+    port: u32,
+    #[serde(default)]
+    weight: i64,
+    #[serde(default)]
+    priority: f64,
+    #[serde(default)]
+    metadata: Option<Map<String, Value>>,
+}
+
+impl From<LenientUpstreamNode> for adc::UpstreamNode {
+    fn from(node: LenientUpstreamNode) -> Self {
+        adc::UpstreamNode {
+            host: node.host,
+            port: node.port,
+            weight: node.weight,
+            priority: node.priority,
+            metadata: node.metadata,
+        }
+    }
+}
+
+/// Rewrites `upstream["nodes"]` in place through [`LenientUpstreamNode`], so
+/// the strict typed deserialization downstream in [`transform_default`]
+/// sees a structurally complete (if zero-valued) node instead of a bare
+/// `{"priority": 0}`. A no-op if `upstream` has no `nodes` array, or if a
+/// specific entry doesn't even parse as the lenient shape (left as-is,
+/// letting the caller's own strict deserialization fail and drop that
+/// resource type's default the way it already does for any other
+/// unrecoverable shape).
+fn repair_upstream_nodes(upstream: &mut Value) {
+    let Some(nodes) = upstream.get_mut("nodes").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for node in nodes {
+        let Ok(lenient) = serde_json::from_value::<LenientUpstreamNode>(node.clone()) else {
+            continue;
+        };
+        if let Ok(repaired) = serde_json::to_value(adc::UpstreamNode::from(lenient)) {
+            *node = repaired;
+        }
+    }
+}
+
 /// Runs an extracted default object through the same read-direction
 /// transform the fetcher applies to a real fetched resource, by treating
 /// it as a (partial) API7 wire-shape object.
@@ -172,13 +229,16 @@ fn resource_type_from_str(value: &str) -> Option<ResourceType> {
 /// all for that resource type rather than failing the whole call — a
 /// resource type without a usable default just doesn't show up in the
 /// result, and every other resource type's default is unaffected.
-fn transform_default(resource_type: ResourceType, data: Value) -> Option<Value> {
+fn transform_default(resource_type: ResourceType, mut data: Value) -> Option<Value> {
     match resource_type {
         ResourceType::Route => {
             let route: typing::Route = serde_json::from_value(data).ok()?;
             serde_json::to_value(adc::Route::try_from(route).ok()?).ok()
         }
         ResourceType::Service | ResourceType::InternalStreamService => {
+            if let Some(upstream) = data.get_mut("upstream") {
+                repair_upstream_nodes(upstream);
+            }
             let service: typing::Service = serde_json::from_value(data).ok()?;
             serde_json::to_value(adc::Service::try_from(service).ok()?).ok()
         }
@@ -191,6 +251,7 @@ fn transform_default(resource_type: ResourceType, data: Value) -> Option<Value> 
             serde_json::to_value(adc::Consumer::from(consumer)).ok()
         }
         ResourceType::Upstream => {
+            repair_upstream_nodes(&mut data);
             let upstream: typing::Upstream = serde_json::from_value(data).ok()?;
             serde_json::to_value(adc::Upstream::from(upstream)).ok()
         }
@@ -312,5 +373,33 @@ mod tests {
             Some(ResourceType::InternalStreamService)
         );
         assert_eq!(resource_type_from_str("not_a_real_type"), None);
+    }
+
+    #[test]
+    fn repair_upstream_nodes_fills_in_a_partial_node_with_zero_values() {
+        let mut upstream = json!({ "nodes": [{ "priority": 0 }] });
+        repair_upstream_nodes(&mut upstream);
+        assert_eq!(
+            upstream["nodes"],
+            json!([{ "host": "", "port": 0, "weight": 0, "priority": 0.0 }])
+        );
+    }
+
+    #[test]
+    fn repair_upstream_nodes_is_a_no_op_with_no_nodes_field() {
+        let mut upstream = json!({ "scheme": "http" });
+        repair_upstream_nodes(&mut upstream);
+        assert_eq!(upstream, json!({ "scheme": "http" }));
+    }
+
+    #[test]
+    fn a_service_with_only_a_partial_default_upstream_node_still_produces_a_default() {
+        let data = json!({
+            "strip_path_prefix": true,
+            "upstream": { "nodes": [{ "priority": 0 }], "scheme": "http" },
+        });
+        let transformed = transform_default(ResourceType::Service, data).unwrap();
+        assert_eq!(transformed["upstream"]["nodes"][0]["host"], "");
+        assert_eq!(transformed["strip_path_prefix"], true);
     }
 }
