@@ -1,6 +1,3 @@
-//! Ties the fetcher, operator, and validator together behind
-//! `adc_sdk::Backend` — the interface the CLI actually dispatches through.
-
 use adc_backend_core::{HttpClient, Method, ResourceFilter};
 use adc_sdk::resources::Configuration;
 use adc_sdk::{
