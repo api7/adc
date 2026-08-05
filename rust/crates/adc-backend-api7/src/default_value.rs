@@ -230,10 +230,15 @@ fn repair_upstream_nodes(upstream: &mut Value) {
 struct LenientSslClient {
     #[serde(default)]
     ca: String,
-    #[serde(default)]
+    #[serde(default = "default_client_depth")]
     depth: u32,
     #[serde(default)]
     skip_mtls_uri_regex: Option<Vec<String>>,
+}
+
+/// Matches `adc_sdk::resources::SslClient`'s own default for this field.
+fn default_client_depth() -> u32 {
+    1
 }
 
 impl From<LenientSslClient> for adc::SslClient {
@@ -450,6 +455,13 @@ mod tests {
         let mut ssl = json!({ "client": { "depth": 1 } });
         repair_ssl_client(&mut ssl);
         assert_eq!(ssl["client"], json!({ "ca": "", "depth": 1 }));
+    }
+
+    #[test]
+    fn repair_ssl_client_defaults_a_missing_depth_to_one_not_zero() {
+        let mut ssl = json!({ "client": {} });
+        repair_ssl_client(&mut ssl);
+        assert_eq!(ssl["client"]["depth"], 1);
     }
 
     #[test]

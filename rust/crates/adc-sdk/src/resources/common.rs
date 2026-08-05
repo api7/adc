@@ -38,7 +38,13 @@ pub fn serialize_whole_number_as_integer<S: serde::Serializer>(
     value: &f64,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    if value.fract() == 0.0 && value.is_finite() && value.abs() <= i64::MAX as f64 {
+    // `i64::MAX as f64` itself rounds up to `2f64.powi(63)` (an `f64` can't
+    // represent `i64::MAX` exactly), so comparing against it as an upper
+    // bound would let a value at or beyond `i64`'s actual range through —
+    // `as i64` on that saturates to `i64::MAX` instead of preserving the
+    // real value, silently corrupting it. Comparing against `2f64.powi(63)`
+    // directly (exclusive) is exact.
+    if value.fract() == 0.0 && value.is_finite() && value.abs() < 2f64.powi(63) {
         serializer.serialize_i64(*value as i64)
     } else {
         serializer.serialize_f64(*value)
@@ -88,5 +94,30 @@ mod tests {
         let timeout = Timeout { connect: 1.5, send: 222.0, read: 333.0 };
         let json = serde_json::to_string(&timeout).unwrap();
         assert!(json.contains("\"connect\":1.5"), "{json}");
+    }
+
+    #[derive(Serialize)]
+    struct WholeNumber(#[serde(serialize_with = "serialize_whole_number_as_integer")] f64);
+
+    #[test]
+    fn a_large_but_in_range_whole_number_still_serializes_as_an_integer() {
+        // `2^62` is exactly representable as both `f64` and `i64`, and well
+        // clear of the boundary this function has to guard.
+        let value = 2f64.powi(62);
+        let json = serde_json::to_string(&WholeNumber(value)).unwrap();
+        assert_eq!(json, (2i64.pow(62)).to_string());
+    }
+
+    #[test]
+    fn a_value_at_two_to_the_63_falls_back_to_a_float_instead_of_an_incorrect_integer() {
+        // `2^63` is exactly `i64::MAX + 1` — out of `i64`'s range. Naively
+        // comparing against `i64::MAX as f64` (itself rounded up to `2^63`,
+        // since `i64::MAX` isn't exactly representable as an `f64`) would
+        // let this through and `as i64` would silently saturate it down to
+        // `i64::MAX` — a wrong value. It must fall back to `f64` instead.
+        let value = 2f64.powi(63);
+        let json = serde_json::to_string(&WholeNumber(value)).unwrap();
+        assert_ne!(json, i64::MAX.to_string(), "{json}");
+        assert_eq!(json.parse::<f64>().unwrap(), value);
     }
 }
