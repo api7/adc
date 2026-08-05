@@ -5,7 +5,13 @@
 //! the ADC type, so a caller can write either `adc::Route::try_from(route)`
 //! or `route.try_into()`. Write direction (ADC -> API7, used by the
 //! operator/validator): plain `From` on the wire type, since nothing here
-//! can fail the way parsing a live server's response can.
+//! can fail the way parsing a live server's response can — except `SSL`,
+//! whose `certificates` list can be empty (nothing stops a locally-authored
+//! config from omitting it, and the read direction deliberately tolerates
+//! that on the way *in*), but there's no wire representation of "no
+//! certificate at all" to send back *out*: the server would just reject an
+//! empty `cert`/`key` string outright. `TryFrom` rejects that case here,
+//! before a doomed request is ever built.
 //! `Service`/`Route`/`StreamRoute`'s write-direction id fields
 //! (`service_id`/`route_id`/`stream_route_id`) and the two conversions that
 //! need more than the resource itself (a route/stream route needs its
@@ -417,17 +423,21 @@ impl From<adc::ConsumerCredential> for typing::ConsumerCredential {
     }
 }
 
-impl From<adc::SSL> for typing::Ssl {
-    fn from(ssl: adc::SSL) -> Self {
+impl TryFrom<adc::SSL> for typing::Ssl {
+    type Error = String;
+
+    fn try_from(ssl: adc::SSL) -> Result<Self, Self::Error> {
         let mut certificates = ssl.certificates.into_iter();
-        let first = certificates.next().unwrap_or(adc::SSLCertificate {
-            certificate: String::new(),
-            key: String::new(),
-        });
+        let Some(first) = certificates.next() else {
+            return Err(format!(
+                "SSL {:?} has no certificates to write",
+                ssl.id.as_deref().unwrap_or("<unknown>")
+            ));
+        };
         let (certs, keys): (Vec<String>, Vec<String>) =
             certificates.map(|c| (c.certificate, c.key)).unzip();
 
-        typing::Ssl {
+        Ok(typing::Ssl {
             id: ssl.id,
             labels: transform_labels_to_wire(ssl.labels),
 
@@ -440,7 +450,7 @@ impl From<adc::SSL> for typing::Ssl {
             snis: Some(ssl.snis),
 
             status: Some(1),
-        }
+        })
     }
 }
 

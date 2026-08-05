@@ -22,8 +22,13 @@ async fn ping_succeeds_against_a_real_dashboard() {
 #[tokio::test]
 #[ignore]
 async fn ping_fails_against_an_unreachable_server() {
+    // `127.0.0.1:1`, not bare `0.0.0.0`: on Linux, connecting to `0.0.0.0`
+    // gets silently remapped to loopback by the kernel, so if port 80
+    // happens to have something listening (plausible on a CI runner) this
+    // test would connect instead of failing the way it's meant to. Port 1
+    // on loopback is about as reliably unbound as it gets.
     let client = HttpClient::new(HttpClientConfig {
-        server: "http://0.0.0.0".to_string(),
+        server: "http://127.0.0.1:1".to_string(),
         token: String::new(),
         timeout: None,
         tls: TlsConfig::default(),

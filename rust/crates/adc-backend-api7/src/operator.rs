@@ -315,7 +315,7 @@ fn request_body(event: &Event) -> Result<Value, BackendError> {
         ResourceType::Ssl => {
             let mut ssl: adc::SSL = deserialize_event_value(new_value)?;
             ssl.id = Some(event.resource_id.clone());
-            to_request_body(typing::Ssl::from(ssl))
+            to_request_body(typing::Ssl::try_from(ssl).map_err(BackendError::Serialization)?)
         }
         ResourceType::ConsumerCredential => {
             let mut credential: adc::ConsumerCredential = deserialize_event_value(new_value)?;

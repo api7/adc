@@ -125,11 +125,9 @@ impl DashboardSession {
             .send()
             .await
             .unwrap_or_else(|e| panic!("PUT {path}: {e}"));
-        assert!(
-            response.status().is_success(),
-            "PUT {path} failed: {}",
-            response.status()
-        );
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        assert!(status.is_success(), "PUT {path} failed: {status}: {text}");
     }
 
     async fn post(&self, path: &str, body: Value) -> Value {
@@ -140,15 +138,11 @@ impl DashboardSession {
             .send()
             .await
             .unwrap_or_else(|e| panic!("POST {path}: {e}"));
-        assert!(
-            response.status().is_success(),
-            "POST {path} failed: {}",
-            response.status()
-        );
-        response
-            .json()
-            .await
-            .unwrap_or_else(|e| panic!("decoding response from POST {path}: {e}"))
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        assert!(status.is_success(), "POST {path} failed: {status}: {text}");
+        serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("decoding response from POST {path}: {e}: {text}"))
     }
 }
 
@@ -203,10 +197,7 @@ async fn bootstrap_token() -> String {
     let session = DashboardSession::new(server());
     session.wait_ready().await;
 
-    let version = env::var("BACKEND_API7_VERSION")
-        .ok()
-        .and_then(|v| semver::Version::parse(&v).ok())
-        .unwrap_or_else(|| semver::Version::new(0, 0, 0));
+    let version = server_version();
     let license = env::var("BACKEND_API7_LICENSE")
         .ok()
         .filter(|v| !v.is_empty());

@@ -21,6 +21,46 @@ fn core_default(
         .clone()
 }
 
+/// Which of this file's three `#[ignore]`d tests a given version's gate
+/// selects — kept in one place so [`version_gates_are_exhaustive`] can
+/// verify no version (including `server_version()`'s own "unset" fallback
+/// of `999.999.999`) slips through all three and leaves every test
+/// reporting a silent pass without actually asserting anything.
+fn gate_for(version: &Version) -> &'static str {
+    if *version < Version::new(3, 6, 0) {
+        "default_value_below_3_6_0"
+    } else if *version < Version::new(3, 8, 0) {
+        "default_value_from_3_6_0_below_3_8_0"
+    } else {
+        "default_value_from_3_8_0"
+    }
+}
+
+#[test]
+fn version_gates_are_exhaustive() {
+    assert_eq!(gate_for(&Version::new(0, 0, 0)), "default_value_below_3_6_0");
+    assert_eq!(
+        gate_for(&Version::new(3, 5, 99)),
+        "default_value_below_3_6_0"
+    );
+    assert_eq!(
+        gate_for(&Version::new(3, 6, 0)),
+        "default_value_from_3_6_0_below_3_8_0"
+    );
+    assert_eq!(
+        gate_for(&Version::new(3, 7, 99)),
+        "default_value_from_3_6_0_below_3_8_0"
+    );
+    assert_eq!(gate_for(&Version::new(3, 8, 0)), "default_value_from_3_8_0");
+    // `server_version()`'s own fallback for an unset `BACKEND_API7_VERSION`
+    // — must land on the same "newest" gate every other local-run default
+    // assumes, not silently miss all three.
+    assert_eq!(
+        gate_for(&Version::new(999, 999, 999)),
+        "default_value_from_3_8_0"
+    );
+}
+
 #[tokio::test]
 #[ignore]
 async fn default_value_below_3_6_0() {

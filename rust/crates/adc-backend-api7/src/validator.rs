@@ -116,7 +116,16 @@ impl Validator {
                     errors,
                 })
             }
-            _ => Err(HttpClient::require_success(response).await.unwrap_err()),
+            status => match HttpClient::require_success(response).await {
+                Err(error) => Err(error),
+                // `require_success` only accepts a 2xx status, and this arm
+                // is only reached for one that's neither 2xx nor 400 — so
+                // this is unreachable in practice, but a descriptive error
+                // beats a panic if that ever stops being true.
+                Ok(_) => Err(BackendError::Other(
+                    format!("unexpected successful response with status {status} from validate").into(),
+                )),
+            },
         }
     }
 }
@@ -208,7 +217,8 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             ResourceType::Ssl => {
                 let mut ssl: adc::SSL = deserialize_event_value(new_value)?;
                 ssl.id = Some(event.resource_id.clone());
-                body.ssls.push(typing::Ssl::from(ssl));
+                body.ssls
+                    .push(typing::Ssl::try_from(ssl).map_err(BackendError::Serialization)?);
                 track(&mut index, "ssls");
             }
             ResourceType::GlobalRule => {

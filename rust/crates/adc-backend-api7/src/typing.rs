@@ -161,6 +161,12 @@ pub struct ConsumerCredential {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Consumer {
+    /// `#[serde(default)]` even though a real consumer always has one: a
+    /// schema-derived default value object (see `crate::default_value`)
+    /// never declares one, and without this, deserializing that object
+    /// into `Consumer` would fail outright and drop consumers from the
+    /// default-value set entirely instead of contributing an empty `{}`.
+    #[serde(default)]
     pub username: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub desc: Option<String>,

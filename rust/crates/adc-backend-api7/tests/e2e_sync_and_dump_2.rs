@@ -25,6 +25,7 @@ async fn syncs_and_dumps_a_mixed_configuration() {
     let mut dump = dump_configuration(&backend).await.unwrap();
 
     let ssls = dump.ssls.as_ref().unwrap();
+    assert!(!ssls.is_empty(), "expected at least one ssl, got none");
     let mut ssl0 = serde_json::to_value(&ssls[0]).unwrap();
     let cert = ssl0["certificates"][0]["certificate"]
         .as_str()
@@ -42,6 +43,11 @@ async fn syncs_and_dumps_a_mixed_configuration() {
     );
 
     let mut services = dump.services.take().unwrap();
+    assert!(
+        services.len() >= 2,
+        "expected at least two services, got {}",
+        services.len()
+    );
     services.sort_by(|a, b| a.name.cmp(&b.name));
 
     assert_matches_object(

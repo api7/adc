@@ -327,13 +327,11 @@ pub fn filter_resource_types(
 }
 
 /// Drops resources whose `labels` don't carry every key/value pair in
-/// `labels`. Delegates to `adc_backend_core`, which both backends' own
-/// fetchers also call on their `dump()` output — this call here is a
-/// second, backend-agnostic pass, not the only place this runs: a fetcher's
-/// server-side `labels[key]=value` query filter isn't guaranteed to have
-/// actually narrowed anything (the admin API might silently ignore an
-/// unrecognized query param), so nothing upstream of this can be trusted to
-/// have already done the job.
+/// `labels`. Delegates to `adc_backend_core` — the same function
+/// `adc_backend_apisix::Fetcher::dump()` calls on its own output as a
+/// client-side backstop for its unreliable server-side `labels[key]=value`
+/// query filter. This call is what makes label filtering apply to `api7ee`
+/// too, whose fetcher does no client-side re-check of its own.
 pub fn filter_by_labels(config: &mut Configuration, labels: &HashMap<String, String>) {
     adc_backend_core::filter_configuration_by_labels(config, labels);
 }
