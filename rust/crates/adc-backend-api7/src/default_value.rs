@@ -180,7 +180,7 @@ struct LenientUpstreamNode {
     #[serde(default)]
     weight: i64,
     #[serde(default)]
-    priority: f64,
+    priority: i64,
     #[serde(default)]
     metadata: Option<Map<String, Value>>,
 }
@@ -381,7 +381,7 @@ mod tests {
         repair_upstream_nodes(&mut upstream);
         assert_eq!(
             upstream["nodes"],
-            json!([{ "host": "", "port": 0, "weight": 0, "priority": 0.0 }])
+            json!([{ "host": "", "port": 0, "weight": 0, "priority": 0 }])
         );
     }
 

@@ -136,7 +136,7 @@ fn route_parses_recognized_http_methods() {
 fn upstream_list_nodes_pass_through_unchanged() {
     let mut upstream = upstream();
     upstream.nodes =
-        Some(typing::UpstreamNodes::List(vec![adc::UpstreamNode { host: "10.0.0.1".into(), port: 8080, weight: 1, priority: 0.0, metadata: None }]));
+        Some(typing::UpstreamNodes::List(vec![adc::UpstreamNode { host: "10.0.0.1".into(), port: 8080, weight: 1, priority: 0, metadata: None }]));
     let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
     let nodes = adc_upstream.nodes.unwrap();
     assert_eq!(nodes.len(), 1);

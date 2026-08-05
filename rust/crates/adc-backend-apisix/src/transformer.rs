@@ -173,7 +173,7 @@ fn parse_discovery_map_nodes(
                 host,
                 port,
                 weight,
-                priority: 0.0,
+                priority: 0,
                 metadata: None,
             })
         })

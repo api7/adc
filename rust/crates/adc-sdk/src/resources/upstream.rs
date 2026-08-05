@@ -114,8 +114,11 @@ pub struct UpstreamNode {
     pub host: String,
     pub port: u32,
     pub weight: i64,
+    // Not `f64`: the gateway's own admin API rejects `0.0` for this field
+    // outright (its underlying type is a plain integer), even though it's
+    // numerically the same value `0` would be.
     #[serde(default)]
-    pub priority: f64,
+    pub priority: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Map<String, Value>>,
 }
