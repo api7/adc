@@ -3,14 +3,13 @@
 //! see `common`'s module doc for how to bring one up and run this file.
 
 use adc_backend_apisix_standalone::Backend;
-use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
 use adc_sdk::resources::Configuration;
 use adc_sdk::Backend as _;
 use adc_sdk::{BackendSyncOptions, ResourceType};
 use serde_json::json;
 
 mod common;
-use common::{backend, create_event, delete_event, update_event};
+use common::{backend, create_event, delete_event, raw_conf_version, update_event};
 
 async fn dump(backend: &Backend) -> Configuration {
     backend.dump().await.unwrap()
@@ -21,19 +20,6 @@ async fn sync_ok(backend: &Backend, events: Vec<adc_sdk::Event>) {
     for result in &results {
         assert!(result.success, "{:?}: {:?}", result.server, result.error);
     }
-}
-
-async fn raw_consumers_conf_version() -> Option<i64> {
-    let client = HttpClient::new(HttpClientConfig {
-        server: common::SERVER1.to_string(),
-        token: common::TOKEN.to_string(),
-        timeout: None,
-        tls: TlsConfig::default(),
-    })
-    .unwrap();
-    let request = client.request(Method::GET, "/apisix/admin/configs").unwrap();
-    let body: serde_json::Value = client.send_json(request).await.unwrap();
-    body.get("consumers_conf_version").and_then(|v| v.as_i64())
 }
 
 #[tokio::test]
@@ -76,7 +62,7 @@ async fn syncs_and_dumps_consumers_with_credentials() {
     assert!(credentials.iter().any(|c| c.name == cred1_name));
     assert!(credentials.iter().any(|c| c.name == cred2_name));
 
-    let version_before_update = raw_consumers_conf_version().await;
+    let version_before_update = raw_conf_version("consumers_conf_version").await;
     sync_ok(
         &backend,
         vec![update_event(
@@ -88,7 +74,7 @@ async fn syncs_and_dumps_consumers_with_credentials() {
         )],
     )
     .await;
-    let version_after_update = raw_consumers_conf_version().await;
+    let version_after_update = raw_conf_version("consumers_conf_version").await;
     assert!(version_after_update > version_before_update, "updating a credential must bump consumers_conf_version");
 
     let config = dump(&backend).await;

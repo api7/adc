@@ -52,6 +52,11 @@ pub struct BackendOptions {
     pub tls: TlsConfig,
 }
 
+/// Stands in for a version that couldn't be determined (missing/unparseable
+/// `Server` header) — high enough to unlock every version-gated code path,
+/// matching the TS backend's own `mockVersion` convention.
+const UNKNOWN_VERSION: Version = Version::new(999, 999, 999);
+
 pub struct Backend {
     servers: Vec<StandaloneServer>,
     cache_key: String,
@@ -126,14 +131,14 @@ impl Backend {
                     .and_then(|value| value.strip_prefix("APISIX/"));
                 Ok::<_, BackendError>(match header.map(Version::parse) {
                     Some(Ok(version)) => version,
-                    _ => Version::new(999, 999, 999),
+                    _ => UNKNOWN_VERSION,
                 })
             })
             .await?;
         // Only cache a genuinely observed version, not the "couldn't tell"
         // fallback — matches the TS backend's own `semverEQ(version,
         // mockVersion)` guard.
-        if *version != Version::new(999, 999, 999) {
+        if *version != UNKNOWN_VERSION {
             Cache::global().set_version(&self.cache_key, version.clone());
         }
         Ok(version.clone())

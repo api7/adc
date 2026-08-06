@@ -12,7 +12,7 @@ use std::time::Duration;
 use adc_backend_apisix_standalone::tests::Cache;
 use adc_backend_apisix_standalone::Backend;
 use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
-use adc_sdk::resources::Configuration;
+use adc_sdk::resources::{self as adc, Configuration};
 use adc_sdk::utils::generate_id;
 use adc_sdk::{DefaultValue, Event, EventKind, ResourceType};
 use serde_json::Value;
@@ -141,17 +141,21 @@ pub async fn restart_apisix() {
     }
 }
 
-/// Polls `server`'s admin API until it actually answers `/apisix/admin/configs`
-/// with something other than a 404. A fixed post-restart sleep isn't
-/// reliable across APISIX versions — older ones (confirmed against a real
-/// 3.13.0 instance in CI) take noticeably longer than others to finish
-/// re-registering their admin routes after `docker compose restart`, and a
-/// request landing in that window gets nginx's own bare 404 rather than a
-/// connection error. A 404 here is never a legitimate steady-state answer
-/// (even a genuinely fresh, never-configured document reads back as 200
-/// with every `*_conf_version` at 0 — confirmed by this same suite's own
-/// passing assertions elsewhere), so it's safe to treat as "not ready yet"
-/// unconditionally, alongside an outright connection failure.
+/// Polls `server`'s admin API until it answers `/apisix/admin/configs` with
+/// a genuine `200` — not merely "anything but 404". A fixed post-restart
+/// sleep isn't reliable across APISIX versions: real container logs from a
+/// 3.13.0 CI failure show `docker compose restart` returning (Docker's own
+/// "container started" signal) 1-2 full seconds *before* APISIX's own boot
+/// sequence inside it — `init_etcd`, then per-worker `init_worker_by_lua`
+/// loading ~80 plugins — actually finishes registering the admin routes.
+/// A request landing in that window can get more than just a plain 404:
+/// nginx's master process can already be accepting connections before
+/// content routing is live, so a stray non-404, non-200 status (a 5xx from
+/// Lua init not being ready, or similar) is possible too — checking only
+/// "not 404" treated one of those as "ready" once and let a real request
+/// moments later land back in the same still-initializing window. Requiring
+/// a 200 specifically, twice in a row, is a tighter bar that a single lucky
+/// sample during a churning startup can't satisfy by accident.
 async fn wait_until_ready(server: &str) {
     let client = HttpClient::new(HttpClientConfig {
         server: server.to_string(),
@@ -161,16 +165,19 @@ async fn wait_until_ready(server: &str) {
     })
     .unwrap();
 
-    const MAX_ATTEMPTS: u32 = 40;
+    const MAX_ATTEMPTS: u32 = 60;
+    const REQUIRED_CONSECUTIVE_SUCCESSES: u32 = 2;
+    let mut consecutive_successes = 0;
     for attempt in 1..=MAX_ATTEMPTS {
-        let ready = match client.request(Method::GET, "/apisix/admin/configs") {
+        let got_200 = match client.request(Method::GET, "/apisix/admin/configs") {
             Ok(request) => match client.execute(request).await {
-                Ok(response) => response.status().as_u16() != 404,
+                Ok(response) => response.status().as_u16() == 200,
                 Err(_) => false,
             },
             Err(_) => false,
         };
-        if ready {
+        consecutive_successes = if got_200 { consecutive_successes + 1 } else { 0 };
+        if consecutive_successes >= REQUIRED_CONSECUTIVE_SUCCESSES {
             return;
         }
         if attempt == MAX_ATTEMPTS {
@@ -198,6 +205,69 @@ pub fn diff(local: &Configuration, remote: &Configuration) -> Vec<Event> {
         }
     }
     adc_differ::DifferV4::diff(&to_diff_map(local), &to_diff_map(remote), None::<&DefaultValue>, None)
+}
+
+/// Reads one `*_conf_version` field straight off `SERVER1`'s admin API —
+/// bypasses this crate's own cache entirely, so it reflects what the server
+/// actually has, not what we think we last wrote. `field` is the raw JSON
+/// key, e.g. `"consumers_conf_version"`.
+pub async fn raw_conf_version(field: &str) -> Option<i64> {
+    let client = HttpClient::new(HttpClientConfig {
+        server: SERVER1.to_string(),
+        token: TOKEN.to_string(),
+        timeout: None,
+        tls: TlsConfig::default(),
+    })
+    .unwrap();
+    let request = client.request(Method::GET, "/apisix/admin/configs").unwrap();
+    let body: Value = client.send_json(request).await.unwrap();
+    body.get(field).and_then(Value::as_i64)
+}
+
+/// An `adc::Upstream` with every field at its zero value — shared starting
+/// point for tests that only care about a couple of fields, via struct
+/// update syntax (`..common::base_upstream()`).
+pub fn base_upstream() -> adc::Upstream {
+    adc::Upstream {
+        id: None,
+        name: None,
+        description: None,
+        labels: None,
+        r#type: adc::UpstreamBalancer::default(),
+        hash_on: None,
+        key: None,
+        checks: None,
+        nodes: None,
+        scheme: adc::UpstreamScheme::default(),
+        retries: None,
+        retry_timeout: None,
+        timeout: None,
+        tls: None,
+        keepalive_pool: None,
+        pass_host: adc::UpstreamPassHost::default(),
+        upstream_host: None,
+        service_name: None,
+        discovery_type: None,
+        discovery_args: None,
+    }
+}
+
+/// An `adc::Service` with every field at its zero value — see
+/// [`base_upstream`].
+pub fn base_service() -> adc::Service {
+    adc::Service {
+        id: None,
+        name: String::new(),
+        description: None,
+        labels: None,
+        upstream: None,
+        upstreams: None,
+        plugins: None,
+        path_prefix: None,
+        strip_path_prefix: None,
+        hosts: None,
+        routes: None,
+    }
 }
 
 pub fn empty_configuration() -> Configuration {

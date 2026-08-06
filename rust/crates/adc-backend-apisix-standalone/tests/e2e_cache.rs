@@ -19,7 +19,7 @@ use adc_sdk::Backend as _;
 use adc_sdk::BackendSyncOptions;
 
 mod common;
-use common::{backend, backend_for, backend_multi, diff, empty_configuration};
+use common::{backend, backend_for, backend_multi, base_service, base_upstream, diff, empty_configuration};
 
 async fn dump(backend: &Backend) -> Configuration {
     backend.dump().await.unwrap()
@@ -31,47 +31,6 @@ async fn sync_ok(backend: &Backend, events: Vec<adc_sdk::Event>) -> Vec<adc_sdk:
         assert!(result.success, "{:?}: {:?}", result.server, result.error);
     }
     results
-}
-
-fn base_upstream() -> adc::Upstream {
-    adc::Upstream {
-        id: None,
-        name: None,
-        description: None,
-        labels: None,
-        r#type: adc::UpstreamBalancer::default(),
-        hash_on: None,
-        key: None,
-        checks: None,
-        nodes: None,
-        scheme: adc::UpstreamScheme::default(),
-        retries: None,
-        retry_timeout: None,
-        timeout: None,
-        tls: None,
-        keepalive_pool: None,
-        pass_host: adc::UpstreamPassHost::default(),
-        upstream_host: None,
-        service_name: None,
-        discovery_type: None,
-        discovery_args: None,
-    }
-}
-
-fn base_service() -> adc::Service {
-    adc::Service {
-        id: None,
-        name: String::new(),
-        description: None,
-        labels: None,
-        upstream: None,
-        upstreams: None,
-        plugins: None,
-        path_prefix: None,
-        strip_path_prefix: None,
-        hosts: None,
-        routes: None,
-    }
 }
 
 fn node(host: &str, port: u32) -> adc::UpstreamNode {

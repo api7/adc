@@ -83,12 +83,12 @@ fn assert_original_layout() {
     assert_eq!(raw.services.as_ref().unwrap()[0].id, service_id);
     let upstreams = raw.upstreams.expect("default + 2 named upstreams were written");
     assert_eq!(upstreams.len(), 3);
-    assert_eq!(upstreams[0].name, "test", "index 0 is the service's own default upstream");
-    assert_eq!(upstreams[1].name, "nd-upstream1");
-    assert_eq!(upstreams[2].name, "nd-upstream2");
-    assert!(upstreams[0].labels.is_none(), "a service's default upstream never carries the service-id bookkeeping label");
-    assert_eq!(upstreams[1].labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
-    assert_eq!(upstreams[2].labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
+    let default_upstream = upstreams.iter().find(|u| u.name == "test").expect("the service's own default upstream");
+    let nd1 = upstreams.iter().find(|u| u.name == "nd-upstream1").expect("nd-upstream1");
+    let nd2 = upstreams.iter().find(|u| u.name == "nd-upstream2").expect("nd-upstream2");
+    assert!(default_upstream.labels.is_none(), "a service's default upstream never carries the service-id bookkeeping label");
+    assert_eq!(nd1.labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
+    assert_eq!(nd2.labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
 
     let config = common::cache().config(CACHE_KEY).expect("sync populated the config cache");
     let services = config.services.expect("service exists");
@@ -96,8 +96,7 @@ fn assert_original_layout() {
     let named = services[0].upstreams.as_ref().expect("named upstreams are nested under the service");
     assert_eq!(named.len(), 2);
     // The bookkeeping label must not leak into the ADC-facing model.
-    assert!(named[0].labels.as_ref().is_none_or(|l| !l.contains_key(ADC_UPSTREAM_SERVICE_ID_LABEL)));
-    assert!(named[1].labels.as_ref().is_none_or(|l| !l.contains_key(ADC_UPSTREAM_SERVICE_ID_LABEL)));
+    assert!(named.iter().all(|u| u.labels.as_ref().is_none_or(|l| !l.contains_key(ADC_UPSTREAM_SERVICE_ID_LABEL))));
 }
 
 #[tokio::test]
@@ -133,17 +132,18 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     let raw = common::cache().raw_config(CACHE_KEY).unwrap();
     let upstreams = raw.upstreams.unwrap();
     assert_eq!(upstreams.len(), 3);
-    assert_eq!(upstreams[1].name, "nd-upstream1");
+    let nd1 = upstreams.iter().find(|u| u.name == "nd-upstream1").expect("nd-upstream1");
     assert_eq!(
-        upstreams[1].labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)),
+        nd1.labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)),
         Some(&generate_id("test"))
     );
-    assert_eq!(upstreams[1].nodes.as_ref().unwrap()[0].host, "8.8.8.8");
+    assert_eq!(nd1.nodes.as_ref().unwrap()[0].host, "8.8.8.8");
 
     let config = common::cache().config(CACHE_KEY).unwrap();
     let services = config.services.unwrap();
     let named = services[0].upstreams.as_ref().unwrap();
     assert_eq!(named.len(), 2);
-    assert!(named[0].labels.as_ref().is_none_or(|l| !l.contains_key(ADC_UPSTREAM_SERVICE_ID_LABEL)));
-    assert_eq!(named[0].nodes.as_ref().unwrap()[0].host, "8.8.8.8");
+    let named_nd1 = named.iter().find(|u| u.name.as_deref() == Some("nd-upstream1")).expect("nd-upstream1");
+    assert!(named_nd1.labels.as_ref().is_none_or(|l| !l.contains_key(ADC_UPSTREAM_SERVICE_ID_LABEL)));
+    assert_eq!(named_nd1.nodes.as_ref().unwrap()[0].host, "8.8.8.8");
 }

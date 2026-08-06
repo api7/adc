@@ -3,14 +3,13 @@
 //! see `common`'s module doc for how to bring one up and run this file.
 
 use adc_backend_apisix_standalone::Backend;
-use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
 use adc_sdk::resources::Configuration;
 use adc_sdk::Backend as _;
 use adc_sdk::{BackendSyncOptions, ResourceType};
 use serde_json::json;
 
 mod common;
-use common::{backend, create_event, delete_event, update_event};
+use common::{backend, create_event, delete_event, raw_conf_version, update_event};
 
 async fn dump(backend: &Backend) -> Configuration {
     backend.dump().await.unwrap()
@@ -53,9 +52,9 @@ async fn creates_dumps_updates_and_deletes_global_rules() {
     // must be recognized as identical (by the digest this crate stamps on
     // every PUT — see `crate::operator::Operator::sync`) and not bump the
     // server's own conf_version, even though a document still gets sent.
-    let version_before = raw_global_rules_conf_version().await;
+    let version_before = raw_conf_version("global_rules_conf_version").await;
     sync_ok(&backend, vec![]).await;
-    let version_after = raw_global_rules_conf_version().await;
+    let version_after = raw_conf_version("global_rules_conf_version").await;
     assert_eq!(version_before, version_after, "resyncing unchanged global rules must not bump the conf_version");
 
     sync_ok(
@@ -77,20 +76,4 @@ async fn creates_dumps_updates_and_deletes_global_rules() {
 
     let config = dump(&backend).await;
     assert_eq!(config.global_rules.map(|rules| rules.len()).unwrap_or(0), 0);
-}
-
-/// Reads `global_rules_conf_version` straight off the admin API — bypasses
-/// this crate's own cache entirely, so it reflects what the server actually
-/// has, not what we think we last wrote.
-async fn raw_global_rules_conf_version() -> Option<i64> {
-    let client = HttpClient::new(HttpClientConfig {
-        server: common::SERVER1.to_string(),
-        token: common::TOKEN.to_string(),
-        timeout: None,
-        tls: TlsConfig::default(),
-    })
-    .unwrap();
-    let request = client.request(Method::GET, "/apisix/admin/configs").unwrap();
-    let body: serde_json::Value = client.send_json(request).await.unwrap();
-    body.get("global_rules_conf_version").and_then(|v| v.as_i64())
 }

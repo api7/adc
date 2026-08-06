@@ -7,6 +7,8 @@
 //! (`crate::operator::Operator`) builds each resource's wire body directly
 //! off the differ's `Event`, not off a full `Configuration`.
 
+use std::collections::HashMap;
+
 use serde_json::{Map, Value};
 
 use adc_sdk::resources::{self as adc, LabelValue};
@@ -142,7 +144,7 @@ fn ssl_to_adc(ssl: &typing::Ssl) -> adc::SSL {
 /// doesn't reject an unrecognized plugin name or a non-object config —
 /// matching the TS transformer, which casts the plugin name and passes the
 /// config through without validating either.
-fn credential_to_adc(credential: &typing::ConsumerCredential, username: &str) -> Option<adc::ConsumerCredential> {
+fn credential_to_adc(credential: &typing::ConsumerCredential, prefix: &str) -> Option<adc::ConsumerCredential> {
     let plugins = credential.plugins.clone()?;
     let (plugin_name, config) = plugins.into_iter().next()?;
     let config = match config {
@@ -150,8 +152,7 @@ fn credential_to_adc(credential: &typing::ConsumerCredential, username: &str) ->
         _ => Map::new(),
     };
 
-    let prefix = format!("{username}/credentials/");
-    let id = credential.id.strip_prefix(&prefix).unwrap_or(&credential.id).to_string();
+    let id = credential.id.strip_prefix(prefix).unwrap_or(&credential.id).to_string();
 
     Some(adc::ConsumerCredential {
         id: Some(id),
@@ -177,33 +178,45 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
         .filter_map(typing::ConsumerOrCredential::as_credential)
         .collect();
 
+    // Grouped once up front rather than re-scanned per service: with S
+    // services and U/R/T upstreams/routes/stream_routes, filtering inside
+    // the services closure below costs O(S*(U+R+T)); a single grouping
+    // pass costs O(U+R+T) plus an O(1) lookup per service.
+    let upstream_by_id: HashMap<&str, &typing::Upstream> =
+        input.upstreams.iter().flatten().map(|upstream| (upstream.id.as_str(), upstream)).collect();
+
+    let mut named_upstreams_by_service: HashMap<&str, Vec<&typing::Upstream>> = HashMap::new();
+    for upstream in input.upstreams.iter().flatten() {
+        if let Some(owner) = upstream.labels.as_ref().and_then(|labels| labels.get(typing::ADC_UPSTREAM_SERVICE_ID_LABEL)) {
+            named_upstreams_by_service.entry(owner.as_str()).or_default().push(upstream);
+        }
+    }
+
+    let mut routes_by_service: HashMap<&str, Vec<&typing::Route>> = HashMap::new();
+    for route in input.routes.iter().flatten() {
+        routes_by_service.entry(route.service_id.as_str()).or_default().push(route);
+    }
+
+    let mut stream_routes_by_service: HashMap<&str, Vec<&typing::StreamRoute>> = HashMap::new();
+    for route in input.stream_routes.iter().flatten() {
+        stream_routes_by_service.entry(route.service_id.as_str()).or_default().push(route);
+    }
+
     let services = input.services.iter().flatten().map(|service| {
         let upstream = service
             .upstream_id
             .as_deref()
-            .and_then(|upstream_id| {
-                input
-                    .upstreams
-                    .iter()
-                    .flatten()
-                    .find(|upstream| upstream.id == upstream_id)
-            })
+            .and_then(|upstream_id| upstream_by_id.get(upstream_id).copied())
             .map(|upstream| adc::Upstream {
                 name: None,
                 ..wire_upstream_to_adc(upstream)
             });
 
-        let named_upstreams: Vec<adc::Upstream> = input
-            .upstreams
-            .iter()
+        let named_upstreams: Vec<adc::Upstream> = named_upstreams_by_service
+            .get(service.id.as_str())
+            .into_iter()
             .flatten()
-            .filter(|upstream| {
-                upstream
-                    .labels
-                    .as_ref()
-                    .and_then(|labels| labels.get(typing::ADC_UPSTREAM_SERVICE_ID_LABEL))
-                    .is_some_and(|owner| owner == &service.id)
-            })
+            .copied()
             .map(|upstream| adc::Upstream {
                 id: Some(upstream.id.clone()),
                 labels: strip_service_id_label(to_adc_labels(upstream.labels.clone())),
@@ -211,18 +224,13 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
             })
             .collect();
 
-        let routes: Vec<adc::Route> = input
-            .routes
-            .iter()
+        let routes: Vec<adc::Route> =
+            routes_by_service.get(service.id.as_str()).into_iter().flatten().copied().map(route_to_adc).collect();
+        let stream_routes: Vec<adc::StreamRoute> = stream_routes_by_service
+            .get(service.id.as_str())
+            .into_iter()
             .flatten()
-            .filter(|route| route.service_id == service.id)
-            .map(route_to_adc)
-            .collect();
-        let stream_routes: Vec<adc::StreamRoute> = input
-            .stream_routes
-            .iter()
-            .flatten()
-            .filter(|route| route.service_id == service.id)
+            .copied()
             .map(stream_route_to_adc)
             .collect();
 
@@ -260,10 +268,11 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
         .flatten()
         .filter_map(typing::ConsumerOrCredential::as_consumer)
         .map(|consumer| {
+            let prefix = format!("{}/credentials/", consumer.username);
             let owned: Vec<adc::ConsumerCredential> = credentials
                 .iter()
-                .filter(|credential| credential.id.starts_with(&format!("{}/credentials/", consumer.username)))
-                .filter_map(|credential| credential_to_adc(credential, &consumer.username))
+                .filter(|credential| credential.id.starts_with(&prefix))
+                .filter_map(|credential| credential_to_adc(credential, &prefix))
                 .collect();
 
             adc::Consumer {

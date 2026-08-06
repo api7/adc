@@ -9,7 +9,7 @@ use adc_sdk::{BackendSyncOptions, ResourceType};
 use serde_json::json;
 
 mod common;
-use common::{backend, create_event, delete_event, diff, empty_configuration};
+use common::{backend, base_service, base_upstream, create_event, delete_event, diff, empty_configuration};
 
 async fn dump(backend: &Backend) -> Configuration {
     backend.dump().await.unwrap()
@@ -19,47 +19,6 @@ async fn sync_ok(backend: &Backend, events: Vec<adc_sdk::Event>) {
     let results = backend.sync(events, BackendSyncOptions::default()).await.unwrap();
     for result in &results {
         assert!(result.success, "{:?}: {:?}", result.server, result.error);
-    }
-}
-
-fn base_upstream() -> adc::Upstream {
-    adc::Upstream {
-        id: None,
-        name: None,
-        description: None,
-        labels: None,
-        r#type: adc::UpstreamBalancer::default(),
-        hash_on: None,
-        key: None,
-        checks: None,
-        nodes: None,
-        scheme: adc::UpstreamScheme::default(),
-        retries: None,
-        retry_timeout: None,
-        timeout: None,
-        tls: None,
-        keepalive_pool: None,
-        pass_host: adc::UpstreamPassHost::default(),
-        upstream_host: None,
-        service_name: None,
-        discovery_type: None,
-        discovery_args: None,
-    }
-}
-
-fn base_service() -> adc::Service {
-    adc::Service {
-        id: None,
-        name: String::new(),
-        description: None,
-        labels: None,
-        upstream: None,
-        upstreams: None,
-        plugins: None,
-        path_prefix: None,
-        strip_path_prefix: None,
-        hosts: None,
-        routes: None,
     }
 }
 

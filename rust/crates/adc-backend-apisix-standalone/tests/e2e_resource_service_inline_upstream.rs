@@ -19,7 +19,7 @@ use adc_sdk::Backend as _;
 use adc_sdk::BackendSyncOptions;
 
 mod common;
-use common::{backend, diff, empty_configuration};
+use common::{backend, base_service, base_upstream, diff, empty_configuration};
 
 const CACHE_KEY: &str = "service-inline-upstream-e2e";
 const SERVICE_NAME: &str = "test";
@@ -35,49 +35,12 @@ async fn sync_ok(backend: &Backend, events: Vec<adc_sdk::Event>) {
     }
 }
 
-fn base_upstream() -> adc::Upstream {
-    adc::Upstream {
-        id: None,
-        name: None,
-        description: None,
-        labels: None,
-        r#type: adc::UpstreamBalancer::default(),
-        hash_on: None,
-        key: None,
-        checks: None,
-        nodes: None,
-        scheme: adc::UpstreamScheme::default(),
-        retries: None,
-        retry_timeout: None,
-        timeout: None,
-        tls: None,
-        keepalive_pool: None,
-        pass_host: adc::UpstreamPassHost::default(),
-        upstream_host: None,
-        service_name: None,
-        discovery_type: None,
-        discovery_args: None,
-    }
-}
-
-fn base_service() -> adc::Service {
-    adc::Service {
-        id: None,
-        name: SERVICE_NAME.to_string(),
-        description: None,
-        labels: None,
-        upstream: None,
-        upstreams: None,
-        plugins: None,
-        path_prefix: None,
-        strip_path_prefix: None,
-        hosts: None,
-        routes: None,
-    }
-}
-
 fn service_with_nodes(nodes: Vec<adc::UpstreamNode>) -> Configuration {
-    let service = adc::Service { upstream: Some(adc::Upstream { nodes: Some(nodes), ..base_upstream() }), ..base_service() };
+    let service = adc::Service {
+        name: SERVICE_NAME.to_string(),
+        upstream: Some(adc::Upstream { nodes: Some(nodes), ..base_upstream() }),
+        ..base_service()
+    };
     Configuration { services: Some(vec![service]), ..empty_configuration() }
 }
 

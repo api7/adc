@@ -29,9 +29,10 @@ use serde_json::{Map, Value};
 /// Bookkeeping label a service-inlined default upstream is stamped with, so
 /// [`crate::transformer::to_adc`] can find "which upstreams belong to this
 /// service" among the flat top-level `upstreams` array — mirrors
-/// `adc-backend-apisix`'s identically-named constant, but this crate has no
-/// dependency on that one (the wire shapes differ too much to share code),
-/// so it's redefined here.
+/// `adc-backend-apisix`'s identically-named constant (this crate does
+/// depend on that one, for its `Validator`, but not for this: the two
+/// crates' upstream wire shapes differ too much to share the constant's
+/// usage, so it's redefined here rather than imported).
 pub const ADC_UPSTREAM_SERVICE_ID_LABEL: &str = "__ADC_UPSTREAM_SERVICE_ID";
 
 pub type StandaloneLabels = HashMap<String, String>;

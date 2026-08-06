@@ -18,7 +18,7 @@ use adc_sdk::resources::{self as adc, Configuration};
 use adc_sdk::Backend as _;
 
 mod common;
-use common::{apisix_version, backend, diff, empty_configuration};
+use common::{apisix_version, backend, base_service, base_upstream, diff, empty_configuration};
 
 macro_rules! skip_below_3_17_0 {
     () => {
@@ -47,37 +47,12 @@ async fn succeeds_with_a_valid_service_and_route() {
     let backend = backend("validate-e2e");
 
     let service = adc::Service {
-        id: None,
         name: "validate-test-svc".to_string(),
-        description: None,
-        labels: None,
         upstream: Some(adc::Upstream {
-            id: None,
-            name: None,
-            description: None,
-            labels: None,
-            r#type: adc::UpstreamBalancer::default(),
-            hash_on: None,
-            key: None,
-            checks: None,
             nodes: Some(vec![adc::UpstreamNode { host: "httpbin.org".to_string(), port: 80, weight: 100, priority: 0, metadata: None }]),
             scheme: adc::UpstreamScheme::Http,
-            retries: None,
-            retry_timeout: None,
-            timeout: None,
-            tls: None,
-            keepalive_pool: None,
-            pass_host: adc::UpstreamPassHost::default(),
-            upstream_host: None,
-            service_name: None,
-            discovery_type: None,
-            discovery_args: None,
+            ..base_upstream()
         }),
-        upstreams: None,
-        plugins: None,
-        path_prefix: None,
-        strip_path_prefix: None,
-        hosts: None,
         routes: Some(adc::ServiceRoutes::Http {
             routes: vec![adc::Route {
                 id: None,
@@ -96,6 +71,7 @@ async fn succeeds_with_a_valid_service_and_route() {
                 filter_func: None,
             }],
         }),
+        ..base_service()
     };
     let local = Configuration { services: Some(vec![service]), ..empty_configuration() };
     let events = diff(&local, &empty_configuration());
@@ -115,37 +91,12 @@ async fn fails_with_an_invalid_plugin_configuration() {
     // limit-count requires `count`/`time_window`; both are missing.
     plugins.insert("limit-count".to_string(), serde_json::json!({}));
     let service = adc::Service {
-        id: None,
         name: "validate-bad-plugin-svc".to_string(),
-        description: None,
-        labels: None,
         upstream: Some(adc::Upstream {
-            id: None,
-            name: None,
-            description: None,
-            labels: None,
-            r#type: adc::UpstreamBalancer::default(),
-            hash_on: None,
-            key: None,
-            checks: None,
             nodes: Some(vec![adc::UpstreamNode { host: "httpbin.org".to_string(), port: 80, weight: 100, priority: 0, metadata: None }]),
             scheme: adc::UpstreamScheme::Http,
-            retries: None,
-            retry_timeout: None,
-            timeout: None,
-            tls: None,
-            keepalive_pool: None,
-            pass_host: adc::UpstreamPassHost::default(),
-            upstream_host: None,
-            service_name: None,
-            discovery_type: None,
-            discovery_args: None,
+            ..base_upstream()
         }),
-        upstreams: None,
-        plugins: None,
-        path_prefix: None,
-        strip_path_prefix: None,
-        hosts: None,
         routes: Some(adc::ServiceRoutes::Http {
             routes: vec![adc::Route {
                 id: None,
@@ -164,6 +115,7 @@ async fn fails_with_an_invalid_plugin_configuration() {
                 filter_func: None,
             }],
         }),
+        ..base_service()
     };
     let local = Configuration { services: Some(vec![service]), ..empty_configuration() };
     let events = diff(&local, &empty_configuration());

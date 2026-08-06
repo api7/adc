@@ -80,7 +80,21 @@ impl Operator {
 
         let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
         let results = if exit_on_failure {
-            concurrent_map_until_err(self.servers.clone(), None, put).await.map_err(|(_, error)| error)?
+            match concurrent_map_until_err(self.servers.clone(), None, put).await {
+                Ok(results) => results,
+                Err((_, error)) => {
+                    // A server earlier in the batch may have already
+                    // accepted the new document before a later one failed
+                    // and aborted the rest — the cache's idea of "current
+                    // state" can't be trusted either way at that point, so
+                    // it's cleared rather than left pointing at data a live
+                    // server may have already moved past. The next dump()
+                    // re-fetches and re-runs `find_latest` to discover the
+                    // cluster's real state instead of trusting stale cache.
+                    Cache::global().invalidate(&self.cache_key);
+                    return Err(error);
+                }
+            }
         } else {
             concurrent_map(self.servers.clone(), None, put)
                 .await
@@ -390,10 +404,18 @@ fn from_adc_stream_route(event: &Event, modified_index: i64) -> Result<typing::S
 /// Creates/updates/deletes one entry in `field`, matched by `identity`
 /// against the id [`generate_id_from_event`] derives — the same lookup
 /// logic every resource type needs, parameterized over its own collection
-/// type and identity accessor. Returns whether a matching entry was
-/// actually created/changed/removed (an `Update`/`Delete` for an id that
-/// isn't present is a no-op, not an error — matches the TS operator's own
-/// `findIndex !== -1` guards).
+/// type and identity accessor.
+///
+/// `Create` and `Update` both upsert: whichever one fires, a matching
+/// existing entry is replaced and a missing one is inserted — a `Create`
+/// for an id that's already present (a duplicate differ event, or a retried
+/// sync landing on a base that already has it) replaces it instead of
+/// appending a second entry with the same id, and symmetrically an
+/// `Update` for an id that isn't there yet still leaves the document with
+/// it rather than silently dropping the write. `Delete` alone stays a
+/// genuine no-op for a missing id (matches the TS operator's own
+/// `findIndex !== -1` guard) — there's nothing sensible to insert for a
+/// deletion. Returns whether `field` actually changed.
 fn upsert_or_delete<T>(
     field: &mut Option<Vec<T>>,
     event: &Event,
@@ -401,20 +423,15 @@ fn upsert_or_delete<T>(
     build: impl FnOnce() -> Result<T, BackendError>,
 ) -> Result<bool, BackendError> {
     match event.event_type() {
-        EventType::Create => {
-            field.get_or_insert_with(Vec::new).push(build()?);
-            Ok(true)
-        }
-        EventType::Update => {
+        EventType::Create | EventType::Update => {
             let target_id = generate_id_from_event(event)?;
             let vec = field.get_or_insert_with(Vec::new);
+            let built = build()?;
             match vec.iter_mut().find(|item| identity(item) == target_id) {
-                Some(slot) => {
-                    *slot = build()?;
-                    Ok(true)
-                }
-                None => Ok(false),
+                Some(slot) => *slot = built,
+                None => vec.push(built),
             }
+            Ok(true)
         }
         EventType::Delete => {
             let target_id = generate_id_from_event(event)?;
@@ -538,17 +555,24 @@ fn apply_event_for_service_inlined_upstream(
             if !diff.iter().any(diff_path_is_upstream) {
                 return Ok(());
             }
-            if let Some(wire) = build_wire(event)? {
-                let upstreams = config.upstreams.get_or_insert_with(Vec::new);
-                if let Some(slot) = upstreams.iter_mut().find(|item| item.id == event.resource_id) {
-                    *slot = wire;
-                    increase_version.insert(ResourceType::Upstream);
-                }
+            // `.as_mut()`, not `get_or_insert_with`: there's nothing to
+            // update when no upstream has ever been written, and
+            // materializing an empty `Vec` here would flip
+            // `config.upstreams` from `None` to `Some(vec![])` — a real
+            // (if harmless-looking) change to what gets cached and PUT to
+            // the servers, for an event that changed nothing.
+            if let Some(wire) = build_wire(event)?
+                && let Some(upstreams) = config.upstreams.as_mut()
+                && let Some(slot) = upstreams.iter_mut().find(|item| item.id == event.resource_id)
+            {
+                *slot = wire;
+                increase_version.insert(ResourceType::Upstream);
             }
         }
         EventType::Delete => {
-            let upstreams = config.upstreams.get_or_insert_with(Vec::new);
-            if let Some(pos) = upstreams.iter().position(|item| item.id == event.resource_id) {
+            if let Some(upstreams) = config.upstreams.as_mut()
+                && let Some(pos) = upstreams.iter().position(|item| item.id == event.resource_id)
+            {
                 upstreams.remove(pos);
                 increase_version.insert(ResourceType::Upstream);
             }
@@ -681,6 +705,68 @@ mod tests {
         assert!(increase_version.contains(&ResourceType::Service));
     }
 
+    /// Regression test: a CREATE for an id that's already present (a
+    /// duplicate differ event, or a retried sync landing on a base that
+    /// already has it) must replace the existing entry, not append a
+    /// second one sharing the same id.
+    #[test]
+    fn create_for_an_already_present_id_replaces_it_instead_of_duplicating() {
+        let mut config = empty_config();
+        config.services = Some(vec![typing::Service {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: Some("original".to_string()),
+            labels: None,
+            hosts: None,
+            upstream_id: None,
+            plugins: None,
+        }]);
+        let mut increase_version = HashSet::new();
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Create { new_value: json!({ "name": "svc-1", "description": "replaced" }) },
+            "svc-1",
+        );
+
+        apply_event(&mut config, &mut increase_version, 200, &service_event).unwrap();
+
+        let services = config.services.unwrap();
+        assert_eq!(services.len(), 1, "must not end up with two entries sharing id \"svc-1\"");
+        assert_eq!(services[0].desc.as_deref(), Some("replaced"));
+        assert_eq!(services[0].modified_index, 200);
+    }
+
+    /// Regression test: an UPDATE for an id that isn't present yet must
+    /// still insert it, rather than silently dropping the write.
+    /// Uses `Route`, not `Service`: `ResourceType::Service`'s own branch in
+    /// `apply_event` gates UPDATE on the diff touching more than just
+    /// `upstream` before it even calls `upsert_or_delete` (see that
+    /// branch's own doc comment), which would make this test exercise that
+    /// gating instead of the upsert behavior it's actually meant to cover.
+    #[test]
+    fn update_for_a_missing_id_inserts_it_instead_of_dropping_the_write() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let mut route_event = event(
+            ResourceType::Route,
+            EventKind::Update {
+                old_value: json!({ "name": "r1", "uris": ["/x"] }),
+                new_value: json!({ "name": "r1", "uris": ["/x"] }),
+                diff: None,
+            },
+            "r1",
+        );
+        route_event.parent_id = Some("svc-1".to_string());
+
+        apply_event(&mut config, &mut increase_version, 300, &route_event).unwrap();
+
+        let routes = config.routes.unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].id, "r1");
+        assert!(increase_version.contains(&ResourceType::Route));
+    }
+
     #[test]
     fn delete_service_removes_it_from_the_services_collection() {
         let mut config = empty_config();
@@ -772,6 +858,51 @@ mod tests {
         let mut config = empty_config();
         let mut increase_version = HashSet::new();
         let service_event = event(ResourceType::Service, EventKind::Create { new_value: json!({ "name": "svc-no-upstream" }) }, "svc-2");
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &service_event).unwrap();
+
+        assert!(config.upstreams.is_none());
+        assert!(!increase_version.contains(&ResourceType::Upstream));
+    }
+
+    /// Regression test: deleting a service that never had a default
+    /// upstream must leave `config.upstreams` at `None`, not flip it to
+    /// `Some(vec![])` — the latter would serialize as a stray `"upstreams":
+    /// []` key in the synced document even though nothing about upstreams
+    /// actually changed.
+    #[test]
+    fn deleting_a_service_with_no_upstream_leaves_the_upstreams_field_absent() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let delete_service_event = event(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, "svc-no-upstream");
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &delete_service_event).unwrap();
+
+        assert!(config.upstreams.is_none());
+        assert!(!increase_version.contains(&ResourceType::Upstream));
+    }
+
+    /// Regression test: an update whose diff touches `upstream` but for
+    /// which no upstream entry exists yet (e.g. `config.upstreams` was
+    /// never populated) must also leave it `None`, for the same reason.
+    #[test]
+    fn updating_a_services_upstream_with_no_existing_entry_leaves_the_upstreams_field_absent() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let diff = vec![ValueDiff::Edit {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            lhs: json!({}),
+            rhs: json!({}),
+        }];
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value: json!({ "name": "svc-no-upstream" }),
+                new_value: json!({ "name": "svc-no-upstream", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+                diff: Some(diff),
+            },
+            "svc-no-upstream",
+        );
 
         apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &service_event).unwrap();
 

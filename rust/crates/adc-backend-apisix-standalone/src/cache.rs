@@ -51,6 +51,10 @@ struct CachedEntry {
     updated_at: Option<Instant>,
 }
 
+fn is_expired(entry: &CachedEntry, ttl: Duration) -> bool {
+    entry.updated_at.is_none_or(|at| at.elapsed() > ttl)
+}
+
 pub struct Cache {
     entries: DashMap<String, CachedEntry>,
     max_entries: usize,
@@ -79,13 +83,17 @@ impl Cache {
 
     fn get_live(&self, key: &str) -> Option<CachedEntry> {
         let entry = self.entries.get(key)?;
-        let expired = entry.updated_at.is_none_or(|at| at.elapsed() > self.ttl);
-        if expired {
-            drop(entry);
-            self.entries.remove(key);
-            return None;
+        if !is_expired(&entry, self.ttl) {
+            return Some(entry.clone());
         }
-        Some(entry.clone())
+        drop(entry);
+        // Rechecks expiry at removal time rather than removing
+        // unconditionally by key: between the drop above and this call, a
+        // concurrent writer could have refreshed this same entry — removing
+        // it unconditionally would discard that fresh write, not just the
+        // stale one this call actually observed.
+        self.entries.remove_if(key, |_, entry| is_expired(entry, self.ttl));
+        None
     }
 
     pub fn version(&self, key: &str) -> Option<Version> {
