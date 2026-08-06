@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use adc_backend_apisix_standalone::tests::Cache;
 use adc_backend_apisix_standalone::Backend;
-use adc_backend_core::TlsConfig;
+use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
 use adc_sdk::resources::Configuration;
 use adc_sdk::utils::generate_id;
 use adc_sdk::{DefaultValue, Event, EventKind, ResourceType};
@@ -135,10 +135,49 @@ pub async fn restart_apisix() {
         .await
         .unwrap_or_else(|e| panic!("failed to run `docker compose restart` in {compose_dir:?}: {e}"));
     assert!(status.success(), "`docker compose restart` in {compose_dir:?} failed");
-    // Give the freshly-restarted containers a moment to accept admin API
-    // requests again — matches the CI setup step's own `sleep 10` after the
-    // initial `docker compose up`.
-    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    for server in [SERVER1, SERVER2, SERVER3] {
+        wait_until_ready(server).await;
+    }
+}
+
+/// Polls `server`'s admin API until it actually answers `/apisix/admin/configs`
+/// with something other than a 404. A fixed post-restart sleep isn't
+/// reliable across APISIX versions — older ones (confirmed against a real
+/// 3.13.0 instance in CI) take noticeably longer than others to finish
+/// re-registering their admin routes after `docker compose restart`, and a
+/// request landing in that window gets nginx's own bare 404 rather than a
+/// connection error. A 404 here is never a legitimate steady-state answer
+/// (even a genuinely fresh, never-configured document reads back as 200
+/// with every `*_conf_version` at 0 — confirmed by this same suite's own
+/// passing assertions elsewhere), so it's safe to treat as "not ready yet"
+/// unconditionally, alongside an outright connection failure.
+async fn wait_until_ready(server: &str) {
+    let client = HttpClient::new(HttpClientConfig {
+        server: server.to_string(),
+        token: TOKEN.to_string(),
+        timeout: Some(Duration::from_secs(2)),
+        tls: tls(),
+    })
+    .unwrap();
+
+    const MAX_ATTEMPTS: u32 = 40;
+    for attempt in 1..=MAX_ATTEMPTS {
+        let ready = match client.request(Method::GET, "/apisix/admin/configs") {
+            Ok(request) => match client.execute(request).await {
+                Ok(response) => response.status().as_u16() != 404,
+                Err(_) => false,
+            },
+            Err(_) => false,
+        };
+        if ready {
+            return;
+        }
+        if attempt == MAX_ATTEMPTS {
+            panic!("{server} never became ready after `docker compose restart` ({MAX_ATTEMPTS} attempts)");
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
 }
 
 /// Runs the real differ (not a stand-in) between a desired `local`
