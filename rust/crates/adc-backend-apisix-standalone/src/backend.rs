@@ -22,8 +22,6 @@ use crate::fetcher::Fetcher;
 use crate::operator::Operator;
 use crate::typing::ApisixStandalone;
 
-const CONFIG_ENDPOINT: &str = "/apisix/admin/configs";
-
 /// One target server plus the client already configured with its own
 /// (server-specific, since standalone clusters can each carry a different
 /// admin API token) auth header.
@@ -114,7 +112,11 @@ impl Backend {
             .version
             .get_or_try_init(|| async {
                 let primary = &self.servers[0];
-                let request = primary.client.request(Method::HEAD, CONFIG_ENDPOINT)?;
+                // HEAD support on the config document endpoint is itself
+                // version-gated (see `Fetcher::find_latest`'s
+                // `version_supports_head`), so the version probe uses the
+                // admin root instead, which has none of that ambiguity.
+                let request = primary.client.request(Method::HEAD, "/apisix/admin")?;
                 let response = primary.client.send(request).await?;
 
                 let header = response
@@ -148,7 +150,7 @@ impl adc_sdk::Backend for Backend {
 
     async fn ping(&self) -> Result<(), BackendError> {
         let primary = &self.servers[0];
-        let request = primary.client.request(Method::HEAD, CONFIG_ENDPOINT)?;
+        let request = primary.client.request(Method::HEAD, "/apisix/admin")?;
         primary.client.send(request).await?;
         Ok(())
     }
