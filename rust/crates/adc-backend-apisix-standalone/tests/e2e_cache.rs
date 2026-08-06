@@ -116,6 +116,16 @@ fn fixture_config(upstream_port: u32) -> Configuration {
     }
 }
 
+/// `fixture_config`'s service+route, without the two consumers — matches
+/// the smaller `config` object the TS suite's own "Partial new instances"
+/// scenario uses (unlike its other scenarios, that one never syncs any
+/// consumers at all).
+fn service_with_route_config(upstream_port: u32) -> Configuration {
+    let mut config = fixture_config(upstream_port);
+    config.consumers = None;
+    config
+}
+
 fn assert_fresh_cache_shape(config: &Configuration) {
     assert!(config.services.is_none(), "a never-configured instance has no services yet");
     assert!(config.ssls.is_none());
@@ -220,7 +230,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
     // Write independently to server1 (older) ...
     common::cache().invalidate(cache_key);
     let backend1 = backend_for(common::SERVER1, cache_key);
-    let events = diff(&fixture_config(5432), &empty_configuration());
+    let events = diff(&service_with_route_config(5432), &empty_configuration());
     assert_eq!(events.len(), 2, "service + route; no consumers in this fixture");
     sync_ok(&backend1, events).await;
 
@@ -232,7 +242,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
 
     common::cache().invalidate(cache_key);
     let backend2 = backend_for(common::SERVER2, cache_key);
-    let events = diff(&fixture_config(3306), &empty_configuration());
+    let events = diff(&service_with_route_config(3306), &empty_configuration());
     sync_ok(&backend2, events).await;
 
     // server3 was never written at all — a real 3-way race between an

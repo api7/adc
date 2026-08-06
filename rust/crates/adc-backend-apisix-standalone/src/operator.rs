@@ -438,16 +438,27 @@ fn apply_event(config: &mut ApisixStandalone, increase_version: &mut HashSet<Res
     let changed = match event.resource_type {
         ResourceType::Route => upsert_or_delete(&mut config.routes, event, |r| r.id.as_str(), || from_adc_route(event, timestamp))?,
         ResourceType::Service => {
-            // Only touch the `services` collection when the service's own
-            // fields changed, not just its inline default upstream — an
-            // upstream-only change is already handled by
-            // `apply_event_for_service_inlined_upstream`, called before
-            // this for every SERVICE event regardless.
-            let diff = event.kind.diff().unwrap_or(&[]);
-            if diff.iter().any(|d| !diff_path_is_upstream(d)) {
-                upsert_or_delete(&mut config.services, event, |s| s.id.as_str(), || from_adc_service(event, timestamp))?
+            // Only an UPDATE can be a no-op for this collection: when the
+            // diff shows nothing but the inline default upstream changed,
+            // the service body itself is untouched (that's already handled
+            // separately by `apply_event_for_service_inlined_upstream`,
+            // called before this for every SERVICE event regardless) — so
+            // skip writing to `config.services` for that update to avoid
+            // bumping `services_conf_version` for no real change. A CREATE
+            // or DELETE always writes: `EventKind::diff()` only ever
+            // returns `Some` for `Update`, so gating on it unconditionally
+            // (as opposed to only within the `Update` arm) would silently
+            // drop every service CREATE — `.unwrap_or(&[])` makes an empty
+            // diff, and `.any()` over an empty slice is always `false`.
+            if event.event_type() == EventType::Update {
+                let diff = event.kind.diff().unwrap_or(&[]);
+                if diff.iter().any(|d| !diff_path_is_upstream(d)) {
+                    upsert_or_delete(&mut config.services, event, |s| s.id.as_str(), || from_adc_service(event, timestamp))?
+                } else {
+                    false
+                }
             } else {
-                false
+                upsert_or_delete(&mut config.services, event, |s| s.id.as_str(), || from_adc_service(event, timestamp))?
             }
         }
         ResourceType::Consumer => {
@@ -614,6 +625,53 @@ mod tests {
         assert_eq!(routes[0].service_id, "svc-1");
         assert_eq!(routes[0].modified_index, 100);
         assert!(increase_version.contains(&ResourceType::Route));
+    }
+
+    /// Regression test: a SERVICE CREATE event must always be pushed into
+    /// `config.services`. An earlier bug gated this on `event.kind.diff()`
+    /// unconditionally — `diff()` only ever returns `Some` for an `Update`
+    /// event, so a CREATE (or DELETE) silently fell through to an empty
+    /// diff, and `.any()` over it was always `false`, meaning `apply_event`
+    /// never actually added the service at all despite the event
+    /// succeeding at the HTTP layer.
+    #[test]
+    fn create_service_pushes_it_into_the_services_collection() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Create { new_value: json!({ "name": "svc-1" }) },
+            "svc-1",
+        );
+
+        apply_event(&mut config, &mut increase_version, 100, &service_event).unwrap();
+
+        let services = config.services.unwrap();
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].id, "svc-1");
+        assert!(increase_version.contains(&ResourceType::Service));
+    }
+
+    #[test]
+    fn delete_service_removes_it_from_the_services_collection() {
+        let mut config = empty_config();
+        config.services = Some(vec![typing::Service {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: None,
+            labels: None,
+            hosts: None,
+            upstream_id: None,
+            plugins: None,
+        }]);
+        let mut increase_version = HashSet::new();
+        let delete_service_event = event(ResourceType::Service, EventKind::Delete { old_value: json!({}) }, "svc-1");
+
+        apply_event(&mut config, &mut increase_version, 200, &delete_service_event).unwrap();
+
+        assert_eq!(config.services.unwrap().len(), 0);
+        assert!(increase_version.contains(&ResourceType::Service));
     }
 
     #[test]
