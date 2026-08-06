@@ -72,7 +72,8 @@ fn delete_child(rt: ResourceType, name: &str, parent_name: &str) -> Event {
 async fn sync_ok(backend: &ApisixBackend, events: Vec<Event>) {
     let results = backend.sync(events, BackendSyncOptions::default()).await.unwrap();
     for result in &results {
-        assert!(result.success, "{:?} {}: {:?}", result.event.resource_type, result.event.resource_id, result.error);
+        let event = result.event.as_ref().expect("apisix always reports one result per event");
+        assert!(result.success, "{:?} {}: {:?}", event.resource_type, event.resource_id, result.error);
     }
 }
 

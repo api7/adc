@@ -41,7 +41,11 @@ pub struct BackendSyncOptions {
 #[derive(Debug)]
 pub struct BackendSyncResult {
     pub success: bool,
-    pub event: Event,
+    /// `None` for a backend whose sync granularity is coarser than "one
+    /// event, one result" — apisix-standalone applies a whole batch of
+    /// events as a single atomic document write per server, so one result
+    /// there describes that write, not any single event within it.
+    pub event: Option<Event>,
     pub error: Option<BackendError>,
     pub server: Option<String>,
 }

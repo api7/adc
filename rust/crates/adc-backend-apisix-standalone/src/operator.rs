@@ -1,0 +1,808 @@
+//! Applying a differ's `Event`s to a standalone cluster: `sync`.
+//!
+//! Unlike `adc-backend-apisix`/`adc-backend-api7` (one HTTP request per
+//! event), standalone has no per-resource admin API at all — every event
+//! is folded into one in-memory config document (cloned from whatever was
+//! cached from the last dump/sync), then that *whole document* is written
+//! to every server with a single `PUT /apisix/admin/configs`. So there's
+//! one `BackendSyncResult` per *server*, not per event (`event` on each
+//! result is always `None` — no single event owns that write), and
+//! `BackendSyncOptions::concurrent` (which bounds how many *events* run at
+//! once in the other two backends) has nothing to bound here; the only
+//! fan-out is across servers, and that's always unbounded — matches the TS
+//! operator's own bare (no concurrency argument) `mergeMap`.
+
+use std::collections::{HashMap, HashSet};
+
+use adc_backend_core::{HttpClient, Method, concurrent_map, concurrent_map_until_err};
+use adc_sdk::resources::{self as adc};
+use adc_sdk::{BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, ValueDiff};
+use serde_json::{Map, Value};
+use sha1::{Digest, Sha1};
+
+use crate::backend::StandaloneServer;
+use crate::cache::Cache;
+use crate::typing::{self, ApisixStandalone, ConsumerOrCredential};
+use crate::utils::stable_timestamp;
+
+const CONFIG_ENDPOINT: &str = "/apisix/admin/configs";
+const HEADER_DIGEST: &str = "x-digest";
+
+pub struct Operator {
+    servers: Vec<StandaloneServer>,
+    cache_key: String,
+    old_raw_config: ApisixStandalone,
+}
+
+impl Operator {
+    pub fn new(servers: Vec<StandaloneServer>, cache_key: String, old_raw_config: ApisixStandalone) -> Self {
+        Self { servers, cache_key, old_raw_config }
+    }
+
+    pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError> {
+        let mut new_config = self.old_raw_config.clone();
+        let mut increase_version: HashSet<ResourceType> = HashSet::new();
+
+        // A static process-start time combined with an always-advancing
+        // wall-clock read would normally never regress on its own, but this
+        // process isn't the only writer — an earlier `sync` (in this
+        // process or another) may have already pushed the cluster's config
+        // to a version ahead of what the wall clock reads right now (e.g.
+        // after a clock rollback). Clamping to one past the latest known
+        // version keeps this write acceptable to the data plane even then.
+        let mut timestamp = stable_timestamp();
+        if let Some(latest) = Cache::global().latest_version(&self.cache_key)
+            && latest > timestamp
+        {
+            log::warn!(
+                "sync timestamp {timestamp} is behind the latest known configuration version {latest}; a clock rollback may have occurred, advancing past it"
+            );
+            timestamp = latest + 1;
+        }
+
+        for event in &events {
+            apply_event_for_service_inlined_upstream(&mut new_config, &mut increase_version, timestamp, event)?;
+            apply_event(&mut new_config, &mut increase_version, timestamp, event)?;
+        }
+
+        filter_orphan_credentials(&mut new_config);
+        bump_conf_versions(&mut new_config, &increase_version, timestamp);
+
+        let body = serde_json::to_string(&new_config)
+            .map_err(|e| BackendError::Serialization(format!("encoding sync config: {e}")))?;
+        let digest = sha1_hex(body.as_bytes());
+
+        let put = |server: StandaloneServer| {
+            let body = body.clone();
+            let digest = digest.clone();
+            async move {
+                match put_one(&server.client, body, digest).await {
+                    Ok(()) => Ok(BackendSyncResult { success: true, event: None, error: None, server: Some(server.server) }),
+                    Err(error) => Err((server.server, error)),
+                }
+            }
+        };
+
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let results = if exit_on_failure {
+            concurrent_map_until_err(self.servers.clone(), None, put).await.map_err(|(_, error)| error)?
+        } else {
+            concurrent_map(self.servers.clone(), None, put)
+                .await
+                .into_iter()
+                .map(|outcome| match outcome {
+                    Ok(result) => result,
+                    Err((server, error)) => BackendSyncResult { success: false, event: None, error: Some(error), server: Some(server) },
+                })
+                .collect()
+        };
+
+        // Updated once, after every server has settled, rather than
+        // per-server as each PUT completes: with concurrent writers, "cache
+        // whatever the most recently completed request happened to see"
+        // has no coherent meaning — completion order isn't sync order.
+        // "At least one server accepted the write" is a real, checkable
+        // fact to key the update on instead.
+        if results.iter().any(|result| result.success) {
+            Cache::global().set_latest_version(&self.cache_key, timestamp);
+            Cache::global().set_config(&self.cache_key, crate::transformer::to_adc(&new_config));
+            Cache::global().set_raw_config(&self.cache_key, new_config);
+        }
+
+        Ok(results)
+    }
+}
+
+async fn put_one(client: &HttpClient, body: String, digest: String) -> Result<(), BackendError> {
+    let request = client.request(Method::PUT, CONFIG_ENDPOINT)?.header(HEADER_DIGEST, digest).body(body);
+    client.send(request).await?;
+    Ok(())
+}
+
+fn sha1_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn missing_new_value(event: &Event) -> BackendError {
+    BackendError::Other(format!("{:?} event for resource {:?} is missing new_value", event.event_type(), event.resource_id).into())
+}
+
+fn missing_parent(event: &Event) -> BackendError {
+    BackendError::Other(format!("{:?} event for resource {:?} is missing a parent_id", event.resource_type, event.resource_id).into())
+}
+
+fn deserialize_event_value<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, BackendError> {
+    serde_json::from_value(value.clone()).map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
+}
+
+/// `ConsumerCredential` events are keyed by `parentId/credentials/resourceId`
+/// (their owning consumer's username plus their own id) since a bare
+/// `resourceId` alone isn't unique across different consumers' credentials;
+/// every other resource type's own `resourceId` is already unique on its own.
+fn generate_id_from_event(event: &Event) -> Result<String, BackendError> {
+    if event.resource_type == ResourceType::ConsumerCredential {
+        let parent_id = event.parent_id.as_deref().ok_or_else(|| missing_parent(event))?;
+        Ok(format!("{parent_id}/credentials/{}", event.resource_id))
+    } else {
+        Ok(event.resource_id.clone())
+    }
+}
+
+fn diff_path_is_upstream(diff: &ValueDiff) -> bool {
+    let path = match diff {
+        ValueDiff::New { path, .. } | ValueDiff::Deleted { path, .. } | ValueDiff::Edit { path, .. } | ValueDiff::Array { path, .. } => path,
+    };
+    matches!(path.first(), Some(PathSegment::Key(key)) if key == "upstream")
+}
+
+fn from_adc_labels(labels: Option<adc::Labels>) -> Option<typing::StandaloneLabels> {
+    labels.map(|labels| labels.into_iter().map(|(key, value)| (key, stringify_label_value(value))).collect())
+}
+
+fn stringify_label_value(value: adc::LabelValue) -> String {
+    match value {
+        adc::LabelValue::Single(s) => s,
+        adc::LabelValue::Multiple(items) => serde_json::to_string(&items).unwrap_or_default(),
+    }
+}
+
+/// Builds an upstream's wire body from its ADC shape, minus `id`/
+/// `modifiedIndex`/`name` (every caller overwrites those with values that
+/// come from the owning `Event`, not from the upstream resource itself —
+/// see `from_adc_upstream` and `apply_event_for_service_inlined_upstream`).
+/// `parent_id`, when set, stamps the service-association bookkeeping label
+/// onto a *named* upstream; a service's own inline default upstream is
+/// never passed one (see `typing::ADC_UPSTREAM_SERVICE_ID_LABEL`'s doc
+/// comment).
+fn from_adc_upstream_wire(res: &adc::Upstream, parent_id: Option<&str>) -> typing::Upstream {
+    let mut labels = from_adc_labels(res.labels.clone());
+    if let Some(parent_id) = parent_id {
+        labels
+            .get_or_insert_with(HashMap::new)
+            .insert(typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(), parent_id.to_string());
+    }
+
+    typing::Upstream {
+        modified_index: 0,
+        id: String::new(),
+        name: res.name.clone().unwrap_or_default(),
+        desc: res.description.clone(),
+        labels,
+
+        nodes: res.nodes.clone(),
+        scheme: Some(res.scheme),
+        ty: Some(res.r#type),
+        hash_on: res.hash_on.clone(),
+        key: res.key.clone(),
+
+        pass_host: Some(res.pass_host),
+        upstream_host: res.upstream_host.clone(),
+        retries: res.retries,
+        retry_timeout: res.retry_timeout,
+        timeout: res.timeout.clone(),
+        tls: res.tls.clone(),
+        keepalive_pool: res.keepalive_pool.clone(),
+
+        checks: res.checks.clone(),
+        discovery_type: res.discovery_type.clone(),
+        service_name: res.service_name.clone(),
+        discovery_args: res.discovery_args.clone(),
+    }
+}
+
+fn from_adc_route(event: &Event, modified_index: i64) -> Result<typing::Route, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::Route = deserialize_event_value(new_value)?;
+    let parent_id = event.parent_id.clone().ok_or_else(|| missing_parent(event))?;
+
+    Ok(typing::Route {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        name: res.name,
+        desc: res.description,
+        labels: from_adc_labels(res.labels),
+
+        uris: res.uris,
+        hosts: res.hosts,
+        methods: res.methods,
+        remote_addrs: res.remote_addrs,
+        vars: res.vars,
+        filter_func: res.filter_func,
+
+        plugins: res.plugins,
+        service_id: parent_id,
+
+        timeout: res.timeout,
+        enable_websocket: res.enable_websocket,
+        priority: res.priority,
+        status: Some(1),
+    })
+}
+
+fn from_adc_service(event: &Event, modified_index: i64) -> Result<typing::Service, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::Service = deserialize_event_value(new_value)?;
+    let id = generate_id_from_event(event)?;
+
+    Ok(typing::Service {
+        modified_index,
+        id: id.clone(),
+        name: res.name,
+        desc: res.description,
+        labels: from_adc_labels(res.labels),
+
+        hosts: res.hosts,
+        // Always points at this service's own id, regardless of whether it
+        // actually has a default upstream — matches the TS operator's own
+        // unconditional `upstream_id: id`. A service with no default
+        // upstream simply references an upstream document that was never
+        // written; standalone tolerates the dangling reference.
+        upstream_id: Some(id),
+        plugins: res.plugins,
+    })
+}
+
+fn from_adc_consumer(event: &Event, modified_index: i64) -> Result<typing::Consumer, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::Consumer = deserialize_event_value(new_value)?;
+
+    Ok(typing::Consumer {
+        modified_index,
+        username: generate_id_from_event(event)?,
+        desc: res.description,
+        labels: from_adc_labels(res.labels),
+        plugins: res.plugins,
+    })
+}
+
+fn from_adc_credential(event: &Event, modified_index: i64) -> Result<typing::ConsumerCredential, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::ConsumerCredential = deserialize_event_value(new_value)?;
+
+    let mut plugins = adc::Plugins::new();
+    plugins.insert(res.r#type, Value::Object(res.config));
+
+    Ok(typing::ConsumerCredential {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        name: res.name,
+        desc: res.description,
+        labels: from_adc_labels(res.labels),
+        plugins: Some(plugins),
+    })
+}
+
+fn from_adc_ssl(event: &Event, modified_index: i64) -> Result<typing::Ssl, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::SSL = deserialize_event_value(new_value)?;
+
+    let mut certificates = res.certificates.into_iter();
+    let first = certificates
+        .next()
+        .ok_or_else(|| BackendError::Other(format!("ssl {:?} has no certificates", event.resource_id).into()))?;
+    let (certs, keys): (Vec<String>, Vec<String>) = certificates.map(|c| (c.certificate, c.key)).unzip();
+
+    Ok(typing::Ssl {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        desc: None,
+        labels: from_adc_labels(res.labels),
+
+        ty: Some(res.r#type),
+        snis: res.snis,
+        cert: first.certificate,
+        key: first.key,
+        certs: (!certs.is_empty()).then_some(certs),
+        keys: (!keys.is_empty()).then_some(keys),
+        client: res.client,
+        ssl_protocols: res.ssl_protocols,
+
+        status: 1,
+    })
+}
+
+fn from_adc_global_rule(event: &Event, modified_index: i64) -> Result<typing::GlobalRule, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let mut plugins = adc::Plugins::new();
+    plugins.insert(event.resource_id.clone(), new_value.clone());
+
+    Ok(typing::GlobalRule {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        plugins: Some(plugins),
+    })
+}
+
+fn from_adc_plugin_metadata(event: &Event, modified_index: i64) -> Result<typing::PluginMetadata, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let extra = match new_value {
+        Value::Object(map) => map.clone(),
+        _ => Map::new(),
+    };
+
+    Ok(typing::PluginMetadata {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        extra,
+    })
+}
+
+fn from_adc_upstream(event: &Event, modified_index: i64) -> Result<typing::Upstream, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::Upstream = deserialize_event_value(new_value)?;
+
+    let mut wire = from_adc_upstream_wire(&res, event.parent_id.as_deref());
+    wire.modified_index = modified_index;
+    wire.id = generate_id_from_event(event)?;
+    Ok(wire)
+}
+
+fn from_adc_stream_route(event: &Event, modified_index: i64) -> Result<typing::StreamRoute, BackendError> {
+    let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+    let res: adc::StreamRoute = deserialize_event_value(new_value)?;
+    let parent_id = event.parent_id.clone().ok_or_else(|| missing_parent(event))?;
+
+    Ok(typing::StreamRoute {
+        modified_index,
+        id: generate_id_from_event(event)?,
+        name: res.name,
+        desc: res.description,
+        labels: from_adc_labels(res.labels),
+
+        remote_addr: res.remote_addr,
+        server_addr: res.server_addr,
+        server_port: res.server_port,
+        sni: res.sni,
+        service_id: parent_id,
+
+        plugins: res.plugins,
+        protocol: None,
+    })
+}
+
+/// Creates/updates/deletes one entry in `field`, matched by `identity`
+/// against the id [`generate_id_from_event`] derives — the same lookup
+/// logic every resource type needs, parameterized over its own collection
+/// type and identity accessor. Returns whether a matching entry was
+/// actually created/changed/removed (an `Update`/`Delete` for an id that
+/// isn't present is a no-op, not an error — matches the TS operator's own
+/// `findIndex !== -1` guards).
+fn upsert_or_delete<T>(
+    field: &mut Option<Vec<T>>,
+    event: &Event,
+    identity: impl Fn(&T) -> &str,
+    build: impl FnOnce() -> Result<T, BackendError>,
+) -> Result<bool, BackendError> {
+    match event.event_type() {
+        EventType::Create => {
+            field.get_or_insert_with(Vec::new).push(build()?);
+            Ok(true)
+        }
+        EventType::Update => {
+            let target_id = generate_id_from_event(event)?;
+            let vec = field.get_or_insert_with(Vec::new);
+            match vec.iter_mut().find(|item| identity(item) == target_id) {
+                Some(slot) => {
+                    *slot = build()?;
+                    Ok(true)
+                }
+                None => Ok(false),
+            }
+        }
+        EventType::Delete => {
+            let target_id = generate_id_from_event(event)?;
+            let Some(vec) = field.as_mut() else { return Ok(false) };
+            match vec.iter().position(|item| identity(item) == target_id) {
+                Some(pos) => {
+                    vec.remove(pos);
+                    Ok(true)
+                }
+                None => Ok(false),
+            }
+        }
+        EventType::OnlySubEvents => Ok(false),
+    }
+}
+
+fn apply_event(config: &mut ApisixStandalone, increase_version: &mut HashSet<ResourceType>, timestamp: i64, event: &Event) -> Result<(), BackendError> {
+    // A CONSUMER_CREDENTIAL shares its owning consumer's collection and
+    // conf_version counter — there's no separate "credentials" array on
+    // the wire.
+    let version_resource_type = match event.resource_type {
+        ResourceType::ConsumerCredential => ResourceType::Consumer,
+        other => other,
+    };
+
+    let changed = match event.resource_type {
+        ResourceType::Route => upsert_or_delete(&mut config.routes, event, |r| r.id.as_str(), || from_adc_route(event, timestamp))?,
+        ResourceType::Service => {
+            // Only touch the `services` collection when the service's own
+            // fields changed, not just its inline default upstream — an
+            // upstream-only change is already handled by
+            // `apply_event_for_service_inlined_upstream`, called before
+            // this for every SERVICE event regardless.
+            let diff = event.kind.diff().unwrap_or(&[]);
+            if diff.iter().any(|d| !diff_path_is_upstream(d)) {
+                upsert_or_delete(&mut config.services, event, |s| s.id.as_str(), || from_adc_service(event, timestamp))?
+            } else {
+                false
+            }
+        }
+        ResourceType::Consumer => {
+            upsert_or_delete(&mut config.consumers, event, ConsumerOrCredential::identity, || {
+                Ok(ConsumerOrCredential::Consumer(from_adc_consumer(event, timestamp)?))
+            })?
+        }
+        ResourceType::ConsumerCredential => {
+            upsert_or_delete(&mut config.consumers, event, ConsumerOrCredential::identity, || {
+                Ok(ConsumerOrCredential::Credential(from_adc_credential(event, timestamp)?))
+            })?
+        }
+        ResourceType::Ssl => upsert_or_delete(&mut config.ssls, event, |s| s.id.as_str(), || from_adc_ssl(event, timestamp))?,
+        ResourceType::GlobalRule => {
+            upsert_or_delete(&mut config.global_rules, event, |g| g.id.as_str(), || from_adc_global_rule(event, timestamp))?
+        }
+        ResourceType::PluginMetadata => {
+            upsert_or_delete(&mut config.plugin_metadata, event, |p| p.id.as_str(), || from_adc_plugin_metadata(event, timestamp))?
+        }
+        ResourceType::Upstream => {
+            upsert_or_delete(&mut config.upstreams, event, |u| u.id.as_str(), || from_adc_upstream(event, timestamp))?
+        }
+        ResourceType::StreamRoute => {
+            upsert_or_delete(&mut config.stream_routes, event, |r| r.id.as_str(), || from_adc_stream_route(event, timestamp))?
+        }
+        // Not part of standalone's config document — matches the TS
+        // operator's `fromADC` switch, which has no case for these either.
+        ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => false,
+    };
+
+    if changed {
+        increase_version.insert(version_resource_type);
+    }
+    Ok(())
+}
+
+/// A service's default upstream is stored as its own entry in the
+/// top-level `upstreams` array (id = the service's own id), not embedded
+/// inline in the service body — this keeps that entry in sync with
+/// whatever the differ's SERVICE event carries. A service with no default
+/// upstream (`upstream: None`) has nothing to write here.
+fn apply_event_for_service_inlined_upstream(
+    config: &mut ApisixStandalone,
+    increase_version: &mut HashSet<ResourceType>,
+    timestamp: i64,
+    event: &Event,
+) -> Result<(), BackendError> {
+    if event.resource_type != ResourceType::Service {
+        return Ok(());
+    }
+
+    let build_wire = |event: &Event| -> Result<Option<typing::Upstream>, BackendError> {
+        let new_value = event.kind.new_value().ok_or_else(|| missing_new_value(event))?;
+        let service: adc::Service = deserialize_event_value(new_value)?;
+        let Some(upstream) = service.upstream else { return Ok(None) };
+        let mut wire = from_adc_upstream_wire(&upstream, None);
+        wire.id = event.resource_id.clone();
+        wire.modified_index = timestamp;
+        wire.name = event.resource_name.clone();
+        Ok(Some(wire))
+    };
+
+    match event.event_type() {
+        EventType::Create => {
+            if let Some(wire) = build_wire(event)? {
+                config.upstreams.get_or_insert_with(Vec::new).push(wire);
+                increase_version.insert(ResourceType::Upstream);
+            }
+        }
+        EventType::Update => {
+            let diff = event.kind.diff().unwrap_or(&[]);
+            if !diff.iter().any(diff_path_is_upstream) {
+                return Ok(());
+            }
+            if let Some(wire) = build_wire(event)? {
+                let upstreams = config.upstreams.get_or_insert_with(Vec::new);
+                if let Some(slot) = upstreams.iter_mut().find(|item| item.id == event.resource_id) {
+                    *slot = wire;
+                    increase_version.insert(ResourceType::Upstream);
+                }
+            }
+        }
+        EventType::Delete => {
+            let upstreams = config.upstreams.get_or_insert_with(Vec::new);
+            if let Some(pos) = upstreams.iter().position(|item| item.id == event.resource_id) {
+                upstreams.remove(pos);
+                increase_version.insert(ResourceType::Upstream);
+            }
+        }
+        EventType::OnlySubEvents => {}
+    }
+    Ok(())
+}
+
+/// A newly-created consumer credential with no matching consumer (or a
+/// consumer deleted in the same batch as its credentials survive) has
+/// nothing left to belong to — dropped rather than left dangling.
+fn filter_orphan_credentials(config: &mut ApisixStandalone) {
+    let Some(consumers) = &mut config.consumers else { return };
+    let usernames: HashSet<String> = consumers
+        .iter()
+        .filter_map(ConsumerOrCredential::as_consumer)
+        .map(|consumer| consumer.username.clone())
+        .collect();
+
+    consumers.retain(|item| match item {
+        ConsumerOrCredential::Consumer(_) => true,
+        ConsumerOrCredential::Credential(credential) => {
+            let owner = credential.id.split('/').next().unwrap_or("");
+            usernames.contains(owner)
+        }
+    });
+}
+
+fn bump_conf_versions(config: &mut ApisixStandalone, increase_version: &HashSet<ResourceType>, timestamp: i64) {
+    for resource_type in increase_version {
+        let field = match resource_type {
+            ResourceType::Route => &mut config.routes_conf_version,
+            ResourceType::Service => &mut config.services_conf_version,
+            ResourceType::Consumer => &mut config.consumers_conf_version,
+            ResourceType::Ssl => &mut config.ssls_conf_version,
+            ResourceType::GlobalRule => &mut config.global_rules_conf_version,
+            ResourceType::PluginMetadata => &mut config.plugin_metadata_conf_version,
+            ResourceType::Upstream => &mut config.upstreams_conf_version,
+            ResourceType::StreamRoute => &mut config.stream_routes_conf_version,
+            ResourceType::ConsumerCredential | ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => continue,
+        };
+        *field = Some(timestamp);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use adc_sdk::EventKind;
+    use serde_json::json;
+    use tokio::task::JoinSet;
+
+    use super::*;
+
+    fn event(rt: ResourceType, kind: EventKind, id: &str) -> Event {
+        Event::new(rt, kind, id, id)
+    }
+
+    fn empty_config() -> ApisixStandalone {
+        ApisixStandalone::default()
+    }
+
+    #[test]
+    fn create_route_pushes_it_with_the_parent_service_id() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let mut route_event = event(
+            ResourceType::Route,
+            EventKind::Create { new_value: json!({ "name": "r1", "uris": ["/x"] }) },
+            "r1",
+        );
+        route_event.parent_id = Some("svc-1".to_string());
+
+        apply_event(&mut config, &mut increase_version, 100, &route_event).unwrap();
+
+        let routes = config.routes.unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].id, "r1");
+        assert_eq!(routes[0].service_id, "svc-1");
+        assert_eq!(routes[0].modified_index, 100);
+        assert!(increase_version.contains(&ResourceType::Route));
+    }
+
+    #[test]
+    fn a_service_update_that_only_touches_upstream_leaves_the_services_collection_untouched_but_updates_the_inline_upstream() {
+        let mut config = empty_config();
+        config.services = Some(vec![typing::Service {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: None,
+            labels: None,
+            hosts: None,
+            upstream_id: Some("svc-1".to_string()),
+            plugins: None,
+        }]);
+        config.upstreams = Some(vec![typing::Upstream {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: None,
+            labels: None,
+            nodes: None,
+            scheme: None,
+            ty: None,
+            hash_on: None,
+            key: None,
+            pass_host: None,
+            upstream_host: None,
+            retries: None,
+            retry_timeout: None,
+            timeout: None,
+            tls: None,
+            keepalive_pool: None,
+            checks: None,
+            discovery_type: None,
+            service_name: None,
+            discovery_args: None,
+        }]);
+        let mut increase_version = HashSet::new();
+        let diff = vec![ValueDiff::Edit {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            lhs: json!({}),
+            rhs: json!({}),
+        }];
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value: json!({ "name": "svc-1" }),
+                new_value: json!({ "name": "svc-1", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+                diff: Some(diff),
+            },
+            "svc-1",
+        );
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 200, &service_event).unwrap();
+        apply_event(&mut config, &mut increase_version, 200, &service_event).unwrap();
+
+        assert_eq!(config.services.as_ref().unwrap()[0].modified_index, 1, "service body itself must stay untouched");
+        assert!(!increase_version.contains(&ResourceType::Service));
+
+        let upstreams = config.upstreams.unwrap();
+        assert_eq!(upstreams.len(), 1);
+        assert_eq!(upstreams[0].id, "svc-1");
+        assert!(increase_version.contains(&ResourceType::Upstream));
+    }
+
+    #[test]
+    fn service_create_with_no_default_upstream_creates_no_inline_upstream_entry() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let service_event = event(ResourceType::Service, EventKind::Create { new_value: json!({ "name": "svc-no-upstream" }) }, "svc-2");
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &service_event).unwrap();
+
+        assert!(config.upstreams.is_none());
+        assert!(!increase_version.contains(&ResourceType::Upstream));
+    }
+
+    #[test]
+    fn delete_consumer_credential_matches_by_the_parent_prefixed_id() {
+        let mut config = empty_config();
+        config.consumers = Some(vec![
+            ConsumerOrCredential::Consumer(typing::Consumer {
+                modified_index: 1,
+                username: "alice".to_string(),
+                desc: None,
+                labels: None,
+                plugins: None,
+            }),
+            ConsumerOrCredential::Credential(typing::ConsumerCredential {
+                modified_index: 1,
+                id: "alice/credentials/key1".to_string(),
+                name: "key1".to_string(),
+                desc: None,
+                labels: None,
+                plugins: None,
+            }),
+        ]);
+        let mut increase_version = HashSet::new();
+        let mut delete_event = event(ResourceType::ConsumerCredential, EventKind::Delete { old_value: json!({}) }, "key1");
+        delete_event.parent_id = Some("alice".to_string());
+
+        apply_event(&mut config, &mut increase_version, 400, &delete_event).unwrap();
+
+        let consumers = config.consumers.unwrap();
+        assert_eq!(consumers.len(), 1);
+        assert!(consumers[0].as_consumer().is_some());
+        assert!(increase_version.contains(&ResourceType::Consumer));
+    }
+
+    #[test]
+    fn filter_orphan_credentials_drops_credentials_whose_consumer_is_gone() {
+        let mut config = empty_config();
+        config.consumers = Some(vec![
+            ConsumerOrCredential::Consumer(typing::Consumer {
+                modified_index: 1,
+                username: "alice".to_string(),
+                desc: None,
+                labels: None,
+                plugins: None,
+            }),
+            ConsumerOrCredential::Credential(typing::ConsumerCredential {
+                modified_index: 1,
+                id: "alice/credentials/key1".to_string(),
+                name: "key1".to_string(),
+                desc: None,
+                labels: None,
+                plugins: None,
+            }),
+            ConsumerOrCredential::Credential(typing::ConsumerCredential {
+                modified_index: 1,
+                id: "bob/credentials/key2".to_string(),
+                name: "key2".to_string(),
+                desc: None,
+                labels: None,
+                plugins: None,
+            }),
+        ]);
+
+        filter_orphan_credentials(&mut config);
+
+        let remaining: Vec<&str> = config.consumers.as_ref().unwrap().iter().map(ConsumerOrCredential::identity).collect();
+        assert_eq!(remaining, vec!["alice", "alice/credentials/key1"]);
+    }
+
+    #[test]
+    fn bump_conf_versions_only_touches_resource_types_that_actually_changed() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        increase_version.insert(ResourceType::Route);
+
+        bump_conf_versions(&mut config, &increase_version, 555);
+
+        assert_eq!(config.routes_conf_version, Some(555));
+        assert_eq!(config.services_conf_version, None);
+    }
+
+    /// Applying an (event batch, base config) pair is a pure computation —
+    /// each call clones its own `new_config` from a shared base and never
+    /// touches any state outside its own locals. Running many of these
+    /// concurrently, each producing its own independently-verified result,
+    /// is a smoke test that nothing here secretly relies on being called
+    /// from a single thread (no hidden shared mutable state, no data races
+    /// under Miri/TSan-style concurrent access) — a real multi-threaded
+    /// runtime, not `current_thread`, so tasks genuinely run in parallel.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn applying_independent_event_batches_concurrently_is_race_free() {
+        let base = empty_config();
+
+        let mut tasks = JoinSet::new();
+        for i in 0..200i64 {
+            let mut config = base.clone();
+            tasks.spawn(async move {
+                let mut increase_version = HashSet::new();
+                let mut route_event = event(
+                    ResourceType::Route,
+                    EventKind::Create { new_value: json!({ "name": format!("r{i}"), "uris": ["/x"] }) },
+                    &format!("r{i}"),
+                );
+                route_event.parent_id = Some(format!("svc-{i}"));
+                apply_event(&mut config, &mut increase_version, i, &route_event).unwrap();
+
+                let routes = config.routes.expect("route was just created");
+                assert_eq!(routes.len(), 1);
+                assert_eq!(routes[0].id, format!("r{i}"));
+                assert_eq!(routes[0].modified_index, i);
+            });
+        }
+        let results = tasks.join_all().await;
+        assert_eq!(results.len(), 200);
+    }
+}

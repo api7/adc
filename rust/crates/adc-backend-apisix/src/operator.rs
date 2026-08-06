@@ -72,7 +72,7 @@ impl Operator {
                 for outcome in group_results {
                     match outcome {
                         Ok(result) => results.push(result),
-                        Err((event, error)) => results.push(BackendSyncResult { success: false, event, error: Some(error), server: None }),
+                        Err((event, error)) => results.push(BackendSyncResult { success: false, event: Some(event), error: Some(error), server: None }),
                     }
                 }
             }
@@ -122,11 +122,11 @@ impl Operator {
     async fn apply_inner(&self, event: Event) -> Result<BackendSyncResult, (Event, BackendError)> {
         if let Err(error) = self.check_version_support(&event) {
             log::warn!("skipping {:?} {:?} \"{}\": {error}", event.event_type(), event.resource_type, event.resource_name);
-            return Ok(BackendSyncResult { success: false, event, error: Some(error), server: None });
+            return Ok(BackendSyncResult { success: false, event: Some(event), error: Some(error), server: None });
         }
 
         match self.operate(&event).await {
-            Ok(()) => Ok(BackendSyncResult { success: true, event, error: None, server: None }),
+            Ok(()) => Ok(BackendSyncResult { success: true, event: Some(event), error: None, server: None }),
             Err(error) => Err((event, error)),
         }
     }
