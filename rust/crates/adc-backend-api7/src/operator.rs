@@ -80,7 +80,7 @@ impl Operator {
                         Ok(result) => results.push(result),
                         Err((event, error)) => results.push(BackendSyncResult {
                             success: false,
-                            event,
+                            event: Some(event),
                             error: Some(error),
                             server: None,
                         }),
@@ -120,7 +120,7 @@ impl Operator {
         match outcome {
             Ok(()) => Ok(BackendSyncResult {
                 success: true,
-                event,
+                event: Some(event),
                 error: None,
                 server: None,
             }),

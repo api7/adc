@@ -62,10 +62,11 @@ async fn sync_ok(events: Vec<Event>) {
         .await
         .unwrap();
     for result in &results {
+        let event = result.event.as_ref().expect("apisix always reports one result per event");
         assert!(
             result.success,
             "sync failed for {:?} {}: {:?}",
-            result.event.resource_type, result.event.resource_id, result.error
+            event.resource_type, event.resource_id, result.error
         );
     }
 }
@@ -113,8 +114,10 @@ impl Drop for Cleanup {
                 for result in &results {
                     if !result.success {
                         eprintln!(
-                            "cleanup failed for {:?} {}: {:?}",
-                            result.event.resource_type, result.event.resource_id, result.error
+                            "cleanup failed for {:?} {:?}: {:?}",
+                            result.event.as_ref().map(|e| e.resource_type),
+                            result.event.as_ref().map(|e| e.resource_id.as_str()),
+                            result.error
                         );
                     }
                 }

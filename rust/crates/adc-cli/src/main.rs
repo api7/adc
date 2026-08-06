@@ -164,12 +164,21 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
     for result in &results {
         if !result.success {
             failed += 1;
-            println!(
-                "[FAILED] {} {}: \"{}\"",
-                event_verb(&result.event),
-                result.event.resource_type.as_str(),
-                result.event.resource_name
-            );
+            match &result.event {
+                Some(event) => println!(
+                    "[FAILED] {} {}: \"{}\"",
+                    event_verb(event),
+                    event.resource_type.as_str(),
+                    event.resource_name
+                ),
+                // A backend whose sync granularity is per-server rather
+                // than per-event (apisix-standalone) has no single event to
+                // blame for the failure — report which server instead.
+                None => println!(
+                    "[FAILED] sync{}",
+                    result.server.as_deref().map(|server| format!(" to {server}")).unwrap_or_default()
+                ),
+            }
             if let Some(err) = &result.error {
                 println!("  {err}");
             }

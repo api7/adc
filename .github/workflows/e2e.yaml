@@ -135,6 +135,28 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix-standalone:test
+
+      # Run the Rust port's E2E tests against the same live cluster. Each
+      # test function restarts every instance itself before it starts
+      # (see adc-backend-apisix-standalone's tests/common/mod.rs), so
+      # running after the TS suite here is safe — nothing from the TS
+      # suite's own state survives into the Rust tests.
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      - name: Run Rust E2E tests
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-apisix-standalone -- --ignored --test-threads=1
+      # Only useful when the step above fails: a bare 404 from an admin API
+      # request gives no clue why on its own — the container's own error
+      # log does.
+      - name: Dump APISIX standalone container logs
+        if: failure()
+        working-directory: ./libs/backend-apisix-standalone/e2e/assets
+        run: docker compose logs --no-color
   api7:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'

@@ -41,7 +41,11 @@ pub struct BackendSyncOptions {
 #[derive(Debug)]
 pub struct BackendSyncResult {
     pub success: bool,
-    pub event: Event,
+    /// `None` for a backend whose sync granularity is coarser than "one
+    /// event, one result" — apisix-standalone applies a whole batch of
+    /// events as a single atomic document write per server, so one result
+    /// there describes that write, not any single event within it.
+    pub event: Option<Event>,
     pub error: Option<BackendError>,
     pub server: Option<String>,
 }
@@ -98,7 +102,7 @@ pub trait Backend: Send + Sync {
 
     async fn dump(&self) -> Result<Configuration, BackendError>;
 
-    /// Applies `events`. Per-event failures are captured as individual
+    /// Applies `events`. Failures are captured as individual
     /// `BackendSyncResult`s with `success: false` rather than failing the
     /// whole call — *unless* `opts.exit_on_failure` is set (the default):
     /// then the first failure aborts the whole call and is returned as
@@ -106,7 +110,12 @@ pub trait Backend: Send + Sync {
     /// implementation's `Observable` erroring out (via `throwError`) instead
     /// of completing with a partial list. Concurrency (per
     /// `opts.concurrent`) is an implementation detail of each backend, not
-    /// something the trait signature encodes.
+    /// something the trait signature encodes — as is the granularity of
+    /// each result: most backends apply one event per request and report
+    /// one result per event, but a backend whose admin API only accepts a
+    /// whole document at once (apisix-standalone) reports one result per
+    /// *server* instead, with `BackendSyncResult::event` left `None` since
+    /// no single event owns that write.
     async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError>;
 
     /// Not every backend can pre-validate events against the remote server

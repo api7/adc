@@ -1,20 +1,20 @@
 mod backend;
+mod cache;
 mod fetcher;
 mod operator;
 mod transformer;
 mod typing;
 mod utils;
-mod validator;
 
-pub use backend::Backend;
-pub use validator::Validator;
+pub use backend::{Backend, BackendOptions};
 
 #[cfg(feature = "test-utils")]
 #[doc(hidden)]
 pub mod tests {
+    pub use crate::backend::StandaloneServer;
+    pub use crate::cache::Cache;
     pub use crate::fetcher::Fetcher;
     pub use crate::operator::Operator;
-    pub use crate::validator::Validator;
 
     pub mod transformer {
         pub use crate::transformer::*;
