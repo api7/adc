@@ -1,13 +1,27 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::LazyLock;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-/// A millisecond wall-clock timestamp, used as a synced config's version
-/// number. Not truly monotonic on its own (wall-clock time can roll back);
-/// [`crate::operator::Operator::sync`] additionally clamps it against the
-/// last version accepted by the data plane so the number it actually sends
-/// never regresses.
+static ORIGIN: LazyLock<(SystemTime, Instant)> = LazyLock::new(|| (SystemTime::now(), Instant::now()));
+
 pub fn stable_timestamp() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
+    let (origin_wall, origin_monotonic) = *ORIGIN;
+    let wall = origin_wall + origin_monotonic.elapsed();
+    wall.duration_since(UNIX_EPOCH)
         .expect("system clock is before the Unix epoch")
         .as_millis() as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn successive_calls_never_decrease() {
+        let mut previous = stable_timestamp();
+        for _ in 0..1000 {
+            let current = stable_timestamp();
+            assert!(current >= previous, "{current} < {previous}");
+            previous = current;
+        }
+    }
 }
