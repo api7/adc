@@ -52,9 +52,9 @@ async fn creates_dumps_updates_and_deletes_global_rules() {
     // must be recognized as identical (by the digest this crate stamps on
     // every PUT — see `crate::operator::Operator::sync`) and not bump the
     // server's own conf_version, even though a document still gets sent.
-    let version_before = raw_conf_version("global_rules_conf_version").await;
+    let version_before = raw_conf_version("global_rules_conf_version").await.expect("global_rules_conf_version should be present once the document exists");
     sync_ok(&backend, vec![]).await;
-    let version_after = raw_conf_version("global_rules_conf_version").await;
+    let version_after = raw_conf_version("global_rules_conf_version").await.expect("global_rules_conf_version should be present once the document exists");
     assert_eq!(version_before, version_after, "resyncing unchanged global rules must not bump the conf_version");
 
     sync_ok(
