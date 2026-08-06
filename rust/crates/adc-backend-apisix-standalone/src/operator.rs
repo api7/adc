@@ -43,22 +43,17 @@ impl Operator {
         let mut new_config = self.old_raw_config.clone();
         let mut increase_version: HashSet<ResourceType> = HashSet::new();
 
-        // A static process-start time combined with an always-advancing
-        // wall-clock read would normally never regress on its own, but this
-        // process isn't the only writer — an earlier `sync` (in this
-        // process or another) may have already pushed the cluster's config
-        // to a version ahead of what the wall clock reads right now (e.g.
-        // after a clock rollback). Clamping to one past the latest known
-        // version keeps this write acceptable to the data plane even then.
-        let mut timestamp = stable_timestamp();
-        if let Some(latest) = Cache::global().latest_version(&self.cache_key)
-            && latest > timestamp
-        {
-            log::warn!(
-                "sync timestamp {timestamp} is behind the latest known configuration version {latest}; a clock rollback may have occurred, advancing past it"
-            );
-            timestamp = latest + 1;
-        }
+        // An always-advancing wall-clock read would normally never regress
+        // on its own, but this process isn't the only writer — an earlier
+        // `sync` (in this process or another) may have already pushed the
+        // cluster's config to a version at or ahead of what the wall clock
+        // reads right now: either a real clock rollback, or simply two
+        // syncs landing in the same millisecond (millisecond resolution is
+        // coarse enough for this to happen under normal, fast-succession
+        // load, not just as a clock-skew edge case). Either way, clamping
+        // to one past the latest known version keeps every write both
+        // acceptable to the data plane and strictly increasing.
+        let timestamp = resolve_sync_timestamp(stable_timestamp(), Cache::global().latest_version(&self.cache_key));
 
         for event in &events {
             apply_event_for_service_inlined_upstream(&mut new_config, &mut increase_version, timestamp, event)?;
@@ -123,6 +118,16 @@ fn sha1_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(bytes);
     hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Never below `latest_known` — clamps `now` up to one past it whenever
+/// `now` isn't already strictly ahead, covering both a real clock rollback
+/// and two syncs landing in the same wall-clock millisecond alike.
+fn resolve_sync_timestamp(now: i64, latest_known: Option<i64>) -> i64 {
+    match latest_known {
+        Some(latest) if latest >= now => latest + 1,
+        _ => now,
+    }
 }
 
 fn missing_new_value(event: &Event) -> BackendError {
@@ -604,6 +609,30 @@ mod tests {
 
     fn empty_config() -> ApisixStandalone {
         ApisixStandalone::default()
+    }
+
+    #[test]
+    fn no_known_latest_version_uses_the_wall_clock_time_as_is() {
+        assert_eq!(resolve_sync_timestamp(100, None), 100);
+    }
+
+    #[test]
+    fn a_wall_clock_time_already_ahead_of_the_latest_known_version_is_used_as_is() {
+        assert_eq!(resolve_sync_timestamp(100, Some(50)), 100);
+    }
+
+    /// Regression test: two syncs landing in the same wall-clock millisecond
+    /// (a real, non-exotic race under fast-succession load, not just a
+    /// clock-rollback edge case) must still produce a strictly increasing
+    /// timestamp, not the same one twice.
+    #[test]
+    fn a_wall_clock_time_equal_to_the_latest_known_version_is_bumped_past_it() {
+        assert_eq!(resolve_sync_timestamp(100, Some(100)), 101);
+    }
+
+    #[test]
+    fn a_wall_clock_time_behind_the_latest_known_version_is_bumped_past_it() {
+        assert_eq!(resolve_sync_timestamp(50, Some(100)), 101);
     }
 
     #[test]
