@@ -157,7 +157,12 @@ async fn single_instance_initializes_caches_and_syncs() {
     assert_eq!(raw.global_rules_conf_version, Some(0));
     assert_eq!(raw.plugin_metadata_conf_version, Some(0));
     assert_eq!(raw.upstreams_conf_version, Some(0));
-    assert_eq!(raw.stream_routes_conf_version, Some(0));
+    // Not asserted like the others: stream routes are a newer standalone
+    // feature, absent from the document's schema entirely (not merely
+    // zeroed) on some of this suite's older supported versions — the same
+    // reason the TS suite's own equivalent check only walks whatever keys
+    // the raw document actually has, rather than a fixed list.
+    assert!(matches!(raw.stream_routes_conf_version, None | Some(0)));
 
     // A second dump is served from cache — same result, no new fetch.
     let again = dump(&backend).await;
