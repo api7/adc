@@ -105,11 +105,14 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert_eq!(raw.upstreams.as_ref().unwrap()[0].name, SERVICE_NAME);
     assert_eq!(raw.services_conf_version, Some(service_modified_index));
     assert_eq!(raw.upstreams_conf_version, Some(upstream_modified_index_1));
-    assert_eq!(raw.consumers_conf_version, None);
-    assert_eq!(raw.global_rules_conf_version, None);
-    assert_eq!(raw.plugin_metadata_conf_version, None);
-    assert_eq!(raw.routes_conf_version, None);
-    assert_eq!(raw.ssls_conf_version, None);
+    // Untouched collections aren't absent — the document already exists
+    // (this crate's own "Initialize cache" dump established that), so every
+    // conf_version field is present, just still at its baseline 0.
+    assert_eq!(raw.consumers_conf_version, Some(0));
+    assert_eq!(raw.global_rules_conf_version, Some(0));
+    assert_eq!(raw.plugin_metadata_conf_version, Some(0));
+    assert_eq!(raw.routes_conf_version, Some(0));
+    assert_eq!(raw.ssls_conf_version, Some(0));
 
     // --- Update: only the inline upstream's port changes. ---
     let before = dump(&backend).await;
@@ -125,11 +128,11 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert!(upstream_modified_index_2 > upstream_modified_index_1);
     assert_eq!(raw.services_conf_version, Some(service_modified_index));
     assert_eq!(raw.upstreams_conf_version, Some(upstream_modified_index_2));
-    assert_eq!(raw.consumers_conf_version, None);
-    assert_eq!(raw.global_rules_conf_version, None);
-    assert_eq!(raw.plugin_metadata_conf_version, None);
-    assert_eq!(raw.routes_conf_version, None);
-    assert_eq!(raw.ssls_conf_version, None);
+    assert_eq!(raw.consumers_conf_version, Some(0));
+    assert_eq!(raw.global_rules_conf_version, Some(0));
+    assert_eq!(raw.plugin_metadata_conf_version, Some(0));
+    assert_eq!(raw.routes_conf_version, Some(0));
+    assert_eq!(raw.ssls_conf_version, Some(0));
 
     // --- Update again: the inline upstream's nodes become empty. ---
     let before = dump(&backend).await;
@@ -146,11 +149,11 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert!(upstream_modified_index_3 > upstream_modified_index_2);
     assert_eq!(raw.services_conf_version, Some(service_modified_index));
     assert_eq!(raw.upstreams_conf_version, Some(upstream_modified_index_3));
-    assert_eq!(raw.consumers_conf_version, None);
-    assert_eq!(raw.global_rules_conf_version, None);
-    assert_eq!(raw.plugin_metadata_conf_version, None);
-    assert_eq!(raw.routes_conf_version, None);
-    assert_eq!(raw.ssls_conf_version, None);
+    assert_eq!(raw.consumers_conf_version, Some(0));
+    assert_eq!(raw.global_rules_conf_version, Some(0));
+    assert_eq!(raw.plugin_metadata_conf_version, Some(0));
+    assert_eq!(raw.routes_conf_version, Some(0));
+    assert_eq!(raw.ssls_conf_version, Some(0));
 
     // --- Delete: both the service and its inline upstream disappear
     //     together, sharing the same new timestamp. ---
