@@ -1,10 +1,10 @@
 # Manage Gateway Configuration in CI/CD
 
-ADC can promote declarative Apache APISIX or API7 Enterprise configuration through a CI/CD pipeline. The pipeline checks proposed configuration, shows the expected gateway changes, waits for the required approval, and then reconciles the target gateway with the reviewed files.
+Use ADC in a CI/CD pipeline to validate and deploy declarative Apache APISIX or API7 Enterprise configuration. The pipeline checks proposed configuration, shows the expected gateway changes, waits for the required approval, and then reconciles the target gateway with the reviewed files.
 
-This is a push-based workflow: the CI/CD runner executes ADC and connects to the gateway Admin API. ADC configuration files are not Kubernetes resources, so a Kubernetes GitOps controller such as Argo CD or Flux does not apply them by itself. If you use a GitOps controller, run ADC in a separate CI job or in another explicitly designed execution mechanism.
+The CI/CD runner deploys the configuration by running ADC and connecting to the gateway Admin API. Unlike Argo CD or Flux, ADC does not continuously watch a Git repository for changes. ADC configuration files are not Kubernetes resources, so run ADC in a separate CI job when you also use a Kubernetes GitOps controller.
 
-## Before You Begin
+## Prerequisites
 
 - Install ADC on the CI/CD runner or use the published `api7/adc` container image. Pin a released version instead of using a floating tag.
 - Store the declarative configuration in version control. See [Use ADC for Declarative Configuration](./workflow.md) to create or adopt an `adc.yaml` file.
@@ -22,7 +22,7 @@ The examples use ADC `0.29.0` and a file at `gateway/adc.yaml`. Change the versi
 
 Use a label selector to give one application or team an independent ownership scope:
 
-```shell
+```bash
 adc diff \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=production
@@ -55,13 +55,13 @@ Do not expose write-capable credentials to workflows triggered from untrusted fo
 
 Run `lint` for every proposed change. It verifies ADC syntax and schema rules without connecting to a backend:
 
-```shell
+```bash
 adc lint -f gateway/adc.yaml
 ```
 
 For trusted pull requests, also validate against a non-production backend and produce a diff:
 
-```shell
+```bash
 adc validate \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=staging
@@ -83,7 +83,7 @@ Use the same version, files, backend, gateway group, resource filters, and label
 
 ### Plan
 
-```shell
+```bash
 adc validate \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=production
@@ -99,7 +99,7 @@ Review `diff.yaml`, paying particular attention to `delete` events. A large or u
 
 After approval, recalculate the plan and apply the desired state:
 
-```shell
+```bash
 adc validate \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=production
@@ -129,7 +129,7 @@ Use `--request-concurrent` to reduce request concurrency when the Admin API is r
 
 The ADC image is published to Docker Hub and GitHub Container Registry for `linux/amd64` and `linux/arm64`. The following helper runs a pinned image and mounts the repository at `/work`:
 
-```shell
+```bash
 ADC_IMAGE=api7/adc:0.29.0
 
 docker run --rm \
@@ -146,7 +146,7 @@ docker run --rm \
 
 The explicit entrypoint keeps the repository as the working directory while running the image's ADC executable at `/home/nonroot/main.cjs`. Add the same `docker run` options for `validate`, `diff`, and `sync`. Mount CA and mutual TLS files read-only when those files are not already in the repository:
 
-```shell
+```bash
 -v "${RUNNER_TEMP}/gateway-ca.pem:/certs/gateway-ca.pem:ro" \
 -e ADC_CA_CERT_FILE=/certs/gateway-ca.pem
 ```
@@ -157,7 +157,7 @@ For stronger supply-chain reproducibility, pin the image digest recorded by your
 
 Run the same diff immediately after synchronization:
 
-```shell
+```bash
 adc diff \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=production
@@ -177,7 +177,7 @@ Then run application-level smoke tests through the gateway. ADC verifies and rec
 
 After confirming that the desired configuration produces a stable empty diff, run a scheduled `diff` with the same target and ownership settings as the deployment job. The following check fails when `diff.yaml` contains one or more events:
 
-```shell
+```bash
 adc diff \
   -f gateway/adc.yaml \
   --label-selector team=catalog,env=production
@@ -202,7 +202,7 @@ Gateway configuration should be rolled back from the same version-controlled sou
 
 Keep exported backups when you adopt existing resources or when your operational policy requires an independent recovery artifact:
 
-```shell
+```bash
 adc dump \
   --with-id \
   --label-selector team=catalog,env=production \
