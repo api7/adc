@@ -86,7 +86,6 @@ An ADC file can define services, routes, consumers, global rules, plugin metadat
 services:
   - name: httpbin-service
     upstream:
-      name: default
       scheme: http
       type: roundrobin
       nodes:
@@ -184,9 +183,12 @@ adc sync -f adc.yaml
 
 Run `sync` only after the diff has been reviewed or approved by your release process.
 
+See [Manage Gateway Configuration in CI/CD](./ci-cd.md) for production guidance on ownership scopes, protected credentials, plan artifacts, deployment approvals, drift detection, verification, and rollback.
+
 ## Related
 
 - [CLI Command Reference](../reference/cli.md)
 - [Configuration Reference](../reference/configuration.md)
 - [Resource IDs](./resource-ids.md)
 - [Label Selector](./label-selector.md)
+- [Manage Gateway Configuration in CI/CD](./ci-cd.md)
