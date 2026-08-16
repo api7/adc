@@ -168,7 +168,8 @@ pub fn differ_meta(resource_type: ResourceType) -> ResourceDifferMeta {
 
         // CONSUMER_GROUP and PLUGIN_CONFIG are not yet reachable via InternalConfiguration
         // (no top-level configField, and nothing currently declares them as a nested field);
-        // kept here for parity with the TS table and for future extension.
+        // kept here so the metadata table stays complete over all ResourceType
+        // variants, ready for whenever a nested field declares one of them.
         ResourceType::ConsumerGroup => ResourceDifferMeta {
             config_field: None,
             collection_kind: CollectionKind::Array,

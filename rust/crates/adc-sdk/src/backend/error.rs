@@ -1,9 +1,7 @@
 use std::error::Error as StdError;
 
-/// Failure modes shared by every `Backend` implementation. The TS codebase had
-/// no equivalent taxonomy — call sites threw bare `Error`/`AxiosError` values
-/// or stuffed an `Error` into a result struct's `error?` field — so this is a
-/// new design surface, not a port.
+/// Failure modes shared by every `Backend` implementation, so callers can
+/// match on a closed set of variants instead of an opaque error type.
 ///
 /// Concrete backends (apisix, api7, apisix-standalone) map their own
 /// transport/serialization errors into these variants; anything that doesn't

@@ -52,7 +52,7 @@ where
             return;
         };
         // Leading `\n`: the block starts on its own line, not tacked onto
-        // the label line, matching the TS CLI's signale-rendered debug block.
+        // the label line.
         let line = crate::progress::format_scoped_line(
             &fields.scope,
             '\u{2b24}',
@@ -80,9 +80,9 @@ struct SpanFields {
 }
 
 impl SpanFields {
-    /// Same shape as the TS CLI's `buildReqAndRespDebugOutput`: optional
-    /// description, `method url`, headers, body, blank line, then status
-    /// (reason phrase looked up here from the numeric code) or the error.
+    /// Optional description, `method url`, headers, body, blank line, then
+    /// status (reason phrase looked up here from the numeric code) or the
+    /// error.
     fn render(&self) -> String {
         let mut block = String::new();
         if !self.description.is_empty() {

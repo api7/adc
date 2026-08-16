@@ -82,14 +82,12 @@ pub struct BackendValidateResult {
 /// user configure", so methods stay object-safe (boxed futures via
 /// `#[async_trait]`, no generics).
 ///
-/// Not carried over from the TS `Backend` interface: `on(eventType, cb)`
-/// event subscription for task-progress/debug-request events. That was a
-/// hand-rolled pub-sub built to feed the CLI's listr2 progress renderer and
-/// axios debug logging. Its two jobs map directly onto `tracing`
-/// instrumentation instead — `TASK_START`/`TASK_DONE` become a `tracing`
-/// span's enter/exit, `AXIOS_DEBUG` becomes a `tracing::debug!` call at the
-/// request site — so implementations emit spans/events directly rather than
-/// through a bespoke bus on this trait.
+/// No event-subscription method here for task-progress/debug-request
+/// reporting: those are jobs `tracing` instrumentation already covers —
+/// a task's start/done is a `tracing` span's enter/exit, a debug request
+/// log is a `tracing::debug!` call at the request site — so implementations
+/// emit spans/events directly rather than through a bespoke bus on this
+/// trait.
 #[async_trait]
 pub trait Backend: Send + Sync {
     fn metadata(&self) -> BackendMetadata;
@@ -106,9 +104,8 @@ pub trait Backend: Send + Sync {
     /// `BackendSyncResult`s with `success: false` rather than failing the
     /// whole call — *unless* `opts.exit_on_failure` is set (the default):
     /// then the first failure aborts the whole call and is returned as
-    /// `Err`, discarding any results accumulated so far, mirroring the TS
-    /// implementation's `Observable` erroring out (via `throwError`) instead
-    /// of completing with a partial list. Concurrency (per
+    /// `Err`, discarding any results accumulated so far, instead of
+    /// completing with a partial list. Concurrency (per
     /// `opts.concurrent`) is an implementation detail of each backend, not
     /// something the trait signature encodes — as is the granularity of
     /// each result: most backends apply one event per request and report
@@ -119,8 +116,8 @@ pub trait Backend: Send + Sync {
     async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError>;
 
     /// Not every backend can pre-validate events against the remote server
-    /// before applying them; the default rejects with `Unsupported`,
-    /// matching the TS interface's `validate?` being absent.
+    /// before applying them, so this defaults to rejecting with
+    /// `Unsupported` rather than being a required method.
     async fn validate(&self, _events: &[Event]) -> Result<BackendValidateResult, BackendError> {
         Err(BackendError::Unsupported("validate".into()))
     }

@@ -1,8 +1,7 @@
-//! Per-stage progress display, replacing `listr2`'s task-list rendering.
-//! Interactive: `stage` runs the future inside a span that `IndicatifLayer`
-//! turns into a spinner. Non-interactive: prints plain
-//! `[time] [ADC] › start/success  message` lines (matches the TS CLI's
-//! `signale` renderer, which never redraws regardless of tty).
+//! Per-stage progress display. Interactive: `stage` runs the future inside a
+//! span that `IndicatifLayer` turns into a spinner. Non-interactive: prints
+//! plain `[time] [ADC] › start/success  message` lines that never redraw,
+//! so output stays readable when piped to a file or a CI log.
 //!
 //! `--verbose 0` silences both modes.
 
@@ -89,7 +88,7 @@ pub fn finish_ok() {
     }
 }
 
-/// A `signale` `info`-styled one-shot line — a fact being reported, not a
+/// A one-shot informational line — a fact being reported, not a
 /// `stage`-style task with a start/finish lifecycle. Interactive mode still
 /// goes through `IndicatifLayer` (span entered and immediately dropped, no
 /// future to await) rather than a bare `eprintln!`, so it lines up visually
@@ -116,8 +115,7 @@ pub fn print_line(icon: char, label: &str, message: &str) {
 
 /// `print_line` with an explicit scope tag instead of `ADC` — backend-owned
 /// lines (`http_debug`/`sync_debug`) use their backend's own
-/// `BackendMetadata::log_scope` (`APISIX`), matching the TS CLI's
-/// `SignaleRenderer`.
+/// `BackendMetadata::log_scope` (`APISIX`) instead.
 pub fn print_scoped_line(scope: &str, icon: char, label: &str, message: &str) {
     eprintln!("{}", format_scoped_line(scope, icon, label, message));
 }
@@ -140,9 +138,8 @@ pub fn format_scoped_line(scope: &str, icon: char, label: &str, message: &str) -
     )
 }
 
-/// Matches `node_modules/signale/types.js`'s palette: `start`/`success`
-/// green, `error`/`debug` red, `star` yellow, everything else (`info`,
-/// `progress` — no TS counterpart) blue.
+/// `start`/`success` green, `error`/`debug` red, `star` yellow, everything
+/// else (`info`, `progress`) blue.
 fn colored_icon_and_label(icon: char, label: &str, is_terminal: bool) -> String {
     let padded = format!("{label:<10}");
     if !is_terminal {

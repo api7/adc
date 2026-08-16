@@ -7,7 +7,10 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldMeta {
     Map {
-        #[allow(dead_code)] // kept for parity with TS; identity is handled by ResourceDifferMeta::get_name/generate_id instead
+        // Documents which key uniquely identifies each item in this nested
+        // list, even though nothing here reads it — actual identity
+        // resolution goes through ResourceDifferMeta::get_name/generate_id.
+        #[allow(dead_code)]
         list_map_key: &'static str,
         nested: bool,
         /// Key under which the nested collection appears in `InternalConfiguration`,
