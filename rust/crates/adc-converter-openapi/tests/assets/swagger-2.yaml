@@ -1,16 +1,15 @@
+swagger: "2.0"
 info:
   title: httpbin.org
   description: httpbin.org description
-x-adc-name: ""
-servers:
-  - url: https://httpbin.org/
+host: httpbin.org
+basePath: /v1
+schemes:
+  - https
 paths:
   /anything:
     get:
-      tags:
-        - Anything
       summary: Returns anything passed in request data.
       responses:
         "200":
-          description: Anything passed in request
-          content: {}
+          description: OK

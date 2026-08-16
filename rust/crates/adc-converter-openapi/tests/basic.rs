@@ -134,3 +134,32 @@ fn case_8_circular_component_schema_is_pruned_away_before_dereferencing() {
     assert_eq!(svc.upstream.as_ref().unwrap().nodes.as_ref().unwrap()[0].host, "localhost");
     assert_eq!(svc.upstream.as_ref().unwrap().nodes.as_ref().unwrap()[0].port, 8080);
 }
+
+#[test]
+fn case_9_swagger_2_0_document_upgrades_host_baseuri_and_schemes_into_servers() {
+    let config = convert("swagger-2.yaml");
+    let svc = service(&config, "httpbin.org");
+    let upstream = svc.upstream.as_ref().unwrap();
+    assert_eq!(upstream.scheme, adc_sdk::resources::UpstreamScheme::Https);
+    let nodes = upstream.nodes.as_ref().unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].host, "httpbin.org");
+    assert_eq!(nodes[0].port, 443);
+    let routes = svc.routes.as_ref().unwrap().http().unwrap();
+    // basePath "/v1" is inlined into the route's own uri.
+    assert_eq!(routes[0].uris, vec!["/v1/anything"]);
+}
+
+#[test]
+fn case_10_path_and_operation_level_splits_both_honor_the_root_x_adc_name() {
+    let config = convert("basic-5-named.yaml");
+    let services = config.services.as_ref().unwrap();
+    assert!(services.iter().all(|s| s.name != "custom-name"), "the main service has no routes of its own left");
+    assert_eq!(services.len(), 2);
+
+    let path_split = service(&config, "custom-name_anything");
+    assert_eq!(route_names(path_split), vec!["httpbin.org_anything_put"]);
+
+    let op_split = service(&config, "custom-name_anything_get");
+    assert_eq!(route_names(op_split), vec!["httpbin.org_anything_get"]);
+}

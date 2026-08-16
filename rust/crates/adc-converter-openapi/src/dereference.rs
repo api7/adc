@@ -26,16 +26,30 @@
 use adc_sdk::ConvertError;
 use serde_json::Value;
 
+/// Ceiling on how many nodes a single `dereference` call will visit.
+/// Without memoization (see this module's own doc comment on that
+/// tradeoff), a document with several `$ref`s that all fan out into the
+/// same shared subtree re-expands that subtree once per path to it —
+/// harmless for the small, mostly-`$ref`-free documents `prune` leaves
+/// this converter with, but a hand-crafted document could chain enough
+/// diamond-shaped sharing to blow that up multiplicatively. This bounds
+/// the damage with a flat error instead of an unbounded hang.
+const MAX_RESOLVED_NODES: usize = 200_000;
+
 pub fn dereference(document: &Value) -> Result<Value, ConvertError> {
-    resolve_node(document, document, &mut Vec::new())
+    let mut budget = MAX_RESOLVED_NODES;
+    resolve_node(document, document, &mut Vec::new(), &mut budget)
 }
 
-fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>) -> Result<Value, ConvertError> {
+fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>, budget: &mut usize) -> Result<Value, ConvertError> {
+    *budget = budget
+        .checked_sub(1)
+        .ok_or_else(|| ConvertError("OpenAPI document has too many $ref expansions to resolve".to_string()))?;
     match node {
         Value::Array(items) => {
             let mut out = Vec::with_capacity(items.len());
             for item in items {
-                out.push(resolve_node(item, root, resolving)?);
+                out.push(resolve_node(item, root, resolving, budget)?);
             }
             Ok(Value::Array(out))
         }
@@ -43,7 +57,7 @@ fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>) -> Resu
             let Some(Value::String(pointer)) = map.get("$ref") else {
                 let mut out = serde_json::Map::with_capacity(map.len());
                 for (key, value) in map {
-                    out.insert(key.clone(), resolve_node(value, root, resolving)?);
+                    out.insert(key.clone(), resolve_node(value, root, resolving, budget)?);
                 }
                 return Ok(Value::Object(out));
             };
@@ -53,7 +67,7 @@ fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>) -> Resu
             }
             let target = resolve_pointer(root, pointer)?;
             resolving.push(pointer.clone());
-            let resolved = resolve_node(&target, root, resolving);
+            let resolved = resolve_node(&target, root, resolving, budget);
             resolving.pop();
 
             // Siblings of `$ref` on this node win over the target's own
@@ -68,7 +82,7 @@ fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>) -> Resu
                 if key == "$ref" {
                     continue;
                 }
-                merged.insert(key.clone(), resolve_node(value, root, resolving)?);
+                merged.insert(key.clone(), resolve_node(value, root, resolving, budget)?);
             }
             Ok(Value::Object(merged))
         }
@@ -162,5 +176,22 @@ mod tests {
     fn a_dangling_reference_is_an_error() {
         let doc = json!({"a": {"$ref": "#/does/not/exist"}});
         assert!(dereference(&doc).is_err());
+    }
+
+    #[test]
+    fn a_diamond_shaped_ref_chain_that_would_blow_up_exponentially_is_bounded() {
+        // No cycle here — L0 through L19 each fan out into two refs to the
+        // next level, so resolving L0 without memoization would revisit the
+        // shared tail 2^20 times, well past MAX_RESOLVED_NODES.
+        let mut doc = serde_json::Map::new();
+        for level in 0..20 {
+            doc.insert(
+                format!("L{level}"),
+                json!({"a": {"$ref": format!("#/L{}", level + 1)}, "b": {"$ref": format!("#/L{}", level + 1)}}),
+            );
+        }
+        doc.insert("L20".to_string(), json!({"value": 1}));
+        let err = dereference(&Value::Object(doc)).unwrap_err();
+        assert!(err.0.contains("too many"), "{}", err.0);
     }
 }

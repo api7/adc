@@ -37,8 +37,17 @@ fn case_1_override_resource_name() {
 }
 
 #[test]
-fn case_2_empty_override_name_is_rejected() {
+fn case_2_empty_root_override_name_is_rejected() {
     assert!(convert("extension-2.yaml").is_err());
+}
+
+#[test]
+fn case_2_empty_operation_override_name_is_rejected() {
+    // extension-2.yaml has no root-level override, so this only exercises
+    // the operation-level `validate_name` call — the root-level check runs
+    // first in `validate_document` and would otherwise always short-circuit
+    // before this path is ever reached.
+    assert!(convert("extension-2-operation.yaml").is_err());
 }
 
 #[test]
@@ -76,13 +85,13 @@ fn case_5_root_and_operation_plugins_merge_with_individual_keys_winning() {
     let plugins = svc.plugins.as_ref().unwrap();
     assert_eq!(plugins.get("test1"), Some(&serde_json::json!({"test1-key": "test1-value"})));
     // x-adc-plugin-test2 overrides the "test2" entry from x-adc-plugins.
-    assert_eq!(plugins.get("test2"), Some(&serde_json::json!({"test2-key": "test3-value-override"})));
+    assert_eq!(plugins.get("test2"), Some(&serde_json::json!({"test2-key": "test2-value-override"})));
     assert_eq!(plugins.get("test3"), Some(&serde_json::json!({"test3-key": "test3-value"})));
 
     let route = &svc.routes.as_ref().unwrap().http().unwrap()[0];
     let route_plugins = route.plugins.as_ref().unwrap();
     assert_eq!(route_plugins.get("test1"), Some(&serde_json::json!({"test1-key": "test1-value"})));
-    assert_eq!(route_plugins.get("test2"), Some(&serde_json::json!({"test2-key": "test3-value-override"})));
+    assert_eq!(route_plugins.get("test2"), Some(&serde_json::json!({"test2-key": "test2-value-override"})));
     assert_eq!(route_plugins.get("test3"), Some(&serde_json::json!({"test3-key": "test3-value"})));
 }
 
@@ -116,13 +125,13 @@ fn case_7_route_defaults_layer_root_path_and_operation() {
 
     let main = service(&config, "httpbin.org");
     let put = &main.routes.as_ref().unwrap().http().unwrap()[0];
-    assert_eq!(put.id.as_deref(), Some("root-id"));
+    assert_eq!(put.remote_addrs, Some(vec!["10.0.0.0/8".to_string()]));
     assert_eq!(put.filter_func.as_deref(), Some("return true -- path"));
     assert_eq!(put.priority, Some(3));
 
     let split = service(&config, "httpbin.org_anything_get");
     let get = &split.routes.as_ref().unwrap().http().unwrap()[0];
-    assert_eq!(get.id.as_deref(), Some("root-id"));
+    assert_eq!(get.remote_addrs, Some(vec!["10.0.0.0/8".to_string()]));
     assert_eq!(get.filter_func.as_deref(), Some("return true -- path"));
     assert_eq!(get.priority, Some(30));
 }
@@ -210,7 +219,7 @@ fn case_11_route_service_and_upstream_defaults_layer_together_across_six_methods
     let routes = path_split.routes.as_ref().unwrap().http().unwrap();
     assert_eq!(routes.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["httpbin.org_anything_put", "httpbin.org_anything_options"]);
     let put = routes.iter().find(|r| r.name == "httpbin.org_anything_put").unwrap();
-    assert_eq!(put.id.as_deref(), Some("root-id"));
+    assert_eq!(put.remote_addrs, Some(vec!["10.0.0.0/8".to_string()]));
     assert_eq!(put.filter_func.as_deref(), Some("return true -- path"));
     assert_eq!(put.priority, Some(300));
     let options = routes.iter().find(|r| r.name == "httpbin.org_anything_options").unwrap();

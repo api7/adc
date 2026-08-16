@@ -28,11 +28,14 @@ pub fn parse_document(content: &str) -> Result<Value, ConvertError> {
 pub fn upgrade_swagger_2_servers(document: &mut Map<String, Value>) {
     if let Some(host) = document.get("host").and_then(Value::as_str).map(str::to_string) {
         let schemes: Vec<String> = match document.get("schemes") {
-            Some(Value::Array(items)) if !items.is_empty() => {
-                items.iter().filter_map(Value::as_str).map(str::to_string).collect()
-            }
-            _ => vec!["http".to_string()],
+            Some(Value::Array(items)) => items.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+            _ => Vec::new(),
         };
+        // Also covers a non-empty `schemes` array that filtered down to
+        // nothing (every entry was a non-string) — falling through to an
+        // empty `servers` array instead would leave `paths`/`info` intact
+        // but no server to derive an upstream from at all.
+        let schemes = if schemes.is_empty() { vec!["http".to_string()] } else { schemes };
         let base_path = document.get("basePath").and_then(Value::as_str).unwrap_or("").to_string();
         let servers: Vec<Value> =
             schemes.into_iter().map(|scheme| serde_json::json!({"url": format!("{scheme}://{host}{base_path}")})).collect();
@@ -91,6 +94,13 @@ mod tests {
         let mut doc = json!({"basePath": "/v1"}).as_object().unwrap().clone();
         upgrade_swagger_2_servers(&mut doc);
         assert_eq!(doc["servers"], json!([{"url": "/v1"}]));
+    }
+
+    #[test]
+    fn a_schemes_array_with_no_string_entries_still_defaults_to_http() {
+        let mut doc = json!({"host": "example.com", "schemes": [1, true]}).as_object().unwrap().clone();
+        upgrade_swagger_2_servers(&mut doc);
+        assert_eq!(doc["servers"], json!([{"url": "http://example.com"}]));
     }
 
     #[test]

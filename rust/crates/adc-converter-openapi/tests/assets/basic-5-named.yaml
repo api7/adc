@@ -1,21 +1,16 @@
 info:
   title: httpbin.org
   description: httpbin.org description
+x-adc-name: custom-name
 servers:
-  - url: https://httpbin.org/
-x-adc-route-defaults:
-  remote_addrs: ["10.0.0.0/8"]
-  filter_func: "return true -- root"
-  priority: 3
+  - url: https://httpbin.org
 paths:
   /anything:
-    x-adc-route-defaults:
-      filter_func: "return true -- path"
+    servers:
+      - url: https://httpbin.net
     get:
-      x-adc-route-defaults:
-        priority: 30
       servers:
-        - url: https://httpbin.org/
+        - url: https://httpbin.com
       tags:
         - Anything
       summary: Returns anything passed in request data.

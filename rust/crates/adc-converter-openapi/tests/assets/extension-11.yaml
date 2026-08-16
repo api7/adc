@@ -4,7 +4,7 @@ info:
 servers:
   - url: https://httpbin.org/
 x-adc-route-defaults:
-  id: root-id
+  remote_addrs: ["10.0.0.0/8"]
   filter_func: "return true -- root"
   priority: 3
 x-adc-service-defaults:

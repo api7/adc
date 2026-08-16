@@ -6,8 +6,7 @@
 //! Every object checked here is loose: unknown keys pass through untouched,
 //! only the specific fields below are checked.
 //!
-//! `servers[].url` is checked for containing `http://`/`https://` anywhere
-//! in the string, not anchored to the start.
+//! `servers[].url` must start with `http://`/`https://`.
 
 use adc_sdk::ConvertError;
 use serde_json::{Map, Value};
@@ -17,8 +16,10 @@ use crate::extension;
 
 pub fn validate_document(spec: &Map<String, Value>) -> Result<(), ConvertError> {
     let info = spec.get("info").and_then(Value::as_object).ok_or_else(|| ConvertError("info is required".to_string()))?;
-    if !matches!(info.get("title"), Some(Value::String(_))) {
-        return Err(ConvertError("info.title is required and must be a string".to_string()));
+    match info.get("title") {
+        Some(Value::String(s)) if s.is_empty() => return Err(ConvertError("info.title must not be empty".to_string())),
+        Some(Value::String(_)) => {}
+        _ => return Err(ConvertError("info.title is required and must be a string".to_string())),
     }
 
     validate_name(spec, "x-adc-name at the document root")?;
@@ -29,7 +30,7 @@ pub fn validate_document(spec: &Map<String, Value>) -> Result<(), ConvertError> 
     }
     for server in servers {
         let url = server.get("url").and_then(Value::as_str).ok_or_else(|| ConvertError("servers[].url is required".to_string()))?;
-        if !(url.contains("http://") || url.contains("https://")) {
+        if !(url.starts_with("http://") || url.starts_with("https://")) {
             return Err(ConvertError(format!("servers[].url must start with \"https://\" or \"http://\": {url}")));
         }
     }
@@ -86,6 +87,18 @@ mod tests {
     #[test]
     fn a_non_http_server_url_fails() {
         let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "ftp://example.com"}]}));
+        assert!(validate_document(&spec).is_err());
+    }
+
+    #[test]
+    fn a_server_url_that_only_contains_http_without_starting_with_it_fails() {
+        let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "data:text/plain,https://x"}]}));
+        assert!(validate_document(&spec).is_err());
+    }
+
+    #[test]
+    fn an_empty_info_title_fails() {
+        let spec = doc(json!({"info": {"title": ""}, "servers": [{"url": "https://example.com"}]}));
         assert!(validate_document(&spec).is_err());
     }
 

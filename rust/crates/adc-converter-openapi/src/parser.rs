@@ -8,6 +8,8 @@ use url::Url;
 use crate::extension;
 use crate::merge::shallow_merge;
 
+/// Last-resort fallback when `Url::port_or_known_default()` doesn't
+/// recognize the scheme (that method already covers http/https/ws/wss/ftp).
 fn get_port(scheme: &str) -> u16 {
     if scheme == "http" { 80 } else { 443 }
 }
@@ -16,16 +18,7 @@ fn get_port(scheme: &str) -> u16 {
 /// `servers`. Returns a `{path_prefix?, upstream}` object, ready to be
 /// shallow-merged into the service being built.
 pub fn transform_upstream(oas_servers: &[Value], upstream_defaults: Option<&Map<String, Value>>) -> Result<Map<String, Value>, ConvertError> {
-    // Deliberately parsed from the *raw*, not-yet-variable-substituted URL
-    // of the first server, before the substitution loop below runs.
-    let default_scheme = match oas_servers.first().and_then(|s| s.get("url")).and_then(Value::as_str) {
-        Some(raw_url) => {
-            let parsed = Url::parse(raw_url).map_err(|e| ConvertError(format!("invalid server url \"{raw_url}\": {e}")))?;
-            parsed.scheme().to_string()
-        }
-        None => "https".to_string(),
-    };
-
+    let mut default_scheme = "https".to_string();
     let mut default_path_prefix: Option<String> = None;
     let mut nodes = Vec::with_capacity(oas_servers.len());
     for (idx, server) in oas_servers.iter().enumerate() {
@@ -43,13 +36,21 @@ pub fn transform_upstream(oas_servers: &[Value], upstream_defaults: Option<&Map<
         }
         let parsed = Url::parse(&url_str).map_err(|e| ConvertError(format!("invalid server url \"{url_str}\": {e}")))?;
 
-        if idx == 0 && parsed.path() != "/" {
-            default_path_prefix = Some(parsed.path().to_string());
+        // Read after variable substitution: a scheme placeholder like
+        // `{scheme}://host` isn't valid URL syntax until substituted, so
+        // parsing the raw (pre-substitution) URL just to read its scheme
+        // would fail before ever reaching the substitution above.
+        if idx == 0 {
+            default_scheme = parsed.scheme().to_string();
+            if parsed.path() != "/" {
+                default_path_prefix = Some(parsed.path().to_string());
+            }
         }
 
+        let host = parsed.host_str().ok_or_else(|| ConvertError(format!("server url \"{url_str}\" has no host")))?;
         let mut node = json!({
-            "host": parsed.host_str().unwrap_or_default(),
-            "port": parsed.port().unwrap_or_else(|| get_port(parsed.scheme())),
+            "host": host,
+            "port": parsed.port_or_known_default().unwrap_or_else(|| get_port(parsed.scheme())),
             "weight": 100,
         });
         if let Some(Value::Object(defaults)) = server.get(extension::UPSTREAM_NODE_DEFAULTS) {
@@ -179,6 +180,25 @@ mod tests {
     fn an_explicit_port_overrides_the_scheme_default() {
         let out = transform_upstream(&servers(json!([{"url": "https://example.com:8443"}])), None).unwrap();
         assert_eq!(out["upstream"]["nodes"][0]["port"], json!(8443));
+    }
+
+    #[test]
+    fn a_scheme_placeholder_is_substituted_before_the_scheme_is_read() {
+        // "{scheme}://..." isn't valid URL syntax on its own — reading the
+        // scheme before substitution would fail here even though the
+        // substituted URL is perfectly valid.
+        let out = transform_upstream(
+            &servers(json!([{"url": "{scheme}://example.com", "variables": {"scheme": {"default": "https"}}}])),
+            None,
+        )
+        .unwrap();
+        assert_eq!(out["upstream"]["scheme"], json!("https"));
+    }
+
+    #[test]
+    fn a_server_url_with_no_host_is_an_error() {
+        let err = transform_upstream(&servers(json!([{"url": "data:text/plain,https://x"}])), None).unwrap_err();
+        assert!(err.0.contains("no host"), "{}", err.0);
     }
 
     #[test]

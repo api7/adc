@@ -157,10 +157,13 @@ pub async fn load_local(
 }
 
 /// Converts each OpenAPI document into its own `Configuration`, then
-/// flattens their `services` into one.
+/// flattens their `services` into one — rejecting outright if two
+/// documents produce a same-named service, since a resource's id is
+/// derived from its name (`generate_id`) and two same-named services would
+/// silently collide into one on sync.
 pub async fn convert_openapi(files: &[PathBuf]) -> Result<Configuration, CliError> {
     let paths = config::resolve_files(files, None).await?;
-    let mut services = Vec::new();
+    let mut per_file = Vec::with_capacity(paths.len());
     for path in &paths {
         let content = tokio::fs::read_to_string(path)
             .await
@@ -168,16 +171,41 @@ pub async fn convert_openapi(files: &[PathBuf]) -> Result<Configuration, CliErro
         let converted = adc_converter_openapi::OpenApiConverter
             .to_adc(&content)
             .map_err(|e| CliError::msg(format!("failed to convert OpenAPI document \"{}\": {e}", path.display())))?;
-        services.extend(converted.services.unwrap_or_default());
+        per_file.push((path.clone(), converted.services.unwrap_or_default()));
     }
     Ok(Configuration {
-        services: Some(services),
+        services: Some(merge_openapi_services(per_file)?),
         ssls: None,
         consumers: None,
         consumer_groups: None,
         global_rules: None,
         plugin_metadata: None,
     })
+}
+
+/// Flattens each input file's services into one list, in file order —
+/// rejecting outright on the first same-named service instead of silently
+/// keeping both (a resource's id is derived from its name via
+/// `generate_id`, so two same-named services would collide into one
+/// ambiguous resource on sync).
+fn merge_openapi_services(
+    per_file: Vec<(PathBuf, Vec<adc_sdk::resources::Service>)>,
+) -> Result<Vec<adc_sdk::resources::Service>, CliError> {
+    let mut services = Vec::new();
+    let mut seen_names: HashSet<String> = HashSet::new();
+    for (path, file_services) in per_file {
+        for service in file_services {
+            if !seen_names.insert(service.name.clone()) {
+                return Err(CliError::msg(format!(
+                    "{}: duplicate service name \"{}\" (already produced by an earlier input file)",
+                    path.display(),
+                    service.name
+                )));
+            }
+            services.push(service);
+        }
+    }
+    Ok(services)
 }
 
 pub async fn load_remote(
@@ -238,6 +266,50 @@ mod tests {
     #[test]
     fn an_empty_selector_is_fine() {
         assert!(parse_label_selector(&[]).unwrap().is_empty());
+    }
+
+    fn service(name: &str) -> adc_sdk::resources::Service {
+        adc_sdk::resources::Service {
+            id: None,
+            name: name.to_string(),
+            description: None,
+            labels: None,
+            upstream: None,
+            upstreams: None,
+            plugins: None,
+            path_prefix: None,
+            strip_path_prefix: None,
+            hosts: None,
+            routes: None,
+        }
+    }
+
+    #[test]
+    fn merge_openapi_services_concatenates_in_file_order() {
+        let per_file = vec![
+            (PathBuf::from("a.yaml"), vec![service("svc-a")]),
+            (PathBuf::from("b.yaml"), vec![service("svc-b")]),
+        ];
+        let merged = merge_openapi_services(per_file).unwrap();
+        assert_eq!(merged.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), vec!["svc-a", "svc-b"]);
+    }
+
+    #[test]
+    fn merge_openapi_services_rejects_a_duplicate_name_across_files() {
+        let per_file = vec![
+            (PathBuf::from("a.yaml"), vec![service("shared")]),
+            (PathBuf::from("b.yaml"), vec![service("shared")]),
+        ];
+        let err = merge_openapi_services(per_file).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("b.yaml"), "{message}");
+        assert!(message.contains("shared"), "{message}");
+    }
+
+    #[test]
+    fn merge_openapi_services_rejects_a_duplicate_name_within_the_same_file() {
+        let per_file = vec![(PathBuf::from("a.yaml"), vec![service("shared"), service("shared")])];
+        assert!(merge_openapi_services(per_file).is_err());
     }
 
     fn backend_args(label_selector: Vec<String>) -> BackendArgs {

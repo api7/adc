@@ -99,4 +99,12 @@ mod tests {
     fn disallowed_punctuation_is_stripped() {
         assert_eq!(slugify("a/b?c=d"), "abcd");
     }
+
+    #[test]
+    fn an_input_of_only_disallowed_characters_slugifies_to_empty() {
+        // `slug_join` joins pieces with "_" regardless of whether any of
+        // them slugified to nothing, so this is worth pinning down on its
+        // own rather than only ever seeing it mixed with survivors.
+        assert_eq!(slugify("/?"), "");
+    }
 }

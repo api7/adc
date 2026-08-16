@@ -184,7 +184,7 @@ fn build_services(spec: &Map<String, Value>) -> Result<Vec<Value>, ConvertError>
             for method in HTTP_METHODS {
                 let Some(operation) = path_item.get(*method).and_then(Value::as_object) else { continue };
 
-                let op_split_name = slug_join(&[title, path, method]);
+                let op_split_name = slug_join(&[main_service_name, path, method]);
                 let op_split_service = parser::parse_separate_service(
                     &main_service,
                     &op_split_name,
@@ -238,6 +238,9 @@ fn build_services(spec: &Map<String, Value>) -> Result<Vec<Value>, ConvertError>
 /// on a service, so this needs to be inlined for that backend to work.
 fn inline_path_prefix(service: &mut Map<String, Value>) {
     let Some(Value::String(prefix)) = service.remove("path_prefix") else { return };
+    // A trailing "/" (e.g. a server url like ".../v1/") would otherwise
+    // double up against a route uri that already starts with "/".
+    let prefix = prefix.trim_end_matches('/');
     if let Some(Value::Array(routes)) = service.get_mut("routes") {
         for route in routes {
             if let Some(Value::Array(uris)) = route.get_mut("uris") {
@@ -248,5 +251,27 @@ fn inline_path_prefix(service: &mut Map<String, Value>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn a_trailing_slash_on_the_prefix_does_not_double_up_against_the_uri() {
+        let mut service =
+            json!({"path_prefix": "/v1/", "routes": [{"uris": ["/foo"]}]}).as_object().unwrap().clone();
+        inline_path_prefix(&mut service);
+        assert_eq!(service["routes"][0]["uris"], json!(["/v1/foo"]));
+    }
+
+    #[test]
+    fn a_prefix_without_a_trailing_slash_is_unaffected() {
+        let mut service = json!({"path_prefix": "/v1", "routes": [{"uris": ["/foo"]}]}).as_object().unwrap().clone();
+        inline_path_prefix(&mut service);
+        assert_eq!(service["routes"][0]["uris"], json!(["/v1/foo"]));
     }
 }

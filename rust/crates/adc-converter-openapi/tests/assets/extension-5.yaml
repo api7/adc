@@ -7,7 +7,7 @@ x-adc-plugins:
   test2:
     test2-key: test2-value
 x-adc-plugin-test2:
-  test2-key: test3-value-override
+  test2-key: test2-value-override
 x-adc-plugin-test3:
   test3-key: test3-value
 servers:
@@ -21,7 +21,7 @@ paths:
         test2:
           test2-key: test2-value
       x-adc-plugin-test2:
-        test2-key: test3-value-override
+        test2-key: test2-value-override
       x-adc-plugin-test3:
         test3-key: test3-value
       tags:
