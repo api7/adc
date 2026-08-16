@@ -192,14 +192,15 @@ fn merge_openapi_services(
     per_file: Vec<(PathBuf, Vec<adc_sdk::resources::Service>)>,
 ) -> Result<Vec<adc_sdk::resources::Service>, CliError> {
     let mut services = Vec::new();
-    let mut seen_names: HashSet<String> = HashSet::new();
+    let mut seen_names: HashMap<String, PathBuf> = HashMap::new();
     for (path, file_services) in per_file {
         for service in file_services {
-            if !seen_names.insert(service.name.clone()) {
+            if let Some(first_path) = seen_names.insert(service.name.clone(), path.clone()) {
                 return Err(CliError::msg(format!(
-                    "{}: duplicate service name \"{}\" (already produced by an earlier input file)",
+                    "{}: duplicate service name \"{}\" (already produced by {})",
                     path.display(),
-                    service.name
+                    service.name,
+                    first_path.display()
                 )));
             }
             services.push(service);
@@ -303,6 +304,7 @@ mod tests {
         let err = merge_openapi_services(per_file).unwrap_err();
         let message = err.to_string();
         assert!(message.contains("b.yaml"), "{message}");
+        assert!(message.contains("a.yaml"), "{message}: should name the file that first produced this service");
         assert!(message.contains("shared"), "{message}");
     }
 
