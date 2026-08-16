@@ -1,0 +1,55 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+x-adc-route-defaults:
+  id: root-id
+  filter_func: "return true -- root"
+  priority: 3
+x-adc-service-defaults:
+  hosts: [root-host]
+  strip_path_prefix: false
+  description: root-description
+x-adc-upstream-defaults:
+  hash_on: vars
+  key: root-key
+  retries: 3
+paths:
+  /anything:
+    x-adc-route-defaults:
+      filter_func: "return true -- path"
+    x-adc-service-defaults:
+      strip_path_prefix: true
+    x-adc-upstream-defaults:
+      key: path-key
+    get:
+      x-adc-route-defaults:
+        priority: 30
+      x-adc-service-defaults:
+        description: get-description
+      x-adc-upstream-defaults:
+        retries: 30
+      servers:
+        - url: https://httpbin.org/
+      summary: Returns anything passed in request data.
+    put:
+      x-adc-route-defaults:
+        priority: 300
+      summary: Returns anything passed in request data.
+    post:
+      x-adc-service-defaults:
+        description: post-description
+      summary: Returns anything passed in request data.
+    delete:
+      x-adc-upstream-defaults:
+        retries: 3000
+      summary: Returns anything passed in request data.
+    patch:
+      x-adc-service-defaults:
+        description: patch-description
+      x-adc-upstream-defaults:
+        retries: 4000
+      summary: Returns anything passed in request data.
+    options:
+      summary: Returns anything passed in request data.

@@ -1,9 +1,8 @@
 //! The sequential stages every backend-talking command runs through:
 //! `init_backend -> load_local -> load_remote -> diff -> {sync,validate}`.
 //! Each stage is a plain function threaded together by its caller in
-//! `main.rs` — there's no task-runner abstraction here (that was `listr2`'s
-//! job in the TS CLI, driven by its progress-rendering needs, which this
-//! CLI doesn't have yet).
+//! `main.rs`, wrapped in `progress::stage` for display — no separate
+//! task-runner abstraction on top of that.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -11,7 +10,7 @@ use std::path::PathBuf;
 use adc_backend_core::{HttpClient, HttpClientConfig, ResourceFilter, TlsConfig};
 use adc_differ::DifferV4;
 use adc_sdk::resources::Configuration;
-use adc_sdk::{Backend, Event, InternalConfiguration, ResourceType};
+use adc_sdk::{Backend, Converter, Event, InternalConfiguration, ResourceType};
 
 use crate::cli::{BackendArgs, BackendKind};
 use crate::config;
@@ -155,6 +154,30 @@ pub async fn load_local(
         .map_err(|e| CliError::msg(format!("invalid configuration: {e}")))?;
     config::filter_resource_types(&mut configuration, include, exclude);
     Ok(configuration)
+}
+
+/// Converts each OpenAPI document into its own `Configuration`, then
+/// flattens their `services` into one.
+pub async fn convert_openapi(files: &[PathBuf]) -> Result<Configuration, CliError> {
+    let paths = config::resolve_files(files, None).await?;
+    let mut services = Vec::new();
+    for path in &paths {
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .map_err(|e| CliError::msg(format!("{}: {e}", path.display())))?;
+        let converted = adc_converter_openapi::OpenApiConverter
+            .to_adc(&content)
+            .map_err(|e| CliError::msg(format!("failed to convert OpenAPI document \"{}\": {e}", path.display())))?;
+        services.extend(converted.services.unwrap_or_default());
+    }
+    Ok(Configuration {
+        services: Some(services),
+        ssls: None,
+        consumers: None,
+        consumer_groups: None,
+        global_rules: None,
+        plugin_metadata: None,
+    })
 }
 
 pub async fn load_remote(

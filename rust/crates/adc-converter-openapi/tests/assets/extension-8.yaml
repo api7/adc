@@ -1,0 +1,33 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+x-adc-service-defaults:
+  hosts: [root-host]
+  strip_path_prefix: false
+  description: root-description
+paths:
+  /anything:
+    x-adc-service-defaults:
+      strip_path_prefix: true
+    get:
+      x-adc-service-defaults:
+        description: get-description
+      servers:
+        - url: https://httpbin.org/
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

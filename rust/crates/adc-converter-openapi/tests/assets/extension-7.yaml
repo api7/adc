@@ -1,0 +1,33 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+x-adc-route-defaults:
+  id: root-id
+  filter_func: "return true -- root"
+  priority: 3
+paths:
+  /anything:
+    x-adc-route-defaults:
+      filter_func: "return true -- path"
+    get:
+      x-adc-route-defaults:
+        priority: 30
+      servers:
+        - url: https://httpbin.org/
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

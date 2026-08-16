@@ -1,7 +1,8 @@
 //! ADC's core data model: resource type definitions, the typed resource
 //! layer for parsing declarative configuration (`resources` module), differ
 //! event types shared with backend/CLI consumers, a generic JSON value-diff
-//! utility, and the `Backend` trait implemented by each gateway integration.
+//! utility, the `Backend` trait implemented by each gateway integration, and
+//! the `Converter` trait implemented by each source-format converter.
 //!
 //! Not yet here: semantic validation (cross-field rules, regex, min/max) on
 //! top of the `resources` types, and JSON Schema export. The differ's own
@@ -9,6 +10,7 @@
 //! outside the differ consumes it.
 
 pub mod backend;
+pub mod converter;
 pub mod default_value;
 pub mod event;
 pub mod resource;
@@ -20,6 +22,7 @@ pub use backend::{
     Backend, BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
     BackendValidationError, SYNC_EVENT_SPAN_NAME,
 };
+pub use converter::{ConvertError, Converter};
 pub use default_value::DefaultValue;
 pub use event::{Event, EventKind, EventType};
 pub use resource::{FieldListType, ResourceType};

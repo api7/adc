@@ -4,6 +4,8 @@ pub enum CliError {
     Message(String),
     #[error(transparent)]
     Backend(#[from] adc_sdk::BackendError),
+    #[error(transparent)]
+    Convert(#[from] adc_sdk::ConvertError),
     #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]

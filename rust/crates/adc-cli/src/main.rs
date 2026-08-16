@@ -10,13 +10,13 @@ use std::collections::{HashMap, HashSet};
 use adc_sdk::{BackendSyncOptions, Event, EventType, ResourceType};
 use clap::Parser;
 
-use cli::{BackendArgs, Cli, Command, DiffArgs, DumpArgs, LintArgs, SyncArgs, ValidateArgs};
+use cli::{BackendArgs, Cli, Command, ConvertArgs, ConvertFormat, DiffArgs, DumpArgs, LintArgs, SyncArgs, ValidateArgs};
 use error::CliError;
 
 #[tokio::main]
 async fn main() {
-    // `from_path`, not `dotenv()`: the latter walks up parent directories,
-    // which Node's `dotenv` package (what the TS CLI uses) doesn't do.
+    // `from_path`, not `dotenv()`: the latter walks up parent directories
+    // looking for a `.env` file, which isn't the intended lookup here.
     let _ = dotenvy::from_path(".env");
 
     let cli = Cli::parse();
@@ -30,7 +30,7 @@ async fn main() {
         Command::Sync(args) => cmd_sync(args).await,
         Command::Lint(args) => cmd_lint(args).await,
         Command::Validate(args) => cmd_validate(args).await,
-        Command::Convert => Err(CliError::msg("adc convert: not yet implemented")),
+        Command::Convert(args) => cmd_convert(args).await,
         Command::IngressSync => Err(CliError::msg("adc ingress-sync: not yet implemented")),
         Command::IngressServer => Err(CliError::msg("adc ingress-server: not yet implemented")),
     };
@@ -69,6 +69,7 @@ async fn cmd_dump(args: DumpArgs) -> Result<(), CliError> {
     if !args.with_id {
         config::strip_ids(&mut value);
     }
+    config::sort_keys_recursively(&mut value);
     tokio::fs::write(&args.output, serde_yaml_ng::to_string(&value)?).await?;
     println!(
         "Dump backend configuration to {} successfully!",
@@ -192,6 +193,26 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
         return Err(CliError::msg("sync completed with failures"));
     }
     Ok(())
+}
+
+async fn cmd_convert(args: ConvertArgs) -> Result<(), CliError> {
+    match args.format {
+        ConvertFormat::Openapi(args) => {
+            let config = progress::stage(
+                "Converting OpenAPI documents...",
+                pipeline::convert_openapi(&args.files),
+            )
+            .await?;
+            let mut value = serde_json::to_value(&config)?;
+            config::sort_keys_recursively(&mut value);
+            tokio::fs::write(&args.output, serde_yaml_ng::to_string(&value)?).await?;
+            println!(
+                "Converted OpenAPI file to {} successfully!",
+                args.output.display()
+            );
+            Ok(())
+        }
+    }
 }
 
 async fn cmd_lint(args: LintArgs) -> Result<(), CliError> {

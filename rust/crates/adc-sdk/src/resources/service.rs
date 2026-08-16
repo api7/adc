@@ -131,3 +131,33 @@ impl TryFrom<ServiceRaw> for Service {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// A JSON `null` and an absent key must deserialize to the identical
+    /// `Option<T>::None` for every optional field here — callers that build
+    /// this document as a `serde_json::Value` in code (rather than through
+    /// `Service`'s own `Serialize` impl) rely on this to fill an unset
+    /// field with `Value::Null` rather than tracking which keys to omit.
+    /// Goes through the `ServiceRaw` -> `Service` `TryFrom` indirection
+    /// (see this module's doc comment), not a plain derive — worth pinning
+    /// down on its own, separately from `Route`'s equivalent test.
+    #[test]
+    fn an_explicit_null_and_an_absent_key_deserialize_identically() {
+        let with_null = json!({
+            "name": "s",
+            "description": null, "labels": null, "plugins": null,
+        });
+        let absent = json!({"name": "s"});
+        let service_with_null: Service = serde_json::from_value(with_null).unwrap();
+        let service_absent: Service = serde_json::from_value(absent).unwrap();
+        assert_eq!(service_with_null, service_absent);
+        assert!(service_with_null.description.is_none());
+        assert!(service_with_null.labels.is_none());
+        assert!(service_with_null.plugins.is_none());
+    }
+}

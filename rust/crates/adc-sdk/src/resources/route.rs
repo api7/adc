@@ -61,6 +61,33 @@ pub struct Route {
     pub filter_func: Option<String>,
 }
 
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// A JSON `null` and an absent key must deserialize to the identical
+    /// `Option<T>::None` for every optional field here — callers that build
+    /// this document as a `serde_json::Value` in code (rather than through
+    /// `Route`'s own `Serialize` impl) rely on this to fill an unset field
+    /// with `Value::Null` rather than tracking which keys to omit.
+    #[test]
+    fn an_explicit_null_and_an_absent_key_deserialize_identically() {
+        let with_null = json!({
+            "name": "r", "uris": ["/x"],
+            "description": null, "labels": null, "plugins": null,
+        });
+        let absent = json!({"name": "r", "uris": ["/x"]});
+        let route_with_null: Route = serde_json::from_value(with_null).unwrap();
+        let route_absent: Route = serde_json::from_value(absent).unwrap();
+        assert_eq!(route_with_null, route_absent);
+        assert!(route_with_null.description.is_none());
+        assert!(route_with_null.labels.is_none());
+        assert!(route_with_null.plugins.is_none());
+    }
+}
+
 /// A stream (TCP/UDP/TLS) route: matches connections by address/SNI rather than URI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
