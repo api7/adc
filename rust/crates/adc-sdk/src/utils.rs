@@ -1,6 +1,10 @@
 use sha1::{Digest, Sha1};
 
 /// Deterministic resource id: the sha1 (not sha256) hex digest of `name`.
+/// SHA-1 is used only to derive a stable identifier from a name — not for
+/// integrity checks, signatures, or password handling, where its known
+/// collision weaknesses would matter. It's fixed at sha1 specifically to
+/// keep generated ids identical to the reference ADC implementation's.
 pub fn generate_id(name: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(name.as_bytes());

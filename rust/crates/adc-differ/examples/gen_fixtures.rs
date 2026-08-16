@@ -1,7 +1,6 @@
 //! Generates layered synthetic ADC configuration fixtures for benchmarking
-//! `DifferV4`. Written once to disk so both the Rust (criterion) benchmark
-//! and an equivalent TS benchmark can load the exact same inputs and produce
-//! comparable numbers.
+//! `DifferV4`. Written once to disk so repeated benchmark runs load the
+//! exact same inputs and produce comparable numbers.
 //!
 //! Each "service" is a `route + service + upstream` bundle: one service body
 //! (with its own plugin + inline `upstream`) and two nested routes (each with
@@ -15,8 +14,7 @@ use std::path::PathBuf;
 use adc_sdk::utils::generate_id;
 use serde_json::{Value, json};
 
-const SCALES: &[(&str, usize)] = &[("small", 100), ("medium", 1_000), ("large", 10_000)];
-const CHANGE_RATIOS: &[(&str, f64)] = &[("none", 0.0), ("few", 0.05), ("many", 0.5)];
+include!("../fixture_scales.rs");
 
 fn route(name: &str, plugin_value: &str) -> Value {
     json!({

@@ -1,4 +1,10 @@
 {
-  "local": { "consumers": [{ "username": "alice", "plugins": { "key-auth": { "key": "alice-key" } } }] },
-  "remote": { "consumers": [{ "username": "alice", "plugins": {} }] }
+  "local": { "services": [{ "name": "Test Service", "description": "new description" }] },
+  "remote": {
+    "services": [{
+      "id": "5139f1c19641e214d3b9c57949d1578c2482b940",
+      "name": "Test Service",
+      "description": "old description"
+    }]
+  }
 }

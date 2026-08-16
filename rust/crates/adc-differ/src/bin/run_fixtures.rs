@@ -1,5 +1,6 @@
-//! Batch runner for `fixtures/differ/*.json`, used by the TS/Rust parity
-//! comparator (see `scripts/compare-differ-fixtures.mjs` in the TS repo).
+//! Batch runner for `fixtures/differ/*.json`, used by the parity comparator
+//! (see `scripts/compare-differ-fixtures.mjs`) to cross-check this crate's
+//! output against the reference differ implementation.
 //! Not part of the crate's public library API — this is dev tooling only.
 //!
 //! Usage: run_fixtures <fixtures-dir> [--out <file>]
@@ -91,5 +92,34 @@ fn main() {
     match out_path {
         Some(path) => fs::write(path, json).unwrap_or_else(|e| panic!("write {path}: {e}")),
         None => println!("{json}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every ResourceType variant listed explicitly (not via ResourceType::ALL,
+    // which excludes some of these) so adding a variant without a matching
+    // resource_type_from_str arm fails this test instead of silently falling
+    // through to None at fixture-parsing time.
+    #[test]
+    fn resource_type_from_str_round_trips_every_variant() {
+        for rt in [
+            ResourceType::Route,
+            ResourceType::Service,
+            ResourceType::Upstream,
+            ResourceType::Ssl,
+            ResourceType::GlobalRule,
+            ResourceType::PluginConfig,
+            ResourceType::PluginMetadata,
+            ResourceType::Consumer,
+            ResourceType::ConsumerGroup,
+            ResourceType::ConsumerCredential,
+            ResourceType::StreamRoute,
+            ResourceType::InternalStreamService,
+        ] {
+            assert_eq!(resource_type_from_str(rt.as_str()), Some(rt));
+        }
     }
 }

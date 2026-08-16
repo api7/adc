@@ -9,8 +9,7 @@ use adc_differ::DifferV4;
 use adc_sdk::{EventType, InternalConfiguration, ResourceType};
 use serde_json::Value;
 
-/// Mirrors `SCALES` in `examples/gen_fixtures.rs`.
-const SCALES: &[(&str, usize)] = &[("small", 100), ("medium", 1_000), ("large", 10_000)];
+include!("../fixture_scales.rs");
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../benches/fixtures")
@@ -35,7 +34,7 @@ fn none_scenario_has_no_diff_at_every_scale() {
 #[test]
 fn few_and_many_scenarios_produce_expected_update_events_at_every_scale() {
     for &(scale, count) in SCALES {
-        for &(scenario, ratio) in &[("few", 0.05_f64), ("many", 0.5_f64)] {
+        for &(scenario, ratio) in CHANGE_RATIOS.iter().filter(|(name, _)| *name != "none") {
             let local = load(&format!("{scale}.{scenario}.local.json"));
             let remote = load(&format!("{scale}.remote.json"));
             let events = DifferV4::diff(&local, &remote, None, None);

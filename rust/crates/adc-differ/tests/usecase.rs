@@ -1,17 +1,12 @@
 //! Ported from `libs/differ/src/test/usecase.spec.ts`.
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, EventKind, InternalConfiguration, ResourceType, utils::generate_id};
-use serde_json::{Value, json};
+use adc_sdk::{DefaultValue, EventKind, ResourceType, utils::generate_id};
+use serde_json::json;
 use std::collections::HashMap;
 
-fn config(v: Value) -> InternalConfiguration {
-    v.as_object().cloned().unwrap_or_default()
-}
-
-fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
-    Event::new(rt, kind, id, name)
-}
+mod common;
+use common::{config, ev};
 
 #[test]
 fn renames_service_with_nested_routes() {

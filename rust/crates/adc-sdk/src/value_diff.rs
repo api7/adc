@@ -232,4 +232,29 @@ mod tests {
             Some(vec![ValueDiff::Edit { path: vec![PathSegment::Index(1)], lhs: json!(2), rhs: json!(5) }])
         );
     }
+
+    #[test]
+    fn a_type_change_from_object_to_string_is_one_edit_at_the_changed_key() {
+        assert_eq!(
+            diff_value(&json!({"a": {"b": 1}}), &json!({"a": "now a string"})),
+            Some(vec![ValueDiff::Edit {
+                path: vec![PathSegment::Key("a".into())],
+                lhs: json!({"b": 1}),
+                rhs: json!("now a string"),
+            }])
+        );
+    }
+
+    #[test]
+    fn a_type_change_from_null_to_object_is_one_edit() {
+        assert_eq!(
+            diff_value(&json!({"a": null}), &json!({"a": {"b": 1}})),
+            Some(vec![ValueDiff::Edit { path: vec![PathSegment::Key("a".into())], lhs: json!(null), rhs: json!({"b": 1}) }])
+        );
+    }
+
+    #[test]
+    fn identical_null_values_produce_no_diff() {
+        assert_eq!(diff_value(&json!({"a": null}), &json!({"a": null})), None);
+    }
 }

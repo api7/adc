@@ -4,12 +4,11 @@
 use std::collections::HashMap;
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, InternalConfiguration, ResourceType, utils::generate_id};
-use serde_json::{Value, json};
+use adc_sdk::{DefaultValue, ResourceType, utils::generate_id};
+use serde_json::json;
 
-fn config(v: Value) -> InternalConfiguration {
-    v.as_object().cloned().unwrap_or_default()
-}
+mod common;
+use common::config;
 
 /// `resolve_default_type` (SERVICE -> STREAM_SERVICE vs SERVICE) inspects the
 /// `stream_routes` field. An earlier optimization pass reordered nested-field

@@ -1,16 +1,11 @@
 //! Ported from `libs/differ/src/test/custom-id.spec.ts`.
 
 use adc_differ::DifferV4;
-use adc_sdk::{Event, EventKind, InternalConfiguration, ResourceType, utils::generate_id};
-use serde_json::{Value, json};
+use adc_sdk::{EventKind, ResourceType, utils::generate_id};
+use serde_json::json;
 
-fn config(v: Value) -> InternalConfiguration {
-    v.as_object().cloned().unwrap_or_default()
-}
-
-fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
-    Event::new(rt, kind, id, name)
-}
+mod common;
+use common::{config, ev};
 
 #[test]
 fn deletes_and_creates_new_resource_when_id_changes() {

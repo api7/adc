@@ -1,12 +1,11 @@
 //! Ported from `libs/differ/src/test/upstream.spec.ts`.
 
 use adc_differ::DifferV4;
-use adc_sdk::{EventType, InternalConfiguration, ResourceType, utils::generate_id};
-use serde_json::{Value, json};
+use adc_sdk::{EventType, ResourceType, utils::generate_id};
+use serde_json::json;
 
-fn config(v: Value) -> InternalConfiguration {
-    v.as_object().cloned().unwrap_or_default()
-}
+mod common;
+use common::config;
 
 #[test]
 fn creates_and_updates_ssl_before_upstream() {

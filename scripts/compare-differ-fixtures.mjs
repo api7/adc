@@ -43,8 +43,8 @@ function normalizeEvent(event) {
 }
 
 console.log(`[1/3] running TS DifferV4 over fixtures in ${FIXTURES_DIR}...`);
-execFileSync('npx', ['vitest', 'run', '--config', 'vitest.fixtures.config.ts'], {
-  cwd: path.join(REPO_ROOT, 'libs/differ'),
+execFileSync('npx', ['nx', 'run', 'differ:dump-fixtures'], {
+  cwd: REPO_ROOT,
   stdio: 'inherit',
   env: {
     ...process.env,
@@ -78,6 +78,10 @@ for (const name of allNames) {
   }
   if (rustEvents === undefined) {
     failures.push({ name, reason: 'missing from Rust results' });
+    continue;
+  }
+  if (!Array.isArray(rustEvents)) {
+    failures.push({ name, reason: `Rust result is not an array (got ${typeof rustEvents})` });
     continue;
   }
 

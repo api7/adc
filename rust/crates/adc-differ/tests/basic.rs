@@ -4,16 +4,11 @@
 use std::collections::HashMap;
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, EventKind, InternalConfiguration, ResourceType, utils::generate_id};
-use serde_json::{Value, json};
+use adc_sdk::{DefaultValue, EventKind, ResourceType, utils::generate_id};
+use serde_json::json;
 
-fn config(v: Value) -> InternalConfiguration {
-    v.as_object().cloned().unwrap_or_default()
-}
-
-fn ev(rt: ResourceType, kind: EventKind, id: &str, name: &str) -> Event {
-    Event::new(rt, kind, id, name)
-}
+mod common;
+use common::{config, ev};
 
 #[test]
 fn empty_input_yields_empty_output() {
