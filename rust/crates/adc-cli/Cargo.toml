@@ -15,6 +15,7 @@ adc-differ = { path = "../adc-differ" }
 adc-backend-core = { path = "../adc-backend-core" }
 adc-backend-apisix = { path = "../adc-backend-apisix" }
 adc-backend-api7 = { path = "../adc-backend-api7" }
+adc-converter-openapi = { path = "../adc-converter-openapi" }
 clap = { version = "4", features = ["derive", "env"] }
 humantime = "2"
 serde_json = { workspace = true }

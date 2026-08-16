@@ -25,8 +25,23 @@ const MANAGED_BY_LABEL_VALUE: &str = "adc";
 /// reads + parses each matched file (YAML, or JSON when the extension says
 /// so) into a raw `Value`, paired with its source path for error messages.
 pub async fn read_files(patterns: &[PathBuf]) -> Result<Vec<(PathBuf, Value)>, CliError> {
+    let paths = resolve_files(patterns, Some("adc.yaml")).await?;
+    let mut files = Vec::with_capacity(paths.len());
+    for path in paths {
+        let value = read_file(&path).await?;
+        files.push((path, value));
+    }
+    Ok(files)
+}
+
+/// Expands `-f`/`--file` glob patterns into the concrete file paths they
+/// match, falling back to `default` (if given) when `patterns` is empty.
+pub async fn resolve_files(patterns: &[PathBuf], default: Option<&str>) -> Result<Vec<PathBuf>, CliError> {
     let patterns: Vec<PathBuf> = if patterns.is_empty() {
-        vec![PathBuf::from("adc.yaml")]
+        match default {
+            Some(default) => vec![PathBuf::from(default)],
+            None => return Ok(Vec::new()),
+        }
     } else {
         patterns.to_vec()
     };
@@ -55,13 +70,7 @@ pub async fn read_files(patterns: &[PathBuf]) -> Result<Vec<(PathBuf, Value)>, C
             paths.extend(matched);
         }
     }
-
-    let mut files = Vec::with_capacity(paths.len());
-    for path in paths {
-        let value = read_file(&path).await?;
-        files.push((path, value));
-    }
-    Ok(files)
+    Ok(paths)
 }
 
 async fn read_file(path: &Path) -> Result<Value, CliError> {
@@ -251,6 +260,28 @@ fn set_label(item: &mut Value, key: &str, value: &str) {
     }
 }
 
+/// Recursively sorts object keys alphabetically, at every depth, so the
+/// written YAML has a stable, diff-friendly key order instead of whatever
+/// order the fields happened to be constructed/read in.
+pub fn sort_keys_recursively(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            let mut entries: Vec<(String, Value)> = std::mem::take(map).into_iter().collect();
+            for (_, v) in &mut entries {
+                sort_keys_recursively(v);
+            }
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            *map = entries.into_iter().collect();
+        }
+        Value::Array(items) => {
+            for item in items {
+                sort_keys_recursively(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Strips `id` fields before writing a `dump` (unless `--with-id` was
 /// given). Wider in scope than [`fill_labels`]: `id` is meaningful on
 /// `services[].upstreams` and `consumers[].credentials` too, even though
@@ -341,6 +372,36 @@ mod tests {
     use super::*;
     use adc_sdk::resources::{Consumer, ConsumerGroup, LabelValue, Labels, SSL, Service};
     use serde_json::json;
+
+    #[test]
+    fn sort_keys_recursively_sorts_every_object_at_every_depth() {
+        let mut value = json!({"b": 1, "a": {"z": 1, "y": 2}, "c": [{"b": 1, "a": 2}]});
+        sort_keys_recursively(&mut value);
+        let Value::Object(root) = &value else { unreachable!() };
+        assert_eq!(root.keys().collect::<Vec<_>>(), vec!["a", "b", "c"]);
+        let Value::Object(nested) = &root["a"] else { unreachable!() };
+        assert_eq!(nested.keys().collect::<Vec<_>>(), vec!["y", "z"]);
+        let Value::Object(in_array) = &root["c"][0] else { unreachable!() };
+        assert_eq!(in_array.keys().collect::<Vec<_>>(), vec!["a", "b"]);
+    }
+
+    /// `sort_keys_recursively` only reorders the in-memory `Map`'s own
+    /// iteration order — this proves that guarantee actually survives all
+    /// the way through to the written-out string, for both serializers
+    /// this CLI uses (`sort_keys_recursively`'s callers write YAML, but
+    /// `cmd_dump`/`cmd_convert` both go through `serde_json::to_value`
+    /// first, so a JSON regression here would matter too).
+    #[test]
+    fn the_sorted_order_survives_serialization_to_yaml_and_json() {
+        let mut value = json!({"zebra": 1, "apple": {"z": 1, "a": 2}, "mango": [{"y": 1, "b": 2}]});
+        sort_keys_recursively(&mut value);
+
+        let yaml = serde_yaml_ng::to_string(&value).unwrap();
+        assert_eq!(yaml, "apple:\n  a: 2\n  z: 1\nmango:\n- b: 2\n  y: 1\nzebra: 1\n");
+
+        let json = serde_json::to_string(&value).unwrap();
+        assert_eq!(json, r#"{"apple":{"a":2,"z":1},"mango":[{"b":2,"y":1}],"zebra":1}"#);
+    }
 
     fn labels(pairs: &[(&str, &str)]) -> Labels {
         pairs

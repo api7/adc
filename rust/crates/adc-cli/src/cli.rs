@@ -32,9 +32,8 @@ pub enum Command {
     Lint(LintArgs),
     /// validate the local configuration against the backend
     Validate(ValidateArgs),
-    /// convert OpenAPI specifications to ADC configuration
-    #[command(hide = true)]
-    Convert,
+    /// convert API definitions in other formats to ADC configuration
+    Convert(ConvertArgs),
     /// synchronize configuration via the ingress controller
     #[command(hide = true)]
     IngressSync,
@@ -204,6 +203,30 @@ pub struct LintArgs {
     /// file to lint
     #[arg(short, long = "file")]
     pub files: Vec<PathBuf>,
+}
+
+#[derive(Args, Debug)]
+pub struct ConvertArgs {
+    #[command(subcommand)]
+    pub format: ConvertFormat,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ConvertFormat {
+    /// convert an OpenAPI specification to ADC configuration
+    #[command(name = "openapi")]
+    OpenApi(ConvertOpenApiArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct ConvertOpenApiArgs {
+    /// OpenAPI specification file path
+    #[arg(short, long = "file", required = true)]
+    pub files: Vec<PathBuf>,
+
+    /// output file path
+    #[arg(short, long, default_value = "adc.yaml")]
+    pub output: PathBuf,
 }
 
 #[derive(Args, Debug)]

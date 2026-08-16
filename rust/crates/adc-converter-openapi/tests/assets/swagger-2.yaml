@@ -1,0 +1,15 @@
+swagger: "2.0"
+info:
+  title: httpbin.org
+  description: httpbin.org description
+host: httpbin.org
+basePath: /v1
+schemes:
+  - https
+paths:
+  /anything:
+    get:
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: OK

@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+x-adc-plugins:
+  root1:
+    root1-key: value
+x-adc-plugin-root2:
+  root2-key: value
+paths:
+  /anything:
+    x-adc-plugins:
+      path1:
+        path1-key: value
+    x-adc-plugin-path2:
+      path2-key: value
+    get:
+      x-adc-plugins:
+        method1:
+          method1-key: value
+        path2:
+          path2-key: value-override
+      x-adc-plugin-method2:
+        method2-key: value
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

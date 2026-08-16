@@ -1,0 +1,48 @@
+openapi: 3.0.2
+info:
+  title: SectorAPI
+  version: 3.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /v3/sectors:
+    get:
+      operationId: getSectors
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Section'
+components:
+  schemas:
+    Sector:
+      type: object
+      properties:
+        key:
+          type: string
+        description:
+          type: string
+    SectorNode:
+      type: object
+      properties:
+        sector:
+          $ref: '#/components/schemas/Sector'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectorNode'
+    Section:
+      type: object
+      properties:
+        key:
+          type: string
+        description:
+          type: string
+        sectorNodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectorNode'
