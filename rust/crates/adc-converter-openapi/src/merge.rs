@@ -1,7 +1,8 @@
-//! `libs/converter-openapi` builds services/routes/upstreams by spreading
-//! plain JS objects (`{...a, ...b}`) — a *shallow* merge, not a recursive
-//! one. This is the Rust equivalent: insert every top-level key of
-//! `overlay` into `target`, overwriting whatever `target` already had.
+//! Services/routes/upstreams/nodes are built by overlaying `x-adc-*-defaults`
+//! blobs (and merged plugin maps) on top of an object under construction —
+//! deliberately a *shallow* merge, not a recursive one: a defaults key
+//! replaces whatever `target` already had for that key wholesale, even if
+//! both sides are themselves objects, rather than merging their fields.
 
 use serde_json::{Map, Value};
 

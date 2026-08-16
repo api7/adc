@@ -214,11 +214,12 @@ pub struct ConvertArgs {
 #[derive(Subcommand, Debug)]
 pub enum ConvertFormat {
     /// convert an OpenAPI specification to ADC configuration
-    Openapi(ConvertOpenapiArgs),
+    #[command(name = "openapi")]
+    OpenApi(ConvertOpenApiArgs),
 }
 
 #[derive(Args, Debug)]
-pub struct ConvertOpenapiArgs {
+pub struct ConvertOpenApiArgs {
     /// OpenAPI specification file path
     #[arg(short, long = "file", required = true)]
     pub files: Vec<PathBuf>,

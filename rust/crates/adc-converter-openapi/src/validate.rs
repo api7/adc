@@ -58,6 +58,7 @@ fn validate_name(context: &Map<String, Value>, label: &str) -> Result<(), Conver
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use serde_json::json;
 
     use super::*;
@@ -66,55 +67,21 @@ mod tests {
         value.as_object().unwrap().clone()
     }
 
-    #[test]
-    fn a_minimal_valid_document_passes() {
-        let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "https://example.com"}], "paths": {}}));
-        assert!(validate_document(&spec).is_ok());
-    }
-
-    #[test]
-    fn missing_info_title_fails() {
-        let spec = doc(json!({"info": {}, "servers": [{"url": "https://example.com"}]}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn empty_servers_fails() {
-        let spec = doc(json!({"info": {"title": "t"}, "servers": []}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn a_non_http_server_url_fails() {
-        let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "ftp://example.com"}]}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn a_server_url_that_only_contains_http_without_starting_with_it_fails() {
-        let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "data:text/plain,https://x"}]}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn an_empty_info_title_fails() {
-        let spec = doc(json!({"info": {"title": ""}, "servers": [{"url": "https://example.com"}]}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn an_empty_root_x_adc_name_fails() {
-        let spec = doc(json!({"info": {"title": "t"}, "servers": [{"url": "https://example.com"}], "x-adc-name": ""}));
-        assert!(validate_document(&spec).is_err());
-    }
-
-    #[test]
-    fn an_empty_operation_x_adc_name_fails() {
-        let spec = doc(json!({
-            "info": {"title": "t"},
-            "servers": [{"url": "https://example.com"}],
-            "paths": {"/foo": {"get": {"x-adc-name": ""}}},
-        }));
-        assert!(validate_document(&spec).is_err());
+    #[rstest]
+    #[case::a_minimal_valid_document_passes(json!({"info": {"title": "t"}, "servers": [{"url": "https://example.com"}], "paths": {}}), true)]
+    #[case::missing_info_title_fails(json!({"info": {}, "servers": [{"url": "https://example.com"}]}), false)]
+    #[case::empty_servers_fails(json!({"info": {"title": "t"}, "servers": []}), false)]
+    #[case::a_non_http_server_url_fails(json!({"info": {"title": "t"}, "servers": [{"url": "ftp://example.com"}]}), false)]
+    #[case::a_server_url_that_only_contains_http_without_starting_with_it_fails(json!({"info": {"title": "t"}, "servers": [{"url": "data:text/plain,https://x"}]}), false)]
+    #[case::an_empty_info_title_fails(json!({"info": {"title": ""}, "servers": [{"url": "https://example.com"}]}), false)]
+    #[case::an_empty_root_x_adc_name_fails(json!({"info": {"title": "t"}, "servers": [{"url": "https://example.com"}], "x-adc-name": ""}), false)]
+    #[case::an_empty_operation_x_adc_name_fails(json!({
+        "info": {"title": "t"},
+        "servers": [{"url": "https://example.com"}],
+        "paths": {"/foo": {"get": {"x-adc-name": ""}}},
+    }), false)]
+    fn validate_document_cases(#[case] spec: Value, #[case] should_be_valid: bool) {
+        let spec = doc(spec);
+        assert_eq!(validate_document(&spec).is_ok(), should_be_valid);
     }
 }

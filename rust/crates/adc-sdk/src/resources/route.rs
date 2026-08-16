@@ -85,6 +85,9 @@ mod tests {
         assert!(route_with_null.description.is_none());
         assert!(route_with_null.labels.is_none());
         assert!(route_with_null.plugins.is_none());
+        assert!(route_absent.description.is_none());
+        assert!(route_absent.labels.is_none());
+        assert!(route_absent.plugins.is_none());
     }
 }
 

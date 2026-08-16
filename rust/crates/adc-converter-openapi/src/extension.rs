@@ -16,10 +16,7 @@ pub const ROUTE_DEFAULTS: &str = "x-adc-route-defaults";
 /// (the latter winning on a name collision), returning `None` if the result
 /// would be empty.
 pub fn parse_ext_plugins(context: &Map<String, Value>) -> Option<Map<String, Value>> {
-    let mut plugins = match context.get(PLUGINS) {
-        Some(Value::Object(map)) => map.clone(),
-        _ => Map::new(),
-    };
+    let mut plugins = context.get(PLUGINS).and_then(Value::as_object).cloned().unwrap_or_default();
     for (key, value) in context {
         if let Some(plugin_name) = key.strip_prefix(PLUGIN_PREFIX) {
             plugins.insert(plugin_name.to_string(), value.clone());
@@ -30,37 +27,24 @@ pub fn parse_ext_plugins(context: &Map<String, Value>) -> Option<Map<String, Val
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use serde_json::json;
 
     use super::*;
 
-    #[test]
-    fn merges_the_plugins_object_with_individual_plugin_keys() {
-        let context = json!({
-            "x-adc-plugins": {"cors": {}},
-            "x-adc-plugin-acl": {"allow": ["a"]},
-        })
-        .as_object()
-        .unwrap()
-        .clone();
-        assert_eq!(parse_ext_plugins(&context), Some(json!({"cors": {}, "acl": {"allow": ["a"]}}).as_object().unwrap().clone()));
-    }
-
-    #[test]
-    fn an_individual_plugin_key_wins_over_the_same_name_in_the_plugins_object() {
-        let context = json!({
-            "x-adc-plugins": {"acl": {"allow": ["a"]}},
-            "x-adc-plugin-acl": {"allow": ["b"]},
-        })
-        .as_object()
-        .unwrap()
-        .clone();
-        assert_eq!(parse_ext_plugins(&context), Some(json!({"acl": {"allow": ["b"]}}).as_object().unwrap().clone()));
-    }
-
-    #[test]
-    fn returns_none_when_there_are_no_plugins() {
-        let context = json!({"operationId": "getFoo"}).as_object().unwrap().clone();
-        assert_eq!(parse_ext_plugins(&context), None);
+    #[rstest]
+    #[case::merges_the_plugins_object_with_individual_plugin_keys(
+        json!({"x-adc-plugins": {"cors": {}}, "x-adc-plugin-acl": {"allow": ["a"]}}),
+        Some(json!({"cors": {}, "acl": {"allow": ["a"]}})),
+    )]
+    #[case::an_individual_plugin_key_wins_over_the_same_name_in_the_plugins_object(
+        json!({"x-adc-plugins": {"acl": {"allow": ["a"]}}, "x-adc-plugin-acl": {"allow": ["b"]}}),
+        Some(json!({"acl": {"allow": ["b"]}})),
+    )]
+    #[case::returns_none_when_there_are_no_plugins(json!({"operationId": "getFoo"}), None)]
+    fn parse_ext_plugins_cases(#[case] context: Value, #[case] expected: Option<Value>) {
+        let context = context.as_object().unwrap().clone();
+        let expected = expected.map(|v| v.as_object().unwrap().clone());
+        assert_eq!(parse_ext_plugins(&context), expected);
     }
 }

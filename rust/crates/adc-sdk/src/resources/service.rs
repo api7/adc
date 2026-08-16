@@ -159,5 +159,8 @@ mod tests {
         assert!(service_with_null.description.is_none());
         assert!(service_with_null.labels.is_none());
         assert!(service_with_null.plugins.is_none());
+        assert!(service_absent.description.is_none());
+        assert!(service_absent.labels.is_none());
+        assert!(service_absent.plugins.is_none());
     }
 }

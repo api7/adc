@@ -1,16 +1,16 @@
-//! Narrow port of `@scalar/openapi-parser`'s `upgrade()` /
-//! `@scalar/openapi-upgrader`'s `upgradeFromTwoToThree` — just the
-//! `host`/`basePath`/`schemes` -> `servers` conversion, the only part of
-//! the real Swagger 2.0 -> 3.0 -> 3.1 upgrade chain `crate::parser`'s own
+//! Parses raw file content into a document, and upgrades a Swagger 2.0
+//! document just enough for the rest of this converter to read it: only
+//! the `host`/`basePath`/`schemes` -> `servers` conversion, since that's
+//! the only part of a full 2.0 -> 3.0 -> 3.1 upgrade `crate::parser`'s own
 //! read surface (`info`/`servers`/`paths.*.{method}` + `x-adc-*`) actually
-//! depends on. The rest of that ~800-line upgrader (`definitions` ->
-//! `components.schemas`, `consumes`/`produces`, `parameters: in: body`,
-//! ...) touches fields `crate::prune::prune_conversion_document` deletes
-//! before this converter ever reads them, so it's skipped.
+//! depends on. Everything else a full upgrade would touch (`definitions`
+//! -> `components.schemas`, `consumes`/`produces`, `parameters: in: body`,
+//! ...) is deleted by `crate::prune::prune_conversion_document` before
+//! this converter ever reads it, so it's skipped.
 //!
-//! Runs unconditionally, same as the real upgrader: a 3.x document simply
-//! has no `host` key, so the `if let Some(host) = ...` branch is a no-op —
-//! there's no version check gating it either upstream or here.
+//! Runs unconditionally: a 3.x document simply has no `host` key, so the
+//! `if let Some(host) = ...` branch is a no-op — there's no version check
+//! gating it.
 
 use adc_sdk::ConvertError;
 use serde_json::{Map, Value};
@@ -27,10 +27,11 @@ pub fn parse_document(content: &str) -> Result<Value, ConvertError> {
 
 pub fn upgrade_swagger_2_servers(document: &mut Map<String, Value>) {
     if let Some(host) = document.get("host").and_then(Value::as_str).map(str::to_string) {
-        let schemes: Vec<String> = match document.get("schemes") {
-            Some(Value::Array(items)) => items.iter().filter_map(Value::as_str).map(str::to_string).collect(),
-            _ => Vec::new(),
-        };
+        let schemes: Vec<String> = document
+            .get("schemes")
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_string).collect())
+            .unwrap_or_default();
         // Also covers a non-empty `schemes` array that filtered down to
         // nothing (every entry was a non-string) — falling through to an
         // empty `servers` array instead would leave `paths`/`info` intact
@@ -51,19 +52,16 @@ pub fn upgrade_swagger_2_servers(document: &mut Map<String, Value>) {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use serde_json::json;
 
     use super::*;
 
-    #[test]
-    fn parses_json_content() {
-        let value = parse_document(r#"{"info":{"title":"t"}}"#).unwrap();
-        assert_eq!(value["info"]["title"], json!("t"));
-    }
-
-    #[test]
-    fn parses_yaml_content() {
-        let value = parse_document("info:\n  title: t\n").unwrap();
+    #[rstest]
+    #[case::json(r#"{"info":{"title":"t"}}"#)]
+    #[case::yaml("info:\n  title: t\n")]
+    fn parse_document_cases(#[case] content: &str) {
+        let value = parse_document(content).unwrap();
         assert_eq!(value["info"]["title"], json!("t"));
     }
 
@@ -75,38 +73,24 @@ mod tests {
         assert!(!doc.contains_key("host") && !doc.contains_key("basePath") && !doc.contains_key("schemes"));
     }
 
-    #[test]
-    fn missing_schemes_defaults_to_http() {
-        let mut doc = json!({"host": "example.com"}).as_object().unwrap().clone();
+    #[rstest]
+    #[case::missing_schemes_defaults_to_http(json!({"host": "example.com"}), json!([{"url": "http://example.com"}]))]
+    #[case::multiple_schemes_produce_multiple_servers(
+        json!({"host": "example.com", "schemes": ["http", "https"]}),
+        json!([{"url": "http://example.com"}, {"url": "https://example.com"}]),
+    )]
+    #[case::a_bare_base_path_with_no_host_becomes_a_relative_server_url(json!({"basePath": "/v1"}), json!([{"url": "/v1"}]))]
+    #[case::a_schemes_array_with_no_string_entries_still_defaults_to_http(
+        json!({"host": "example.com", "schemes": [1, true]}),
+        json!([{"url": "http://example.com"}]),
+    )]
+    #[case::a_document_without_host_or_basepath_is_untouched(
+        json!({"servers": [{"url": "https://example.com"}]}),
+        json!([{"url": "https://example.com"}]),
+    )]
+    fn upgrade_swagger_2_servers_cases(#[case] doc: Value, #[case] expected_servers: Value) {
+        let mut doc = doc.as_object().unwrap().clone();
         upgrade_swagger_2_servers(&mut doc);
-        assert_eq!(doc["servers"], json!([{"url": "http://example.com"}]));
-    }
-
-    #[test]
-    fn multiple_schemes_produce_multiple_servers() {
-        let mut doc = json!({"host": "example.com", "schemes": ["http", "https"]}).as_object().unwrap().clone();
-        upgrade_swagger_2_servers(&mut doc);
-        assert_eq!(doc["servers"], json!([{"url": "http://example.com"}, {"url": "https://example.com"}]));
-    }
-
-    #[test]
-    fn a_bare_base_path_with_no_host_becomes_a_relative_server_url() {
-        let mut doc = json!({"basePath": "/v1"}).as_object().unwrap().clone();
-        upgrade_swagger_2_servers(&mut doc);
-        assert_eq!(doc["servers"], json!([{"url": "/v1"}]));
-    }
-
-    #[test]
-    fn a_schemes_array_with_no_string_entries_still_defaults_to_http() {
-        let mut doc = json!({"host": "example.com", "schemes": [1, true]}).as_object().unwrap().clone();
-        upgrade_swagger_2_servers(&mut doc);
-        assert_eq!(doc["servers"], json!([{"url": "http://example.com"}]));
-    }
-
-    #[test]
-    fn a_document_without_host_or_basepath_is_untouched() {
-        let mut doc = json!({"servers": [{"url": "https://example.com"}]}).as_object().unwrap().clone();
-        upgrade_swagger_2_servers(&mut doc);
-        assert_eq!(doc["servers"], json!([{"url": "https://example.com"}]));
+        assert_eq!(doc["servers"], expected_servers);
     }
 }

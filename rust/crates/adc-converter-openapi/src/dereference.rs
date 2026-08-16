@@ -1,27 +1,16 @@
-//! Resolves every `$ref` in a document against itself. Ported from
-//! `@scalar/openapi-parser`'s `resolveReferences`, narrowed to what
-//! `OpenAPIConverter` actually needs from it: `parseOAS` only ever calls
-//! `dereference(specification)` on a single in-memory object, never with a
-//! filesystem/fetch plugin registered, so external (cross-file) `$ref`s are
-//! rejected outright rather than supported.
+//! Resolves every `$ref` in a document against itself — same-document JSON
+//! Pointer resolution only, no external file loading, since this converter
+//! only ever needs to dereference a single in-memory document, never a
+//! multi-file spec split across a filesystem.
 //!
-//! Simplified relative to the upstream implementation in two ways, both
-//! deliberate:
-//! - Upstream resolves against the *same* object tree it mutates in place,
-//!   so a `$ref` target that was itself just rewritten by an earlier step
-//!   can observe that rewrite; this resolves every `$ref` against a frozen
-//!   snapshot of the input instead. The two only disagree on documents with
-//!   `$ref` chains through content order-dependently mutated mid-resolution
-//!   — not a shape `pruneConversionDocument` ever leaves behind for this
-//!   converter's own inputs.
-//! - Upstream detects only *direct* self-reference chains (`processedRefs`,
-//!   reset per node) and otherwise relies on a `WeakSet` of already-visited
-//!   objects to silently stop re-descending into shared/cyclic structure.
-//!   This tracks the full stack of `$ref` pointers currently being expanded
-//!   and errors on any cycle through it — strictly more cycles are caught,
-//!   never fewer — matching this project's rustify.md 7.2 call to
-//!   strengthen cycle handling rather than track scalar's own edge cases
-//!   1:1.
+//! Resolves every `$ref` against a frozen snapshot of the input rather than
+//! mutating the tree in place as it goes: simpler to reason about, and
+//! sufficient for what this converter actually receives (see
+//! `crate::prune`'s module doc for why `$ref`s are rare at all once pruning
+//! runs — there's rarely a chain deep enough for the distinction to show
+//! up). Cycle detection tracks the full stack of `$ref` pointers currently
+//! being expanded and errors on any repeat, so indirect cycles through
+//! several hops are caught, not just a node referencing itself directly.
 
 use adc_sdk::ConvertError;
 use serde_json::Value;
@@ -71,12 +60,12 @@ fn resolve_node(node: &Value, root: &Value, resolving: &mut Vec<String>, budget:
             resolving.pop();
 
             // Siblings of `$ref` on this node win over the target's own
-            // keys (mirroring `if (schema[key] === undefined) schema[key]
-            // = resolved[key]`), but still get their own nested `$ref`s
-            // resolved independently.
-            let mut merged = match resolved? {
-                Value::Object(m) => m,
-                other => return Ok(other),
+            // keys: only keys this node doesn't already have get filled in
+            // from the resolved target, but every key — inherited or
+            // original — still gets its own nested `$ref`s resolved below.
+            let resolved = resolved?;
+            let Value::Object(mut merged) = resolved else {
+                return Ok(resolved);
             };
             for (key, value) in map {
                 if key == "$ref" {
@@ -122,59 +111,43 @@ fn resolve_pointer(root: &Value, uri: &str) -> Result<Value, ConvertError> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use serde_json::json;
 
     use super::*;
 
-    #[test]
-    fn resolves_a_simple_pointer() {
-        let doc = json!({"components": {"pathItems": {"foo": {"a": 1}}}, "target": {"$ref": "#/components/pathItems/foo"}});
+    #[rstest]
+    #[case::resolves_a_simple_pointer(
+        json!({"components": {"pathItems": {"foo": {"a": 1}}}, "target": {"$ref": "#/components/pathItems/foo"}}),
+        "target",
+        json!({"a": 1}),
+    )]
+    #[case::follows_a_chain_of_refs(
+        json!({"a": {"$ref": "#/b"}, "b": {"$ref": "#/c"}, "c": {"value": 1}}),
+        "a",
+        json!({"value": 1}),
+    )]
+    #[case::sibling_keys_win_over_the_targets_own_keys(
+        json!({"a": {"$ref": "#/b", "value": "own"}, "b": {"value": "target", "other": 1}}),
+        "a",
+        json!({"value": "own", "other": 1}),
+    )]
+    #[case::unescapes_tilde_and_slash_in_pointer_segments(
+        json!({"a": {"b/c~d": {"value": 1}}, "target": {"$ref": "#/a/b~1c~0d"}}),
+        "target",
+        json!({"value": 1}),
+    )]
+    fn dereference_resolves_cases(#[case] doc: Value, #[case] key: &str, #[case] expected: Value) {
         let out = dereference(&doc).unwrap();
-        assert_eq!(out["target"], json!({"a": 1}));
+        assert_eq!(out[key], expected);
     }
 
-    #[test]
-    fn follows_a_chain_of_refs() {
-        let doc = json!({"a": {"$ref": "#/b"}, "b": {"$ref": "#/c"}, "c": {"value": 1}});
-        let out = dereference(&doc).unwrap();
-        assert_eq!(out["a"], json!({"value": 1}));
-    }
-
-    #[test]
-    fn sibling_keys_win_over_the_targets_own_keys() {
-        let doc = json!({"a": {"$ref": "#/b", "value": "own"}, "b": {"value": "target", "other": 1}});
-        let out = dereference(&doc).unwrap();
-        assert_eq!(out["a"], json!({"value": "own", "other": 1}));
-    }
-
-    #[test]
-    fn unescapes_tilde_and_slash_in_pointer_segments() {
-        let doc = json!({"a": {"b/c~d": {"value": 1}}, "target": {"$ref": "#/a/b~1c~0d"}});
-        let out = dereference(&doc).unwrap();
-        assert_eq!(out["target"], json!({"value": 1}));
-    }
-
-    #[test]
-    fn a_direct_self_reference_is_an_error() {
-        let doc = json!({"a": {"$ref": "#/a"}});
-        assert!(dereference(&doc).is_err());
-    }
-
-    #[test]
-    fn a_two_step_cycle_is_an_error() {
-        let doc = json!({"a": {"$ref": "#/b"}, "b": {"$ref": "#/a"}});
-        assert!(dereference(&doc).is_err());
-    }
-
-    #[test]
-    fn an_external_reference_is_rejected() {
-        let doc = json!({"a": {"$ref": "other.yaml#/b"}});
-        assert!(dereference(&doc).is_err());
-    }
-
-    #[test]
-    fn a_dangling_reference_is_an_error() {
-        let doc = json!({"a": {"$ref": "#/does/not/exist"}});
+    #[rstest]
+    #[case::a_direct_self_reference_is_an_error(json!({"a": {"$ref": "#/a"}}))]
+    #[case::a_two_step_cycle_is_an_error(json!({"a": {"$ref": "#/b"}, "b": {"$ref": "#/a"}}))]
+    #[case::an_external_reference_is_rejected(json!({"a": {"$ref": "other.yaml#/b"}}))]
+    #[case::a_dangling_reference_is_an_error(json!({"a": {"$ref": "#/does/not/exist"}}))]
+    fn dereference_error_cases(#[case] doc: Value) {
         assert!(dereference(&doc).is_err());
     }
 

@@ -197,7 +197,7 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
 
 async fn cmd_convert(args: ConvertArgs) -> Result<(), CliError> {
     match args.format {
-        ConvertFormat::Openapi(args) => {
+        ConvertFormat::OpenApi(args) => {
             let config = progress::stage(
                 "Converting OpenAPI documents...",
                 pipeline::convert_openapi(&args.files),

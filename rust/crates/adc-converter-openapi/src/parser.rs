@@ -90,18 +90,9 @@ pub fn parse_separate_service(
     path_upstream_defaults: Option<&Map<String, Value>>,
 ) -> Result<Option<Map<String, Value>>, ConvertError> {
     let Some(context) = context else { return Ok(None) };
-    let context_upstream_defaults = match context.get(extension::UPSTREAM_DEFAULTS) {
-        Some(Value::Object(m)) => Some(m),
-        _ => None,
-    };
-    let context_service_defaults = match context.get(extension::SERVICE_DEFAULTS) {
-        Some(Value::Object(m)) => Some(m),
-        _ => None,
-    };
-    let context_servers = match context.get("servers") {
-        Some(Value::Array(a)) => Some(a.as_slice()),
-        _ => None,
-    };
+    let context_upstream_defaults = context.get(extension::UPSTREAM_DEFAULTS).and_then(Value::as_object);
+    let context_service_defaults = context.get(extension::SERVICE_DEFAULTS).and_then(Value::as_object);
+    let context_servers = context.get("servers").and_then(Value::as_array);
     if context_upstream_defaults.is_none() && context_service_defaults.is_none() && context_servers.is_none() {
         return Ok(None);
     }
@@ -113,10 +104,7 @@ pub fn parse_separate_service(
         shallow_merge(&mut service, &generated);
     }
 
-    let mut upstream = match service.get("upstream") {
-        Some(Value::Object(m)) => m.clone(),
-        _ => Map::new(),
-    };
+    let mut upstream = service.get("upstream").and_then(Value::as_object).cloned().unwrap_or_default();
     if let Some(defaults) = path_upstream_defaults {
         shallow_merge(&mut upstream, defaults);
     }

@@ -385,6 +385,24 @@ mod tests {
         assert_eq!(in_array.keys().collect::<Vec<_>>(), vec!["a", "b"]);
     }
 
+    /// `sort_keys_recursively` only reorders the in-memory `Map`'s own
+    /// iteration order — this proves that guarantee actually survives all
+    /// the way through to the written-out string, for both serializers
+    /// this CLI uses (`sort_keys_recursively`'s callers write YAML, but
+    /// `cmd_dump`/`cmd_convert` both go through `serde_json::to_value`
+    /// first, so a JSON regression here would matter too).
+    #[test]
+    fn the_sorted_order_survives_serialization_to_yaml_and_json() {
+        let mut value = json!({"zebra": 1, "apple": {"z": 1, "a": 2}, "mango": [{"y": 1, "b": 2}]});
+        sort_keys_recursively(&mut value);
+
+        let yaml = serde_yaml_ng::to_string(&value).unwrap();
+        assert_eq!(yaml, "apple:\n  a: 2\n  z: 1\nmango:\n- b: 2\n  y: 1\nzebra: 1\n");
+
+        let json = serde_json::to_string(&value).unwrap();
+        assert_eq!(json, r#"{"apple":{"a":2,"z":1},"mango":[{"b":2,"y":1}],"zebra":1}"#);
+    }
+
     fn labels(pairs: &[(&str, &str)]) -> Labels {
         pairs
             .iter()

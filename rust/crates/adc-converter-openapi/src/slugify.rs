@@ -63,48 +63,23 @@ pub fn slugify(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
-    #[test]
-    fn spaces_become_a_single_hyphen() {
-        assert_eq!(slugify("some name"), "some-name");
-    }
-
-    #[test]
-    fn casing_is_preserved() {
-        assert_eq!(slugify("Some Name"), "Some-Name");
-    }
-
-    #[test]
-    fn diacritics_are_transliterated() {
-        assert_eq!(slugify("café"), "cafe");
-    }
-
-    #[test]
-    fn multiple_consecutive_spaces_collapse_to_one_hyphen() {
-        assert_eq!(slugify("a   b"), "a-b");
-    }
-
-    #[test]
-    fn a_leading_en_dash_is_trimmed_away_like_whitespace() {
-        assert_eq!(slugify("\u{2013}leading"), "leading");
-    }
-
-    #[test]
-    fn allowed_punctuation_survives() {
-        assert_eq!(slugify("get_user(v1)!"), "get_user(v1)!");
-    }
-
-    #[test]
-    fn disallowed_punctuation_is_stripped() {
-        assert_eq!(slugify("a/b?c=d"), "abcd");
-    }
-
-    #[test]
-    fn an_input_of_only_disallowed_characters_slugifies_to_empty() {
-        // `slug_join` joins pieces with "_" regardless of whether any of
-        // them slugified to nothing, so this is worth pinning down on its
-        // own rather than only ever seeing it mixed with survivors.
-        assert_eq!(slugify("/?"), "");
+    #[rstest]
+    #[case::spaces_become_a_single_hyphen("some name", "some-name")]
+    #[case::casing_is_preserved("Some Name", "Some-Name")]
+    #[case::diacritics_are_transliterated("café", "cafe")]
+    #[case::multiple_consecutive_spaces_collapse_to_one_hyphen("a   b", "a-b")]
+    #[case::a_leading_en_dash_is_trimmed_away_like_whitespace("\u{2013}leading", "leading")]
+    #[case::allowed_punctuation_survives("get_user(v1)!", "get_user(v1)!")]
+    #[case::disallowed_punctuation_is_stripped("a/b?c=d", "abcd")]
+    // `slug_join` joins pieces with "_" regardless of whether any of them
+    // slugified to nothing, so this is worth pinning down on its own
+    // rather than only ever seeing it mixed with survivors.
+    #[case::an_input_of_only_disallowed_characters_slugifies_to_empty("/?", "")]
+    fn slugify_cases(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(slugify(input), expected);
     }
 }
