@@ -8,8 +8,6 @@ members = [
   "crates/adc-backend-api7",
   "crates/adc-backend-apisix-standalone",
   "crates/adc-converter-openapi",
-  "crates/adc-sync-bench",
-  "crates/adc-mock-server",
   "crates/adc-cli",
 ]
 
