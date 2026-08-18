@@ -6,12 +6,13 @@
 //! describing an optional shape. Fields that are merely optional with no
 //! default stay `Option<T>` and are genuinely absent when not provided.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::common::{Labels, Timeout};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub enum UpstreamBalancer {
     #[default]
     #[serde(rename = "roundrobin")]
@@ -24,7 +25,7 @@ pub enum UpstreamBalancer {
     Ewma,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub enum UpstreamScheme {
     #[serde(rename = "grpc")]
     Grpc,
@@ -45,7 +46,7 @@ pub enum UpstreamScheme {
     Kafka,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub enum UpstreamPassHost {
     #[default]
     #[serde(rename = "pass")]
@@ -56,7 +57,7 @@ pub enum UpstreamPassHost {
     Rewrite,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub enum UpstreamHealthCheckType {
     #[default]
     #[serde(rename = "http")]
@@ -108,11 +109,14 @@ fn default_keepalive_requests() -> u32 {
 }
 
 /// A single upstream target: host, port, and load-balancing weight.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamNode {
+    #[schemars(length(min = 1))]
     pub host: String,
+    #[schemars(range(min = 1))]
     pub port: u16,
+    #[schemars(range(min = 0))]
     pub weight: i64,
     // A count, not a duration: unlike `Timeout`/`retry_timeout`, there's no
     // real-world fractional priority — matches the gateway's own schema
@@ -125,62 +129,76 @@ pub struct UpstreamNode {
 }
 
 /// Passive-health-check thresholds for marking a target healthy.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckPassiveHealthy {
     #[serde(default = "default_healthy_http_statuses")]
+    #[schemars(length(min = 1), inner(range(min = 200, max = 599)))]
     pub http_statuses: Vec<u32>,
     #[serde(default = "default_successes")]
+    #[schemars(range(min = 1, max = 254))]
     pub successes: u32,
 }
 
 /// Passive-health-check thresholds for marking a target unhealthy.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckPassiveUnhealthy {
     #[serde(default = "default_unhealthy_http_statuses")]
+    #[schemars(length(min = 1), inner(range(min = 200, max = 599)))]
     pub http_statuses: Vec<u32>,
     #[serde(default = "default_http_failures")]
+    #[schemars(range(min = 1, max = 254))]
     pub http_failures: u32,
     #[serde(default = "default_tcp_failures")]
+    #[schemars(range(min = 1, max = 254))]
     pub tcp_failures: u32,
     #[serde(default = "default_timeouts")]
+    #[schemars(range(min = 1, max = 254))]
     pub timeouts: u32,
 }
 
 /// Active-health-check thresholds for marking a target healthy, plus the
 /// polling interval (seconds, default 1) active checks need that passive
 /// checks don't.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckActiveHealthy {
     #[serde(default = "default_healthy_http_statuses")]
+    #[schemars(length(min = 1), inner(range(min = 200, max = 599)))]
     pub http_statuses: Vec<u32>,
     #[serde(default = "default_successes")]
+    #[schemars(range(min = 1, max = 254))]
     pub successes: u32,
     #[serde(default = "default_interval")]
+    #[schemars(range(min = 1))]
     pub interval: u32,
 }
 
 /// Active-health-check thresholds for marking a target unhealthy, plus the
 /// polling interval (seconds, default 1) active checks need that passive
 /// checks don't.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckActiveUnhealthy {
     #[serde(default = "default_unhealthy_http_statuses")]
+    #[schemars(length(min = 1), inner(range(min = 200, max = 599)))]
     pub http_statuses: Vec<u32>,
     #[serde(default = "default_http_failures")]
+    #[schemars(range(min = 1, max = 254))]
     pub http_failures: u32,
     #[serde(default = "default_tcp_failures")]
+    #[schemars(range(min = 1, max = 254))]
     pub tcp_failures: u32,
     #[serde(default = "default_timeouts")]
+    #[schemars(range(min = 1, max = 254))]
     pub timeouts: u32,
     #[serde(default = "default_interval")]
+    #[schemars(range(min = 1))]
     pub interval: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckActive {
     #[serde(rename = "type", default)]
@@ -193,14 +211,17 @@ pub struct UpstreamHealthCheckActive {
     #[serde(default = "default_concurrency")]
     pub concurrency: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1))]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1))]
     pub port: Option<u16>,
     #[serde(default = "default_http_path")]
     pub http_path: String,
     #[serde(default = "default_true")]
     pub https_verify_certificate: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1))]
     pub http_request_headers: Option<Vec<String>>,
     // The wrapping object itself is only `.optional()` (no `.default()`), so
     // absence stays `None` — only fields *inside* it (once present) default.
@@ -214,7 +235,7 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheckPassive {
     #[serde(rename = "type", default)]
@@ -228,7 +249,7 @@ pub struct UpstreamHealthCheckPassive {
 /// Health-check configuration: `active` (the gateway polls targets) is
 /// required whenever `checks` is set at all; `passive` (inferred from live
 /// traffic) is optional on top of it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamHealthCheck {
     pub active: UpstreamHealthCheckActive,
@@ -236,18 +257,21 @@ pub struct UpstreamHealthCheck {
     pub passive: Option<UpstreamHealthCheckPassive>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamKeepalivePool {
     #[serde(default = "default_keepalive_pool_size")]
+    #[schemars(range(min = 1))]
     pub size: u32,
     #[serde(default = "default_keepalive_idle_timeout")]
+    #[schemars(range(min = 0))]
     pub idle_timeout: f64,
     #[serde(default = "default_keepalive_requests")]
+    #[schemars(range(min = 1))]
     pub requests: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpstreamTls {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -265,14 +289,17 @@ pub struct UpstreamTls {
 /// appears: a service's own default `upstream` doesn't need one, while a
 /// named entry in `upstreams[]` does. That's a semantic rule for the
 /// validation layer, not a structural one.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Upstream {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1, max = 256), regex(pattern = r"^[a-zA-Z0-9-_.]+$"))]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1, max = 65536))]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(max = 65536))]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<Labels>,
@@ -290,8 +317,10 @@ pub struct Upstream {
     #[serde(default)]
     pub scheme: UpstreamScheme,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 0, max = 65535))]
     pub retries: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 0))]
     pub retry_timeout: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Timeout>,
@@ -304,6 +333,7 @@ pub struct Upstream {
     #[serde(default)]
     pub pass_host: UpstreamPassHost,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1))]
     pub upstream_host: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]

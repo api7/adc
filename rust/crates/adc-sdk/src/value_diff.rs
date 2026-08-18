@@ -24,6 +24,30 @@ pub enum PathSegment {
 
 pub type DiffPath = Vec<PathSegment>;
 
+impl std::fmt::Display for PathSegment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathSegment::Key(key) => write!(f, "{key}"),
+            PathSegment::Index(index) => write!(f, "[{index}]"),
+        }
+    }
+}
+
+/// Renders a `DiffPath` as `services[0].upstream.nodes`: `Key` segments are
+/// dot-joined, `Index` segments bracket directly onto the segment before
+/// them. Not a `Display` impl on `DiffPath` itself — that's a bare `Vec`
+/// alias, and a free function reads more clearly than an impl on it.
+pub fn format_path(path: &[PathSegment]) -> String {
+    let mut out = String::new();
+    for (i, segment) in path.iter().enumerate() {
+        if i > 0 && matches!(segment, PathSegment::Key(_)) {
+            out.push('.');
+        }
+        out.push_str(&segment.to_string());
+    }
+    out
+}
+
 /// A single field-level change, tagged by kind: new, deleted, edited, or an
 /// array-tail change.
 #[derive(Debug, Clone, PartialEq, Serialize)]

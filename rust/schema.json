@@ -1,0 +1,1354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Configuration",
+  "description": "The external, user-facing declarative config file shape: nested\nsub-resources embedded under their parent, no top-level\nroutes/upstreams/consumer_credentials.",
+  "type": "object",
+  "properties": {
+    "services": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Service"
+      }
+    },
+    "ssls": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/SSL"
+      }
+    },
+    "consumers": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Consumer"
+      }
+    },
+    "consumer_groups": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/ConsumerGroup"
+      }
+    },
+    "global_rules": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    },
+    "plugin_metadata": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Service": {
+      "description": "Plain-shape deserialization target for `Service` — see `ServiceRoutes`'s\ndoc comment for why this indirection exists. Every field here must stay\nin sync with `Service`'s (routes/stream_routes excepted).\n\nThis is also where the `#[schemars(...)]` field attributes live rather\nthan on `Service` itself: `#[serde(try_from = \"ServiceRaw\")]` makes\n`schemars` derive `Service`'s exported schema *from* `ServiceRaw`'s shape\n(the actual wire input), not `Service`'s own internal representation —\nputting the attributes on `Service` would silently be dead code.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Upstream"
+                },
+                {
+                  "not": {
+                    "required": [
+                      "id"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "upstreams": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/Upstream"
+                  },
+                  {
+                    "required": [
+                      "name"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "plugins": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "path_prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strip_path_prefix": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hosts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "routes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Route"
+          },
+          "default": null
+        },
+        "stream_routes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/StreamRoute"
+          },
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ]
+    },
+    "LabelValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "Upstream": {
+      "description": "An upstream target group. `id` is always present on the struct as an\n`Option`, but whether it's actually required depends on where the upstream\nappears: a service's own default `upstream` doesn't need one, while a\nnamed entry in `upstreams[]` does. That's a semantic rule for the\nvalidation layer, not a structural one.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "type": {
+          "$ref": "#/$defs/UpstreamBalancer",
+          "default": "roundrobin"
+        },
+        "hash_on": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheck"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/UpstreamNode"
+          }
+        },
+        "scheme": {
+          "$ref": "#/$defs/UpstreamScheme",
+          "default": "http"
+        },
+        "retries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "retry_timeout": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "minimum": 0
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamTls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "keepalive_pool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamKeepalivePool"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pass_host": {
+          "$ref": "#/$defs/UpstreamPassHost",
+          "default": "pass"
+        },
+        "upstream_host": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "service_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "discovery_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "discovery_args": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamBalancer": {
+      "type": "string",
+      "enum": [
+        "roundrobin",
+        "chash",
+        "least_conn",
+        "ewma"
+      ]
+    },
+    "UpstreamHealthCheck": {
+      "description": "Health-check configuration: `active` (the gateway polls targets) is\nrequired whenever `checks` is set at all; `passive` (inferred from live\ntraffic) is optional on top of it.",
+      "type": "object",
+      "properties": {
+        "active": {
+          "$ref": "#/$defs/UpstreamHealthCheckActive"
+        },
+        "passive": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheckPassive"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "active"
+      ]
+    },
+    "UpstreamHealthCheckActive": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/UpstreamHealthCheckType",
+          "default": "http"
+        },
+        "timeout": {
+          "type": "number",
+          "format": "double",
+          "default": 1.0
+        },
+        "concurrency": {
+          "type": "integer",
+          "format": "int64",
+          "default": 10
+        },
+        "host": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "http_path": {
+          "type": "string",
+          "default": "/"
+        },
+        "https_verify_certificate": {
+          "type": "boolean",
+          "default": true
+        },
+        "http_request_headers": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "healthy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheckActiveHealthy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unhealthy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheckActiveUnhealthy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamHealthCheckType": {
+      "type": "string",
+      "enum": [
+        "http",
+        "https",
+        "tcp"
+      ]
+    },
+    "UpstreamHealthCheckActiveHealthy": {
+      "description": "Active-health-check thresholds for marking a target healthy, plus the\npolling interval (seconds, default 1) active checks need that passive\nchecks don't.",
+      "type": "object",
+      "properties": {
+        "http_statuses": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 200,
+            "maximum": 599
+          },
+          "minItems": 1,
+          "default": [
+            200,
+            302
+          ]
+        },
+        "successes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 2
+        },
+        "interval": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamHealthCheckActiveUnhealthy": {
+      "description": "Active-health-check thresholds for marking a target unhealthy, plus the\npolling interval (seconds, default 1) active checks need that passive\nchecks don't.",
+      "type": "object",
+      "properties": {
+        "http_statuses": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 200,
+            "maximum": 599
+          },
+          "minItems": 1,
+          "default": [
+            429,
+            404,
+            500,
+            501,
+            502,
+            503,
+            504,
+            505
+          ]
+        },
+        "http_failures": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 5
+        },
+        "tcp_failures": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 2
+        },
+        "timeouts": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 3
+        },
+        "interval": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamHealthCheckPassive": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/UpstreamHealthCheckType",
+          "default": "http"
+        },
+        "healthy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheckPassiveHealthy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unhealthy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpstreamHealthCheckPassiveUnhealthy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamHealthCheckPassiveHealthy": {
+      "description": "Passive-health-check thresholds for marking a target healthy.",
+      "type": "object",
+      "properties": {
+        "http_statuses": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 200,
+            "maximum": 599
+          },
+          "minItems": 1,
+          "default": [
+            200,
+            302
+          ]
+        },
+        "successes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamHealthCheckPassiveUnhealthy": {
+      "description": "Passive-health-check thresholds for marking a target unhealthy.",
+      "type": "object",
+      "properties": {
+        "http_statuses": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 200,
+            "maximum": 599
+          },
+          "minItems": 1,
+          "default": [
+            429,
+            404,
+            500,
+            501,
+            502,
+            503,
+            504,
+            505
+          ]
+        },
+        "http_failures": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 5
+        },
+        "tcp_failures": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 2
+        },
+        "timeouts": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "maximum": 254,
+          "default": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamNode": {
+      "description": "A single upstream target: host, port, and load-balancing weight.",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "weight": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "priority": {
+          "type": "integer",
+          "format": "int64",
+          "default": 0
+        },
+        "metadata": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "weight"
+      ]
+    },
+    "UpstreamScheme": {
+      "type": "string",
+      "enum": [
+        "grpc",
+        "grpcs",
+        "http",
+        "https",
+        "tcp",
+        "tls",
+        "udp",
+        "kafka"
+      ]
+    },
+    "Timeout": {
+      "description": "Connect/send/read timeouts in seconds, shared by upstream and route configs.",
+      "type": "object",
+      "properties": {
+        "connect": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "send": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "read": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "connect",
+        "send",
+        "read"
+      ]
+    },
+    "UpstreamTls": {
+      "type": "object",
+      "properties": {
+        "client_cert": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "client_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "client_cert_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verify": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamKeepalivePool": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "default": 320
+        },
+        "idle_timeout": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0,
+          "default": 60.0
+        },
+        "requests": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 1,
+          "default": 1000
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpstreamPassHost": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "node",
+        "rewrite"
+      ]
+    },
+    "Route": {
+      "description": "An HTTP route: matches requests by URI/host/method and applies plugins to them.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "hosts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uris": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "priority": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vars": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": true
+        },
+        "methods": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/HttpMethod"
+          },
+          "minItems": 1
+        },
+        "enable_websocket": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remote_addrs": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "ipv4",
+                    "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"
+                  },
+                  {
+                    "type": "string",
+                    "format": "ipv6",
+                    "pattern": "^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$"
+                  },
+                  {
+                    "type": "string",
+                    "format": "cidrv4",
+                    "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\/([0-9]|[1-2][0-9]|3[0-2])$"
+                  },
+                  {
+                    "type": "string",
+                    "format": "cidrv6",
+                    "pattern": "^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:?){0,6})\\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plugins": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "filter_func": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uris"
+      ]
+    },
+    "HttpMethod": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+        "CONNECT",
+        "TRACE",
+        "PURGE"
+      ]
+    },
+    "StreamRoute": {
+      "description": "A stream (TCP/UDP/TLS) route: matches connections by address/SNI rather than URI.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "plugins": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "remote_addr": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "server_addr": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "server_port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "sni": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ]
+    },
+    "SSL": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "type": {
+          "$ref": "#/$defs/SslType",
+          "default": "server"
+        },
+        "snis": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "certificates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SSLCertificate"
+          },
+          "minItems": 1
+        },
+        "client": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SslClient"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ssl_protocols": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/SslProtocol"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "snis",
+        "certificates"
+      ]
+    },
+    "SslType": {
+      "type": "string",
+      "enum": [
+        "server",
+        "client"
+      ]
+    },
+    "SSLCertificate": {
+      "description": "A certificate/key pair. Either may also be a `$secret://`/`$env://`\nreference string instead of inline PEM content — that's a semantic\n(regex-union) check, not a structural one, so both fields are plain\n`String` here.",
+      "type": "object",
+      "properties": {
+        "certificate": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 128,
+              "maxLength": 65536
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$(secret|env):\\/\\/"
+            }
+          ]
+        },
+        "key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 65536
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$(secret|env):\\/\\/"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "certificate",
+        "key"
+      ]
+    },
+    "SslClient": {
+      "type": "object",
+      "properties": {
+        "ca": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 128,
+              "maxLength": 65536
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$(secret|env):\\/\\/"
+            }
+          ]
+        },
+        "depth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 1
+        },
+        "skip_mtls_uri_regex": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ca"
+      ]
+    },
+    "SslProtocol": {
+      "type": "string",
+      "enum": [
+        "TLSv1.1",
+        "TLSv1.2",
+        "TLSv1.3"
+      ]
+    },
+    "Consumer": {
+      "description": "A consumer, identified by `username` rather than `name`.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "plugins": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "credentials": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ConsumerCredential"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "username"
+      ]
+    },
+    "ConsumerCredential": {
+      "description": "A credential attached to a consumer (e.g. an API key or JWT secret).\n`type` is kept as a plain string rather than a closed enum: the 4-value\nrestriction (\"key-auth\"/\"basic-auth\"/\"jwt-auth\"/\"hmac-auth\") is a semantic\nrule for the validation layer, not encoded here.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "type": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "config"
+      ]
+    },
+    "ConsumerGroup": {
+      "description": "A named group of consumers sharing plugin configuration.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 65536
+        },
+        "labels": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelValue"
+          }
+        },
+        "plugins": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "consumers": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Consumer"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ]
+    }
+  }
+}

@@ -4,11 +4,51 @@
 //! ("HTTP routes and Stream routes are mutually exclusive") is enforced here
 //! instead, via `ServiceRoutes` — see its doc comment for why and how.
 
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use super::common::{Labels, Plugins};
 use super::route::{Route, StreamRoute};
 use super::upstream::Upstream;
+
+/// `Upstream.name` is optional everywhere in its own schema (it doubles as
+/// `Service.upstream`, the unnamed default), but each entry in
+/// `Service.upstreams[]` needs a name to be addressable — matches the TS SDK's
+/// exported `schema.json`, which shows `upstreams[].items.required ==
+/// ["name"]` even though the base `Upstream` schema has no required list at
+/// all. `allOf` layers the extra `required` on top of `Upstream`'s own
+/// (possibly `$ref`'d) schema rather than trying to mutate it in place. The
+/// outer `anyOf`+`null` is needed because `schema_with` disables schemars'
+/// usual `Option<T>` handling (see `common.rs`'s note on `schema_with`) —
+/// `upstreams` is itself optional even though each of its items needs a name.
+fn upstreams_schema(generator: &mut SchemaGenerator) -> Schema {
+    let item = generator.subschema_for::<Upstream>();
+    let value = serde_json::json!({
+        "anyOf": [
+            {"type": "array", "items": {"allOf": [item, {"required": ["name"]}]}},
+            {"type": "null"}
+        ]
+    });
+    Schema::try_from(value).expect("valid schema")
+}
+
+/// `Service.upstream` (the singular, embedded default upstream) must never
+/// carry an `id`: it isn't an addressable resource of its own — the id it
+/// ends up with, if the backend splits it into a real upstream sub-resource,
+/// is generated internally. `Service.upstreams[]` items *are* addressable on
+/// their own and do allow an explicit `id` (see `upstreams_schema`, which
+/// doesn't restrict it). `not: {required: ["id"]}` rejects the key if
+/// present, rather than just leaving it optional.
+fn default_upstream_schema(generator: &mut SchemaGenerator) -> Schema {
+    let item = generator.subschema_for::<Upstream>();
+    let value = serde_json::json!({
+        "anyOf": [
+            {"allOf": [item, {"not": {"required": ["id"]}}]},
+            {"type": "null"}
+        ]
+    });
+    Schema::try_from(value).expect("valid schema")
+}
 
 /// `Service.routes`/`Service.stream_routes` are two sibling JSON keys, at
 /// most one of which may be present — a service either proxies HTTP or a
@@ -23,7 +63,7 @@ use super::upstream::Upstream;
 /// — `ServiceRaw` derives normally with both fields as plain
 /// `Option<Vec<_>>`, and `TryFrom` is where the two are reconciled into this
 /// enum (or rejected).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ServiceRoutes {
     Http { routes: Vec<Route> },
@@ -60,7 +100,7 @@ impl ServiceRoutes {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "ServiceRaw")]
 pub struct Service {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,19 +131,33 @@ pub struct Service {
 /// Plain-shape deserialization target for `Service` — see `ServiceRoutes`'s
 /// doc comment for why this indirection exists. Every field here must stay
 /// in sync with `Service`'s (routes/stream_routes excepted).
-#[derive(Debug, Deserialize)]
+///
+/// This is also where the `#[schemars(...)]` field attributes live rather
+/// than on `Service` itself: `#[serde(try_from = "ServiceRaw")]` makes
+/// `schemars` derive `Service`'s exported schema *from* `ServiceRaw`'s shape
+/// (the actual wire input), not `Service`'s own internal representation —
+/// putting the attributes on `Service` would silently be dead code.
+#[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ServiceRaw {
+    #[schemars(length(min = 1, max = 256), regex(pattern = r"^[a-zA-Z0-9-_.]+$"))]
     id: Option<String>,
+    #[schemars(length(min = 1, max = 65536))]
     name: String,
+    #[schemars(length(max = 65536))]
     description: Option<String>,
     labels: Option<Labels>,
 
+    #[serde(default)]
+    #[schemars(schema_with = "default_upstream_schema")]
     upstream: Option<Upstream>,
+    #[serde(default)]
+    #[schemars(schema_with = "upstreams_schema")]
     upstreams: Option<Vec<Upstream>>,
     plugins: Option<Plugins>,
     path_prefix: Option<String>,
     strip_path_prefix: Option<bool>,
+    #[schemars(inner(length(min = 1)))]
     hosts: Option<Vec<String>>,
 
     #[serde(default)]

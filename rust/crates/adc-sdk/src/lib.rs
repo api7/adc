@@ -1,18 +1,21 @@
 //! ADC's core data model: resource type definitions, the typed resource
-//! layer for parsing declarative configuration (`resources` module), differ
+//! layer for parsing declarative configuration (`resources` module), a
+//! semantic-validation pass on top of that same model (`lint`), differ
 //! event types shared with backend/CLI consumers, a generic JSON value-diff
 //! utility, the `Backend` trait implemented by each gateway integration, and
 //! the `Converter` trait implemented by each source-format converter.
 //!
-//! Not yet here: semantic validation (cross-field rules, regex, min/max) on
-//! top of the `resources` types, and JSON Schema export. The differ's own
-//! field-metadata table lives in `adc-differ` instead of here, since nothing
-//! outside the differ consumes it.
+//! `lint` is a separate call (`lint::lint`), not baked into `Deserialize` —
+//! deserializing a `resources::Configuration` only ever enforces shape
+//! (types, required fields, unknown fields); semantic rules run only when a
+//! caller explicitly asks. The differ's own field-metadata table lives in
+//! `adc-differ` instead of here, since nothing outside the differ consumes it.
 
 pub mod backend;
 pub mod converter;
 pub mod default_value;
 pub mod event;
+pub mod lint;
 pub mod resource;
 pub mod resources;
 pub mod utils;
@@ -26,7 +29,7 @@ pub use converter::{ConvertError, Converter};
 pub use default_value::DefaultValue;
 pub use event::{Event, EventKind, EventType};
 pub use resource::{FieldListType, ResourceType};
-pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value};
+pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value, format_path};
 
 use serde_json::{Map, Value};
 
