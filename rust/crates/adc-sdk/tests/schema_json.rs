@@ -14,8 +14,13 @@ fn schema_json_is_consistent_with_the_current_resource_model() {
     let committed = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schema.json"))
         .expect("rust/schema.json should exist — run `cargo run -p adc-sdk --bin export-schema`");
 
+    // Normalize CRLF -> LF on both sides: `current_json` is always built
+    // with bare `\n`, but a CRLF checkout (e.g. git's `core.autocrlf` on
+    // Windows) would read `committed` back with `\r\n`, which isn't the
+    // drift this test exists to catch.
     assert_eq!(
-        current_json, committed,
+        current_json.replace("\r\n", "\n"),
+        committed.replace("\r\n", "\n"),
         "rust/schema.json is stale — re-run `cargo run -p adc-sdk --bin export-schema` from rust/ and commit the result"
     );
 }

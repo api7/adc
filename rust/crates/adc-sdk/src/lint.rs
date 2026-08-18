@@ -57,13 +57,30 @@ pub fn lint(config: &Configuration) -> Vec<LintIssue> {
     let instance = serde_json::to_value(config).expect("Configuration always serializes");
     let mut issues: Vec<LintIssue> = SCHEMA_VALIDATOR
         .iter_errors(&instance)
-        .map(|e| LintIssue {
-            path: json_pointer_to_diff_path(&e.instance_path().to_string()),
-            message: e.to_string(),
+        .map(|e| {
+            let path = json_pointer_to_diff_path(&e.instance_path().to_string());
+            let message = masked_message(&e, &path);
+            LintIssue { path, message }
         })
         .collect();
     check_cross_field_rules(config, &mut issues);
     issues
+}
+
+/// Field names that might carry secret material (inline PEM content, or the
+/// plaintext of a `$secret://`/`$env://` reference) — `jsonschema`'s own
+/// error `Display` embeds the failing instance value verbatim, which is fine
+/// for debugging but not for a CLI's stdout/logs, so these get a generic
+/// message instead of the real one.
+const SENSITIVE_FIELD_NAMES: &[&str] = &["certificate", "key", "ca"];
+
+fn masked_message(error: &jsonschema::ValidationError, path: &[PathSegment]) -> String {
+    let sensitive = matches!(path.last(), Some(PathSegment::Key(key)) if SENSITIVE_FIELD_NAMES.contains(&key.as_str()));
+    if sensitive {
+        "does not match the expected format (value redacted)".to_string()
+    } else {
+        error.to_string()
+    }
 }
 
 /// Converts a JSON Pointer (e.g. `/services/0/upstream/nodes`) into a
@@ -353,6 +370,36 @@ mod tests {
         };
         let config = Configuration { ssls: Some(vec![ssl]), ..empty_config() };
         assert_eq!(lint(&config), Vec::new());
+    }
+
+    /// An invalid `certificate`/`key` value fails the schema's `anyOf`
+    /// check — `jsonschema`'s default error message would otherwise embed
+    /// the offending value verbatim, leaking secret material into lint output.
+    #[test]
+    fn an_invalid_ssl_key_value_is_not_echoed_into_the_lint_message() {
+        use crate::resources::{SSL, SSLCertificate};
+        // Under the 32-char minimum, so it fails validation (too short to be
+        // real PEM content, and doesn't match the `$secret://`/`$env://`
+        // reference pattern either) — short enough on purpose, to prove the
+        // failure path in particular doesn't echo it back.
+        let secret_value = "sk_live_UNIQUE_MARKER_9f3a7c";
+        let ssl = SSL {
+            id: None,
+            labels: None,
+            r#type: Default::default(),
+            snis: vec!["example.com".into()],
+            certificates: vec![SSLCertificate { certificate: "x".repeat(128), key: secret_value.into() }],
+            client: None,
+            ssl_protocols: None,
+        };
+        let config = Configuration { ssls: Some(vec![ssl]), ..empty_config() };
+        let issues = lint(&config);
+        assert_eq!(issues.len(), 1);
+        assert!(
+            !issues[0].message.contains(secret_value),
+            "lint message leaked the secret value: {}",
+            issues[0].message
+        );
     }
 
     #[test]
