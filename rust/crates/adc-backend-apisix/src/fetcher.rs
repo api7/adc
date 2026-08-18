@@ -10,11 +10,6 @@ use serde::de::DeserializeOwned;
 use crate::typing;
 use crate::utils::resource_type_to_api_name;
 
-/// Bounds how many consumers' credentials `list_consumers` fetches at once,
-/// so a large consumer list doesn't fan out unboundedly against the admin
-/// API.
-const CREDENTIAL_FETCH_CONCURRENCY: usize = 16;
-
 /// Fetches an ADC-managed APISIX instance's full resource state, one
 /// resource type at a time, in APISIX's own wire shape (`crate::typing`) —
 /// converting that into ADC's model (`adc_sdk::resources`) and assembling it
@@ -24,14 +19,19 @@ pub struct Fetcher {
     client: HttpClient,
     version: Version,
     filter: ResourceFilter,
+    /// Bounds how many consumers' credentials `list_consumers` fetches at
+    /// once, so a large consumer list doesn't fan out unboundedly against
+    /// the admin API. The CLI's `--request-concurrent`.
+    concurrency: usize,
 }
 
 impl Fetcher {
-    pub fn new(client: HttpClient, version: Version, filter: ResourceFilter) -> Self {
+    pub fn new(client: HttpClient, version: Version, filter: ResourceFilter, concurrency: usize) -> Self {
         Self {
             client,
             version,
             filter,
+            concurrency,
         }
     }
 
@@ -154,7 +154,7 @@ impl Fetcher {
             return Ok(consumers);
         }
 
-        concurrent_map_until_err(consumers, Some(CREDENTIAL_FETCH_CONCURRENCY), |consumer| {
+        concurrent_map_until_err(consumers, Some(self.concurrency), |consumer| {
             self.with_credentials(consumer)
         })
         .await
@@ -432,7 +432,7 @@ mod tests {
             exclude,
             label_selector: HashMap::new(),
         };
-        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter);
+        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter, 10);
 
         let configuration = fetcher.dump().await.unwrap();
         assert_eq!(
@@ -488,7 +488,7 @@ mod tests {
             exclude: HashSet::from([ResourceType::Service]),
             label_selector: HashMap::new(),
         };
-        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter);
+        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter, 10);
 
         fetcher.dump().await.unwrap();
 
@@ -510,7 +510,7 @@ mod tests {
             exclude: HashSet::new(),
             label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
         };
-        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter);
+        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter, 10);
 
         let builder = fetcher.filter.attach_label_selector(
             fetcher
@@ -563,7 +563,7 @@ mod tests {
             exclude: HashSet::new(),
             label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
         };
-        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter);
+        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter, 10);
 
         let configuration = fetcher.dump().await.unwrap();
 

@@ -163,7 +163,7 @@ async fn syncs_a_service_with_a_service_discovery_upstream_and_no_static_nodes()
     let events = diff(&config_with_services(vec![service]), &before);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config("service-e2e-discovery").expect("dump/sync populate the raw config cache");
+    let raw = common::cache().raw_config("service-e2e-discovery").await.expect("dump/sync populate the raw config cache");
     let upstreams = raw.upstreams.expect("the service's default upstream was written");
     assert_eq!(upstreams.len(), 1);
     assert_eq!(upstreams[0].nodes, None, "a discovery-based upstream has no static node list");

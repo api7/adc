@@ -107,14 +107,18 @@ where
 
 fn print_progress(report: &Report) {
     let elapsed = report.started_at.elapsed();
+    // `completed` counts every closed event regardless of outcome (that's
+    // what percent/eta need — a batch isn't "done" just because everything
+    // that finished so far succeeded), but a failed event was never
+    // actually applied, so the "applied" count subtracts those back out.
     let (percent, eta) = crate::progress::percent_and_eta(report.completed, report.total, elapsed);
+    let applied = report.completed.saturating_sub(report.failed);
 
     print_line(
         '\u{2026}',
         "progress",
         &format!(
-            "{}/{} ({percent}%) applied, {} failed, elapsed {} eta {}",
-            report.completed,
+            "{applied}/{} ({percent}%) applied, {} failed, elapsed {} eta {}",
             report.total,
             report.failed,
             compact_duration(elapsed),

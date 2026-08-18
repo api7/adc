@@ -31,7 +31,7 @@ macro_rules! skip_below_3_17_0 {
 }
 
 fn validator() -> Validator {
-    Validator::new(client())
+    Validator::new(client(), apisix_version())
 }
 
 fn create(rt: ResourceType, id: &str, new_value: serde_json::Value) -> Event {
@@ -212,6 +212,7 @@ async fn is_a_dry_run_with_no_side_effects_on_the_server() {
         client(),
         semver::Version::new(3, 17, 0),
         adc_backend_core::ResourceFilter::default(),
+        10,
     );
     let services = fetcher.list_services().await.unwrap();
     assert!(

@@ -111,7 +111,7 @@ pub struct StreamRoute {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_addr: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub server_port: Option<u32>,
+    pub server_port: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sni: Option<String>,
 }

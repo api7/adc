@@ -119,17 +119,26 @@ pub struct BackendArgs {
     #[arg(long, value_delimiter = ',')]
     pub label_selector: Vec<String>,
 
-    /// filter resources that only contain the specified type
+    /// filter resources that only contain the specified type. Applies to
+    /// top-level types only — route/upstream/stream_route/consumer_credential/plugin_config
+    /// live nested under a service or consumer, so naming them has no
+    /// effect (support for them will be removed)
     #[arg(long, conflicts_with = "exclude_resource_type")]
     pub include_resource_type: Vec<ResourceTypeArg>,
 
-    /// filter resources that do not contain the specified type
+    /// filter resources that do not contain the specified type (top-level
+    /// types only — see `--include-resource-type`)
     #[arg(long, conflicts_with = "include_resource_type")]
     pub exclude_resource_type: Vec<ResourceTypeArg>,
 
     /// timeout for adc to connect with the backend (examples: 10s, 1h10m)
     #[arg(long, default_value = "10s", value_parser = parse_timeout)]
     pub timeout: Duration,
+
+    /// number of concurrent requests to the backend (both fetching remote
+    /// state and, for `sync`, applying it)
+    #[arg(long, default_value_t = 10)]
+    pub request_concurrent: usize,
 
     /// path to the CA certificate to verify the backend
     #[arg(long, env = "ADC_CA_CERT_FILE", value_parser = existing_file)]
@@ -192,10 +201,6 @@ pub struct SyncArgs {
     /// disable lint check
     #[arg(long = "no-lint", action = clap::ArgAction::SetFalse)]
     pub lint: bool,
-
-    /// number of concurrent requests to the backend
-    #[arg(long, default_value_t = 10)]
-    pub request_concurrent: usize,
 }
 
 #[derive(Args, Debug)]

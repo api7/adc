@@ -71,11 +71,13 @@ async fn service_with_multiple_named_upstreams() {
 
     let dump = dump_configuration(&backend).await.unwrap();
     let mut upstreams = dump.services.unwrap()[0].upstreams.clone().unwrap();
+    assert_eq!(upstreams.len(), 2);
     upstreams.sort_by(|a, b| a.name.cmp(&b.name));
     assert_matches_object(
         &serde_json::to_value(&upstreams[0]).unwrap(),
         &new_upstream_nd1,
     );
+    assert_matches_object(&serde_json::to_value(&upstreams[1]).unwrap(), &upstream_nd2);
 
     let mut service_with_one_upstream = service_base.clone();
     service_with_one_upstream["upstreams"] = json!([new_upstream_nd1]);

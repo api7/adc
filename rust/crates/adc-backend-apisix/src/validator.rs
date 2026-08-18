@@ -10,6 +10,7 @@ use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendValidateResult, BackendValidationError, Event, EventType, ResourceType,
 };
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,6 +19,7 @@ use crate::typing;
 
 pub struct Validator {
     client: HttpClient,
+    version: Version,
 }
 
 /// One entry per group APISIX's validate endpoint recognizes
@@ -60,12 +62,12 @@ struct RawValidationError {
 }
 
 impl Validator {
-    pub fn new(client: HttpClient) -> Self {
-        Self { client }
+    pub fn new(client: HttpClient, version: Version) -> Self {
+        Self { client, version }
     }
 
     pub async fn validate(&self, events: &[Event]) -> Result<BackendValidateResult, BackendError> {
-        let (body, index) = build_request(events)?;
+        let (body, index) = build_request(events, &self.version)?;
 
         let request = self
             .client
@@ -122,7 +124,7 @@ fn deserialize_event_value<T: serde::de::DeserializeOwned>(
         .map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
 }
 
-fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
+fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
     let mut body = ValidateRequestBody::default();
     let mut index: ValidateIndex = HashMap::new();
 
@@ -165,14 +167,14 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
                 track(&mut index, "routes");
             }
             ResourceType::StreamRoute => {
-                let mut route: adc::StreamRoute = deserialize_event_value(new_value)?;
-                route.id = Some(event.resource_id.clone());
+                let route: adc::StreamRoute = deserialize_event_value(new_value)?;
                 let parent_id = event
                     .parent_id
                     .clone()
                     .ok_or_else(|| missing_parent(event))?;
+                let inject_name = *version >= Version::new(3, 8, 0);
                 body.stream_routes
-                    .push(transformer::transform_stream_route(route, parent_id, true));
+                    .push(transformer::transform_stream_route(route, parent_id, inject_name));
                 track(&mut index, "stream_routes");
             }
             ResourceType::Consumer => {
@@ -223,6 +225,30 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    fn stream_route_create(id: &str) -> Event {
+        let mut event = Event::new(
+            ResourceType::StreamRoute,
+            EventKind::Create { new_value: json!({ "name": id }) },
+            id,
+            id,
+        );
+        event.parent_id = Some("svc1".to_string());
+        event
+    }
+
+    #[test]
+    fn stream_route_omits_the_name_label_below_3_8_0() {
+        let (body, _) = build_request(&[stream_route_create("sr1")], &Version::new(3, 7, 0)).unwrap();
+        assert!(body.stream_routes[0].labels.is_none());
+    }
+
+    #[test]
+    fn stream_route_injects_the_name_label_at_or_above_3_8_0() {
+        let (body, _) = build_request(&[stream_route_create("sr1")], &Version::new(3, 8, 0)).unwrap();
+        let labels = body.stream_routes[0].labels.as_ref().expect("name label injected");
+        assert!(labels.contains_key(typing::ADC_NAME_LABEL));
+    }
 
     #[test]
     fn enrich_matches_a_known_resource_type_and_index() {

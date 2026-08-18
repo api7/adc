@@ -77,8 +77,8 @@ fn service_with_named_upstreams(nd1_host: &str) -> adc::Service {
     }
 }
 
-fn assert_original_layout() {
-    let raw = common::cache().raw_config(CACHE_KEY).expect("sync populated the raw config cache");
+async fn assert_original_layout() {
+    let raw = common::cache().raw_config(CACHE_KEY).await.expect("sync populated the raw config cache");
     let service_id = generate_id("test");
     assert_eq!(raw.services.as_ref().unwrap()[0].id, service_id);
     let upstreams = raw.upstreams.expect("default + 2 named upstreams were written");
@@ -90,7 +90,7 @@ fn assert_original_layout() {
     assert_eq!(nd1.labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
     assert_eq!(nd2.labels.as_ref().and_then(|l| l.get(ADC_UPSTREAM_SERVICE_ID_LABEL)), Some(&service_id));
 
-    let config = common::cache().config(CACHE_KEY).expect("sync populated the config cache");
+    let config = common::cache().config(CACHE_KEY).await.expect("sync populated the config cache");
     let services = config.services.expect("service exists");
     assert_eq!(services.len(), 1);
     let named = services[0].upstreams.as_ref().expect("named upstreams are nested under the service");
@@ -112,7 +112,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     let events = diff(&local, &before);
     sync_ok(&backend, events).await;
 
-    assert_original_layout();
+    assert_original_layout().await;
 
     // Re-syncing the identical desired state produces no events at all.
     let before = dump(&backend).await;
@@ -120,7 +120,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     assert!(events.is_empty(), "an unchanged desired state must diff to no events");
     sync_ok(&backend, events).await;
 
-    assert_original_layout();
+    assert_original_layout().await;
 
     // Change nd-upstream1's node host; nd-upstream2 and the default
     // upstream must be untouched.
@@ -129,7 +129,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     let events = diff(&Configuration { services: Some(vec![updated_service]), ..empty_configuration() }, &before);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).unwrap();
+    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
     let upstreams = raw.upstreams.unwrap();
     assert_eq!(upstreams.len(), 3);
     let nd1 = upstreams.iter().find(|u| u.name == "nd-upstream1").expect("nd-upstream1");
@@ -139,7 +139,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     );
     assert_eq!(nd1.nodes.as_ref().unwrap()[0].host, "8.8.8.8");
 
-    let config = common::cache().config(CACHE_KEY).unwrap();
+    let config = common::cache().config(CACHE_KEY).await.unwrap();
     let services = config.services.unwrap();
     let named = services[0].upstreams.as_ref().unwrap();
     assert_eq!(named.len(), 2);

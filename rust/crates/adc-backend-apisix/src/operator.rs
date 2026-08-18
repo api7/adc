@@ -299,23 +299,25 @@ type BuiltRequest = (Method, String, Option<Value>, RequestKind);
 /// [`Operator::operate`], which needs it to know whether a `DELETE` is for
 /// the upstream sub-resource specifically (see its doc comment for why
 /// that one tolerates a 404).
+/// Whether a `SERVICE` event's new value still has an `upstream` field —
+/// `transform_service` returns `None` when it doesn't, which the upstream
+/// sub-request must turn into a DELETE (nothing to PUT) rather than an error.
+fn service_has_upstream(event: &Event) -> bool {
+    event.kind.new_value().and_then(|v| v.get("upstream")).is_some_and(|v| !v.is_null())
+}
+
 fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>, BackendError> {
     let is_delete = event.event_type() == EventType::Delete;
-    let mut paths = vec![(main_path(event)?, RequestKind::Main)];
+    let main_method = if is_delete { Method::DELETE } else { Method::PUT };
+    let mut paths = vec![(main_path(event)?, RequestKind::Main, main_method)];
 
     if event.resource_type == ResourceType::Service {
-        let upstream_path = (format!("/apisix/admin/upstreams/{}", encode_path_segment(&event.resource_id)?), RequestKind::Upstream);
+        let upstream_path = format!("/apisix/admin/upstreams/{}", encode_path_segment(&event.resource_id)?);
         match event.event_type() {
-            EventType::Delete => paths.push(upstream_path),
+            EventType::Delete => paths.push((upstream_path, RequestKind::Upstream, Method::DELETE)),
             EventType::Create => {
-                // A service create with no `upstream` field at all has
-                // nothing to write there — `transform_service` would
-                // return `None` for it, which `request_body` would
-                // otherwise have to reject as an error for a case that
-                // isn't actually one.
-                let has_upstream = event.kind.new_value().and_then(|v| v.get("upstream")).is_some_and(|v| !v.is_null());
-                if has_upstream {
-                    paths.insert(0, upstream_path);
+                if service_has_upstream(event) {
+                    paths.insert(0, (upstream_path, RequestKind::Upstream, Method::PUT));
                 }
             }
             EventType::Update => {
@@ -328,7 +330,11 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
                     paths.pop();
                 }
                 if touches_upstream {
-                    paths.insert(0, upstream_path);
+                    // Still has an upstream: PUT the new body. Lost it
+                    // entirely: nothing to PUT, so DELETE instead — `operate`
+                    // already tolerates a 404 here for the "never had one" case.
+                    let method = if service_has_upstream(event) { Method::PUT } else { Method::DELETE };
+                    paths.insert(0, (upstream_path, RequestKind::Upstream, method));
                 }
             }
             EventType::OnlySubEvents => {}
@@ -337,9 +343,8 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
 
     paths
         .into_iter()
-        .map(|(path, kind)| {
-            let method = if is_delete { Method::DELETE } else { Method::PUT };
-            let body = if is_delete { None } else { Some(request_body(event, kind, version)?) };
+        .map(|(path, kind, method)| {
+            let body = if method == Method::DELETE { None } else { Some(request_body(event, kind, version)?) };
             Ok((method, path, body, kind))
         })
         .collect()
@@ -509,6 +514,26 @@ mod tests {
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 1, "no upstream request should be generated for a service with no upstream");
         assert!(requests[0].1.ends_with("/services/svc-no-upstream"), "{}", requests[0].1);
+    }
+
+    #[test]
+    fn service_update_removing_its_upstream_deletes_the_upstream_resource_instead_of_erroring() {
+        let old_value = json!({ "name": "svc1", "upstream": { "nodes": [] } });
+        let new_value = json!({ "name": "svc1" });
+        let diff = vec![ValueDiff::Deleted { path: vec![PathSegment::Key("upstream".to_string())], lhs: old_value["upstream"].clone() }];
+        let service_event =
+            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+
+        let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
+        // Only the upstream field changed, so the service body itself isn't
+        // re-sent (same rule as any other upstream-only update) — just the
+        // DELETE for the upstream that's no longer there.
+        assert_eq!(requests.len(), 1);
+        let (method, path, body, kind) = &requests[0];
+        assert!(matches!(kind, RequestKind::Upstream));
+        assert_eq!(*method, Method::DELETE);
+        assert!(body.is_none());
+        assert!(path.ends_with("/upstreams/svc1"), "{path}");
     }
 
     #[test]

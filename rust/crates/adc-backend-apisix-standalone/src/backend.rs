@@ -17,9 +17,9 @@ use async_trait::async_trait;
 use semver::Version;
 use tokio::sync::OnceCell;
 
-use crate::cache::Cache;
+use crate::cache::{Cache, CachedEntry};
 use crate::fetcher::Fetcher;
-use crate::operator::Operator;
+use crate::operator::{Operator, SyncOutcome};
 use crate::typing::ApisixStandalone;
 
 /// One target server plus the client already configured with its own
@@ -108,7 +108,7 @@ impl Backend {
         if let Some(version) = self.version.get() {
             return Ok(version.clone());
         }
-        if let Some(version) = Cache::global().version(&self.cache_key) {
+        if let Some(version) = Cache::global().version(&self.cache_key).await {
             let _ = self.version.set(version.clone());
             return Ok(version);
         }
@@ -139,7 +139,7 @@ impl Backend {
         // fallback — matches the TS backend's own `semverEQ(version,
         // mockVersion)` guard.
         if *version != UNKNOWN_VERSION {
-            Cache::global().set_version(&self.cache_key, version.clone());
+            Cache::global().set_version(&self.cache_key, version.clone()).await;
         }
         Ok(version.clone())
     }
@@ -168,36 +168,86 @@ impl adc_sdk::Backend for Backend {
         Ok(DefaultValue::default())
     }
 
+    /// The real cross-server "find the latest state" bootstrap
+    /// (`Fetcher::dump`) only ever runs for the first `dump` of a given
+    /// `cache_key`. Every call after that, and `sync` below, both just read
+    /// whatever's cached — `sync` writes its own result back into the same
+    /// cache at the end, so a `dump` right before it always sees fresh data
+    /// without needing to hit the servers again.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key);
         }
-        if let Some(config) = Cache::global().config(&self.cache_key) {
+        if let Some(config) = Cache::global().config(&self.cache_key).await {
             return Ok(config);
         }
 
         let version = self.resolved_version().await?;
         let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
 
-        Cache::global().set_latest_version(&self.cache_key, highest_conf_version(&raw_config));
-        Cache::global().set_config(&self.cache_key, config.clone());
-        Cache::global().set_raw_config(&self.cache_key, raw_config);
+        Cache::global().set_latest_version(&self.cache_key, highest_conf_version(&raw_config)).await;
+        Cache::global().set_config(&self.cache_key, config.clone()).await;
+        Cache::global().set_raw_config(&self.cache_key, raw_config).await;
         Ok(config)
     }
 
+    /// Relies on a `dump` having already primed the cache for this
+    /// `cache_key` — this is why `dump`'s own doc comment calls out that
+    /// contract. The lock below guards against a *concurrent* `sync` for
+    /// the same key, not against a cold cache: every caller (the CLI's
+    /// `dump`-then-`sync` pipeline, and any other caller expected to
+    /// follow the same convention) dumps before it syncs.
     async fn sync(
         &self,
         events: Vec<Event>,
         opts: BackendSyncOptions,
     ) -> Result<Vec<BackendSyncResult>, BackendError> {
-        let old_raw_config = Cache::global().raw_config(&self.cache_key).unwrap_or_default();
-        Operator::new(self.servers.clone(), self.cache_key.clone(), old_raw_config)
-            .sync(events, opts)
-            .await
+        // Held for the whole read-modify-write span, not just the read
+        // below — see `Cache::lock`'s doc comment for why two concurrent
+        // syncs on the same key can't just read-then-write independently.
+        let mut entry = Cache::global().lock(&self.cache_key).await;
+        let old_raw_config = entry.raw_config.clone().unwrap_or_default();
+        let latest_known_version = entry.latest_version;
+
+        match Operator::new(self.servers.clone(), old_raw_config, latest_known_version).sync(events, opts).await {
+            Ok(SyncOutcome { results, new_state: Some((timestamp, new_config)) }) => {
+                // Built in full before it touches `entry`, then swapped in
+                // as one assignment — a panic while computing the new state
+                // (e.g. inside `to_adc`) leaves the old entry untouched
+                // instead of a torn mix of old and new fields.
+                // `tokio::sync::Mutex` never poisons on a panicked guard
+                // holder, so nothing else would catch a partial write here.
+                let new_entry = CachedEntry {
+                    version: entry.version.clone(),
+                    latest_version: Some(entry.latest_version.map_or(timestamp, |current| current.max(timestamp))),
+                    config: Some(crate::transformer::to_adc(&new_config)),
+                    raw_config: Some(new_config),
+                    updated_at: Some(timestamp),
+                };
+                *entry = new_entry;
+                Ok(results)
+            }
+            Ok(SyncOutcome { results, new_state: None }) => Ok(results),
+            Err(error) => {
+                // A server earlier in the batch may have already accepted
+                // the new document before a later one failed — the cache
+                // can't be trusted either way at that point, so this
+                // resets the entry we're already holding the lock for
+                // (same effect as `Cache::invalidate`, just through the
+                // guard instead of a second lookup) rather than leaving it
+                // pointing at data a live server may have moved past. The
+                // next dump() re-fetches and re-runs `find_latest` to
+                // discover the cluster's real state instead of trusting
+                // stale cache.
+                *entry = CachedEntry::default();
+                Err(error)
+            }
+        }
     }
 
     async fn validate(&self, events: &[Event]) -> Result<BackendValidateResult, BackendError> {
-        adc_backend_apisix::Validator::new(self.servers[0].client.clone())
+        let version = self.resolved_version().await?;
+        adc_backend_apisix::Validator::new(self.servers[0].client.clone(), version)
             .validate(events)
             .await
     }

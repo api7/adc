@@ -241,7 +241,7 @@ pub struct StreamRoute {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_addr: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub server_port: Option<i64>,
+    pub server_port: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sni: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -313,11 +313,7 @@ pub struct Upstream {
     pub upstream_host: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retries: Option<u32>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "adc_sdk::resources::serialize_optional_whole_number_as_integer"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_timeout: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Timeout>,

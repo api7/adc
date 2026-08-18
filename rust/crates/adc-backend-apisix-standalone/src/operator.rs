@@ -21,25 +21,39 @@ use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
 
 use crate::backend::StandaloneServer;
-use crate::cache::Cache;
 use crate::typing::{self, ApisixStandalone, ConsumerOrCredential};
 use crate::utils::stable_timestamp;
 
 const CONFIG_ENDPOINT: &str = "/apisix/admin/configs";
 const HEADER_DIGEST: &str = "x-digest";
 
+/// What a successful `Operator::sync` learned, for the caller (which owns
+/// the cache lock this ran under) to write back. `new_state` is `None` when
+/// no server accepted the write — nothing to cache in that case.
+pub struct SyncOutcome {
+    pub results: Vec<BackendSyncResult>,
+    pub new_state: Option<(i64, ApisixStandalone)>,
+}
+
 pub struct Operator {
     servers: Vec<StandaloneServer>,
-    cache_key: String,
     old_raw_config: ApisixStandalone,
+    latest_known_version: Option<i64>,
 }
 
 impl Operator {
-    pub fn new(servers: Vec<StandaloneServer>, cache_key: String, old_raw_config: ApisixStandalone) -> Self {
-        Self { servers, cache_key, old_raw_config }
+    /// Doesn't touch `Cache` itself — the caller (`Backend::sync`) already
+    /// holds the lock for this `cache_key`'s entry and passes in what it
+    /// read; `sync` below hands back what to write, for the same held lock
+    /// to apply. Two `Cache` accesses for the same key inside one already
+    /// locked critical section would deadlock (`tokio::sync::Mutex` isn't
+    /// reentrant), which is the real reason this doesn't just take a
+    /// `cache_key` and read/write `Cache::global()` itself.
+    pub fn new(servers: Vec<StandaloneServer>, old_raw_config: ApisixStandalone, latest_known_version: Option<i64>) -> Self {
+        Self { servers, old_raw_config, latest_known_version }
     }
 
-    pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError> {
+    pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<SyncOutcome, BackendError> {
         let mut new_config = self.old_raw_config.clone();
         let mut increase_version: HashSet<ResourceType> = HashSet::new();
 
@@ -53,7 +67,7 @@ impl Operator {
         // load, not just as a clock-skew edge case). Either way, clamping
         // to one past the latest known version keeps every write both
         // acceptable to the data plane and strictly increasing.
-        let timestamp = resolve_sync_timestamp(stable_timestamp(), Cache::global().latest_version(&self.cache_key));
+        let timestamp = resolve_sync_timestamp(stable_timestamp(), self.latest_known_version);
 
         for event in &events {
             apply_event_for_service_inlined_upstream(&mut new_config, &mut increase_version, timestamp, event)?;
@@ -87,11 +101,11 @@ impl Operator {
                     // accepted the new document before a later one failed
                     // and aborted the rest — the cache's idea of "current
                     // state" can't be trusted either way at that point, so
-                    // it's cleared rather than left pointing at data a live
-                    // server may have already moved past. The next dump()
-                    // re-fetches and re-runs `find_latest` to discover the
-                    // cluster's real state instead of trusting stale cache.
-                    Cache::global().invalidate(&self.cache_key);
+                    // the caller resets its held entry rather than leaving
+                    // it pointing at data a live server may have already
+                    // moved past. The next dump() re-fetches and re-runs
+                    // `find_latest` to discover the cluster's real state
+                    // instead of trusting stale cache.
                     return Err(error);
                 }
             }
@@ -106,19 +120,13 @@ impl Operator {
                 .collect()
         };
 
-        // Updated once, after every server has settled, rather than
-        // per-server as each PUT completes: with concurrent writers, "cache
+        // Keyed on "at least one server accepted the write", not on
+        // per-server completion order — with concurrent writers, "cache
         // whatever the most recently completed request happened to see"
-        // has no coherent meaning — completion order isn't sync order.
-        // "At least one server accepted the write" is a real, checkable
-        // fact to key the update on instead.
-        if results.iter().any(|result| result.success) {
-            Cache::global().set_latest_version(&self.cache_key, timestamp);
-            Cache::global().set_config(&self.cache_key, crate::transformer::to_adc(&new_config));
-            Cache::global().set_raw_config(&self.cache_key, new_config);
-        }
+        // has no coherent meaning.
+        let new_state = results.iter().any(|result| result.success).then_some((timestamp, new_config));
 
-        Ok(results)
+        Ok(SyncOutcome { results, new_state })
     }
 }
 
@@ -546,7 +554,16 @@ fn apply_event_for_service_inlined_upstream(
     match event.event_type() {
         EventType::Create => {
             if let Some(wire) = build_wire(event)? {
-                config.upstreams.get_or_insert_with(Vec::new).push(wire);
+                let upstreams = config.upstreams.get_or_insert_with(Vec::new);
+                // This is a plain `Vec`, not a map — nothing stops two
+                // entries from sharing an id unless every write path checks
+                // first. Replace an existing entry rather than appending,
+                // matching `upsert_or_delete` and this function's own
+                // Update/Delete branches below.
+                match upstreams.iter_mut().find(|item| item.id == event.resource_id) {
+                    Some(slot) => *slot = wire,
+                    None => upstreams.push(wire),
+                }
                 increase_version.insert(ResourceType::Upstream);
             }
         }
@@ -851,6 +868,51 @@ mod tests {
         assert_eq!(upstreams.len(), 1);
         assert_eq!(upstreams[0].id, "svc-1");
         assert!(increase_version.contains(&ResourceType::Upstream));
+    }
+
+    /// Regression test: a service CREATE whose inline upstream id already
+    /// has an entry in `config.upstreams` must replace it, not append a
+    /// second entry sharing the same id.
+    #[test]
+    fn service_create_for_an_already_present_inline_upstream_id_replaces_it_instead_of_duplicating() {
+        let mut config = empty_config();
+        config.upstreams = Some(vec![typing::Upstream {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: None,
+            labels: None,
+            nodes: None,
+            scheme: None,
+            ty: None,
+            hash_on: None,
+            key: None,
+            pass_host: None,
+            upstream_host: None,
+            retries: None,
+            retry_timeout: None,
+            timeout: None,
+            tls: None,
+            keepalive_pool: None,
+            checks: None,
+            discovery_type: None,
+            service_name: None,
+            discovery_args: None,
+        }]);
+        let mut increase_version = HashSet::new();
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Create {
+                new_value: json!({ "name": "svc-1", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+            },
+            "svc-1",
+        );
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 200, &service_event).unwrap();
+
+        let upstreams = config.upstreams.unwrap();
+        assert_eq!(upstreams.len(), 1, "must not end up with two entries sharing id \"svc-1\"");
+        assert_eq!(upstreams[0].modified_index, 200);
     }
 
     #[test]

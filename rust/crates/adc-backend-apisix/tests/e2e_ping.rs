@@ -32,7 +32,7 @@ fn backend(server: &str, tls: TlsConfig) -> ApisixBackend {
         tls,
     })
     .unwrap();
-    ApisixBackend::new(client, adc_backend_core::ResourceFilter::default())
+    ApisixBackend::new(client, adc_backend_core::ResourceFilter::default(), 10)
 }
 
 #[tokio::test]

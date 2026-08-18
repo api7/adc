@@ -39,13 +39,13 @@ fn resource_type_from_str(s: &str) -> Option<ResourceType> {
     })
 }
 
-fn parse_default_value(v: &Value) -> DefaultValue {
+fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
     let mut default_value = DefaultValue::default();
     if let Some(core) = v.get("core").and_then(Value::as_object) {
         for (k, val) in core {
-            if let Some(rt) = resource_type_from_str(k) {
-                default_value.core.insert(rt, val.clone());
-            }
+            let rt = resource_type_from_str(k)
+                .unwrap_or_else(|| panic!("{context}: unknown resource type {k:?} in defaultValue.core"));
+            default_value.core.insert(rt, val.clone());
         }
     }
     if let Some(plugins) = v.get("plugins").and_then(Value::as_object) {
@@ -56,8 +56,16 @@ fn parse_default_value(v: &Value) -> DefaultValue {
     default_value
 }
 
-fn load_config(v: Option<&Value>) -> InternalConfiguration {
-    v.and_then(Value::as_object).cloned().unwrap_or_default()
+/// `None` (the key is absent) is a legitimate empty config; `Some` holding
+/// anything but an object is very likely a malformed fixture and panics
+/// instead of silently running the differ against an empty config as if
+/// nothing were wrong.
+fn load_config(v: Option<&Value>, context: &str) -> InternalConfiguration {
+    match v {
+        None => InternalConfiguration::default(),
+        Some(Value::Object(obj)) => obj.clone(),
+        Some(other) => panic!("{context} must be an object, got {other}"),
+    }
 }
 
 fn main() {
@@ -80,9 +88,11 @@ fn main() {
         let fixture: Value =
             serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
 
-        let local = load_config(fixture.get("local"));
-        let remote = load_config(fixture.get("remote"));
-        let default_value = fixture.get("defaultValue").map(parse_default_value);
+        let local = load_config(fixture.get("local"), &format!("{}: \"local\"", path.display()));
+        let remote = load_config(fixture.get("remote"), &format!("{}: \"remote\"", path.display()));
+        let default_value = fixture
+            .get("defaultValue")
+            .map(|v| parse_default_value(v, &format!("{}: \"defaultValue\"", path.display())));
 
         let events = DifferV4::diff(&local, &remote, default_value.as_ref(), None);
         results.insert(name, events);
@@ -121,5 +131,41 @@ mod tests {
         ] {
             assert_eq!(resource_type_from_str(rt.as_str()), Some(rt));
         }
+    }
+
+    #[test]
+    fn load_config_treats_a_missing_key_as_an_empty_config() {
+        assert_eq!(load_config(None, "ctx"), InternalConfiguration::default());
+    }
+
+    #[test]
+    fn load_config_accepts_an_object() {
+        let value = serde_json::json!({"services": []});
+        assert_eq!(load_config(Some(&value), "ctx"), value.as_object().unwrap().clone());
+    }
+
+    #[test]
+    #[should_panic(expected = "must be an object")]
+    fn load_config_rejects_a_non_object_instead_of_silently_defaulting() {
+        let value = serde_json::json!("not an object");
+        load_config(Some(&value), "ctx");
+    }
+
+    #[test]
+    fn parse_default_value_reads_known_core_and_plugin_entries() {
+        let value = serde_json::json!({
+            "core": {"route": {"a": 1}},
+            "plugins": {"cors": {"b": 2}},
+        });
+        let default_value = parse_default_value(&value, "ctx");
+        assert_eq!(default_value.core.get(&ResourceType::Route), Some(&serde_json::json!({"a": 1})));
+        assert_eq!(default_value.plugins.get("cors"), Some(&serde_json::json!({"b": 2})));
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown resource type")]
+    fn parse_default_value_rejects_an_unknown_core_key_instead_of_silently_dropping_it() {
+        let value = serde_json::json!({"core": {"raute": {}}});
+        parse_default_value(&value, "ctx");
     }
 }

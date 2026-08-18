@@ -62,7 +62,8 @@ async fn syncs_and_dumps_consumers_with_credentials() {
     assert!(credentials.iter().any(|c| c.name == cred1_name));
     assert!(credentials.iter().any(|c| c.name == cred2_name));
 
-    let version_before_update = raw_conf_version("consumers_conf_version").await;
+    let version_before_update =
+        raw_conf_version("consumers_conf_version").await.expect("consumers_conf_version present after consumer sync");
     sync_ok(
         &backend,
         vec![update_event(
@@ -74,7 +75,9 @@ async fn syncs_and_dumps_consumers_with_credentials() {
         )],
     )
     .await;
-    let version_after_update = raw_conf_version("consumers_conf_version").await;
+    let version_after_update = raw_conf_version("consumers_conf_version")
+        .await
+        .expect("consumers_conf_version present after credential update");
     assert!(version_after_update > version_before_update, "updating a credential must bump consumers_conf_version");
 
     let config = dump(&backend).await;

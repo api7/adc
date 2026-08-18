@@ -1,26 +1,39 @@
 //! Cross-request cache of each standalone target's resolved state, keyed by
 //! a caller-supplied `cache_key` (typically derived from its server list).
-//! Mirrors the TS backend's module-level `lru-cache` singletons — a real
-//! process-wide cache, not per-`Backend`-instance state, so that
+//! A real process-wide cache, not per-`Backend`-instance state, so that
 //! long-lived callers (e.g. an ingress-server handling many requests
 //! against the same standalone target) don't pay for a fresh
 //! "find the latest server + full dump" bootstrap on every request.
 //!
-//! Structurally simpler than the TS version: one entry per `cache_key`
-//! holding all four cached values together (version/latest_version/
-//! config/raw_config), rather than four independent `lru-cache` instances —
-//! they're always read and written in the same lifecycle anyway (see
-//! `crate::backend::Backend::dump`/`sync`), so there's no case where one
-//! would legitimately expire or evict independently of the others.
+//! One entry per `cache_key`, holding all four cached values together
+//! (version/latest_version/config/raw_config) behind a single per-key
+//! `tokio::sync::Mutex` — they're always read and written in the same
+//! lifecycle anyway (see `crate::backend::Backend::dump`/`sync`), so
+//! there's no case where one legitimately needs to expire, evict, or lock
+//! independently of the others. A single map keyed by `cache_key`, not two
+//! separate ones for data and locking: keeping a lock map in sync with a
+//! data map by hand is its own bug source, and the mutex *is* the entry's
+//! own access control, not a bolted-on second concept.
+//!
+//! `Backend::sync` locks the whole entry for its read-modify-write span via
+//! [`Cache::lock`], so two concurrent syncs on the same key can't both read
+//! the same starting snapshot and silently discard one another's changes.
+//! Every other accessor below takes the same per-key lock too, just briefly
+//! (one field, not a multi-step operation) — which also means a `dump`
+//! reading through `config`/`raw_config` while a `sync` is in flight for
+//! the same key naturally waits for it, rather than reading a half-applied
+//! state.
 
-use std::sync::LazyLock;
-use std::time::{Duration, Instant};
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 
 use adc_sdk::resources::Configuration;
 use dashmap::DashMap;
 use semver::Version;
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::typing::ApisixStandalone;
+use crate::utils::stable_timestamp;
 
 const DEFAULT_MAX_ENTRIES: usize = 16;
 const DEFAULT_TTL_MS: u64 = 3_600_000;
@@ -43,20 +56,26 @@ fn env_ttl() -> Duration {
 }
 
 #[derive(Clone, Default)]
-struct CachedEntry {
-    version: Option<Version>,
-    latest_version: Option<i64>,
-    config: Option<Configuration>,
-    raw_config: Option<ApisixStandalone>,
-    updated_at: Option<Instant>,
+pub(crate) struct CachedEntry {
+    pub(crate) version: Option<Version>,
+    pub(crate) latest_version: Option<i64>,
+    pub(crate) config: Option<Configuration>,
+    pub(crate) raw_config: Option<ApisixStandalone>,
+    /// Milliseconds since the Unix epoch, from [`stable_timestamp`] — the
+    /// same clock `Operator::sync`'s own conf-version timestamps come from,
+    /// so a successful sync's write-back reuses that call's timestamp
+    /// directly instead of taking a second, separate "now" reading.
+    pub(crate) updated_at: Option<i64>,
 }
 
-fn is_expired(entry: &CachedEntry, ttl: Duration) -> bool {
-    entry.updated_at.is_none_or(|at| at.elapsed() > ttl)
+impl CachedEntry {
+    fn is_expired(&self, ttl: Duration) -> bool {
+        self.updated_at.is_none_or(|at| stable_timestamp() - at > ttl.as_millis() as i64)
+    }
 }
 
 pub struct Cache {
-    entries: DashMap<String, CachedEntry>,
+    entries: DashMap<String, Arc<AsyncMutex<CachedEntry>>>,
     max_entries: usize,
     ttl: Duration,
 }
@@ -81,48 +100,54 @@ impl Cache {
         &GLOBAL
     }
 
-    fn get_live(&self, key: &str) -> Option<CachedEntry> {
-        let entry = self.entries.get(key)?;
-        if !is_expired(&entry, self.ttl) {
-            return Some(entry.clone());
-        }
-        drop(entry);
-        // Rechecks expiry at removal time rather than removing
-        // unconditionally by key: between the drop above and this call, a
-        // concurrent writer could have refreshed this same entry — removing
-        // it unconditionally would discard that fresh write, not just the
-        // stale one this call actually observed.
-        self.entries.remove_if(key, |_, entry| is_expired(entry, self.ttl));
-        None
+    fn entry(&self, key: &str) -> Arc<AsyncMutex<CachedEntry>> {
+        self.entries.entry(key.to_string()).or_default().clone()
     }
 
-    pub fn version(&self, key: &str) -> Option<Version> {
-        self.get_live(key)?.version
+    /// Locks the whole cached entry for `key`, for a caller that needs to
+    /// read then later write it as one atomic step spanning more than a
+    /// single field access — see `Backend::sync`'s use of this. Every
+    /// other method here (`raw_config`, `set_raw_config`, ...) takes and
+    /// releases this same lock internally, just for the one field it
+    /// touches, so ordinary callers never need this directly. Not exposed
+    /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
+    /// caller elsewhere couldn't do anything with the guard anyway.
+    pub(crate) async fn lock(&self, key: &str) -> OwnedMutexGuard<CachedEntry> {
+        self.entry(key).lock_owned().await
     }
 
-    pub fn latest_version(&self, key: &str) -> Option<i64> {
-        self.get_live(key)?.latest_version
+    async fn get_live(&self, key: &str) -> Option<CachedEntry> {
+        let entry = self.lock(key).await;
+        if entry.is_expired(self.ttl) { None } else { Some(entry.clone()) }
     }
 
-    pub fn config(&self, key: &str) -> Option<Configuration> {
-        self.get_live(key)?.config
+    pub async fn version(&self, key: &str) -> Option<Version> {
+        self.get_live(key).await?.version
     }
 
-    pub fn raw_config(&self, key: &str) -> Option<ApisixStandalone> {
-        self.get_live(key)?.raw_config
+    pub async fn latest_version(&self, key: &str) -> Option<i64> {
+        self.get_live(key).await?.latest_version
     }
 
-    fn touch(&self, key: &str, apply: impl FnOnce(&mut CachedEntry)) {
+    pub async fn config(&self, key: &str) -> Option<Configuration> {
+        self.get_live(key).await?.config
+    }
+
+    pub async fn raw_config(&self, key: &str) -> Option<ApisixStandalone> {
+        self.get_live(key).await?.raw_config
+    }
+
+    async fn touch(&self, key: &str, apply: impl FnOnce(&mut CachedEntry)) {
         {
-            let mut entry = self.entries.entry(key.to_string()).or_default();
-            entry.updated_at = Some(Instant::now());
+            let mut entry = self.lock(key).await;
+            entry.updated_at = Some(stable_timestamp());
             apply(&mut entry);
         }
         self.evict_if_over_capacity();
     }
 
-    pub fn set_version(&self, key: &str, version: Version) {
-        self.touch(key, |entry| entry.version = Some(version));
+    pub async fn set_version(&self, key: &str, version: Version) {
+        self.touch(key, |entry| entry.version = Some(version)).await;
     }
 
     /// Bumps the cached version to `value`, never below whatever's already
@@ -134,27 +159,31 @@ impl Cache {
     /// sync's clock-rollback guard reads this value to pick its own
     /// timestamp, so a regressed value here could produce a
     /// `*_conf_version` the data plane has already seen (and rejects).
-    pub fn set_latest_version(&self, key: &str, value: i64) {
+    pub async fn set_latest_version(&self, key: &str, value: i64) {
         self.touch(key, |entry| {
             entry.latest_version = Some(entry.latest_version.map_or(value, |current| current.max(value)));
-        });
+        })
+        .await;
     }
 
-    pub fn set_config(&self, key: &str, config: Configuration) {
-        self.touch(key, |entry| entry.config = Some(config));
+    pub async fn set_config(&self, key: &str, config: Configuration) {
+        self.touch(key, |entry| entry.config = Some(config)).await;
     }
 
-    pub fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
-        self.touch(key, |entry| entry.raw_config = Some(raw_config));
+    pub async fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
+        self.touch(key, |entry| entry.raw_config = Some(raw_config)).await;
     }
 
     pub fn invalidate(&self, key: &str) {
         self.entries.remove(key);
     }
 
-    /// A soft, best-effort cap: eviction reads `updated_at` timestamps
-    /// without coordinating with concurrent inserts, so under concurrent
-    /// writers the map can transiently hold a couple more entries than
+    /// A soft, best-effort cap: eviction peeks at each entry's
+    /// `updated_at` via a non-blocking `try_lock`, skipping (not blocking
+    /// on) any entry currently held by an in-flight `dump`/`sync` — that
+    /// one's clearly not idle, so it's in no danger of actually being the
+    /// least-recently-touched one anyway. Under concurrent writers the map
+    /// can therefore transiently hold a couple more entries than
     /// `max_entries` before the next call trims it back down. That's fine —
     /// this exists to bound long-run memory growth, not to enforce an exact
     /// invariant.
@@ -163,8 +192,9 @@ impl Cache {
             let oldest = self
                 .entries
                 .iter()
-                .min_by_key(|entry| entry.updated_at)
-                .map(|entry| entry.key().clone());
+                .filter_map(|entry| Some((entry.key().clone(), entry.value().try_lock().ok()?.updated_at)))
+                .min_by_key(|(_, updated_at)| *updated_at)
+                .map(|(key, _)| key);
             match oldest {
                 Some(key) => {
                     self.entries.remove(&key);
@@ -181,29 +211,29 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn a_fresh_cache_has_nothing_cached() {
+    #[tokio::test]
+    async fn a_fresh_cache_has_nothing_cached() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
-        assert!(cache.version("k").is_none());
-        assert!(cache.config("k").is_none());
+        assert!(cache.version("k").await.is_none());
+        assert!(cache.config("k").await.is_none());
     }
 
-    #[test]
-    fn set_then_get_round_trips_within_ttl() {
+    #[tokio::test]
+    async fn set_then_get_round_trips_within_ttl() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
-        cache.set_latest_version("k", 42);
-        assert_eq!(cache.latest_version("k"), Some(42));
+        cache.set_latest_version("k", 42).await;
+        assert_eq!(cache.latest_version("k").await, Some(42));
     }
 
-    #[test]
-    fn writing_a_smaller_version_never_regresses_the_cached_one() {
+    #[tokio::test]
+    async fn writing_a_smaller_version_never_regresses_the_cached_one() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
-        cache.set_latest_version("k", 100);
+        cache.set_latest_version("k", 100).await;
         // Simulates a slower concurrent `Operator::sync` call that decided
         // on an older timestamp before a faster one raced ahead and wrote a
         // newer value, only landing its own write afterward.
-        cache.set_latest_version("k", 50);
-        assert_eq!(cache.latest_version("k"), Some(100));
+        cache.set_latest_version("k", 50).await;
+        assert_eq!(cache.latest_version("k").await, Some(100));
     }
 
     /// Regression coverage for a real bug this crate's design guards
@@ -215,7 +245,7 @@ mod tests {
     /// threads rather than just cooperatively yielding on one.
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn concurrent_writers_racing_on_the_same_key_never_regress_the_cached_version() {
-        let cache = std::sync::Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
+        let cache = Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
         let values: Vec<i64> = (0..200).map(|i| (i * 7919) % 1000).collect();
         let expected_max = *values.iter().max().unwrap();
 
@@ -226,20 +256,50 @@ mod tests {
                 // Jitter completion order so writers genuinely interleave
                 // instead of running in the order they were spawned.
                 tokio::time::sleep(Duration::from_micros((value as u64 * 37) % 500)).await;
-                cache.set_latest_version("k", value);
+                cache.set_latest_version("k", value).await;
             });
         }
         tasks.join_all().await;
 
-        assert_eq!(cache.latest_version("k"), Some(expected_max));
+        assert_eq!(cache.latest_version("k").await, Some(expected_max));
     }
 
-    #[test]
-    fn an_entry_older_than_the_ttl_is_treated_as_absent() {
+    /// `Cache::lock` must give real mutual exclusion, not just a fresh
+    /// mutex each call: many tasks racing a read-increment-write on a
+    /// value protected by nothing but this lock must never lose an
+    /// update. Runs on a genuine multi-threaded runtime so the critical
+    /// sections actually interleave across OS threads.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn lock_serializes_concurrent_read_modify_write_on_the_same_key() {
+        let cache = Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
+        // A bare atomic, read and written non-atomically below (individual
+        // `load`/`store` calls, not a `fetch_add`) — its own type gives no
+        // mutual exclusion, so correctness here depends entirely on
+        // `Cache::lock` closing the race window between the two.
+        let counter = Arc::new(std::sync::atomic::AtomicI64::new(0));
+
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..200 {
+            let cache = cache.clone();
+            let counter = counter.clone();
+            tasks.spawn(async move {
+                let _guard = cache.lock("k").await;
+                let read = counter.load(std::sync::atomic::Ordering::Relaxed);
+                tokio::task::yield_now().await;
+                counter.store(read + 1, std::sync::atomic::Ordering::Relaxed);
+            });
+        }
+        tasks.join_all().await;
+
+        assert_eq!(counter.load(std::sync::atomic::Ordering::Relaxed), 200);
+    }
+
+    #[tokio::test]
+    async fn an_entry_older_than_the_ttl_is_treated_as_absent() {
         let cache = Cache::with_limits(16, Duration::from_millis(10));
-        cache.set_latest_version("k", 1);
+        cache.set_latest_version("k", 1).await;
         sleep(Duration::from_millis(30));
-        assert!(cache.latest_version("k").is_none());
+        assert!(cache.latest_version("k").await.is_none());
     }
 
     fn empty_configuration() -> Configuration {
@@ -253,53 +313,53 @@ mod tests {
         }
     }
 
-    #[test]
-    fn invalidate_removes_every_cached_field_for_that_key() {
+    #[tokio::test]
+    async fn invalidate_removes_every_cached_field_for_that_key() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
-        cache.set_latest_version("k", 1);
-        cache.set_config("k", empty_configuration());
+        cache.set_latest_version("k", 1).await;
+        cache.set_config("k", empty_configuration()).await;
         cache.invalidate("k");
-        assert!(cache.latest_version("k").is_none());
-        assert!(cache.config("k").is_none());
+        assert!(cache.latest_version("k").await.is_none());
+        assert!(cache.config("k").await.is_none());
     }
 
-    #[test]
-    fn different_keys_are_cached_independently() {
+    #[tokio::test]
+    async fn different_keys_are_cached_independently() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
-        cache.set_latest_version("a", 1);
-        cache.set_latest_version("b", 2);
-        assert_eq!(cache.latest_version("a"), Some(1));
-        assert_eq!(cache.latest_version("b"), Some(2));
+        cache.set_latest_version("a", 1).await;
+        cache.set_latest_version("b", 2).await;
+        assert_eq!(cache.latest_version("a").await, Some(1));
+        assert_eq!(cache.latest_version("b").await, Some(2));
     }
 
-    #[test]
-    fn inserting_past_capacity_evicts_the_least_recently_touched_key() {
+    #[tokio::test]
+    async fn inserting_past_capacity_evicts_the_least_recently_touched_key() {
         let cache = Cache::with_limits(2, Duration::from_secs(3600));
-        cache.set_latest_version("a", 1);
+        cache.set_latest_version("a", 1).await;
         sleep(Duration::from_millis(5));
-        cache.set_latest_version("b", 2);
+        cache.set_latest_version("b", 2).await;
         sleep(Duration::from_millis(5));
-        cache.set_latest_version("c", 3);
+        cache.set_latest_version("c", 3).await;
 
-        assert!(cache.latest_version("a").is_none());
-        assert_eq!(cache.latest_version("b"), Some(2));
-        assert_eq!(cache.latest_version("c"), Some(3));
+        assert!(cache.latest_version("a").await.is_none());
+        assert_eq!(cache.latest_version("b").await, Some(2));
+        assert_eq!(cache.latest_version("c").await, Some(3));
     }
 
-    #[test]
-    fn re_touching_a_key_protects_it_from_eviction() {
+    #[tokio::test]
+    async fn re_touching_a_key_protects_it_from_eviction() {
         let cache = Cache::with_limits(2, Duration::from_secs(3600));
-        cache.set_latest_version("a", 1);
+        cache.set_latest_version("a", 1).await;
         sleep(Duration::from_millis(5));
-        cache.set_latest_version("b", 2);
+        cache.set_latest_version("b", 2).await;
         sleep(Duration::from_millis(5));
         // Re-touch "a" so "b" becomes the least recently touched instead.
-        cache.set_latest_version("a", 10);
+        cache.set_latest_version("a", 10).await;
         sleep(Duration::from_millis(5));
-        cache.set_latest_version("c", 3);
+        cache.set_latest_version("c", 3).await;
 
-        assert_eq!(cache.latest_version("a"), Some(10));
-        assert!(cache.latest_version("b").is_none());
-        assert_eq!(cache.latest_version("c"), Some(3));
+        assert_eq!(cache.latest_version("a").await, Some(10));
+        assert!(cache.latest_version("b").await.is_none());
+        assert_eq!(cache.latest_version("c").await, Some(3));
     }
 }

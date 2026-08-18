@@ -51,10 +51,11 @@ async fn syncs_and_dumps_consumers_without_credential_support() {
     .unwrap();
 
     let dump = dump_configuration(&backend).await.unwrap();
-    let consumers = dump.consumers.as_ref().unwrap();
+    let mut consumers = dump.consumers.clone().unwrap();
     assert_eq!(consumers.len(), 2);
-    assert_matches_object(&serde_json::to_value(&consumers[0]).unwrap(), &consumer2);
-    assert_matches_object(&serde_json::to_value(&consumers[1]).unwrap(), &consumer1);
+    consumers.sort_by(|a, b| a.username.cmp(&b.username));
+    assert_matches_object(&serde_json::to_value(&consumers[0]).unwrap(), &consumer1);
+    assert_matches_object(&serde_json::to_value(&consumers[1]).unwrap(), &consumer2);
 
     consumer1["description"] = json!("desc");
     sync_events(
@@ -70,10 +71,13 @@ async fn syncs_and_dumps_consumers_without_credential_support() {
     .unwrap();
 
     let dump = dump_configuration(&backend).await.unwrap();
-    assert_matches_object(
-        &serde_json::to_value(&dump.consumers.unwrap()[0]).unwrap(),
-        &consumer1,
-    );
+    let updated_consumer1 = dump
+        .consumers
+        .unwrap()
+        .into_iter()
+        .find(|c| c.username == consumer1_name)
+        .expect("consumer1 missing from dump");
+    assert_matches_object(&serde_json::to_value(&updated_consumer1).unwrap(), &consumer1);
 
     sync_events(
         &backend,

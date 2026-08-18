@@ -314,3 +314,24 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
         plugin_metadata: (!plugin_metadata.is_empty()).then_some(plugin_metadata),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `server_port` is `u16` at the wire level too (not a wider int
+    /// narrowed later): a port outside 0-65535 is never a real port, so a
+    /// document containing one is rejected right at deserialization
+    /// instead of being silently dropped downstream.
+    #[test]
+    fn an_out_of_range_wire_port_is_rejected_at_deserialization() {
+        let json = serde_json::json!({
+            "modifiedIndex": 1,
+            "id": "sr1",
+            "name": "sr1",
+            "service_id": "svc1",
+            "server_port": 70_000,
+        });
+        assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
+    }
+}

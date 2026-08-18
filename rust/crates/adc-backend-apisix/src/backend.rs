@@ -12,18 +12,23 @@ use crate::fetcher::Fetcher;
 use crate::operator::Operator;
 use crate::validator::Validator;
 
+/// Shared by `ping` and `resolved_version` — neither needs the response body.
+const PROBE_PATH: &str = "/apisix/admin/routes?page=1&page_size=1";
+
 pub struct Backend {
     client: HttpClient,
     filter: ResourceFilter,
     version: OnceCell<Version>,
+    fetch_concurrency: usize,
 }
 
 impl Backend {
-    pub fn new(client: HttpClient, filter: ResourceFilter) -> Self {
+    pub fn new(client: HttpClient, filter: ResourceFilter, fetch_concurrency: usize) -> Self {
         Self {
             client: client.with_log_scope(vec!["APISIX".to_string()]),
             filter,
             version: OnceCell::new(),
+            fetch_concurrency,
         }
     }
 
@@ -38,7 +43,7 @@ impl Backend {
         let version = self
             .version
             .get_or_try_init(|| async {
-                let request = self.client.request(Method::GET, "/apisix/admin/routes")?;
+                let request = self.client.request(Method::GET, PROBE_PATH)?;
                 let response = self.client.send(request).await?;
 
                 let header = response
@@ -65,14 +70,7 @@ impl adc_sdk::Backend for Backend {
     }
 
     async fn ping(&self) -> Result<(), BackendError> {
-        // Bounds the response to a handful of routes rather than the
-        // server's entire route table — a lighter probe on route-heavy
-        // deployments. Unrecognized query params are ignored by APISIX
-        // versions that predate pagination support, so this is safe across
-        // the whole supported version range.
-        let request = self
-            .client
-            .request(Method::GET, "/apisix/admin/routes?page=1&page_size=10")?;
+        let request = self.client.request(Method::GET, PROBE_PATH)?;
         self.client.send(request).await?;
         Ok(())
     }
@@ -87,9 +85,14 @@ impl adc_sdk::Backend for Backend {
 
     async fn dump(&self) -> Result<Configuration, BackendError> {
         let version = self.resolved_version().await?;
-        Fetcher::new(self.client.clone(), version, self.filter.clone())
-            .dump()
-            .await
+        Fetcher::new(
+            self.client.clone(),
+            version,
+            self.filter.clone(),
+            self.fetch_concurrency,
+        )
+        .dump()
+        .await
     }
 
     async fn sync(
@@ -104,6 +107,7 @@ impl adc_sdk::Backend for Backend {
     }
 
     async fn validate(&self, events: &[Event]) -> Result<BackendValidateResult, BackendError> {
-        Validator::new(self.client.clone()).validate(events).await
+        let version = self.resolved_version().await?;
+        Validator::new(self.client.clone(), version).validate(events).await
     }
 }

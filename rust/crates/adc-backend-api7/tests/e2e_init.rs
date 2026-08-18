@@ -21,6 +21,15 @@ mod common;
 #[tokio::test]
 #[ignore]
 async fn bootstrap_shared_token() {
+    // `TOKEN` already set means this ran once already this job (CI's own
+    // package-wide `cargo test -p adc-backend-api7 -- --ignored` picks up
+    // this file too, alongside the dedicated bootstrap step that runs it
+    // first) — skip re-appending to `$GITHUB_ENV` so "exactly once" holds
+    // regardless of how many times this binary happens to run.
+    if std::env::var("TOKEN").is_ok() {
+        return;
+    }
+
     let token = common::token().await;
 
     let Ok(github_env) = std::env::var("GITHUB_ENV") else {

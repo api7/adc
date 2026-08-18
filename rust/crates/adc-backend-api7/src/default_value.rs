@@ -15,6 +15,19 @@ use serde_json::{Map, Value, json};
 
 use crate::typing;
 
+/// JSON Schema keyword names this module reads/writes by key, kept as
+/// constants so a typo shows up at compile time (an unrecognized string
+/// literal would otherwise just silently never match).
+const KEY_TYPE: &str = "type";
+const KEY_PROPERTIES: &str = "properties";
+const KEY_ITEMS: &str = "items";
+const KEY_DEFAULT: &str = "default";
+const KEY_ALL_OF: &str = "allOf";
+/// The `type` keyword's value for an object schema, not a key itself —
+/// grouped with the `KEY_*` constants above since it's compared against
+/// `KEY_TYPE`'s value everywhere this module cares about it.
+const TYPE_OBJECT: &str = "object";
+
 pub async fn fetch(client: &HttpClient) -> Result<DefaultValue, BackendError> {
     let request = client.request(Method::GET, "/api/schema/core")?;
     let body: typing::ValueResponse<Map<String, Value>> = client.send_json(request).await?;
@@ -26,7 +39,7 @@ pub async fn fetch(client: &HttpClient) -> Result<DefaultValue, BackendError> {
         let Some(resource_type) = resource_type_from_str(&type_name) else {
             continue;
         };
-        let merged = match schema_entry.get("allOf").and_then(Value::as_array) {
+        let merged = match schema_entry.get(KEY_ALL_OF).and_then(Value::as_array) {
             Some(all_of) => merge_all_of(all_of.clone()),
             None => schema_entry,
         };
@@ -58,7 +71,7 @@ fn patch_missing_upstream_schema(schema: &mut Map<String, Value>) {
         return;
     };
     if let Value::Object(map) = &mut upstream {
-        map.insert("type".to_string(), Value::String("object".to_string()));
+        map.insert(KEY_TYPE.to_string(), Value::String(TYPE_OBJECT.to_string()));
     }
     schema.insert("upstream".to_string(), upstream);
 }
@@ -67,34 +80,35 @@ fn patch_missing_upstream_schema(schema: &mut Map<String, Value>) {
 /// only `properties` are merged, not other JSON Schema keywords. A
 /// composition with no `object`-typed member at all merges to an empty
 /// object rather than attempting to merge non-object schemas.
-fn merge_all_of(mut items: Vec<Value>) -> Value {
+///
+/// Builds the result from a fresh object rather than mutating whichever
+/// member happens to come first: nothing downstream reads any keyword but
+/// `type`/`properties`, so there's no reason to carry a member's other
+/// fields (`required`, `additionalProperties`, ...) into the result, and no
+/// need to hunt for "the" object-typed member to use as a base — every
+/// member's `properties` gets merged in regardless of position, and `type`
+/// is set once we already know at least one member declared it as `object`.
+fn merge_all_of(items: Vec<Value>) -> Value {
     if items.len() < 2 {
-        return items.pop().unwrap_or(Value::Null);
+        return items.into_iter().next().unwrap_or(Value::Null);
     }
     if !items
         .iter()
-        .any(|item| item.get("type").and_then(Value::as_str) == Some("object"))
+        .any(|item| item.get(KEY_TYPE).and_then(Value::as_str) == Some(TYPE_OBJECT))
     {
         return json!({});
     }
 
-    let mut iter = items.into_iter();
-    let Some(Value::Object(mut first)) = iter.next() else {
-        return json!({});
-    };
-    if !matches!(first.get("properties"), Some(Value::Object(_))) {
-        first.insert("properties".to_string(), json!({}));
+    let mut properties = Map::new();
+    for item in &items {
+        if let Some(Value::Object(props)) = item.get(KEY_PROPERTIES) {
+            properties.extend(props.clone());
+        }
     }
-    for item in iter {
-        let Some(Value::Object(props)) = item.get("properties").cloned() else {
-            continue;
-        };
-        let Some(Value::Object(merged_properties)) = first.get_mut("properties") else {
-            unreachable!("just ensured `properties` is an object above");
-        };
-        merged_properties.extend(props);
-    }
-    Value::Object(first)
+    let mut merged = Map::new();
+    merged.insert(KEY_TYPE.to_string(), Value::String(TYPE_OBJECT.to_string()));
+    merged.insert(KEY_PROPERTIES.to_string(), Value::Object(properties));
+    Value::Object(merged)
 }
 
 /// Recursively walks a JSON Schema object's `properties`, extracting each
@@ -111,31 +125,31 @@ fn merge_all_of(mut items: Vec<Value>) -> Value {
 /// A field with nothing to contribute (no `default`, and neither case 1
 /// nor 2 applies) is absent from the result, not `null`.
 fn extract_object_default(schema: &Value) -> Option<Value> {
-    if schema.get("type").and_then(Value::as_str) != Some("object") {
+    if schema.get(KEY_TYPE).and_then(Value::as_str) != Some(TYPE_OBJECT) {
         return None;
     }
-    let properties = schema.get("properties")?.as_object()?;
+    let properties = schema.get(KEY_PROPERTIES)?.as_object()?;
 
     let mut defaults = Map::new();
     for (key, field) in properties {
-        let field_type = field.get("type").and_then(Value::as_str);
+        let field_type = field.get(KEY_TYPE).and_then(Value::as_str);
         let is_object_array_item = field_type == Some("array")
-            && !matches!(field.get("items"), Some(Value::Array(_)))
+            && !matches!(field.get(KEY_ITEMS), Some(Value::Array(_)))
             && field
-                .get("items")
-                .and_then(|items| items.get("type"))
+                .get(KEY_ITEMS)
+                .and_then(|items| items.get(KEY_TYPE))
                 .and_then(Value::as_str)
-                == Some("object");
+                == Some(TYPE_OBJECT);
 
-        let value = if field_type == Some("object") {
+        let value = if field_type == Some(TYPE_OBJECT) {
             extract_object_default(field)
         } else if is_object_array_item {
             field
-                .get("items")
+                .get(KEY_ITEMS)
                 .and_then(extract_object_default)
                 .map(|item_default| Value::Array(vec![item_default]))
         } else {
-            field.get("default").cloned()
+            field.get(KEY_DEFAULT).cloned()
         };
 
         if let Some(value) = value {
@@ -176,7 +190,7 @@ struct LenientUpstreamNode {
     #[serde(default)]
     host: String,
     #[serde(default)]
-    port: u32,
+    port: u16,
     #[serde(default)]
     weight: i64,
     #[serde(default)]
@@ -384,6 +398,20 @@ mod tests {
         let merged = merge_all_of(items);
         assert_eq!(merged["properties"]["a"], json!({ "default": 2 }));
         assert_eq!(merged["properties"]["b"], json!({ "default": 3 }));
+    }
+
+    #[test]
+    fn merges_all_of_when_the_object_typed_member_is_not_first() {
+        // The `type: object` member is second, not first — merging must not
+        // depend on which member happens to come first in the array.
+        let items = vec![
+            json!({ "properties": { "a": { "default": 1 } } }),
+            json!({ "type": "object", "properties": { "b": { "default": 2 } } }),
+        ];
+        let merged = merge_all_of(items);
+        assert_eq!(merged["type"], json!("object"));
+        assert_eq!(merged["properties"]["a"], json!({ "default": 1 }));
+        assert_eq!(merged["properties"]["b"], json!({ "default": 2 }));
     }
 
     #[test]

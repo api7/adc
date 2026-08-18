@@ -283,7 +283,7 @@ impl From<typing::StreamRoute> for adc::StreamRoute {
             plugins: route.plugins,
             remote_addr: route.remote_addr,
             server_addr: route.server_addr,
-            server_port: route.server_port.map(|port| port as u32),
+            server_port: route.server_port,
             sni: None,
         }
     }
@@ -326,7 +326,7 @@ pub fn transform_stream_route(route: adc::StreamRoute, parent_id: String) -> typ
         plugins: route.plugins,
 
         server_addr: route.server_addr,
-        server_port: route.server_port.map(i64::from),
+        server_port: route.server_port,
         remote_addr: route.remote_addr,
     }
 }
@@ -511,5 +511,15 @@ mod tests {
         let route = adc::StreamRoute::from(wire);
 
         assert_eq!(route.plugins, Some(ip_restriction_plugins()));
+    }
+
+    /// `server_port` is `u16` at the wire level too (not a wider int
+    /// narrowed later): a port outside 0-65535 is never a real port, so a
+    /// server response containing one is rejected right at deserialization
+    /// instead of being silently dropped downstream.
+    #[test]
+    fn an_out_of_range_wire_port_is_rejected_at_deserialization() {
+        let json = serde_json::json!({ "server_port": 70_000 });
+        assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
     }
 }

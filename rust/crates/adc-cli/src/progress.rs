@@ -39,6 +39,12 @@ pub fn spinner_style() -> ProgressStyle {
     colored_spinner_style("\u{1b}[32m", '\u{2713}')
 }
 
+/// `stage`'s style when the future resolved to `Err` — red `✗` instead of
+/// the usual green `✓`, so a failed stage doesn't render as if it succeeded.
+fn error_spinner_style() -> ProgressStyle {
+    colored_spinner_style("\u{1b}[31m", '\u{2717}')
+}
+
 /// `info`'s style: blue `ℹ` on finish.
 fn info_style() -> ProgressStyle {
     colored_spinner_style("\u{1b}[34m", '\u{2139}')
@@ -60,9 +66,9 @@ pub fn interactive() -> bool {
     std::io::stderr().is_terminal() && VERBOSE.load(Ordering::Relaxed) < 2
 }
 
-pub async fn stage<F, T>(message: &str, fut: F) -> T
+pub async fn stage<F, T, E>(message: &str, fut: F) -> Result<T, E>
 where
-    F: Future<Output = T>,
+    F: Future<Output = Result<T, E>>,
 {
     if VERBOSE.load(Ordering::Relaxed) == 0 {
         return fut.await;
@@ -73,11 +79,22 @@ where
         span.pb_set_style(&spinner_style());
         span.pb_set_message(message);
         span.pb_set_finish_message(message);
-        fut.instrument(span).await
+        // `span` (not just its clone below) has to outlive the await: the
+        // finish render only fires once every clone of the span is gone, so
+        // restyling on `Err` has to happen while this one is still alive,
+        // before it's dropped at the end of this block.
+        let result = fut.instrument(span.clone()).await;
+        if result.is_err() {
+            span.pb_set_style(&error_spinner_style());
+        }
+        result
     } else {
         print_line('\u{25b6}', "start", message);
         let result = fut.await;
-        print_line('\u{2714}', "success", message);
+        match &result {
+            Ok(_) => print_line('\u{2714}', "success", message),
+            Err(_) => print_line('\u{2717}', "failed", message),
+        }
         result
     }
 }
@@ -253,5 +270,24 @@ mod tests {
             compact_duration(std::time::Duration::from_secs(3600 * 3 + 60 * 2 + 5)),
             "3h02m"
         );
+    }
+
+    #[test]
+    fn error_spinner_style_ends_on_a_red_x() {
+        let final_frame = error_spinner_style().get_final_tick_str().to_string();
+        assert!(final_frame.contains('\u{2717}'), "{final_frame:?} should contain an x");
+        assert!(final_frame.contains("\u{1b}[31m"), "{final_frame:?} should be red");
+    }
+
+    #[tokio::test]
+    async fn stage_passes_through_an_ok_result() {
+        let result: Result<i32, &str> = stage("t", async { Ok(42) }).await;
+        assert_eq!(result, Ok(42));
+    }
+
+    #[tokio::test]
+    async fn stage_passes_through_an_err_result_instead_of_swallowing_it() {
+        let result: Result<i32, &str> = stage("t", async { Err("boom") }).await;
+        assert_eq!(result, Err("boom"));
     }
 }

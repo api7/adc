@@ -139,11 +139,11 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
     .await?;
 
     let opts = BackendSyncOptions {
-        concurrent: Some(args.request_concurrent),
+        concurrent: Some(args.backend.request_concurrent),
         exit_on_failure: Some(true),
     };
 
-    if progress::interactive() {
+    if progress::interactive() && progress::verbose() > 0 {
         logging::sync_slots::start(events.len() as u64);
     } else if progress::verbose() == 1 {
         logging::sync_report::start(events.len() as u64);

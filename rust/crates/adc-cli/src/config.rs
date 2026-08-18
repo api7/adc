@@ -121,7 +121,8 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
                 };
                 let seen = seen_keys.entry(array_key).or_default();
                 for item in items {
-                    let name = resource_key(array_key, &item);
+                    let name = resource_key(array_key, &item)
+                        .map_err(|e| CliError::msg(format!("{}: {e}", path.display())))?;
                     if !seen.insert(name.clone()) {
                         return Err(CliError::msg(format!(
                             "{}: duplicate {} \"{name}\"",
@@ -166,27 +167,33 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
     Ok(Value::Object(merged))
 }
 
-fn resource_key(array_key: &str, item: &Value) -> String {
+/// The field this resource is deduplicated by — missing, wrong-typed, or
+/// empty is rejected outright rather than defaulting to `""`, which would
+/// make two differently-broken resources look like a legitimate duplicate
+/// of each other instead of surfacing the real problem (a missing field).
+fn resource_key(array_key: &'static str, item: &Value) -> Result<String, String> {
     match array_key {
-        "ssls" => item
-            .get("snis")
-            .and_then(Value::as_array)
-            .map(|snis| {
-                let mut snis: Vec<&str> = snis.iter().filter_map(Value::as_str).collect();
-                snis.sort_unstable();
-                snis.join(",")
-            })
-            .unwrap_or_default(),
-        "consumers" => item
-            .get("username")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
-        _ => item
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
+        "ssls" => {
+            let snis = item.get("snis").and_then(Value::as_array).ok_or("ssl is missing a \"snis\" array")?;
+            let mut snis: Vec<&str> = snis
+                .iter()
+                .map(|v| v.as_str().ok_or("ssl \"snis\" must be an array of strings"))
+                .collect::<Result<_, _>>()?;
+            if snis.is_empty() {
+                return Err("ssl \"snis\" must not be empty".to_string());
+            }
+            snis.sort_unstable();
+            Ok(snis.join(","))
+        }
+        "consumers" => required_field(item, "username", "consumer"),
+        _ => required_field(item, "name", singular(array_key)),
+    }
+}
+
+fn required_field(item: &Value, field: &str, resource: &str) -> Result<String, String> {
+    match item.get(field).and_then(Value::as_str) {
+        Some(value) if !value.is_empty() => Ok(value.to_string()),
+        _ => Err(format!("{resource} is missing a non-empty \"{field}\" field")),
     }
 }
 
@@ -196,6 +203,7 @@ fn singular(array_key: &'static str) -> &'static str {
         "ssls" => "ssl",
         "consumers" => "consumer",
         "consumer_groups" => "consumer_group",
+        "global_rules" => "global_rule",
         _ => array_key,
     }
 }
@@ -604,6 +612,74 @@ mod tests {
             filter_by_labels(&mut config, &HashMap::from([("env".to_string(), "prod".to_string())]));
             let names: Vec<&str> = config.services.as_ref().unwrap().iter().map(|s| s.name.as_str()).collect();
             assert_eq!(names, vec!["matches"]);
+        }
+    }
+
+    mod merge_files_tests {
+        use super::*;
+
+        fn file(value: Value) -> Vec<(PathBuf, Value)> {
+            vec![(PathBuf::from("a.yaml"), value)]
+        }
+
+        #[test]
+        fn a_service_with_no_name_field_is_rejected_outright() {
+            let err = merge_files(file(json!({"services": [{}]}))).unwrap_err();
+            assert!(err.to_string().contains("name"), "{err}");
+        }
+
+        #[test]
+        fn a_service_with_an_empty_name_is_rejected() {
+            let err = merge_files(file(json!({"services": [{"name": ""}]}))).unwrap_err();
+            assert!(err.to_string().contains("name"), "{err}");
+        }
+
+        #[test]
+        fn a_consumer_with_no_username_field_is_rejected_outright() {
+            let err = merge_files(file(json!({"consumers": [{}]}))).unwrap_err();
+            assert!(err.to_string().contains("username"), "{err}");
+        }
+
+        #[test]
+        fn an_ssl_with_no_snis_field_is_rejected_outright() {
+            let err = merge_files(file(json!({"ssls": [{}]}))).unwrap_err();
+            assert!(err.to_string().contains("snis"), "{err}");
+        }
+
+        #[test]
+        fn an_ssl_with_an_empty_snis_array_is_rejected() {
+            let err = merge_files(file(json!({"ssls": [{"snis": []}]}))).unwrap_err();
+            assert!(err.to_string().contains("snis"), "{err}");
+        }
+
+        /// Two services both missing `name` used to collide into one silent
+        /// `""` key and get reported as a duplicate, hiding the real
+        /// problem — this pins down that the first one now fails outright
+        /// with a message about the missing field instead.
+        #[test]
+        fn two_services_both_missing_a_name_report_the_missing_field_not_a_false_duplicate() {
+            let err = merge_files(file(json!({"services": [{}, {}]}))).unwrap_err();
+            let message = err.to_string();
+            assert!(message.contains("name"), "{message}");
+            assert!(!message.contains("duplicate"), "{message}: a missing field isn't a duplicate");
+        }
+
+        #[test]
+        fn two_services_with_the_same_real_name_are_still_reported_as_a_duplicate() {
+            let err = merge_files(file(json!({"services": [{"name": "svc"}, {"name": "svc"}]}))).unwrap_err();
+            assert!(err.to_string().contains("duplicate"), "{err}");
+        }
+
+        #[test]
+        fn a_duplicate_global_rule_is_reported_with_the_singular_word() {
+            // Two files, not one object with a duplicate key (JSON objects
+            // can't have duplicate keys) — needs a second file to collide.
+            let files = vec![
+                (PathBuf::from("a.yaml"), json!({"global_rules": {"gr1": {}}})),
+                (PathBuf::from("b.yaml"), json!({"global_rules": {"gr1": {}}})),
+            ];
+            let err = merge_files(files).unwrap_err();
+            assert!(err.to_string().contains("duplicate global_rule "), "{err}");
         }
     }
 }

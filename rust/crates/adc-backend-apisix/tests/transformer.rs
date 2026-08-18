@@ -157,12 +157,11 @@ fn upstream_discovery_map_nodes_parse_host_and_port() {
 }
 
 #[test]
-fn upstream_discovery_map_nodes_without_a_port_fall_back_to_scheme_default() {
+fn upstream_discovery_map_nodes_without_a_port_is_rejected() {
     let mut upstream = upstream();
-    upstream.scheme = Some(adc::UpstreamScheme::Https);
     upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("10.0.0.1".to_string(), 1)])));
-    let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
-    assert_eq!(adc_upstream.nodes.unwrap()[0].port, 443);
+    let result: Result<adc::Upstream, String> = upstream.try_into();
+    assert!(result.is_err());
 }
 
 #[test]
@@ -178,14 +177,11 @@ fn upstream_discovery_map_nodes_parse_bracketed_ipv6_host_and_port() {
 }
 
 #[test]
-fn upstream_discovery_map_nodes_bracketed_ipv6_without_a_port_fall_back_to_scheme_default() {
+fn upstream_discovery_map_nodes_bracketed_ipv6_without_a_port_is_rejected() {
     let mut upstream = upstream();
-    upstream.scheme = Some(adc::UpstreamScheme::Https);
     upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("[::1]".to_string(), 1)])));
-    let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
-    let nodes = adc_upstream.nodes.unwrap();
-    assert_eq!(nodes[0].host, "::1");
-    assert_eq!(nodes[0].port, 443);
+    let result: Result<adc::Upstream, String> = upstream.try_into();
+    assert!(result.is_err());
 }
 
 #[test]

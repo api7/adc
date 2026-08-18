@@ -21,7 +21,11 @@ pub async fn init_backend(args: &BackendArgs) -> Result<Box<dyn Backend>, CliErr
     match args.backend {
         BackendKind::Apisix => {
             let (client, _token) = build_client(args).await?;
-            Ok(Box::new(adc_backend_apisix::Backend::new(client, filter)))
+            Ok(Box::new(adc_backend_apisix::Backend::new(
+                client,
+                filter,
+                args.request_concurrent,
+            )))
         }
         BackendKind::Api7Ee => {
             let (client, token) = build_client(args).await?;
@@ -30,6 +34,7 @@ pub async fn init_backend(args: &BackendArgs) -> Result<Box<dyn Backend>, CliErr
                 args.gateway_group.clone(),
                 &token,
                 filter,
+                args.request_concurrent,
             )))
         }
         BackendKind::ApisixStandalone => Err(CliError::msg(format!(
@@ -72,17 +77,55 @@ async fn read_optional(path: &Option<PathBuf>) -> Result<Option<Vec<u8>>, CliErr
     }
 }
 
+/// Resource types nested under a service/consumer rather than a top-level
+/// `Configuration` field — `config::filter_resource_types` only ever drops
+/// or keeps whole top-level fields, so naming one of these here has no
+/// effect at all (see the CLI's own doc comment on the two flags below).
+const UNFILTERABLE_RESOURCE_TYPES: &[(&str, ResourceType)] = &[
+    ("route", ResourceType::Route),
+    ("upstream", ResourceType::Upstream),
+    ("stream_route", ResourceType::StreamRoute),
+    ("consumer_credential", ResourceType::ConsumerCredential),
+    ("plugin_config", ResourceType::PluginConfig),
+];
+
+fn warn_on_unfilterable_resource_types(flag: &str, set: &HashSet<ResourceType>) {
+    let named: Vec<&str> = UNFILTERABLE_RESOURCE_TYPES
+        .iter()
+        .filter(|(_, rt)| set.contains(rt))
+        .map(|(name, _)| *name)
+        .collect();
+    if !named.is_empty() {
+        tracing::warn!(
+            "{flag} does not support {}: these are nested under a service or consumer, not a \
+             top-level resource, so filtering by them has no effect. Support for naming them here \
+             will be removed in a future release.",
+            named.join(", ")
+        );
+    }
+}
+
 pub fn resource_type_sets(args: &BackendArgs) -> (HashSet<ResourceType>, HashSet<ResourceType>) {
-    let include = args
+    let mut include: HashSet<ResourceType> = args
         .include_resource_type
         .iter()
         .map(|t| (*t).into())
         .collect();
-    let exclude = args
+    let mut exclude: HashSet<ResourceType> = args
         .exclude_resource_type
         .iter()
         .map(|t| (*t).into())
         .collect();
+    warn_on_unfilterable_resource_types("--include-resource-type", &include);
+    warn_on_unfilterable_resource_types("--exclude-resource-type", &exclude);
+    // Stripped here, after warning above, so "has no effect" is actually
+    // true downstream: `ResourceFilter::is_skip`/`config::filter_resource_types`
+    // only ever check top-level types, so a nested one left in `include`
+    // would make every real top-level type look excluded instead of doing
+    // nothing.
+    let is_unfilterable = |rt: &ResourceType| UNFILTERABLE_RESOURCE_TYPES.iter().any(|(_, unfilterable)| unfilterable == rt);
+    include.retain(|rt| !is_unfilterable(rt));
+    exclude.retain(|rt| !is_unfilterable(rt));
     (include, exclude)
 }
 
@@ -134,9 +177,12 @@ fn resource_filter(args: &BackendArgs) -> Result<ResourceFilter, CliError> {
 
 /// Loads, merges, and structurally parses the local configuration file(s).
 /// Deserializing into `Configuration` here is the structural-validity gate
-/// (unknown fields, wrong types, missing required fields all reject) — the
-/// separate `--no-lint`/`Lint` step has nothing left to check yet, since
-/// semantic validation (regex/cross-field rules) hasn't landed (stage 2.2).
+/// (unknown fields, wrong types, missing required fields all reject —
+/// except inside a plugin config body: `Plugin`/`Plugins` are bare maps,
+/// deliberately not `deny_unknown_fields`, since ADC can't know every
+/// plugin's own schema) — the separate `--no-lint`/`Lint` step has nothing
+/// left to check yet, since semantic validation (regex/cross-field rules)
+/// hasn't landed (stage 2.2).
 pub async fn load_local(
     files: &[PathBuf],
     include: &HashSet<ResourceType>,
@@ -248,7 +294,7 @@ fn to_diff_map(configuration: &Configuration) -> Result<InternalConfiguration, C
 mod tests {
     use std::time::Duration;
 
-    use crate::cli::BackendKind;
+    use crate::cli::{BackendKind, ResourceTypeArg};
 
     use super::*;
 
@@ -324,6 +370,7 @@ mod tests {
             include_resource_type: vec![],
             exclude_resource_type: vec![],
             timeout: Duration::from_secs(10),
+            request_concurrent: 10,
             ca_cert_file: None,
             tls_client_cert_file: None,
             tls_client_key_file: None,
@@ -347,5 +394,58 @@ mod tests {
         // rejected outright instead.
         let args = backend_args(vec!["managed-by=custom".to_string()]);
         assert!(label_selector_map(&args).is_err());
+    }
+
+    #[derive(Clone, Default)]
+    struct SharedBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl std::io::Write for SharedBuffer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn captured_warning(set: &HashSet<ResourceType>) -> String {
+        let buffer = SharedBuffer::default();
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt().with_writer(move || writer.clone()).finish();
+        tracing::subscriber::with_default(subscriber, || {
+            warn_on_unfilterable_resource_types("--include-resource-type", set);
+        });
+        String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap()
+    }
+
+    #[test]
+    fn warns_when_a_nested_resource_type_is_named() {
+        let output = captured_warning(&HashSet::from([ResourceType::Route, ResourceType::Service]));
+        assert!(output.contains("route"), "{output}");
+        assert!(output.contains("--include-resource-type"), "{output}");
+    }
+
+    #[test]
+    fn no_warning_when_only_top_level_types_are_named() {
+        let output = captured_warning(&HashSet::from([ResourceType::Service, ResourceType::Consumer]));
+        assert!(output.is_empty(), "{output}");
+    }
+
+    #[test]
+    fn resource_type_sets_strips_unfilterable_types_but_keeps_real_ones() {
+        let mut args = backend_args(vec![]);
+        args.include_resource_type = vec![ResourceTypeArg::Route, ResourceTypeArg::Service];
+        let (include, exclude) = resource_type_sets(&args);
+        assert_eq!(include, HashSet::from([ResourceType::Service]));
+        assert!(exclude.is_empty());
+    }
+
+    #[test]
+    fn resource_type_sets_with_only_unfilterable_types_ends_up_empty() {
+        let mut args = backend_args(vec![]);
+        args.include_resource_type = vec![ResourceTypeArg::Route, ResourceTypeArg::Upstream];
+        let (include, _) = resource_type_sets(&args);
+        assert!(include.is_empty(), "an include set with nothing but unfilterable types must behave like no --include-resource-type was passed at all");
     }
 }

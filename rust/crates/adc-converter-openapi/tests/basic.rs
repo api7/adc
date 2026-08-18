@@ -46,7 +46,7 @@ fn case_1_single_path() {
     let upstream = svc.upstream.as_ref().unwrap();
     assert_eq!(upstream.nodes.as_ref().unwrap().len(), 1);
     assert_eq!(upstream.nodes.as_ref().unwrap()[0].host, "httpbin.org");
-    assert_eq!(upstream.nodes.as_ref().unwrap()[0].port, 443u32);
+    assert_eq!(upstream.nodes.as_ref().unwrap()[0].port, 443u16);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn case_3_multiple_servers() {
     let config = convert("basic-3.yaml");
     let svc = service(&config, "httpbin.org");
     let nodes = svc.upstream.as_ref().unwrap().nodes.as_ref().unwrap();
-    let hosts_ports: Vec<(&str, u32)> = nodes.iter().map(|n| (n.host.as_str(), n.port)).collect();
+    let hosts_ports: Vec<(&str, u16)> = nodes.iter().map(|n| (n.host.as_str(), n.port)).collect();
     // The 5th server's path (httpbin.us/{test}) is dropped: only the
     // *first* server's path can become the service's `path_prefix`.
     assert_eq!(

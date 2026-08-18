@@ -22,7 +22,7 @@ pub fn client() -> HttpClient {
 }
 
 pub fn backend() -> ApisixBackend {
-    ApisixBackend::new(client(), adc_backend_core::ResourceFilter::default())
+    ApisixBackend::new(client(), adc_backend_core::ResourceFilter::default(), 10)
 }
 
 /// The CI matrix runs this suite against every supported APISIX release

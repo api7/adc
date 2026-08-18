@@ -95,8 +95,16 @@ pub fn init(verbose: u8) {
                 .without_time()
                 .with_ansi(interactive)
                 .with_filter(
-                    EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| EnvFilter::new(log_filter)),
+                    // `--verbose 0` is an absolute "silence everything"
+                    // promise (see this module's own doc comment), not a
+                    // default `RUST_LOG` can override — an unrelated
+                    // `RUST_LOG` left in the environment (or loaded from a
+                    // stray `.env`) must not un-silence it.
+                    if verbose == 0 {
+                        EnvFilter::new(log_filter)
+                    } else {
+                        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_filter))
+                    },
                 ),
         )
         .with(sync_debug_layer)

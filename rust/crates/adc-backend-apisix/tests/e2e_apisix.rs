@@ -32,6 +32,7 @@ fn fetcher() -> Fetcher {
         client(),
         apisix_version(),
         adc_backend_core::ResourceFilter::default(),
+        10,
     )
 }
 

@@ -39,6 +39,7 @@ async fn ping_fails_against_an_unreachable_server() {
         common::gateway_group(),
         "",
         adc_backend_core::ResourceFilter::default(),
+        10,
     );
 
     let error = backend.ping().await.unwrap_err();
@@ -66,6 +67,7 @@ async fn ping_fails_against_a_self_signed_certificate_without_skip_verify() {
         common::gateway_group(),
         &common::token().await,
         adc_backend_core::ResourceFilter::default(),
+        10,
     );
 
     let error = backend.ping().await.unwrap_err();

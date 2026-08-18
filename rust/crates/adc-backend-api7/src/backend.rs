@@ -21,6 +21,7 @@ pub struct Backend {
     filter: ResourceFilter,
     version: OnceCell<Version>,
     default_value: OnceCell<DefaultValue>,
+    fetch_concurrency: usize,
 }
 
 impl Backend {
@@ -29,6 +30,7 @@ impl Backend {
         gateway_group_name: String,
         token: &str,
         filter: ResourceFilter,
+        fetch_concurrency: usize,
     ) -> Self {
         let client = client.with_log_scope(vec!["API7".to_string()]);
         let gateway_group = GatewayGroupResolver::new(client.clone(), gateway_group_name, token);
@@ -38,6 +40,7 @@ impl Backend {
             filter,
             version: OnceCell::new(),
             default_value: OnceCell::new(),
+            fetch_concurrency,
         }
     }
 
@@ -101,6 +104,7 @@ impl adc_sdk::Backend for Backend {
             version,
             gateway_group_id,
             self.filter.clone(),
+            self.fetch_concurrency,
         )
         .dump()
         .await

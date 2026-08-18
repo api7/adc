@@ -34,6 +34,7 @@ use std::collections::HashMap;
 
 use adc_sdk::resources::{self as adc, LabelValue};
 use serde_json::Value;
+use url::{Host, Url};
 
 use crate::typing;
 
@@ -123,59 +124,22 @@ impl TryFrom<typing::Service> for adc::Service {
     }
 }
 
-fn default_upstream_port(scheme: Option<adc::UpstreamScheme>) -> u32 {
-    match scheme {
-        Some(adc::UpstreamScheme::Http) | Some(adc::UpstreamScheme::Grpc) => 80,
-        Some(adc::UpstreamScheme::Https) | Some(adc::UpstreamScheme::Grpcs) => 443,
-        _ => 80,
-    }
-}
-
 /// Parses APISIX's legacy `"host:port": weight` node map into ADC's node
-/// list. The TS transformer's own naive `host.split(':')` mishandles any
-/// host with more than one colon, including a *bracketed* IPv6 address
-/// (`"[::1]:9000"`) — unlike TS, that specific case is recognized and
-/// parsed correctly here (see the `strip_prefix('[')` branch below). A
-/// bare, bracket-less IPv6 host is inherently ambiguous with a
-/// `host:port` pair and still falls through to the "no port" branch.
-fn parse_discovery_map_nodes(
-    map: HashMap<String, i64>,
-    scheme: Option<adc::UpstreamScheme>,
-) -> Result<Vec<adc::UpstreamNode>, String> {
+/// list, via `url`'s authority parser (a throwaway scheme makes a bare
+/// `host:port` parse as one) — reliably distinguishes a bracketed IPv6 host
+/// (`"[::1]:9000"`) from a plain `host:port` pair, which naive
+/// colon-splitting (still what the TS transformer does) can't.
+fn parse_discovery_map_nodes(map: HashMap<String, i64>) -> Result<Vec<adc::UpstreamNode>, String> {
     map.into_iter()
         .map(|(node, weight)| {
-            let (host, port) = if let Some(rest) = node.strip_prefix('[') {
-                // Bracketed IPv6, e.g. "[::1]:9000" or "[::1]" — the host
-                // itself contains colons, so unlike an IPv4/hostname:port
-                // pair it can't be split on ':' directly.
-                let (host, after_bracket) = rest
-                    .split_once(']')
-                    .ok_or_else(|| format!("unterminated \"[\" in upstream node {node:?}"))?;
-                let port = match after_bracket.strip_prefix(':') {
-                    Some(port) => port
-                        .parse::<u32>()
-                        .map_err(|_| format!("invalid upstream node port in {node:?}"))?,
-                    None => default_upstream_port(scheme),
-                };
-                (host.to_string(), port)
-            } else {
-                let parts: Vec<&str> = node.split(':').collect();
-                if parts.len() == 2 {
-                    let port = parts[1]
-                        .parse::<u32>()
-                        .map_err(|_| format!("invalid upstream node port in {node:?}"))?;
-                    (parts[0].to_string(), port)
-                } else {
-                    (parts[0].to_string(), default_upstream_port(scheme))
-                }
+            let url = Url::parse(&format!("adc://{node}")).map_err(|_| format!("invalid upstream node {node:?}"))?;
+            let host = match url.host().ok_or_else(|| format!("upstream node {node:?} has no host"))? {
+                Host::Domain(host) => host.to_string(),
+                Host::Ipv4(ip) => ip.to_string(),
+                Host::Ipv6(ip) => ip.to_string(),
             };
-            Ok(adc::UpstreamNode {
-                host,
-                port,
-                weight,
-                priority: 0,
-                metadata: None,
-            })
+            let port = url.port().ok_or_else(|| format!("upstream node {node:?} has no port"))?;
+            Ok(adc::UpstreamNode { host, port, weight, priority: 0, metadata: None })
         })
         .collect()
 }
@@ -188,7 +152,7 @@ impl TryFrom<typing::Upstream> for adc::Upstream {
             None => None,
             Some(typing::UpstreamNodes::List(nodes)) => Some(nodes),
             Some(typing::UpstreamNodes::Map(map)) => {
-                Some(parse_discovery_map_nodes(map, upstream.scheme)?)
+                Some(parse_discovery_map_nodes(map)?)
             }
         };
 
@@ -361,7 +325,7 @@ impl From<typing::StreamRoute> for adc::StreamRoute {
             plugins: route.plugins,
             remote_addr: route.remote_addr,
             server_addr: route.server_addr,
-            server_port: route.server_port.map(|port| port as u32),
+            server_port: route.server_port,
             sni: route.sni,
         }
     }
@@ -615,7 +579,7 @@ pub fn transform_stream_route(
 
         remote_addr: route.remote_addr,
         server_addr: route.server_addr,
-        server_port: route.server_port.map(i64::from),
+        server_port: route.server_port,
         sni: route.sni,
         upstream: None,
         upstream_id: None,
@@ -662,4 +626,49 @@ pub fn transform_consumer_group(
     };
 
     (wire_group, consumers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `server_port` is `u16` at the wire level too (not a wider int
+    /// narrowed later): a port outside 0-65535 is never a real port, so a
+    /// server response containing one is rejected right at deserialization
+    /// instead of being silently dropped downstream.
+    #[test]
+    fn an_out_of_range_wire_port_is_rejected_at_deserialization() {
+        let json = serde_json::json!({ "server_port": 70_000 });
+        assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
+    }
+
+    fn nodes_for(node: &str) -> Result<Vec<adc::UpstreamNode>, String> {
+        parse_discovery_map_nodes(HashMap::from([(node.to_string(), 100)]))
+    }
+
+    #[test]
+    fn discovery_map_node_parses_ipv4_host_and_port() {
+        let nodes = nodes_for("1.2.3.4:8080").unwrap();
+        assert_eq!(nodes[0].host, "1.2.3.4");
+        assert_eq!(nodes[0].port, 8080);
+    }
+
+    #[test]
+    fn discovery_map_node_parses_domain_host_and_port() {
+        let nodes = nodes_for("example.com:8080").unwrap();
+        assert_eq!(nodes[0].host, "example.com");
+        assert_eq!(nodes[0].port, 8080);
+    }
+
+    #[test]
+    fn discovery_map_node_parses_bracketed_ipv6_host_without_the_brackets() {
+        let nodes = nodes_for("[2001:db8::1]:9000").unwrap();
+        assert_eq!(nodes[0].host, "2001:db8::1");
+        assert_eq!(nodes[0].port, 9000);
+    }
+
+    #[test]
+    fn discovery_map_node_with_no_port_is_rejected() {
+        assert!(nodes_for("example.com").is_err());
+    }
 }

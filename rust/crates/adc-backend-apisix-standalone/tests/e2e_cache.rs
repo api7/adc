@@ -33,7 +33,7 @@ async fn sync_ok(backend: &Backend, events: Vec<adc_sdk::Event>) -> Vec<adc_sdk:
     results
 }
 
-fn node(host: &str, port: u32) -> adc::UpstreamNode {
+fn node(host: &str, port: u16) -> adc::UpstreamNode {
     adc::UpstreamNode { host: host.to_string(), port, weight: 100, priority: 0, metadata: None }
 }
 
@@ -41,7 +41,7 @@ fn node(host: &str, port: u32) -> adc::UpstreamNode {
 /// bound to `/apisix/admin/configs`) plus two empty-plugin consumers,
 /// `jack`/`jane` — mirrors the fixture shared by `cache.e2e-spec.ts`'s
 /// first three `describe` blocks.
-fn fixture_config(upstream_port: u32) -> Configuration {
+fn fixture_config(upstream_port: u16) -> Configuration {
     let service = adc::Service {
         name: "service1".to_string(),
         upstream: Some(adc::Upstream { nodes: Some(vec![node("127.0.0.1", upstream_port)]), ..base_upstream() }),
@@ -79,7 +79,7 @@ fn fixture_config(upstream_port: u32) -> Configuration {
 /// the smaller `config` object the TS suite's own "Partial new instances"
 /// scenario uses (unlike its other scenarios, that one never syncs any
 /// consumers at all).
-fn service_with_route_config(upstream_port: u32) -> Configuration {
+fn service_with_route_config(upstream_port: u16) -> Configuration {
     let mut config = fixture_config(upstream_port);
     config.consumers = None;
     config
@@ -100,12 +100,12 @@ async fn single_instance_initializes_caches_and_syncs() {
     let cache_key = "cache-e2e-single";
     let backend = backend(cache_key);
 
-    assert!(common::cache().config(cache_key).is_none());
-    assert!(common::cache().raw_config(cache_key).is_none());
+    assert!(common::cache().config(cache_key).await.is_none());
+    assert!(common::cache().raw_config(cache_key).await.is_none());
 
     let initial = dump(&backend).await;
-    assert!(common::cache().config(cache_key).is_some());
-    let raw = common::cache().raw_config(cache_key).expect("dump populates the raw config cache");
+    assert!(common::cache().config(cache_key).await.is_some());
+    let raw = common::cache().raw_config(cache_key).await.expect("dump populates the raw config cache");
     assert_fresh_cache_shape(&initial);
     // A never-configured instance reports every conf_version as a present 0,
     // not absent — the document itself already exists, just empty.
@@ -137,7 +137,7 @@ async fn single_instance_initializes_caches_and_syncs() {
     assert_eq!(results.len(), 1, "a single-server backend writes to exactly one server");
     assert_eq!(results[0].server.as_deref(), Some(common::SERVER1));
 
-    let config = common::cache().config(cache_key).unwrap();
+    let config = common::cache().config(cache_key).await.unwrap();
     let services = config.services.unwrap();
     assert_eq!(services[0].name, "service1");
     let consumers = config.consumers.unwrap();
@@ -147,7 +147,7 @@ async fn single_instance_initializes_caches_and_syncs() {
     // Every resource created in this one sync call shares the same
     // timestamp, on both its own `modifiedIndex` and its collection's
     // `conf_version` — and that's also what got cached as `latest_version`.
-    let raw = common::cache().raw_config(cache_key).unwrap();
+    let raw = common::cache().raw_config(cache_key).await.unwrap();
     let timestamp = raw.services.as_ref().unwrap()[0].modified_index;
     assert_eq!(raw.services_conf_version, Some(timestamp));
     assert_eq!(raw.routes.as_ref().unwrap()[0].modified_index, timestamp);
@@ -159,7 +159,7 @@ async fn single_instance_initializes_caches_and_syncs() {
         assert_eq!(consumer.modified_index, timestamp);
     }
     assert_eq!(raw.consumers_conf_version, Some(timestamp));
-    assert_eq!(common::cache().latest_version(cache_key), Some(timestamp));
+    assert_eq!(common::cache().latest_version(cache_key).await, Some(timestamp));
 }
 
 #[tokio::test]
@@ -171,7 +171,7 @@ async fn multiple_fresh_instances_all_receive_the_sync() {
 
     let initial = dump(&backend).await;
     assert_fresh_cache_shape(&initial);
-    let raw = common::cache().raw_config(cache_key).unwrap();
+    let raw = common::cache().raw_config(cache_key).await.unwrap();
     assert_eq!(raw.services_conf_version, Some(0));
 
     let before = dump(&backend).await;
@@ -220,7 +220,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
         let port = services[0].upstream.as_ref().unwrap().nodes.as_ref().unwrap()[0].port;
         assert_eq!(port, 3306, "must pick server2's (the more recently written) document, not server1's");
     } else {
-        assert!(common::cache().raw_config(cache_key).is_some());
+        assert!(common::cache().raw_config(cache_key).await.is_some());
     }
 }
 
@@ -235,15 +235,15 @@ async fn bypass_cache_discards_stale_state_and_refetches() {
     dump(&backend).await;
     let synced = fixture_config(9180);
     sync_ok(&backend, diff(&synced, &empty_configuration())).await;
-    let cached = common::cache().config(cache_key).unwrap();
+    let cached = common::cache().config(cache_key).await.unwrap();
     assert_eq!(cached.services.unwrap()[0].name, "service1");
 
     // Inject data that doesn't exist on the real server, simulating a
     // cache that's gone stale relative to it.
     let mut stale = fixture_config(80);
     stale.services.as_mut().unwrap()[0].name = "stale-service".to_string();
-    common::cache().set_config(cache_key, stale.clone());
-    assert_eq!(common::cache().config(cache_key).unwrap().services.unwrap()[0].name, "stale-service");
+    common::cache().set_config(cache_key, stale.clone()).await;
+    assert_eq!(common::cache().config(cache_key).await.unwrap().services.unwrap()[0].name, "stale-service");
 
     // Without bypassing, dump serves the (now stale) cache as-is.
     let result = dump(&backend).await;
@@ -258,7 +258,7 @@ async fn bypass_cache_discards_stale_state_and_refetches() {
     assert_eq!(result.services.as_ref().unwrap()[0].name, "service1", "bypassing must re-fetch the real server state, not the stale cache");
 
     // The cache is now repopulated with the fresh data ...
-    let cached = common::cache().config(cache_key).unwrap();
+    let cached = common::cache().config(cache_key).await.unwrap();
     assert_eq!(cached.services.as_ref().unwrap()[0].name, "service1");
 
     // ... and a subsequent non-bypassing dump serves that repopulated cache.

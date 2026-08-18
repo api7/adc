@@ -36,6 +36,7 @@ async fn creating_a_service_with_an_inline_upstream_splits_it_into_a_separate_re
         client(),
         semver::Version::new(3, 17, 0),
         adc_backend_core::ResourceFilter::default(),
+        10,
     );
     let services = fetcher.list_services().await.unwrap();
     let wire_service = services

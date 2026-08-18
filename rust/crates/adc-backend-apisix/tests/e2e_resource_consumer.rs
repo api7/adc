@@ -183,6 +183,7 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
         client(),
         semver::Version::new(3, 10, 0),
         adc_backend_core::ResourceFilter::default(),
+        10,
     );
     let consumers = old_fetcher.list_consumers().await.unwrap();
     let consumer = consumers

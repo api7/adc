@@ -51,7 +51,11 @@ struct State {
 }
 
 /// Call once, right before `Backend::sync`, only when
-/// `progress::interactive()`; call `finish` unconditionally afterward.
+/// `progress::interactive() && progress::verbose() > 0` — `interactive()`
+/// alone doesn't rule out `verbose == 0`, which the actual redraw layer
+/// (`SyncSlotsLayer`'s own filter) does require, so calling this without
+/// also checking `verbose` draws a header and a stuck-at-zero counts line
+/// that nothing ever updates. Call `finish` unconditionally afterward.
 pub fn start(total: u64) {
     let multi = MultiProgress::new();
 

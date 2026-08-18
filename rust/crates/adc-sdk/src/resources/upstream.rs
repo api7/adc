@@ -112,7 +112,7 @@ fn default_keepalive_requests() -> u32 {
 #[serde(deny_unknown_fields)]
 pub struct UpstreamNode {
     pub host: String,
-    pub port: u32,
+    pub port: u16,
     pub weight: i64,
     // A count, not a duration: unlike `Timeout`/`retry_timeout`, there's no
     // real-world fractional priority — matches the gateway's own schema
@@ -185,7 +185,7 @@ pub struct UpstreamHealthCheckActiveUnhealthy {
 pub struct UpstreamHealthCheckActive {
     #[serde(rename = "type", default)]
     pub r#type: UpstreamHealthCheckType,
-    #[serde(default = "default_active_timeout", serialize_with = "super::common::serialize_whole_number_as_integer")]
+    #[serde(default = "default_active_timeout")]
     pub timeout: f64,
     // A count, not a duration: matches the gateway's own schema
     // (`concurrency` is `type = "integer"` there), even though ADC's own
@@ -195,7 +195,7 @@ pub struct UpstreamHealthCheckActive {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub port: Option<u32>,
+    pub port: Option<u16>,
     #[serde(default = "default_http_path")]
     pub http_path: String,
     #[serde(default = "default_true")]
@@ -241,7 +241,7 @@ pub struct UpstreamHealthCheck {
 pub struct UpstreamKeepalivePool {
     #[serde(default = "default_keepalive_pool_size")]
     pub size: u32,
-    #[serde(default = "default_keepalive_idle_timeout", serialize_with = "super::common::serialize_whole_number_as_integer")]
+    #[serde(default = "default_keepalive_idle_timeout")]
     pub idle_timeout: f64,
     #[serde(default = "default_keepalive_requests")]
     pub requests: u32,
@@ -291,10 +291,7 @@ pub struct Upstream {
     pub scheme: UpstreamScheme,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retries: Option<u32>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "super::common::serialize_optional_whole_number_as_integer"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub retry_timeout: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Timeout>,

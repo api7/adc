@@ -11,7 +11,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml_ng = "0.10"
 unicode-normalization = "0.1"
-url = "2"
+url = { workspace = true }
 regex = "1"
 thiserror = { workspace = true }
 log = { workspace = true }

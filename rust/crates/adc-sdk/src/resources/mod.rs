@@ -21,10 +21,7 @@ pub mod service;
 pub mod ssl;
 pub mod upstream;
 
-pub use common::{
-    Expr, Labels, LabelValue, Plugin, Plugins, Timeout, serialize_optional_whole_number_as_integer,
-    serialize_whole_number_as_integer,
-};
+pub use common::{Expr, Labels, LabelValue, Plugin, Plugins, Timeout};
 pub use consumer::{Consumer, ConsumerCredential, ConsumerGroup};
 pub use route::{HttpMethod, Route, StreamRoute};
 pub use service::{Service, ServiceRoutes};

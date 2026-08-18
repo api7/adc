@@ -7,6 +7,7 @@
 
 use adc_backend_core::{
     HttpClient, Method, RequestBuilder, ResourceFilter, concurrent_map_until_err,
+    encode_path_segment,
 };
 use adc_sdk::BackendError;
 use adc_sdk::ResourceType;
@@ -21,6 +22,11 @@ pub struct Fetcher {
     version: Version,
     gateway_group_id: Option<String>,
     filter: ResourceFilter,
+    /// Bounds how many services' (or consumers') follow-up requests
+    /// `list_services`/`list_consumers` fan out at once, so a large
+    /// gateway group doesn't fan out unboundedly against the admin API.
+    /// The CLI's `--request-concurrent`.
+    concurrency: usize,
 }
 
 impl Fetcher {
@@ -29,12 +35,14 @@ impl Fetcher {
         version: Version,
         gateway_group_id: Option<String>,
         filter: ResourceFilter,
+        concurrency: usize,
     ) -> Self {
         Self {
             client,
             version,
             gateway_group_id,
             filter,
+            concurrency,
         }
     }
 
@@ -68,7 +76,7 @@ impl Fetcher {
             return Ok(Vec::new());
         }
         let services: Vec<typing::Service> = self.list("/apisix/admin/services").await?;
-        concurrent_map_until_err(services, None, |service| {
+        concurrent_map_until_err(services, Some(self.concurrency), |service| {
             self.with_upstreams_and_routes(service)
         })
         .await
@@ -89,10 +97,7 @@ impl Fetcher {
         })?;
 
         if self.version >= Version::new(3, 5, 0) {
-            let builder = self.request(
-                Method::GET,
-                &format!("/apisix/admin/services/{id}/upstreams"),
-            )?;
+            let builder = self.request(Method::GET, &upstreams_path(&id)?)?;
             let response = self.client.execute(builder).await?;
             if response.status().is_success() {
                 let body: typing::ListResponse<typing::Upstream> =
@@ -128,14 +133,14 @@ impl Fetcher {
             return Ok(Vec::new());
         }
         let consumers: Vec<typing::Consumer> = self.list("/apisix/admin/consumers").await?;
-        concurrent_map_until_err(consumers, None, |consumer| self.with_credentials(consumer)).await
+        concurrent_map_until_err(consumers, Some(self.concurrency), |consumer| self.with_credentials(consumer)).await
     }
 
     async fn with_credentials(
         &self,
         mut consumer: typing::Consumer,
     ) -> Result<typing::Consumer, BackendError> {
-        let path = format!("/apisix/admin/consumers/{}/credentials", consumer.username);
+        let path = credentials_path(&consumer.username)?;
         let builder = self.request(Method::GET, &path)?;
         // Purpose isn't obvious from the URL alone in a `--verbose 2` dump
         // of N concurrent credential fetches.
@@ -239,6 +244,19 @@ impl Fetcher {
     }
 }
 
+/// Path for a service's named-upstreams sub-collection, with `id`
+/// percent-encoded so a `/`/`?`/`#` in it can't redirect the request to a
+/// different endpoint.
+fn upstreams_path(id: &str) -> Result<String, BackendError> {
+    Ok(format!("/apisix/admin/services/{}/upstreams", encode_path_segment(id)?))
+}
+
+/// Path for a consumer's credentials sub-collection, with `username`
+/// percent-encoded for the same reason as [`upstreams_path`]'s `id`.
+fn credentials_path(username: &str) -> Result<String, BackendError> {
+    Ok(format!("/apisix/admin/consumers/{}/credentials", encode_path_segment(username)?))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
@@ -279,6 +297,7 @@ mod tests {
             Version::new(999, 999, 999),
             Some("test".to_string()),
             filter,
+            10,
         );
 
         let configuration = fetcher.dump().await.unwrap();
@@ -340,6 +359,7 @@ mod tests {
             Version::new(999, 999, 999),
             Some("test".to_string()),
             filter,
+            10,
         );
 
         fetcher.dump().await.unwrap();
@@ -367,6 +387,7 @@ mod tests {
             Version::new(999, 999, 999),
             None,
             filter,
+            10,
         );
 
         let collection = fetcher
@@ -382,5 +403,19 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(nested.url().query(), None);
+    }
+
+    #[test]
+    fn upstreams_path_percent_encodes_a_service_id_containing_a_path_separator() {
+        let path = upstreams_path("a/../b").unwrap();
+        assert!(path.starts_with("/apisix/admin/services/"), "{path}");
+        assert!(!path.contains("/../"), "{path}");
+    }
+
+    #[test]
+    fn credentials_path_percent_encodes_a_username_containing_a_path_separator() {
+        let path = credentials_path("a/../b").unwrap();
+        assert!(path.starts_with("/apisix/admin/consumers/"), "{path}");
+        assert!(!path.contains("/../"), "{path}");
     }
 }

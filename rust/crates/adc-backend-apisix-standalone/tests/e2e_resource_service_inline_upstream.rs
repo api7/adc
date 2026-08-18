@@ -44,7 +44,7 @@ fn service_with_nodes(nodes: Vec<adc::UpstreamNode>) -> Configuration {
     Configuration { services: Some(vec![service]), ..empty_configuration() }
 }
 
-fn node(port: u32) -> adc::UpstreamNode {
+fn node(port: u16) -> adc::UpstreamNode {
     adc::UpstreamNode { host: "127.0.0.1".to_string(), port, weight: 100, priority: 0, metadata: None }
 }
 
@@ -60,7 +60,7 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     let local = service_with_nodes(vec![node(9180)]);
     sync_ok(&backend, diff(&local, &before)).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).unwrap();
+    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
     let service_id = raw.services.as_ref().unwrap()[0].id.clone();
     let service_modified_index = raw.services.as_ref().unwrap()[0].modified_index;
     let upstream_modified_index_1 = raw.upstreams.as_ref().unwrap()[0].modified_index;
@@ -85,7 +85,7 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert_eq!(events[0].resource_type, adc_sdk::ResourceType::Service);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).unwrap();
+    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
     let upstream_modified_index_2 = raw.upstreams.as_ref().unwrap()[0].modified_index;
     assert_eq!(raw.services.as_ref().unwrap()[0].modified_index, service_modified_index, "service body itself must be untouched");
     assert!(upstream_modified_index_2 > upstream_modified_index_1);
@@ -105,7 +105,7 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert_eq!(events[0].resource_type, adc_sdk::ResourceType::Service);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).unwrap();
+    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
     let upstream_modified_index_3 = raw.upstreams.as_ref().unwrap()[0].modified_index;
     assert_eq!(raw.upstreams.as_ref().unwrap()[0].nodes, Some(vec![]));
     assert_eq!(raw.services.as_ref().unwrap()[0].modified_index, service_modified_index, "service body still untouched");
@@ -127,7 +127,7 @@ async fn a_service_only_update_never_moves_the_services_conf_version_only_upstre
     assert_eq!(events[0].resource_type, adc_sdk::ResourceType::Service);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).unwrap();
+    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
     assert_eq!(raw.upstreams.map(|u| u.len()).unwrap_or(0), 0);
     assert_eq!(raw.services.map(|s| s.len()).unwrap_or(0), 0);
     let final_services_version = raw.services_conf_version.unwrap();
