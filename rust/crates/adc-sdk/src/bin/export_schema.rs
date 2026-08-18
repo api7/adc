@@ -4,9 +4,9 @@
 //! (`apps/cli/src/linter/exporter.ts`), which is likewise a standalone
 //! script rather than an `adc` subcommand.
 //!
-//! Usage: `cargo run -p adc-sdk --bin export-schema`, from anywhere — the
-//! output path is anchored to this crate's manifest dir (same convention as
-//! `tests/schema_json.rs`'s drift check), not the process's cwd.
+//! Usage: `cargo run -p adc-sdk --bin export-schema`, from the workspace
+//! root — the output path is anchored to this crate's manifest dir (same
+//! convention as `tests/schema_json.rs`'s drift check), not the cwd.
 
 const SCHEMA_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../schema.json");
 
