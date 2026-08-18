@@ -12,3 +12,9 @@ sha1 = { workspace = true }
 async-trait = { workspace = true }
 semver = { workspace = true }
 thiserror = { workspace = true }
+schemars = { workspace = true }
+jsonschema = { workspace = true }
+
+[[bin]]
+name = "export-schema"
+path = "src/bin/export_schema.rs"

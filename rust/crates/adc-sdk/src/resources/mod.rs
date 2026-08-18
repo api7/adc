@@ -33,6 +33,7 @@ pub use upstream::{
     UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A global rule is just a plugin config map applied gateway-wide.
@@ -43,7 +44,7 @@ pub type PluginMetadata = Plugins;
 /// The external, user-facing declarative config file shape: nested
 /// sub-resources embedded under their parent, no top-level
 /// routes/upstreams/consumer_credentials.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Configuration {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,7 +65,7 @@ pub struct Configuration {
 /// routes/stream_routes/consumer_credentials/upstreams alongside the nested
 /// sub-resources, so every resource is also reachable directly by its own
 /// collection field.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InternalConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]

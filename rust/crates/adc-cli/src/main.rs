@@ -91,6 +91,7 @@ async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
             &exclude,
             &label_selector,
             args.backend.managed_by_label,
+            args.lint,
         ),
     )
     .await?;
@@ -124,6 +125,7 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
             &exclude,
             &label_selector,
             args.backend.managed_by_label,
+            args.lint,
         ),
     )
     .await?;
@@ -226,10 +228,11 @@ async fn cmd_lint(args: LintArgs) -> Result<(), CliError> {
             &empty_types,
             &empty_labels,
             false,
+            true,
         ),
     )
     .await?;
-    println!("Configuration is structurally valid.");
+    println!("Configuration is valid.");
     Ok(())
 }
 
@@ -246,6 +249,7 @@ async fn cmd_validate(args: ValidateArgs) -> Result<(), CliError> {
             &exclude,
             &label_selector,
             args.backend.managed_by_label,
+            args.lint,
         ),
     )
     .await?;

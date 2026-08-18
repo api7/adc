@@ -175,20 +175,21 @@ fn resource_filter(args: &BackendArgs) -> Result<ResourceFilter, CliError> {
     })
 }
 
-/// Loads, merges, and structurally parses the local configuration file(s).
-/// Deserializing into `Configuration` here is the structural-validity gate
-/// (unknown fields, wrong types, missing required fields all reject —
-/// except inside a plugin config body: `Plugin`/`Plugins` are bare maps,
-/// deliberately not `deny_unknown_fields`, since ADC can't know every
-/// plugin's own schema) — the separate `--no-lint`/`Lint` step has nothing
-/// left to check yet, since semantic validation (regex/cross-field rules)
-/// hasn't landed (stage 2.2).
+/// Loads, merges, and structurally parses the local configuration file(s),
+/// then (unless `lint` is `false`, i.e. `--no-lint`) runs semantic
+/// validation on top. Deserializing into `Configuration` is the
+/// structural-validity gate (unknown fields, wrong types, missing required
+/// fields all reject — except inside a plugin config body: `Plugin`/
+/// `Plugins` are bare maps, deliberately not `deny_unknown_fields`, since
+/// ADC can't know every plugin's own schema) and always runs, regardless of
+/// `lint` — only the semantic pass (`adc_sdk::lint::lint`) is skippable.
 pub async fn load_local(
     files: &[PathBuf],
     include: &HashSet<ResourceType>,
     exclude: &HashSet<ResourceType>,
     label_selector: &HashMap<String, String>,
     managed_by_label: bool,
+    lint: bool,
 ) -> Result<Configuration, CliError> {
     let files = config::read_files(files).await?;
     let mut merged = config::merge_files(files)?;
@@ -199,7 +200,25 @@ pub async fn load_local(
     let mut configuration: Configuration = serde_json::from_value(merged)
         .map_err(|e| CliError::msg(format!("invalid configuration: {e}")))?;
     config::filter_resource_types(&mut configuration, include, exclude);
+    if lint {
+        let issues = adc_sdk::lint::lint(&configuration);
+        if !issues.is_empty() {
+            return Err(CliError::msg(format_lint_issues(&issues)));
+        }
+    }
     Ok(configuration)
+}
+
+/// Collects every lint violation into one multi-line message — mirrors the
+/// TS CLI wrapping `z.prettifyError`'s multi-issue output into a single
+/// thrown `Error`.
+fn format_lint_issues(issues: &[adc_sdk::lint::LintIssue]) -> String {
+    let mut message = "Lint configuration\nThe following errors were found in configuration:\n".to_string();
+    for issue in issues {
+        message.push_str(&format!("  - {issue}\n"));
+    }
+    message.pop();
+    message
 }
 
 /// Converts each OpenAPI document into its own `Configuration`, then
