@@ -13,7 +13,7 @@ use crate::operator::Operator;
 use crate::validator::Validator;
 
 /// Shared by `ping` and `resolved_version` — neither needs the response body.
-const PROBE_PATH: &str = "/apisix/admin/routes?page=1&page_size=1";
+const PROBE_PATH: &str = "/apisix/admin/routes?page=1&page_size=10";
 
 pub struct Backend {
     client: HttpClient,
