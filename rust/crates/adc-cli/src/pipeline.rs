@@ -6,75 +6,135 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use adc_backend_core::{HttpClient, HttpClientConfig, ResourceFilter, TlsConfig};
 use adc_differ::DifferV4;
 use adc_sdk::resources::Configuration;
 use adc_sdk::{Backend, Converter, Event, InternalConfiguration, ResourceType};
 
-use crate::cli::{BackendArgs, BackendKind};
+use crate::cli::BackendArgs;
 use crate::config;
 use crate::error::CliError;
 
-pub async fn init_backend(args: &BackendArgs) -> Result<Box<dyn Backend>, CliError> {
-    let filter = resource_filter(args)?;
-    match args.backend {
-        BackendKind::Apisix => {
-            let (client, _token) = build_client(args).await?;
-            Ok(Box::new(adc_backend_apisix::Backend::new(
-                client,
-                filter,
-                args.request_concurrent,
-            )))
-        }
-        BackendKind::Api7Ee => {
-            let (client, token) = build_client(args).await?;
+/// Everything [`init_backend`] needs to pick and construct a backend,
+/// independent of where the caller sourced it from (CLI args or an
+/// ingress-server request body).
+pub struct BackendSpec {
+    pub kind: String,
+    pub servers: Vec<String>,
+    pub tokens: Vec<String>,
+    pub gateway_group: Option<String>,
+    pub filter: ResourceFilter,
+    pub concurrency: usize,
+    pub cache_key: String,
+    pub bypass_cache: bool,
+    pub timeout: Option<Duration>,
+    pub tls: TlsConfig,
+}
+
+/// CLI args resolve into a `BackendSpec` with no I/O — `--ca-cert-file` and
+/// friends already read their file's bytes at argument-parse time (see
+/// `cli::read_file_bytes`), so this is a plain, synchronous field mapping.
+/// Fallible only because `label_selector_map` rejects `managed-by` as a
+/// selector key.
+impl TryFrom<&BackendArgs> for BackendSpec {
+    type Error = CliError;
+
+    fn try_from(args: &BackendArgs) -> Result<Self, CliError> {
+        let (include, exclude) = resource_type_sets(args);
+        let label_selector = label_selector_map(args)?;
+        let token = args.token.as_deref().ok_or_else(|| {
+            CliError::msg("a backend token is required: pass --token or set ADC_TOKEN")
+        })?;
+
+        Ok(BackendSpec {
+            kind: args.backend.as_str().to_string(),
+            servers: args.server.split(',').map(str::to_string).collect(),
+            tokens: token.split(',').map(str::to_string).collect(),
+            gateway_group: Some(args.gateway_group.clone()),
+            filter: ResourceFilter {
+                include,
+                exclude,
+                label_selector,
+            },
+            concurrency: args.request_concurrent,
+            cache_key: "default".to_string(),
+            bypass_cache: false,
+            timeout: Some(args.timeout),
+            tls: TlsConfig {
+                ca_cert_pem: args.ca_cert_pem.clone(),
+                client_cert_pem: args.tls_client_cert_pem.clone(),
+                client_key_pem: args.tls_client_key_pem.clone(),
+                skip_verify: args.tls_skip_verify,
+            },
+        })
+    }
+}
+
+/// `shared_client`: `None` builds a fresh `HttpClient` from `spec.tls` (the
+/// one-shot CLI); `Some` reuses an already-built, pooled `reqwest::Client`
+/// (the ingress-server daemon). Only `apisix`/`api7ee` look at it —
+/// `apisix-standalone` always builds its own clients from `spec.tls`.
+pub fn init_backend(
+    spec: BackendSpec,
+    shared_client: Option<reqwest::Client>,
+) -> Result<Box<dyn Backend>, CliError> {
+    let server = spec.servers.first().cloned().unwrap_or_default();
+    let token = spec.tokens.first().cloned().unwrap_or_default();
+
+    match spec.kind.as_str() {
+        "api7ee" => {
+            let client = http_client(shared_client, &server, &token, spec.timeout, &spec.tls)?;
+            let gateway_group = spec.gateway_group.unwrap_or_else(|| "default".to_string());
             Ok(Box::new(adc_backend_api7::Backend::new(
                 client,
-                args.gateway_group.clone(),
+                gateway_group,
                 &token,
-                filter,
-                args.request_concurrent,
+                spec.filter,
+                spec.concurrency,
             )))
         }
-        BackendKind::ApisixStandalone => Err(CliError::msg(format!(
-            "backend \"{}\" is not yet implemented (only \"apisix\"/\"api7ee\" are supported so far)",
-            args.backend.as_str()
-        ))),
+        "apisix-standalone" => Ok(Box::new(adc_backend_apisix_standalone::Backend::new(
+            adc_backend_apisix_standalone::BackendOptions {
+                servers: spec.servers,
+                tokens: spec.tokens,
+                cache_key: spec.cache_key,
+                bypass_cache: spec.bypass_cache,
+                timeout: spec.timeout,
+                tls: spec.tls,
+            },
+        )?)),
+        // "apisix" and anything unrecognized both default to apisix.
+        _ => {
+            let client = http_client(shared_client, &server, &token, spec.timeout, &spec.tls)?;
+            Ok(Box::new(adc_backend_apisix::Backend::new(
+                client,
+                spec.filter,
+                spec.concurrency,
+            )))
+        }
     }
 }
 
-/// Shared by every backend: the `X-API-KEY`/TLS-configured `HttpClient`
-/// every one of them wraps. Returns the raw token alongside it — `api7ee`
-/// needs it separately (to recognize an `a7adm-` admin token, which skips
-/// gateway_group resolution entirely), not just baked into the client's
-/// headers.
-async fn build_client(args: &BackendArgs) -> Result<(HttpClient, String), CliError> {
-    let token = args.token.clone().ok_or_else(|| {
-        CliError::msg("a backend token is required: pass --token or set ADC_TOKEN")
-    })?;
-    let ca_cert_pem = read_optional(&args.ca_cert_file).await?;
-    let client_cert_pem = read_optional(&args.tls_client_cert_file).await?;
-    let client_key_pem = read_optional(&args.tls_client_key_file).await?;
-    let client = HttpClient::new(HttpClientConfig {
-        server: args.server.clone(),
-        token: token.clone(),
-        timeout: Some(args.timeout),
-        tls: TlsConfig {
-            ca_cert_pem,
-            client_cert_pem,
-            client_key_pem,
-            skip_verify: args.tls_skip_verify,
-        },
-    })?;
-    Ok((client, token))
-}
-
-async fn read_optional(path: &Option<PathBuf>) -> Result<Option<Vec<u8>>, CliError> {
-    match path {
-        Some(path) => Ok(Some(tokio::fs::read(path).await?)),
-        None => Ok(None),
-    }
+fn http_client(
+    shared_client: Option<reqwest::Client>,
+    server: &str,
+    token: &str,
+    timeout: Option<Duration>,
+    tls: &TlsConfig,
+) -> Result<HttpClient, CliError> {
+    Ok(match shared_client {
+        None => HttpClient::new(HttpClientConfig {
+            server: server.to_string(),
+            token: token.to_string(),
+            timeout,
+            tls: tls.clone(),
+        })?,
+        Some(client) => {
+            HttpClient::with_shared_client(client, server.to_string(), token.to_string())?
+        }
+    })
 }
 
 /// Resource types nested under a service/consumer rather than a top-level
@@ -123,7 +183,11 @@ pub fn resource_type_sets(args: &BackendArgs) -> (HashSet<ResourceType>, HashSet
     // only ever check top-level types, so a nested one left in `include`
     // would make every real top-level type look excluded instead of doing
     // nothing.
-    let is_unfilterable = |rt: &ResourceType| UNFILTERABLE_RESOURCE_TYPES.iter().any(|(_, unfilterable)| unfilterable == rt);
+    let is_unfilterable = |rt: &ResourceType| {
+        UNFILTERABLE_RESOURCE_TYPES
+            .iter()
+            .any(|(_, unfilterable)| unfilterable == rt)
+    };
     include.retain(|rt| !is_unfilterable(rt));
     exclude.retain(|rt| !is_unfilterable(rt));
     (include, exclude)
@@ -160,21 +224,6 @@ fn parse_label_selector(entries: &[String]) -> Result<HashMap<String, String>, C
         .collect()
 }
 
-/// The filter a backend applies at fetch time: skipping whole resource
-/// types the request never needed, and (where the admin API supports it)
-/// asking the server itself to narrow results by label. This is an
-/// optimization only — `config::filter_resource_types`/`filter_by_labels`
-/// still run afterward and are what actually guarantee the result matches.
-fn resource_filter(args: &BackendArgs) -> Result<ResourceFilter, CliError> {
-    let (include, exclude) = resource_type_sets(args);
-    let label_selector = label_selector_map(args)?;
-    Ok(ResourceFilter {
-        include,
-        exclude,
-        label_selector,
-    })
-}
-
 /// Loads, merges, and structurally parses the local configuration file(s),
 /// then (unless `lint` is `false`, i.e. `--no-lint`) runs semantic
 /// validation on top. Deserializing into `Configuration` is the
@@ -209,11 +258,10 @@ pub async fn load_local(
     Ok(configuration)
 }
 
-/// Collects every lint violation into one multi-line message — mirrors the
-/// TS CLI wrapping `z.prettifyError`'s multi-issue output into a single
-/// thrown `Error`.
+/// Collects every lint violation into one multi-line message.
 fn format_lint_issues(issues: &[adc_sdk::lint::LintIssue]) -> String {
-    let mut message = "Lint configuration\nThe following errors were found in configuration:\n".to_string();
+    let mut message =
+        "Lint configuration\nThe following errors were found in configuration:\n".to_string();
     for issue in issues {
         message.push_str(&format!("  - {issue}\n"));
     }
@@ -235,7 +283,12 @@ pub async fn convert_openapi(files: &[PathBuf]) -> Result<Configuration, CliErro
             .map_err(|e| CliError::msg(format!("{}: {e}", path.display())))?;
         let converted = adc_converter_openapi::OpenApiConverter
             .to_adc(&content)
-            .map_err(|e| CliError::msg(format!("failed to convert OpenAPI document \"{}\": {e}", path.display())))?;
+            .map_err(|e| {
+                CliError::msg(format!(
+                    "failed to convert OpenAPI document \"{}\": {e}",
+                    path.display()
+                ))
+            })?;
         per_file.push((path.clone(), converted.services.unwrap_or_default()));
     }
     Ok(Configuration {
@@ -319,7 +372,8 @@ mod tests {
 
     #[test]
     fn parses_key_value_entries_into_a_map() {
-        let selector = parse_label_selector(&["env=prod".to_string(), "team=core".to_string()]).unwrap();
+        let selector =
+            parse_label_selector(&["env=prod".to_string(), "team=core".to_string()]).unwrap();
         assert_eq!(selector.get("env"), Some(&"prod".to_string()));
         assert_eq!(selector.get("team"), Some(&"core".to_string()));
     }
@@ -357,7 +411,10 @@ mod tests {
             (PathBuf::from("b.yaml"), vec![service("svc-b")]),
         ];
         let merged = merge_openapi_services(per_file).unwrap();
-        assert_eq!(merged.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), vec!["svc-a", "svc-b"]);
+        assert_eq!(
+            merged.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            vec!["svc-a", "svc-b"]
+        );
     }
 
     #[test]
@@ -369,13 +426,19 @@ mod tests {
         let err = merge_openapi_services(per_file).unwrap_err();
         let message = err.to_string();
         assert!(message.contains("b.yaml"), "{message}");
-        assert!(message.contains("a.yaml"), "{message}: should name the file that first produced this service");
+        assert!(
+            message.contains("a.yaml"),
+            "{message}: should name the file that first produced this service"
+        );
         assert!(message.contains("shared"), "{message}");
     }
 
     #[test]
     fn merge_openapi_services_rejects_a_duplicate_name_within_the_same_file() {
-        let per_file = vec![(PathBuf::from("a.yaml"), vec![service("shared"), service("shared")])];
+        let per_file = vec![(
+            PathBuf::from("a.yaml"),
+            vec![service("shared"), service("shared")],
+        )];
         assert!(merge_openapi_services(per_file).is_err());
     }
 
@@ -390,12 +453,37 @@ mod tests {
             exclude_resource_type: vec![],
             timeout: Duration::from_secs(10),
             request_concurrent: 10,
-            ca_cert_file: None,
-            tls_client_cert_file: None,
-            tls_client_key_file: None,
+            ca_cert_pem: None,
+            tls_client_cert_pem: None,
+            tls_client_key_pem: None,
             tls_skip_verify: false,
             managed_by_label: true,
         }
+    }
+
+    #[test]
+    fn backend_spec_splits_comma_joined_servers_and_tokens() {
+        let mut args = backend_args(vec![]);
+        args.server = "http://a:9180,http://b:9180".to_string();
+        args.token = Some("tok-a,tok-b".to_string());
+        let spec = BackendSpec::try_from(&args).unwrap();
+        assert_eq!(spec.servers, vec!["http://a:9180", "http://b:9180"]);
+        assert_eq!(spec.tokens, vec!["tok-a", "tok-b"]);
+    }
+
+    #[test]
+    fn backend_spec_accepts_a_single_server_and_token() {
+        let mut args = backend_args(vec![]);
+        args.token = Some("tok".to_string());
+        let spec = BackendSpec::try_from(&args).unwrap();
+        assert_eq!(spec.servers, vec!["http://localhost:9180"]);
+        assert_eq!(spec.tokens, vec!["tok"]);
+    }
+
+    #[test]
+    fn backend_spec_rejects_a_missing_token() {
+        let args = backend_args(vec![]);
+        assert!(BackendSpec::try_from(&args).is_err());
     }
 
     #[test]
@@ -431,7 +519,9 @@ mod tests {
     fn captured_warning(set: &HashSet<ResourceType>) -> String {
         let buffer = SharedBuffer::default();
         let writer = buffer.clone();
-        let subscriber = tracing_subscriber::fmt().with_writer(move || writer.clone()).finish();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .finish();
         tracing::subscriber::with_default(subscriber, || {
             warn_on_unfilterable_resource_types("--include-resource-type", set);
         });
@@ -447,7 +537,10 @@ mod tests {
 
     #[test]
     fn no_warning_when_only_top_level_types_are_named() {
-        let output = captured_warning(&HashSet::from([ResourceType::Service, ResourceType::Consumer]));
+        let output = captured_warning(&HashSet::from([
+            ResourceType::Service,
+            ResourceType::Consumer,
+        ]));
         assert!(output.is_empty(), "{output}");
     }
 
@@ -465,6 +558,9 @@ mod tests {
         let mut args = backend_args(vec![]);
         args.include_resource_type = vec![ResourceTypeArg::Route, ResourceTypeArg::Upstream];
         let (include, _) = resource_type_sets(&args);
-        assert!(include.is_empty(), "an include set with nothing but unfilterable types must behave like no --include-resource-type was passed at all");
+        assert!(
+            include.is_empty(),
+            "an include set with nothing but unfilterable types must behave like no --include-resource-type was passed at all"
+        );
     }
 }

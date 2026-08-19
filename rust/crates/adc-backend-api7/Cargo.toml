@@ -28,4 +28,4 @@ adc-backend-api7 = { path = ".", features = ["test-utils"] }
 adc-differ = { path = "../adc-differ" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
-axum = "0.8"
+axum = { workspace = true }

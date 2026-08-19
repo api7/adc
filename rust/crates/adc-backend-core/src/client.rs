@@ -62,32 +62,35 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(config: HttpClientConfig) -> Result<Self, BackendError> {
-        let base_url = Url::parse(&config.server).map_err(|e| {
-            BackendError::Other(format!("invalid server URL {:?}: {e}", config.server).into())
-        })?;
-
-        let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        let mut token = HeaderValue::from_str(&config.token)
-            .map_err(|e| BackendError::Other(format!("invalid token: {e}").into()))?;
-        token.set_sensitive(true);
-        headers.insert("X-API-KEY", token);
-        let default_headers = headers.clone();
-
-        let mut builder = reqwest::Client::builder().default_headers(headers);
+        let mut builder = reqwest::Client::builder();
         if let Some(timeout) = config.timeout {
             builder = builder.timeout(timeout);
         }
         builder = config.tls.apply(builder)?;
-
         let inner = builder.build().map_err(|e| {
             BackendError::Other(format!("failed to build HTTP client: {}", with_source(&e)).into())
         })?;
 
+        Self::with_shared_client(inner, config.server, config.token)
+    }
+
+    /// Like [`HttpClient::new`], but wraps an already-built `reqwest::Client`
+    /// — for callers pooling clients across many `HttpClient`s by TLS material.
+    pub fn with_shared_client(client: reqwest::Client, server: String, token: String) -> Result<Self, BackendError> {
+        let base_url = Url::parse(&server)
+            .map_err(|e| BackendError::Other(format!("invalid server URL {server:?}: {e}").into()))?;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        let mut token = HeaderValue::from_str(&token)
+            .map_err(|e| BackendError::Other(format!("invalid token: {e}").into()))?;
+        token.set_sensitive(true);
+        headers.insert("X-API-KEY", token);
+
         Ok(Self {
-            inner,
+            inner: client,
             base_url,
-            default_headers,
+            default_headers: headers,
             log_scope: vec!["ADC".to_string()],
         })
     }
@@ -102,6 +105,8 @@ impl HttpClient {
     /// Plain string concatenation, not `Url::join` — a root-anchored `path`
     /// via `join` would replace the base URL's path outright, dropping any
     /// prefix the server URL carries (e.g. behind a reverse-proxy).
+    /// `default_headers` are attached here, not baked into the underlying
+    /// client, since that client may be shared across tokens.
     pub fn request(&self, method: Method, path: &str) -> Result<RequestBuilder, BackendError> {
         let base = self.base_url.as_str().trim_end_matches('/');
         let path = path.trim_start_matches('/');
@@ -109,7 +114,7 @@ impl HttpClient {
         let url = Url::parse(&combined).map_err(|e| {
             BackendError::Other(format!("invalid request path {path:?}: {e}").into())
         })?;
-        Ok(self.inner.request(method, url))
+        Ok(self.inner.request(method, url).headers(self.default_headers.clone()))
     }
 
     /// Classifies only transport-level failures into `BackendError::Transport`.
@@ -135,8 +140,7 @@ impl HttpClient {
         let server_address = url.host_str().unwrap_or("").to_string();
         let server_port = url.port_or_known_default().unwrap_or(0);
 
-        // `request.headers()` alone misses `default_headers` (merged only
-        // at send time); request-set headers win on conflict.
+        // Defensive fallback for a `RequestBuilder` not built via `request()`.
         let mut request_headers = self.default_headers.clone();
         for (name, value) in request.headers() {
             request_headers.insert(name.clone(), value.clone());
