@@ -31,6 +31,8 @@ url = "2"
 regex = "1"
 schemars = "1"
 jsonschema = "0.49"
+axum = "0.8"
+rustls = "0.23"
 
 [profile.release]
 lto = "fat"

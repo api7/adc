@@ -19,4 +19,4 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time"] }
-axum = "0.8"
+axum = { workspace = true }

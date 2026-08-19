@@ -18,6 +18,14 @@ pub struct TlsConfig {
 }
 
 impl TlsConfig {
+    /// Builds a bare `reqwest::Client` from this config alone, with no
+    /// server/token/timeout attached.
+    pub fn build_client(&self) -> Result<reqwest::Client, BackendError> {
+        self.apply(reqwest::Client::builder())?
+            .build()
+            .map_err(|e| BackendError::Other(format!("failed to build HTTP client: {e}").into()))
+    }
+
     pub(crate) fn apply(&self, mut builder: reqwest::ClientBuilder) -> Result<reqwest::ClientBuilder, BackendError> {
         if self.skip_verify {
             builder = builder.danger_accept_invalid_certs(true);

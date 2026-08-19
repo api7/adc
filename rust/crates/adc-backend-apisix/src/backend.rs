@@ -19,16 +19,16 @@ pub struct Backend {
     client: HttpClient,
     filter: ResourceFilter,
     version: OnceCell<Version>,
-    fetch_concurrency: usize,
+    concurrency: usize,
 }
 
 impl Backend {
-    pub fn new(client: HttpClient, filter: ResourceFilter, fetch_concurrency: usize) -> Self {
+    pub fn new(client: HttpClient, filter: ResourceFilter, concurrency: usize) -> Self {
         Self {
             client: client.with_log_scope(vec!["APISIX".to_string()]),
             filter,
             version: OnceCell::new(),
-            fetch_concurrency,
+            concurrency,
         }
     }
 
@@ -89,7 +89,7 @@ impl adc_sdk::Backend for Backend {
             self.client.clone(),
             version,
             self.filter.clone(),
-            self.fetch_concurrency,
+            self.concurrency,
         )
         .dump()
         .await

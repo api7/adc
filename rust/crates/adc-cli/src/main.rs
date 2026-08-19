@@ -4,14 +4,23 @@ mod error;
 mod logging;
 mod pipeline;
 mod progress;
+mod server;
 
 use std::collections::{HashMap, HashSet};
 
 use adc_sdk::{BackendSyncOptions, Event, EventType, ResourceType};
 use clap::Parser;
 
-use cli::{BackendArgs, Cli, Command, ConvertArgs, ConvertFormat, DiffArgs, DumpArgs, LintArgs, SyncArgs, ValidateArgs};
+use cli::{
+    BackendArgs, Cli, Command, ConvertArgs, ConvertFormat, DiffArgs, DumpArgs, LintArgs, SyncArgs,
+    ValidateArgs,
+};
 use error::CliError;
+use pipeline::BackendSpec;
+
+pub(crate) fn install_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
 
 #[tokio::main]
 async fn main() {
@@ -20,8 +29,19 @@ async fn main() {
     let _ = dotenvy::from_path(".env");
 
     let cli = Cli::parse();
-    logging::init(cli.verbose);
-    progress::set_verbose(cli.verbose);
+
+    install_crypto_provider();
+
+    // The global tracing subscriber can only be installed once, so pick
+    // which logging setup to use before dispatching below.
+    let is_ingress_server = matches!(cli.command, Command::IngressServer(_));
+    match &cli.command {
+        Command::IngressServer(_) => server::logging::init(),
+        _ => {
+            logging::init(cli.verbose);
+            progress::set_verbose(cli.verbose);
+        }
+    }
 
     let result = match cli.command {
         Command::Ping(args) => cmd_ping(args).await,
@@ -32,10 +52,13 @@ async fn main() {
         Command::Validate(args) => cmd_validate(args).await,
         Command::Convert(args) => cmd_convert(args).await,
         Command::IngressSync => Err(CliError::msg("adc ingress-sync: not yet implemented")),
-        Command::IngressServer => Err(CliError::msg("adc ingress-server: not yet implemented")),
+        Command::IngressServer(args) => server::run(args).await,
     };
 
     match result {
+        // The ingress-server daemon has its own "Stopping..." log line on
+        // shutdown — skip the one-shot-command "All is well" line here.
+        Ok(()) if is_ingress_server => {}
         Ok(()) => progress::finish_ok(),
         Err(CliError::AlreadyReported) => std::process::exit(1),
         Err(err) => {
@@ -46,7 +69,7 @@ async fn main() {
 }
 
 async fn cmd_ping(args: BackendArgs) -> Result<(), CliError> {
-    let backend = pipeline::init_backend(&args).await?;
+    let backend = pipeline::init_backend(BackendSpec::try_from(&args)?, None)?;
     progress::stage("Connecting to backend...", backend.ping()).await?;
     println!(
         "Connected to the \"{}\" backend successfully!",
@@ -56,7 +79,7 @@ async fn cmd_ping(args: BackendArgs) -> Result<(), CliError> {
 }
 
 async fn cmd_dump(args: DumpArgs) -> Result<(), CliError> {
-    let backend = pipeline::init_backend(&args.backend).await?;
+    let backend = pipeline::init_backend(BackendSpec::try_from(&args.backend)?, None)?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
     let label_selector = pipeline::label_selector_map(&args.backend)?;
     let remote = progress::stage(
@@ -79,7 +102,7 @@ async fn cmd_dump(args: DumpArgs) -> Result<(), CliError> {
 }
 
 async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
-    let backend = pipeline::init_backend(&args.backend).await?;
+    let backend = pipeline::init_backend(BackendSpec::try_from(&args.backend)?, None)?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
     let label_selector = pipeline::label_selector_map(&args.backend)?;
 
@@ -113,7 +136,7 @@ async fn cmd_diff(args: DiffArgs) -> Result<(), CliError> {
 }
 
 async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
-    let backend = pipeline::init_backend(&args.backend).await?;
+    let backend = pipeline::init_backend(BackendSpec::try_from(&args.backend)?, None)?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
     let label_selector = pipeline::label_selector_map(&args.backend)?;
 
@@ -179,7 +202,11 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
                 // blame for the failure — report which server instead.
                 None => println!(
                     "[FAILED] sync{}",
-                    result.server.as_deref().map(|server| format!(" to {server}")).unwrap_or_default()
+                    result
+                        .server
+                        .as_deref()
+                        .map(|server| format!(" to {server}"))
+                        .unwrap_or_default()
                 ),
             }
             if let Some(err) = &result.error {
@@ -237,7 +264,7 @@ async fn cmd_lint(args: LintArgs) -> Result<(), CliError> {
 }
 
 async fn cmd_validate(args: ValidateArgs) -> Result<(), CliError> {
-    let backend = pipeline::init_backend(&args.backend).await?;
+    let backend = pipeline::init_backend(BackendSpec::try_from(&args.backend)?, None)?;
     let (include, exclude) = pipeline::resource_type_sets(&args.backend);
     let label_selector = pipeline::label_selector_map(&args.backend)?;
 

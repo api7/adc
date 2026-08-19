@@ -39,7 +39,41 @@ pub enum Command {
     IngressSync,
     /// run the local ingress server
     #[command(hide = true)]
-    IngressServer,
+    IngressServer(IngressServerArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct IngressServerArgs {
+    /// listen address of the ADC server, in the form scheme://host:port
+    /// (http/https/unix are supported)
+    #[arg(long, default_value = "http://127.0.0.1:3000", value_parser = parse_listen_url)]
+    pub listen: url::Url,
+
+    /// status listen port (exposes GET /healthz/ready)
+    #[arg(long, default_value_t = 3001, value_parser = clap::value_parser!(u16).range(1..=65535))]
+    pub listen_status: u16,
+
+    /// path to the CA certificate used to verify client certificates (enables mTLS)
+    #[arg(long, value_parser = existing_file)]
+    pub ca_cert_file: Option<PathBuf>,
+
+    /// path to the TLS server certificate (required for https:// listen addresses)
+    #[arg(long, value_parser = existing_file)]
+    pub tls_cert_file: Option<PathBuf>,
+
+    /// path to the TLS server key (required for https:// listen addresses)
+    #[arg(long, value_parser = existing_file)]
+    pub tls_key_file: Option<PathBuf>,
+}
+
+fn parse_listen_url(raw: &str) -> Result<url::Url, String> {
+    let url = url::Url::parse(raw).map_err(|e| e.to_string())?;
+    match url.scheme() {
+        "http" | "https" | "unix" => Ok(url),
+        other => Err(format!(
+            "unsupported --listen scheme \"{other}\": expected http, https, or unix"
+        )),
+    }
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,16 +175,16 @@ pub struct BackendArgs {
     pub request_concurrent: usize,
 
     /// path to the CA certificate to verify the backend
-    #[arg(long, env = "ADC_CA_CERT_FILE", value_parser = existing_file)]
-    pub ca_cert_file: Option<PathBuf>,
+    #[arg(long = "ca-cert-file", env = "ADC_CA_CERT_FILE", value_parser = read_file_bytes)]
+    pub ca_cert_pem: Option<Vec<u8>>,
 
     /// path to the mutual TLS client certificate to verify the backend
-    #[arg(long, env = "ADC_TLS_CLIENT_CERT_FILE", value_parser = existing_file, requires = "tls_client_key_file")]
-    pub tls_client_cert_file: Option<PathBuf>,
+    #[arg(long = "tls-client-cert-file", env = "ADC_TLS_CLIENT_CERT_FILE", value_parser = read_file_bytes, requires = "tls_client_key_pem")]
+    pub tls_client_cert_pem: Option<Vec<u8>>,
 
     /// path to the mutual TLS client key to verify the backend
-    #[arg(long, env = "ADC_TLS_CLIENT_KEY_FILE", value_parser = existing_file, requires = "tls_client_cert_file")]
-    pub tls_client_key_file: Option<PathBuf>,
+    #[arg(long = "tls-client-key-file", env = "ADC_TLS_CLIENT_KEY_FILE", value_parser = read_file_bytes, requires = "tls_client_cert_pem")]
+    pub tls_client_key_pem: Option<Vec<u8>>,
 
     /// disable the verification of the backend TLS certificate
     #[arg(long, env = "ADC_TLS_SKIP_VERIFY")]
@@ -258,4 +292,10 @@ fn existing_file(raw: &str) -> Result<PathBuf, String> {
         return Err(format!("path does not exist or is not a file: {raw}"));
     }
     Ok(path)
+}
+
+/// Reads the file's content at parse time — so downstream code (`BackendSpec`)
+/// only ever deals with bytes already in memory, never a path.
+fn read_file_bytes(raw: &str) -> Result<Vec<u8>, String> {
+    std::fs::read(raw).map_err(|e| format!("{raw}: {e}"))
 }
