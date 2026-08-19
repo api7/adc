@@ -44,7 +44,9 @@ pub async fn request_logger(request: Request, next: Next) -> Response {
 fn redacted_body_text(bytes: &[u8]) -> String {
     match serde_json::from_slice::<Value>(bytes) {
         Ok(value) => redact_request_body(&value).to_string(),
-        Err(_) => String::from_utf8_lossy(bytes).into_owned(),
+        // Non-JSON bytes could still contain a raw token/key substring —
+        // logging them verbatim would defeat the redaction above.
+        Err(_) => format!("<non-JSON body, {} bytes>", bytes.len()),
     }
 }
 

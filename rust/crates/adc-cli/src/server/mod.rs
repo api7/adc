@@ -10,7 +10,7 @@ mod sync;
 mod validate;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -153,9 +153,18 @@ async fn serve_unix(
     ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     let path = args.listen.path();
-    if Path::new(path).exists() {
-        std::fs::remove_file(path)
-            .map_err(|e| CliError::msg(format!("failed to remove stale socket {path}: {e}")))?;
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_socket() => {
+            std::fs::remove_file(path)
+                .map_err(|e| CliError::msg(format!("failed to remove stale socket {path}: {e}")))?;
+        }
+        Ok(_) => {
+            return Err(CliError::msg(format!(
+                "refusing to bind unix socket: {path} already exists and is not a socket"
+            )));
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(CliError::msg(format!("failed to inspect {path}: {e}"))),
     }
     let listener = tokio::net::UnixListener::bind(path)
         .map_err(|e| CliError::msg(format!("failed to bind unix socket {path}: {e}")))?;
@@ -507,7 +516,8 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("adc-server-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("adc.sock");
-        std::fs::write(&path, b"stale").unwrap(); // proves serve_unix removes it, not fails to bind
+        // A real leftover socket from a crashed previous run, not just any file.
+        drop(std::os::unix::net::UnixListener::bind(&path).unwrap());
 
         let args = IngressServerArgs {
             listen: url::Url::parse(&format!("unix://{}", path.display())).unwrap(),
