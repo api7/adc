@@ -216,9 +216,7 @@ fn build_rustls_config(
     key_path: &Path,
     ca_path: Option<&Path>,
 ) -> Result<rustls::ServerConfig, CliError> {
-    // rustls 0.23 needs a crypto backend installed before building any
-    // `ServerConfig`; a second call just returns `Err`, which is fine.
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    crate::install_crypto_provider();
 
     let certs = load_certs(cert_path)?;
     let key = load_key(key_path)?;

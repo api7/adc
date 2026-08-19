@@ -95,6 +95,7 @@ dependencies = [
  "dotenvy",
  "glob",
  "http",
+ "http-body-util",
  "humantime",
  "indicatif",
  "libc",

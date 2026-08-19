@@ -18,6 +18,10 @@ use cli::{
 use error::CliError;
 use pipeline::BackendSpec;
 
+pub(crate) fn install_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
 #[tokio::main]
 async fn main() {
     // `from_path`, not `dotenv()`: the latter walks up parent directories
@@ -25,6 +29,8 @@ async fn main() {
     let _ = dotenvy::from_path(".env");
 
     let cli = Cli::parse();
+
+    install_crypto_provider();
 
     // The global tracing subscriber can only be installed once, so pick
     // which logging setup to use before dispatching below.

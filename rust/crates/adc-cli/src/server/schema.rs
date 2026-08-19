@@ -205,17 +205,33 @@ pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
     issues
 }
 
+/// Parses the decoded DER via `RootCertStore::add`, not just the PEM
+/// framing — garbage base64 between valid `-----BEGIN/END CERTIFICATE-----`
+/// markers would otherwise pass and only fail later, deep inside backend
+/// construction.
 fn is_valid_pem_certificate(value: &str) -> bool {
     let mut reader = std::io::BufReader::new(value.as_bytes());
-    matches!(
-        rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>(),
-        Ok(certs) if !certs.is_empty()
-    )
+    let Ok(certs) = rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>() else {
+        return false;
+    };
+    if certs.is_empty() {
+        return false;
+    }
+    let mut store = rustls::RootCertStore::empty();
+    certs.into_iter().all(|cert| store.add(cert).is_ok())
 }
 
+/// Goes through the installed `CryptoProvider`, not a specific backend
+/// module, so this stays agnostic to which one `server::run` installs.
 fn is_valid_pem_private_key(value: &str) -> bool {
     let mut reader = std::io::BufReader::new(value.as_bytes());
-    matches!(rustls_pemfile::private_key(&mut reader), Ok(Some(_)))
+    let Ok(Some(key)) = rustls_pemfile::private_key(&mut reader) else {
+        return false;
+    };
+    let Some(provider) = rustls::crypto::CryptoProvider::get_default() else {
+        return false;
+    };
+    provider.key_provider.load_private_key(key).is_ok()
 }
 
 #[cfg(test)]
@@ -349,6 +365,7 @@ tXcdh4oFCmXB1MOupxSI3DqCFvMJc/QeH92Nz/qWvLW7TEWRCo2/Bay1\n\
 
     #[test]
     fn a_paired_cert_and_key_is_accepted_at_the_pairing_check() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let opts = opts(|o| {
             o.tls_client_cert = Some(CERT_PEM.to_string());
             o.tls_client_key = Some(KEY_PEM.to_string());
@@ -362,6 +379,7 @@ tXcdh4oFCmXB1MOupxSI3DqCFvMJc/QeH92Nz/qWvLW7TEWRCo2/Bay1\n\
         // A lone tlsClientKey should be reported once, on the pairing
         // check — not duplicated by the per-field PEM-validity check,
         // since the key itself is valid PEM.
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let opts = opts(|o| o.tls_client_key = Some(KEY_PEM.to_string()));
         let issues = validate_tls_material(&opts);
         assert_eq!(
@@ -380,6 +398,39 @@ tXcdh4oFCmXB1MOupxSI3DqCFvMJc/QeH92Nz/qWvLW7TEWRCo2/Bay1\n\
         let issues = validate_tls_material(&opts);
         assert!(
             issues.iter().any(|i| i.path == vec!["caCert"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn a_well_formed_pem_wrapping_garbage_der_is_rejected() {
+        // Valid PEM framing, but the base64 payload isn't a real X.509
+        // certificate — must fail at the DER-parsing check, not just the
+        // PEM-extraction one.
+        let garbage_cert = "-----BEGIN CERTIFICATE-----\n\
+dGhpcyBpcyBub3QgYSB2YWxpZCB4NTA5IGNlcnRpZmljYXRlLCBqdXN0IHNvbWUgcGFkZGluZyBieXRlcyB0byBtYWtlIGl0IGxvbmcgZW5vdWdo\n\
+-----END CERTIFICATE-----\n";
+        let opts = opts(|o| o.ca_cert = Some(garbage_cert.to_string()));
+        let issues = validate_tls_material(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["caCert"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn a_well_formed_pem_wrapping_garbage_der_key_is_rejected() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let garbage_key = "-----BEGIN PRIVATE KEY-----\n\
+dGhpcyBpcyBub3QgYSB2YWxpZCBwcml2YXRlIGtleSBkZXIsIGp1c3QgcGFkZGluZyBieXRlcyB0byBtYWtlIGl0IGxvbmcgZW5vdWdoIHRvIGxvb2sgcmVhbA==\n\
+-----END PRIVATE KEY-----\n";
+        let opts = opts(|o| {
+            o.tls_client_cert = Some(CERT_PEM.to_string());
+            o.tls_client_key = Some(garbage_key.to_string());
+        });
+        let issues = validate_tls_material(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["tlsClientKey"]),
             "{issues:?}"
         );
     }

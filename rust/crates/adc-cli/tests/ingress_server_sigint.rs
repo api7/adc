@@ -78,9 +78,15 @@ async fn sigint_before_the_server_is_ready_still_lets_it_exit() {
     let pid = child.id().expect("child should have a pid right after spawning") as i32;
 
     let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
-    let _ = timeout(Duration::from_secs(10), lines.next_line()).await;
+    match timeout(Duration::from_secs(10), lines.next_line()).await {
+        Ok(Ok(Some(_))) => {}
+        Ok(Ok(None)) => panic!("child exited before printing its startup line"),
+        Ok(Err(error)) => panic!("failed to read the child's stdout: {error}"),
+        Err(_) => panic!("child did not print its startup line within the timeout"),
+    }
 
-    // SAFETY: `pid` is this test's own freshly-spawned, still-alive child.
+    // SAFETY: `pid` is this test's own freshly-spawned, still-alive child —
+    // proven by having just read its startup line above.
     let rc = unsafe { libc::kill(pid, libc::SIGINT) };
     assert_eq!(rc, 0, "failed to send SIGINT: {}", std::io::Error::last_os_error());
 

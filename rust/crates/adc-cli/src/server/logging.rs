@@ -25,7 +25,12 @@ pub async fn request_logger(request: Request, next: Next) -> Response {
         Ok(bytes) => bytes,
         Err(error) => {
             tracing::warn!(request_id = %request_id, %error, "failed to read request body");
-            return axum::http::StatusCode::BAD_REQUEST.into_response();
+            let status = if std::error::Error::source(&error).is_some_and(|source| source.is::<http_body_util::LengthLimitError>()) {
+                axum::http::StatusCode::PAYLOAD_TOO_LARGE
+            } else {
+                axum::http::StatusCode::BAD_REQUEST
+            };
+            return status.into_response();
         }
     };
     if !bytes.is_empty() {
