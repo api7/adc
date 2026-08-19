@@ -511,8 +511,6 @@ mod tests {
 
     #[tokio::test]
     async fn unix_listener_removes_a_stale_socket_and_sets_0o660_permissions() {
-        use std::os::unix::fs::FileTypeExt;
-
         let dir = std::env::temp_dir().join(format!("adc-server-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("adc.sock");
@@ -527,28 +525,23 @@ mod tests {
             tls_key_file: None,
         };
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let server = tokio::spawn(async move {
-            serve_unix(
-                &args,
-                adc_router(),
-                shutdown_rx,
-                Arc::new(AtomicBool::new(false)),
-            )
-            .await
+        let ready = Arc::new(AtomicBool::new(false));
+        let server = tokio::spawn({
+            let ready = ready.clone();
+            async move { serve_unix(&args, adc_router(), shutdown_rx, ready).await }
         });
 
-        // Poll for a *socket*, not just existence — the stale file already exists.
-        let mut is_socket = false;
+        // `serve_unix` only flips `ready` after `set_permissions` succeeds —
+        // polling the socket's mere existence races the chmod that follows it.
+        let mut became_ready = false;
         for _ in 0..100 {
-            if let Ok(metadata) = std::fs::metadata(&path)
-                && metadata.file_type().is_socket()
-            {
-                is_socket = true;
+            if ready.load(Ordering::Acquire) {
+                became_ready = true;
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-        assert!(is_socket, "socket never appeared at {}", path.display());
+        assert!(became_ready, "server never became ready");
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o660);
 
