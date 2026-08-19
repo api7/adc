@@ -13,7 +13,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, put};
@@ -26,6 +29,11 @@ use crate::cli::IngressServerArgs;
 use crate::error::CliError;
 
 const MAX_BODY_BYTES: usize = 100 * 1024 * 1024;
+
+/// Bound on how long the HTTPS listener waits for in-flight (e.g.
+/// keep-alive) connections to finish once a shutdown starts — without this,
+/// an idle keep-alive connection could block process exit indefinitely.
+const HTTPS_SHUTDOWN_DEADLINE: Duration = Duration::from_secs(10);
 
 /// Checks the current value first so an already-sent `true` isn't missed.
 async fn wait_for_shutdown(mut rx: watch::Receiver<bool>) {
@@ -43,8 +51,10 @@ fn adc_router() -> Router {
         .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY_BYTES))
 }
 
-fn status_router() -> Router {
-    Router::new().route("/healthz/ready", get(healthz))
+fn status_router(ready: Arc<AtomicBool>) -> Router {
+    Router::new()
+        .route("/healthz/ready", get(healthz))
+        .with_state(ready)
 }
 
 pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
@@ -55,7 +65,9 @@ pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
         .map_err(|e| CliError::msg(format!("failed to install SIGINT handler: {e}")))?;
 
     let app = adc_router();
-    let status_app = status_router();
+
+    let ready = Arc::new(AtomicBool::new(false));
+    let status_app = status_router(ready.clone());
 
     let status_addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::UNSPECIFIED), args.listen_status));
     let status_listener = tokio::net::TcpListener::bind(status_addr)
@@ -80,7 +92,7 @@ pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
         "ADC server is running on: {}",
         display_listen_address(&args.listen)
     );
-    let adc_server = serve_adc(&args, app, shutdown_rx);
+    let adc_server = serve_adc(&args, app, shutdown_rx, ready);
 
     tokio::spawn(async move {
         sigint.recv().await;
@@ -92,19 +104,24 @@ pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn healthz() -> impl IntoResponse {
-    (StatusCode::OK, "OK")
+async fn healthz(State(ready): State<Arc<AtomicBool>>) -> Response {
+    if ready.load(Ordering::Acquire) {
+        (StatusCode::OK, "ok").into_response()
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, "not ready").into_response()
+    }
 }
 
 async fn serve_adc(
     args: &IngressServerArgs,
     app: Router,
     shutdown: watch::Receiver<bool>,
+    ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     match args.listen.scheme() {
-        "unix" => serve_unix(args, app, shutdown).await,
-        "https" => serve_https(args, app, shutdown).await,
-        _ => serve_http(args, app, shutdown).await,
+        "unix" => serve_unix(args, app, shutdown, ready).await,
+        "https" => serve_https(args, app, shutdown, ready).await,
+        _ => serve_http(args, app, shutdown, ready).await,
     }
 }
 
@@ -112,11 +129,13 @@ async fn serve_http(
     args: &IngressServerArgs,
     app: Router,
     shutdown: watch::Receiver<bool>,
+    ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     let addr = tcp_addr(&args.listen)?;
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| CliError::msg(format!("failed to bind {addr}: {e}")))?;
+    ready.store(true, Ordering::Release);
     axum::serve(listener, app)
         .with_graceful_shutdown(wait_for_shutdown(shutdown))
         .await
@@ -124,11 +143,14 @@ async fn serve_http(
 }
 
 /// An existing stale socket file is removed before binding, and the fresh
-/// one gets `0o660` permissions once bound.
+/// one gets `0o660` permissions once bound. The socket file itself is
+/// removed again on shutdown so a normal restart doesn't depend on this
+/// stale-file cleanup happening next time.
 async fn serve_unix(
     args: &IngressServerArgs,
     app: Router,
     shutdown: watch::Receiver<bool>,
+    ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     let path = args.listen.path();
     if Path::new(path).exists() {
@@ -139,16 +161,20 @@ async fn serve_unix(
         .map_err(|e| CliError::msg(format!("failed to bind unix socket {path}: {e}")))?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o660))
         .map_err(|e| CliError::msg(format!("failed to chmod unix socket {path}: {e}")))?;
-    axum::serve(listener, app)
+    ready.store(true, Ordering::Release);
+    let result = axum::serve(listener, app)
         .with_graceful_shutdown(wait_for_shutdown(shutdown))
         .await
-        .map_err(|e| CliError::msg(format!("server error: {e}")))
+        .map_err(|e| CliError::msg(format!("server error: {e}")));
+    std::fs::remove_file(path).ok();
+    result
 }
 
 async fn serve_https(
     args: &IngressServerArgs,
     app: Router,
     shutdown: watch::Receiver<bool>,
+    ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     let cert_path = args
         .tls_cert_file
@@ -165,7 +191,14 @@ async fn serve_https(
     let handle_for_shutdown = handle.clone();
     tokio::spawn(async move {
         wait_for_shutdown(shutdown).await;
-        handle_for_shutdown.graceful_shutdown(None);
+        handle_for_shutdown.graceful_shutdown(Some(HTTPS_SHUTDOWN_DEADLINE));
+    });
+
+    let handle_for_ready = handle.clone();
+    tokio::spawn(async move {
+        if handle_for_ready.listening().await.is_some() {
+            ready.store(true, Ordering::Release);
+        }
     });
 
     let tls_config = axum_server::tls_rustls::RustlsConfig::from_config(Arc::new(server_config));
@@ -289,9 +322,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn healthz_ready_returns_ok() {
-        let (status, _) = send(status_router(), "GET", "/healthz/ready", "").await;
+    async fn healthz_ready_returns_ok_once_marked_ready() {
+        let router = status_router(Arc::new(AtomicBool::new(true)));
+        let (status, _) = send(router, "GET", "/healthz/ready", "").await;
         assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn healthz_ready_returns_service_unavailable_before_ready() {
+        let router = status_router(Arc::new(AtomicBool::new(false)));
+        let (status, _) = send(router, "GET", "/healthz/ready", "").await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test]
@@ -478,8 +519,15 @@ mod tests {
             tls_key_file: None,
         };
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let server =
-            tokio::spawn(async move { serve_unix(&args, adc_router(), shutdown_rx).await });
+        let server = tokio::spawn(async move {
+            serve_unix(
+                &args,
+                adc_router(),
+                shutdown_rx,
+                Arc::new(AtomicBool::new(false)),
+            )
+            .await
+        });
 
         // Poll for a *socket*, not just existence — the stale file already exists.
         let mut is_socket = false;

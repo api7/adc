@@ -35,7 +35,9 @@ pub async fn sync_handler(body: Bytes) -> Response {
     let mut configuration: Configuration = match serde_json::from_value(config_value) {
         Ok(configuration) => configuration,
         Err(error) => {
-            return bad_request(json!({"message": format!("invalid configuration: {error}"), "errors": []}));
+            return bad_request(
+                json!({"message": format!("invalid configuration: {error}"), "errors": []}),
+            );
         }
     };
 
@@ -52,7 +54,16 @@ pub async fn sync_handler(body: Bytes) -> Response {
         }
     }
 
-    match run(&opts.backend, &opts, configuration, &include, &exclude, &label_selector).await {
+    match run(
+        &opts.backend,
+        &opts,
+        configuration,
+        &include,
+        &exclude,
+        &label_selector,
+    )
+    .await
+    {
         Ok(output) => (StatusCode::ACCEPTED, Json(output)).into_response(),
         Err(error) => internal_error(json!({"message": error.to_string()})),
     }
@@ -69,13 +80,17 @@ async fn run(
     let gateway = backend::build_backend(opts)?;
     let remote = pipeline::load_remote(gateway.as_ref(), include, exclude, label_selector).await?;
     let events = pipeline::diff(gateway.as_ref(), &local, &remote).await?;
-    let sync_opts = BackendSyncOptions { concurrent: Some(opts.request_concurrent), exit_on_failure: Some(false) };
-    let results = gateway.sync(events.clone(), sync_opts).await?;
+    let sync_opts = BackendSyncOptions {
+        concurrent: Some(opts.request_concurrent),
+        exit_on_failure: Some(false),
+    };
 
-    Ok(if backend_kind == "apisix-standalone" {
-        output_for_apisix_standalone(&events, &results)
-    } else {
-        output(&results)
+    let is_apisix_standalone = backend_kind == "apisix-standalone";
+    let events_for_output = is_apisix_standalone.then(|| events.clone());
+    let results = gateway.sync(events, sync_opts).await?;
+    Ok(match events_for_output {
+        Some(events) => output_for_apisix_standalone(&events, &results),
+        None => output(&results),
     })
 }
 
@@ -139,7 +154,13 @@ fn output_for_apisix_standalone(events: &[Event], results: &[BackendSyncResult])
 }
 
 fn simplify_event(event: &Event) -> Value {
-    let mut value = serde_json::to_value(event).expect("Event always serializes");
+    let mut value = match serde_json::to_value(event) {
+        Ok(value) => value,
+        // The sync itself already happened by the time this runs — a
+        // response with a placeholder event beats panicking and losing the
+        // result entirely.
+        Err(error) => return json!({"error": format!("failed to serialize event: {error}")}),
+    };
     if let Value::Object(map) = &mut value {
         map.remove("old_value");
         map.remove("new_value");

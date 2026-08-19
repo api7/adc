@@ -1,10 +1,10 @@
 //! JSON structured logging for the ingress-server daemon. Level is
 //! controlled by `ADC_INGRESS_LOG_LEVEL` (default `info`), not `--verbose`.
 
-use axum::body::{Body, Bytes};
+use axum::body::Body;
 use axum::extract::Request;
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 
 pub fn init() {
@@ -23,7 +23,10 @@ pub async fn request_logger(request: Request, next: Next) -> Response {
     let (parts, body) = request.into_parts();
     let bytes = match axum::body::to_bytes(body, 100 * 1024 * 1024).await {
         Ok(bytes) => bytes,
-        Err(_) => Bytes::new(),
+        Err(error) => {
+            tracing::warn!(request_id = %request_id, %error, "failed to read request body");
+            return axum::http::StatusCode::BAD_REQUEST.into_response();
+        }
     };
     if !bytes.is_empty() {
         tracing::debug!(request_id = %request_id, request_body = %redacted_body_text(&bytes));
@@ -40,11 +43,13 @@ fn redacted_body_text(bytes: &[u8]) -> String {
     }
 }
 
-/// Never let a raw mTLS private key reach a debug log.
+/// Never let a raw mTLS private key or backend token reach a debug log.
 pub fn redact_request_body(body: &Value) -> Value {
     let mut redacted = body.clone();
-    if let Some(key) = redacted.pointer_mut("/task/opts/tlsClientKey") {
-        *key = Value::String("***".to_string());
+    for pointer in ["/task/opts/tlsClientKey", "/task/opts/token"] {
+        if let Some(field) = redacted.pointer_mut(pointer) {
+            *field = Value::String("***".to_string());
+        }
     }
     redacted
 }
@@ -61,6 +66,16 @@ mod tests {
         assert_eq!(
             redacted,
             json!({"task": {"opts": {"backend": "apisix", "tlsClientKey": "***", "tlsClientCert": "cert"}, "config": {}}})
+        );
+    }
+
+    #[test]
+    fn redacts_the_backend_token() {
+        let body = json!({"task": {"opts": {"backend": "apisix", "token": "SECRET"}, "config": {}}});
+        let redacted = redact_request_body(&body);
+        assert_eq!(
+            redacted,
+            json!({"task": {"opts": {"backend": "apisix", "token": "***"}, "config": {}}})
         );
     }
 

@@ -58,6 +58,11 @@ pub struct HttpClient {
     /// (`"APISIX"`), not the generic `"ADC"`. Set via `with_log_scope`
     /// since `HttpClient` itself doesn't know which backend owns it.
     log_scope: Vec<String>,
+    /// Applied per-request in [`HttpClient::request`], not just baked into
+    /// `inner` at build time — a caller-owned pooled client (see
+    /// [`HttpClient::with_shared_client`]) may have no client-level timeout
+    /// of its own, so this is the only way its callers still get one.
+    timeout: Option<Duration>,
 }
 
 impl HttpClient {
@@ -71,12 +76,21 @@ impl HttpClient {
             BackendError::Other(format!("failed to build HTTP client: {}", with_source(&e)).into())
         })?;
 
-        Self::with_shared_client(inner, config.server, config.token)
+        Self::with_shared_client(inner, config.server, config.token, config.timeout)
     }
 
     /// Like [`HttpClient::new`], but wraps an already-built `reqwest::Client`
-    /// — for callers pooling clients across many `HttpClient`s by TLS material.
-    pub fn with_shared_client(client: reqwest::Client, server: String, token: String) -> Result<Self, BackendError> {
+    /// — for callers pooling clients across many `HttpClient`s by TLS
+    /// material. That pooled client is shared across callers that may want
+    /// different timeouts, so `timeout` (if given) is applied per-request
+    /// here rather than relying on whatever the pooled client itself was
+    /// built with.
+    pub fn with_shared_client(
+        client: reqwest::Client,
+        server: String,
+        token: String,
+        timeout: Option<Duration>,
+    ) -> Result<Self, BackendError> {
         let base_url = Url::parse(&server)
             .map_err(|e| BackendError::Other(format!("invalid server URL {server:?}: {e}").into()))?;
 
@@ -92,6 +106,7 @@ impl HttpClient {
             base_url,
             default_headers: headers,
             log_scope: vec!["ADC".to_string()],
+            timeout,
         })
     }
 
@@ -114,7 +129,11 @@ impl HttpClient {
         let url = Url::parse(&combined).map_err(|e| {
             BackendError::Other(format!("invalid request path {path:?}: {e}").into())
         })?;
-        Ok(self.inner.request(method, url).headers(self.default_headers.clone()))
+        let mut builder = self.inner.request(method, url).headers(self.default_headers.clone());
+        if let Some(timeout) = self.timeout {
+            builder = builder.timeout(timeout);
+        }
+        Ok(builder)
     }
 
     /// Classifies only transport-level failures into `BackendError::Transport`.

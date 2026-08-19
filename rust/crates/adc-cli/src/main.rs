@@ -28,6 +28,7 @@ async fn main() {
 
     // The global tracing subscriber can only be installed once, so pick
     // which logging setup to use before dispatching below.
+    let is_ingress_server = matches!(cli.command, Command::IngressServer(_));
     match &cli.command {
         Command::IngressServer(_) => server::logging::init(),
         _ => {
@@ -45,16 +46,13 @@ async fn main() {
         Command::Validate(args) => cmd_validate(args).await,
         Command::Convert(args) => cmd_convert(args).await,
         Command::IngressSync => Err(CliError::msg("adc ingress-sync: not yet implemented")),
-        Command::IngressServer(args) => match server::run(args).await {
-            Ok(()) => std::process::exit(0),
-            Err(err) => {
-                eprintln!("Error: {err}");
-                std::process::exit(1);
-            }
-        },
+        Command::IngressServer(args) => server::run(args).await,
     };
 
     match result {
+        // The ingress-server daemon has its own "Stopping..." log line on
+        // shutdown — skip the one-shot-command "All is well" line here.
+        Ok(()) if is_ingress_server => {}
         Ok(()) => progress::finish_ok(),
         Err(CliError::AlreadyReported) => std::process::exit(1),
         Err(err) => {

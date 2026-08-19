@@ -27,6 +27,7 @@ async fn sigint_shuts_down_both_listeners_gracefully_and_exits_zero() {
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .kill_on_drop(true)
         .spawn()
         .expect("failed to spawn the adc binary");
     let pid = child.id().expect("child should have a pid right after spawning") as i32;
@@ -71,6 +72,7 @@ async fn sigint_before_the_server_is_ready_still_lets_it_exit() {
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .kill_on_drop(true)
         .spawn()
         .expect("failed to spawn the adc binary");
     let pid = child.id().expect("child should have a pid right after spawning") as i32;
@@ -78,6 +80,7 @@ async fn sigint_before_the_server_is_ready_still_lets_it_exit() {
     let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
     let _ = timeout(Duration::from_secs(10), lines.next_line()).await;
 
+    // SAFETY: `pid` is this test's own freshly-spawned, still-alive child.
     let rc = unsafe { libc::kill(pid, libc::SIGINT) };
     assert_eq!(rc, 0, "failed to send SIGINT: {}", std::io::Error::last_os_error());
 

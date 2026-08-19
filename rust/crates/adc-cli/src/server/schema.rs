@@ -45,6 +45,8 @@ pub struct Opts {
     pub gateway_group: Option<String>,
     #[serde(default = "default_request_concurrent")]
     pub request_concurrent: usize,
+    #[serde(default = "default_timeout_ms")]
+    pub timeout: u64,
 
     // TLS/mTLS to the backend gateway — raw PEM, not a file path.
     #[serde(default)]
@@ -60,6 +62,10 @@ fn default_true() -> bool {
 
 fn default_request_concurrent() -> usize {
     10
+}
+
+fn default_timeout_ms() -> u64 {
+    30_000
 }
 
 impl Opts {
@@ -158,7 +164,7 @@ impl ValidationIssue {
     }
 }
 
-/// cert/key must be provided together; any of the three, if given, must look like PEM.
+/// cert/key must be provided together; any of the three, if given, must be PEM.
 pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
     if opts.tls_client_cert.is_some() != opts.tls_client_key.is_some() {
@@ -167,13 +173,28 @@ pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
             "tlsClientCert and tlsClientKey must be provided together",
         ));
     }
-    for (field, value, noun) in [
-        ("caCert", &opts.ca_cert, "certificate"),
-        ("tlsClientCert", &opts.tls_client_cert, "certificate"),
-        ("tlsClientKey", &opts.tls_client_key, "key"),
+    for (field, value, noun, is_valid) in [
+        (
+            "caCert",
+            &opts.ca_cert,
+            "certificate",
+            is_valid_pem_certificate as fn(&str) -> bool,
+        ),
+        (
+            "tlsClientCert",
+            &opts.tls_client_cert,
+            "certificate",
+            is_valid_pem_certificate,
+        ),
+        (
+            "tlsClientKey",
+            &opts.tls_client_key,
+            "key",
+            is_valid_pem_private_key,
+        ),
     ] {
         if let Some(value) = value
-            && !is_pem_like(value)
+            && !is_valid(value)
         {
             issues.push(ValidationIssue::new(
                 field,
@@ -184,8 +205,17 @@ pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
     issues
 }
 
-fn is_pem_like(value: &str) -> bool {
-    value.trim_start().starts_with("-----BEGIN")
+fn is_valid_pem_certificate(value: &str) -> bool {
+    let mut reader = std::io::BufReader::new(value.as_bytes());
+    matches!(
+        rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>(),
+        Ok(certs) if !certs.is_empty()
+    )
+}
+
+fn is_valid_pem_private_key(value: &str) -> bool {
+    let mut reader = std::io::BufReader::new(value.as_bytes());
+    matches!(rustls_pemfile::private_key(&mut reader), Ok(Some(_)))
 }
 
 #[cfg(test)]
@@ -205,6 +235,7 @@ mod tests {
             bypass_cache: false,
             gateway_group: None,
             request_concurrent: 10,
+            timeout: 30_000,
             tls_skip_verify: false,
             ca_cert: None,
             tls_client_cert: None,
@@ -297,14 +328,60 @@ mod tests {
         );
     }
 
+    // A real self-signed EC cert/key pair (generated once via `openssl req
+    // -x509 -newkey ec ...`, not fetched at test time) — validation parses
+    // this for real, not just checking for a `-----BEGIN` prefix.
+    const CERT_PEM: &str = "-----BEGIN CERTIFICATE-----\n\
+MIIBcjCCARmgAwIBAgIUWp+abBNKuUPdUIeouYDaDgHPIO4wCgYIKoZIzj0EAwIw\n\
+DzENMAsGA1UEAwwEdGVzdDAeFw0yNjA4MTgwMzIwMDJaFw0yNjA4MTkwMzIwMDJa\n\
+MA8xDTALBgNVBAMMBHRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARVo3/X\n\
+uhOYfghuoLbag2VJvGofvgPYtXcdh4oFCmXB1MOupxSI3DqCFvMJc/QeH92Nz/qW\n\
+vLW7TEWRCo2/Bay1o1MwUTAdBgNVHQ4EFgQUy80qZFI7+wryg4UyeI+YsHfSqgow\n\
+HwYDVR0jBBgwFoAUy80qZFI7+wryg4UyeI+YsHfSqgowDwYDVR0TAQH/BAUwAwEB\n\
+/zAKBggqhkjOPQQDAgNHADBEAiB+ddl9S2GSo8/NF37M47JI1HtxOzQQTizSoAQd\n\
+tx5+SQIgKX3ASSnC8rrNGSFda+y79MOudxia/iQouBhv8Fb/hnE=\n\
+-----END CERTIFICATE-----\n";
+    const KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgO3caXwd/kpykMTTw\n\
++IoxA9NXadu2yhvQXw/rxkgjhZChRANCAARVo3/XuhOYfghuoLbag2VJvGofvgPY\n\
+tXcdh4oFCmXB1MOupxSI3DqCFvMJc/QeH92Nz/qWvLW7TEWRCo2/Bay1\n\
+-----END PRIVATE KEY-----\n";
+
     #[test]
     fn a_paired_cert_and_key_is_accepted_at_the_pairing_check() {
         let opts = opts(|o| {
-            o.tls_client_cert = Some("-----BEGIN CERTIFICATE-----\n...".to_string());
-            o.tls_client_key = Some("-----BEGIN PRIVATE KEY-----\n...".to_string());
+            o.tls_client_cert = Some(CERT_PEM.to_string());
+            o.tls_client_key = Some(KEY_PEM.to_string());
         });
         let issues = validate_tls_material(&opts);
         assert!(issues.is_empty(), "{issues:?}");
+    }
+
+    #[test]
+    fn a_lone_tls_client_key_missing_its_cert_is_flagged_on_tls_client_key_only() {
+        // A lone tlsClientKey should be reported once, on the pairing
+        // check — not duplicated by the per-field PEM-validity check,
+        // since the key itself is valid PEM.
+        let opts = opts(|o| o.tls_client_key = Some(KEY_PEM.to_string()));
+        let issues = validate_tls_material(&opts);
+        assert_eq!(
+            issues,
+            vec![ValidationIssue::new(
+                "tlsClientKey",
+                "tlsClientCert and tlsClientKey must be provided together",
+            )],
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn an_incomplete_pem_certificate_is_rejected() {
+        let opts = opts(|o| o.ca_cert = Some("-----BEGIN CERTIFICATE-----\n...".to_string()));
+        let issues = validate_tls_material(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["caCert"]),
+            "{issues:?}"
+        );
     }
 
     #[test]

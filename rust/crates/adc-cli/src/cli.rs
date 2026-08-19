@@ -67,7 +67,13 @@ pub struct IngressServerArgs {
 }
 
 fn parse_listen_url(raw: &str) -> Result<url::Url, String> {
-    url::Url::parse(raw).map_err(|e| e.to_string())
+    let url = url::Url::parse(raw).map_err(|e| e.to_string())?;
+    match url.scheme() {
+        "http" | "https" | "unix" => Ok(url),
+        other => Err(format!(
+            "unsupported --listen scheme \"{other}\": expected http, https, or unix"
+        )),
+    }
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]

@@ -105,8 +105,7 @@ pub fn init_backend(
                 tls: spec.tls,
             },
         )?)),
-        // "apisix" and anything unrecognized both default to apisix.
-        _ => {
+        "" | "apisix" => {
             let client = http_client(shared_client, &server, &token, spec.timeout, &spec.tls)?;
             Ok(Box::new(adc_backend_apisix::Backend::new(
                 client,
@@ -114,6 +113,9 @@ pub fn init_backend(
                 spec.concurrency,
             )))
         }
+        other => Err(CliError::msg(format!(
+            "unrecognized backend kind: \"{other}\""
+        ))),
     }
 }
 
@@ -132,7 +134,7 @@ fn http_client(
             tls: tls.clone(),
         })?,
         Some(client) => {
-            HttpClient::with_shared_client(client, server.to_string(), token.to_string())?
+            HttpClient::with_shared_client(client, server.to_string(), token.to_string(), timeout)?
         }
     })
 }
