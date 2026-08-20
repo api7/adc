@@ -31,8 +31,37 @@ use adc_sdk::resources::{
     Expr, Plugins, SslClient, SslType, Timeout, UpstreamBalancer, UpstreamHealthCheck,
     UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
+
+/// API7's `UpstreamTimeout.{connect,send,read}` fields are `int` on
+/// some old gateway versions; `serde_json` always emits a decimal point
+/// for an `f64`, even a whole number like `111.0`, and Go's `int` unmarshal
+/// rejects that outright.
+/// A bare integer JSON literal is valid input either way, so whole-number
+/// values are always written as one.
+fn serialize_timeout<S: Serializer>(
+    timeout: &Option<Timeout>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let Some(timeout) = timeout else {
+        return serializer.serialize_none();
+    };
+    let mut map = serializer.serialize_map(Some(3))?;
+    for (key, value) in [
+        ("connect", timeout.connect),
+        ("send", timeout.send),
+        ("read", timeout.read),
+    ] {
+        if value.fract() == 0.0 {
+            map.serialize_entry(key, &(value as i64))?;
+        } else {
+            map.serialize_entry(key, &value)?;
+        }
+    }
+    map.end()
+}
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Route {
@@ -67,7 +96,11 @@ pub struct Route {
     pub enable_websocket: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_timeout"
+    )]
     pub timeout: Option<Timeout>,
 }
 
@@ -261,7 +294,11 @@ pub struct Upstream {
     pub retries: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_timeout: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_timeout"
+    )]
     pub timeout: Option<Timeout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<UpstreamTls>,
@@ -282,4 +319,68 @@ pub struct ListResponse<T> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValueResponse<T> {
     pub value: T,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn timeout(connect: f64, send: f64, read: f64) -> Timeout {
+        Timeout {
+            connect,
+            send,
+            read,
+        }
+    }
+
+    #[test]
+    fn a_route_s_whole_number_timeout_has_no_decimal_point() {
+        let route = Route {
+            timeout: Some(timeout(111.0, 222.0, 333.0)),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            serde_json::to_value(&route).unwrap()["timeout"],
+            json!({"connect": 111, "send": 222, "read": 333})
+        );
+    }
+
+    #[test]
+    fn a_fractional_timeout_value_keeps_its_decimal_point() {
+        let route = Route {
+            timeout: Some(timeout(1.5, 222.0, 333.0)),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            serde_json::to_value(&route).unwrap()["timeout"],
+            json!({"connect": 1.5, "send": 222, "read": 333})
+        );
+    }
+
+    #[test]
+    fn no_timeout_omits_the_field_entirely() {
+        let route = Route::default();
+
+        assert_eq!(serde_json::to_value(&route).unwrap().get("timeout"), None);
+    }
+
+    #[test]
+    fn a_service_s_inline_default_upstream_timeout_is_also_normalized() {
+        let service = Service {
+            upstream: Some(Upstream {
+                timeout: Some(timeout(60.0, 60.0, 60.0)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            serde_json::to_value(&service).unwrap()["upstream"]["timeout"],
+            json!({"connect": 60, "send": 60, "read": 60})
+        );
+    }
 }
