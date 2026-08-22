@@ -84,6 +84,16 @@ impl CachedEntry {
         // ms, making every entry look immediately expired.
         self.updated_at.is_none_or(|at| stable_timestamp().saturating_sub(at).max(0) as u128 > ttl.as_millis())
     }
+
+    /// Every write path goes through this first: a single-field write onto
+    /// an already-expired entry must not leave the *other* (genuinely
+    /// stale) fields in place merely because this write refreshes
+    /// `updated_at` and makes the entry look fresh again.
+    fn reset_if_expired(&mut self, ttl: Duration) {
+        if self.is_expired(ttl) {
+            *self = CachedEntry::default();
+        }
+    }
 }
 
 pub struct Cache {
@@ -125,14 +135,19 @@ impl Cache {
     /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
     /// caller elsewhere couldn't do anything with the guard anyway.
     ///
-    /// Resets an expired entry before returning it, so a caller through
-    /// here sees the same "expired == absent" state `get_live` does,
-    /// rather than reading stale data past its TTL.
+    /// Deliberately does *not* reset an expired entry the way `touch` does:
+    /// `Backend::sync` uses this to read the last-known real `raw_config`
+    /// as its diff base when it has no pinned snapshot of its own, and a
+    /// stale-but-genuine document there is far safer than treating "past
+    /// TTL" as "no server state exists", which would fold `sync`'s events
+    /// onto an empty document and wipe whatever the servers actually hold.
+    /// Runs eviction on the way out regardless: unlike `touch`, this can
+    /// materialize a fresh entry for a key that's never been cached (e.g.
+    /// a `Backend::sync` with no prior `dump`) without going through
+    /// `touch` at all, so capacity has to be enforced here too.
     pub(crate) async fn lock(&self, key: &str) -> OwnedMutexGuard<CachedEntry> {
-        let mut entry = self.entry(key).lock_owned().await;
-        if entry.is_expired(self.ttl) {
-            *entry = CachedEntry::default();
-        }
+        let entry = self.entry(key).lock_owned().await;
+        self.evict_if_over_capacity();
         entry
     }
 
@@ -177,6 +192,7 @@ impl Cache {
         {
             let entry = self.entry(key);
             let mut entry = entry.lock().await;
+            entry.reset_if_expired(self.ttl);
             entry.updated_at = Some(stable_timestamp());
             apply(&mut entry);
         }
@@ -381,6 +397,39 @@ mod tests {
         assert!(cache.latest_version("k").await.is_none());
     }
 
+    /// A single-field write onto an already-expired entry must not
+    /// resurrect the *other* fields left over from before the TTL — only
+    /// the field this particular write actually touches should come back.
+    #[tokio::test]
+    async fn writing_a_single_field_after_expiration_does_not_resurrect_the_rest_of_the_entry() {
+        let cache = Cache::with_limits(16, Duration::from_millis(10));
+        cache.set_version("k", Version::new(1, 0, 0)).await;
+        cache.set_latest_version("k", 99).await;
+        sleep(Duration::from_millis(30));
+
+        cache.set_latest_version("k", 1).await;
+
+        assert!(cache.version("k").await.is_none());
+        assert_eq!(cache.latest_version("k").await, Some(1));
+    }
+
+    /// `Backend::sync` reads `raw_config` through `Cache::lock` as its diff
+    /// base when it has no pinned snapshot of its own. Past the entry's
+    /// TTL, that must still be the last real data written — not `None` —
+    /// or `sync` would fold its events onto an empty document and wipe
+    /// whatever the servers actually hold.
+    #[tokio::test]
+    async fn lock_returns_the_last_real_raw_config_even_past_the_ttl() {
+        let cache = Cache::with_limits(16, Duration::from_millis(10));
+        cache.set_raw_config("k", ApisixStandalone::default()).await;
+        cache.set_latest_version("k", 42).await;
+        sleep(Duration::from_millis(30));
+
+        let entry = cache.lock("k").await;
+        assert!(entry.raw_config.is_some());
+        assert_eq!(entry.latest_version, Some(42));
+    }
+
     fn empty_configuration() -> Configuration {
         Configuration {
             services: None,
@@ -517,5 +566,19 @@ mod tests {
         holder.await.unwrap();
 
         assert_eq!(cache.latest_version("a").await, Some(1));
+    }
+
+    /// `Backend::sync` calls `Cache::lock` directly, without ever going
+    /// through `touch` — models many `sync` calls (successful or not, it
+    /// doesn't matter here) each on a key that's never been cached before,
+    /// which must stay capacity-bounded the same as writes through `touch`
+    /// do.
+    #[tokio::test]
+    async fn repeatedly_locking_new_keys_still_stays_within_capacity() {
+        let cache = Cache::with_limits(2, Duration::from_secs(3600));
+        for i in 0..20 {
+            let _guard = cache.lock(&format!("k{i}")).await;
+        }
+        assert!(cache.entries.len() <= 2, "{}", cache.entries.len());
     }
 }
