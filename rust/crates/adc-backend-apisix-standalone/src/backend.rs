@@ -60,6 +60,14 @@ pub struct Backend {
     cache_key: String,
     bypass_cache: bool,
     version: OnceCell<Version>,
+    /// Pinned from this instance's own `dump`, if it ran one — so a later
+    /// `sync` on the *same* instance folds events onto the exact document
+    /// they were diffed against, not a fresh (possibly since-changed by a
+    /// concurrent caller) read of the global cache. See `sync`'s doc
+    /// comment. A caller can legitimately `dump`/`sync` more than once on
+    /// the same instance, so every call overwrites this with its own
+    /// result.
+    dumped_raw_config: std::sync::Mutex<Option<ApisixStandalone>>,
 }
 
 impl Backend {
@@ -98,6 +106,7 @@ impl Backend {
             cache_key: opts.cache_key,
             bypass_cache: opts.bypass_cache,
             version: OnceCell::new(),
+            dumped_raw_config: std::sync::Mutex::new(None),
         })
     }
 
@@ -170,29 +179,51 @@ impl adc_sdk::Backend for Backend {
     /// whatever's cached — `sync` writes its own result back into the same
     /// cache at the end, so a `dump` right before it always sees fresh data
     /// without needing to hit the servers again.
+    ///
+    /// Also pins `raw_config` onto this instance (`dumped_raw_config`) —
+    /// see `sync`'s doc comment for why a later `sync` on this same
+    /// instance prefers that pinned copy over a fresh cache read.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
         }
-        if let Some(config) = Cache::global().config(&self.cache_key).await {
+        // `config` and `raw_config` must come from the same moment, or the
+        // value pinned below could mismatch what's cached.
+        if let Some(entry) = Cache::global().get_live(&self.cache_key).await
+            && let Some(config) = entry.config
+        {
+            if let Some(raw_config) = entry.raw_config {
+                *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
+            }
             return Ok(config);
         }
 
         let version = self.resolved_version().await?;
         let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
 
-        Cache::global().set_latest_version(&self.cache_key, highest_conf_version(&raw_config)).await;
-        Cache::global().set_config(&self.cache_key, config.clone()).await;
-        Cache::global().set_raw_config(&self.cache_key, raw_config).await;
+        // A concurrent reader must never observe just some of the three
+        // fields updated and not the others.
+        Cache::global()
+            .set_dump_result(&self.cache_key, highest_conf_version(&raw_config), config.clone(), raw_config.clone())
+            .await;
+        *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
         Ok(config)
     }
 
-    /// Relies on a `dump` having already primed the cache for this
-    /// `cache_key` — this is why `dump`'s own doc comment calls out that
-    /// contract. The lock below guards against a *concurrent* `sync` for
-    /// the same key, not against a cold cache: every caller (the CLI's
-    /// `dump`-then-`sync` pipeline, and any other caller expected to
-    /// follow the same convention) dumps before it syncs.
+    /// When this instance ran its own `dump` first — the normal case: a
+    /// caller diffs `events` against whatever `dump` just returned, then
+    /// syncs them on the same instance — prefers that `dump`'s pinned
+    /// `dumped_raw_config` over a fresh read of the global cache: a
+    /// concurrent caller (a `bypass_cache` dump, or another sync) could
+    /// have changed the cached entry for this key in the time between
+    /// this instance's `dump` and this `sync` call, and folding `events`
+    /// onto a document other than the one they were diffed against would
+    /// produce a wrong result. Without a pinned snapshot — `events` built
+    /// from something other than this instance's own `dump` (a caller
+    /// applying a known change directly, say) — falls back to whatever's
+    /// in the global cache for this key, or an empty document if there's
+    /// nothing there yet; this is a documented convention, not something
+    /// enforced here.
     async fn sync(
         &self,
         events: Vec<Event>,
@@ -202,11 +233,19 @@ impl adc_sdk::Backend for Backend {
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
         let mut entry = Cache::global().lock(&self.cache_key).await;
-        let old_raw_config = entry.raw_config.clone().unwrap_or_default();
+        let old_raw_config = match self.dumped_raw_config.lock().unwrap().clone() {
+            Some(raw_config) => raw_config,
+            None => entry.raw_config.clone().unwrap_or_default(),
+        };
         let latest_known_version = entry.latest_version;
 
         match Operator::new(self.servers.clone(), old_raw_config, latest_known_version).sync(events, opts).await {
             Ok(SyncOutcome { results, new_state: Some((timestamp, new_config)) }) => {
+                // Pinned before `new_config` is moved into `new_entry`
+                // below, so a later `sync`/`dump` on this same instance
+                // builds on what this call actually wrote, not the
+                // pre-sync snapshot it started from.
+                *self.dumped_raw_config.lock().unwrap() = Some(new_config.clone());
                 // Built in full before it touches `entry`, then swapped in
                 // as one assignment — a panic while computing the new state
                 // (e.g. inside `to_adc`) leaves the old entry untouched
@@ -234,8 +273,11 @@ impl adc_sdk::Backend for Backend {
                 // pointing at data a live server may have moved past. The
                 // next dump() re-fetches and re-runs `find_latest` to
                 // discover the cluster's real state instead of trusting
-                // stale cache.
+                // stale cache. This instance's own pinned snapshot is now
+                // equally untrustworthy, so it's cleared too — a retry on
+                // the same instance must go through a fresh `dump`.
                 *entry = CachedEntry::default();
+                *self.dumped_raw_config.lock().unwrap() = None;
                 Err(error)
             }
         }

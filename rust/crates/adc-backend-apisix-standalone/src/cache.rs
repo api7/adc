@@ -10,10 +10,7 @@
 //! `tokio::sync::Mutex` — they're always read and written in the same
 //! lifecycle anyway (see `crate::backend::Backend::dump`/`sync`), so
 //! there's no case where one legitimately needs to expire, evict, or lock
-//! independently of the others. A single map keyed by `cache_key`, not two
-//! separate ones for data and locking: keeping a lock map in sync with a
-//! data map by hand is its own bug source, and the mutex *is* the entry's
-//! own access control, not a bolted-on second concept.
+//! independently of the others.
 //!
 //! `Backend::sync` locks the whole entry for its read-modify-write span via
 //! [`Cache::lock`], so two concurrent syncs on the same key can't both read
@@ -23,12 +20,23 @@
 //! reading through `config`/`raw_config` while a `sync` is in flight for
 //! the same key naturally waits for it, rather than reading a half-applied
 //! state.
+//!
+//! Eviction checks `Arc::strong_count`, not the entry's own lock state: an
+//! entry with a strong count of 1 has no clone anywhere outside this map,
+//! so nobody could be about to lock it either — this also catches a
+//! caller that already holds a clone but hasn't called `.lock()` yet,
+//! which a lock-state check alone would miss. The scan for a candidate and
+//! the actual removal are two separate steps, but the removal re-checks
+//! the count under `DashMap::remove_if`'s single shard-lock acquisition,
+//! so nothing can acquire a new clone in the gap between "this looked
+//! idle" and "so I removed it".
 
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use adc_sdk::resources::Configuration;
 use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
 use semver::Version;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
@@ -64,14 +72,27 @@ pub(crate) struct CachedEntry {
     /// Milliseconds since the Unix epoch, from [`stable_timestamp`] — the
     /// same clock `Operator::sync`'s own conf-version timestamps come from,
     /// so a successful sync's write-back reuses that call's timestamp
-    /// directly instead of taking a second, separate "now" reading.
+    /// directly instead of taking a second, separate "now" reading. Also
+    /// what eviction ranks candidates by (older wins).
     pub(crate) updated_at: Option<i64>,
 }
 
 impl CachedEntry {
     fn is_expired(&self, ttl: Duration) -> bool {
-        self.updated_at
-            .is_none_or(|at| stable_timestamp() - at > ttl.as_millis() as i64)
+        // Compared in u128 throughout: a `ttl.as_millis()` (u128) cast down
+        // to i64 would silently wrap for a configured TTL above i64::MAX
+        // ms, making every entry look immediately expired.
+        self.updated_at.is_none_or(|at| stable_timestamp().saturating_sub(at).max(0) as u128 > ttl.as_millis())
+    }
+
+    /// Every write path goes through this first: a single-field write onto
+    /// an already-expired entry must not leave the *other* (genuinely
+    /// stale) fields in place merely because this write refreshes
+    /// `updated_at` and makes the entry look fresh again.
+    fn reset_if_expired(&mut self, ttl: Duration) {
+        if self.is_expired(ttl) {
+            *self = CachedEntry::default();
+        }
     }
 }
 
@@ -113,17 +134,32 @@ impl Cache {
     /// touches, so ordinary callers never need this directly. Not exposed
     /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
     /// caller elsewhere couldn't do anything with the guard anyway.
+    ///
+    /// Deliberately does *not* reset an expired entry the way `touch` does:
+    /// `Backend::sync` uses this to read the last-known real `raw_config`
+    /// as its diff base when it has no pinned snapshot of its own, and a
+    /// stale-but-genuine document there is far safer than treating "past
+    /// TTL" as "no server state exists", which would fold `sync`'s events
+    /// onto an empty document and wipe whatever the servers actually hold.
+    /// Runs eviction on the way out regardless: unlike `touch`, this can
+    /// materialize a fresh entry for a key that's never been cached (e.g.
+    /// a `Backend::sync` with no prior `dump`) without going through
+    /// `touch` at all, so capacity has to be enforced here too.
     pub(crate) async fn lock(&self, key: &str) -> OwnedMutexGuard<CachedEntry> {
-        self.entry(key).lock_owned().await
+        let entry = self.entry(key).lock_owned().await;
+        self.evict_if_over_capacity();
+        entry
     }
 
-    async fn get_live(&self, key: &str) -> Option<CachedEntry> {
-        let entry = self.lock(key).await;
-        if entry.is_expired(self.ttl) {
-            None
-        } else {
-            Some(entry.clone())
-        }
+    /// Every field, read under one lock acquisition, so a caller pinning
+    /// more than one of them (`Backend::dump` does, for `config` and
+    /// `raw_config`) gets values guaranteed to be from the same moment.
+    pub(crate) async fn get_live(&self, key: &str) -> Option<CachedEntry> {
+        // A plain `get`, not `entry()` — reading a key that was never
+        // cached must not materialize a fresh entry.
+        let arc = self.entries.get(key)?.value().clone();
+        let entry = arc.lock().await;
+        if entry.is_expired(self.ttl) { None } else { Some(entry.clone()) }
     }
 
     pub async fn version(&self, key: &str) -> Option<Version> {
@@ -138,6 +174,11 @@ impl Cache {
         self.get_live(key).await?.latest_version
     }
 
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) now that `dump` reads `get_live` directly instead —
+    // dead as far as a plain `--lib` build (no consumer outside this
+    // crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn config(&self, key: &str) -> Option<Configuration> {
         self.get_live(key).await?.config
     }
@@ -149,7 +190,9 @@ impl Cache {
 
     async fn touch(&self, key: &str, apply: impl FnOnce(&mut CachedEntry)) {
         {
-            let mut entry = self.lock(key).await;
+            let entry = self.entry(key);
+            let mut entry = entry.lock().await;
+            entry.reset_if_expired(self.ttl);
             entry.updated_at = Some(stable_timestamp());
             apply(&mut entry);
         }
@@ -169,6 +212,11 @@ impl Cache {
     /// sync's clock-rollback guard reads this value to pick its own
     /// timestamp, so a regressed value here could produce a
     /// `*_conf_version` the data plane has already seen (and rejects).
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) now that `Backend::dump` writes all three fields
+    // together via `set_dump_result` instead — dead as far as a plain
+    // `--lib` build (no consumer outside this crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_latest_version(&self, key: &str, value: i64) {
         self.touch(key, |entry| {
             entry.latest_version = Some(
@@ -180,51 +228,73 @@ impl Cache {
         .await;
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_config(&self, key: &str, config: Configuration) {
         self.touch(key, |entry| entry.config = Some(config)).await;
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
         self.touch(key, |entry| entry.raw_config = Some(raw_config))
             .await;
     }
 
-    pub async fn invalidate(&self, key: &str) {
-        let entry = match self.entries.entry(key.to_string()) {
-            dashmap::mapref::entry::Entry::Occupied(occupied) => occupied.get().clone(),
-            dashmap::mapref::entry::Entry::Vacant(_) => return,
-        };
-        let mut guard = entry.lock_owned().await;
-        *guard = CachedEntry::default();
+    /// `latest_version`/`config`/`raw_config` together, under one lock
+    /// acquisition, so a concurrent reader (another `dump`'s `get_live`)
+    /// can never observe just some of the three updated and not the
+    /// others.
+    pub async fn set_dump_result(&self, key: &str, latest_version: i64, config: Configuration, raw_config: ApisixStandalone) {
+        self.touch(key, |entry| {
+            entry.latest_version = Some(entry.latest_version.map_or(latest_version, |current| current.max(latest_version)));
+            entry.config = Some(config);
+            entry.raw_config = Some(raw_config);
+        })
+        .await;
     }
 
-    /// A soft, best-effort cap: eviction peeks at each entry's
-    /// `updated_at` via a non-blocking `try_lock`, skipping (not blocking
-    /// on) any entry currently held by an in-flight `dump`/`sync` — that
-    /// one's clearly not idle, so it's in no danger of actually being the
-    /// least-recently-touched one anyway. Under concurrent writers the map
-    /// can therefore transiently hold a couple more entries than
-    /// `max_entries` before the next call trims it back down. That's fine —
-    /// this exists to bound long-run memory growth, not to enforce an exact
-    /// invariant.
+    /// No-op for a never-cached key — checked via `entries.entry`, whose
+    /// `Occupied`/`Vacant` match settles that under one shard-lock
+    /// acquisition rather than a separate lookup-then-decide. For a cached
+    /// key, resets its contents in place rather than removing the map
+    /// entry: a concurrent `Backend::sync` that already holds this same
+    /// `Arc` (e.g. mid-write) must keep writing into the entry this call
+    /// reset, not one orphaned from the map.
+    pub async fn invalidate(&self, key: &str) {
+        let entry = match self.entries.entry(key.to_string()) {
+            Entry::Occupied(occupied) => occupied.get().clone(),
+            Entry::Vacant(_) => return,
+        };
+        let mut entry = entry.lock().await;
+        *entry = CachedEntry::default();
+    }
+
+    /// Best-effort: if every entry is currently referenced by something
+    /// other than this map (an in-flight `lock`/`get_live`/...), this
+    /// leaves the map over `max_entries` rather than evicting something
+    /// still in use. Long-running processes with pathologically many
+    /// distinct `cache_key`s and constant concurrent access could keep the
+    /// map slightly over budget indefinitely, which is an acceptable
+    /// trade against ever corrupting a key's cached state.
     fn evict_if_over_capacity(&self) {
         while self.entries.len() > self.max_entries {
             let oldest = self
                 .entries
                 .iter()
                 .filter_map(|entry| {
-                    Some((
-                        entry.key().clone(),
-                        entry.value().try_lock().ok()?.updated_at,
-                    ))
+                    if Arc::strong_count(entry.value()) != 1 {
+                        return None;
+                    }
+                    let updated_at = entry.value().try_lock().ok()?.updated_at;
+                    Some((entry.key().clone(), updated_at))
                 })
                 .min_by_key(|(_, updated_at)| *updated_at)
                 .map(|(key, _)| key);
-            match oldest {
-                Some(key) => {
-                    self.entries.remove(&key);
-                }
-                None => break,
+            let Some(key) = oldest else { break };
+            // Re-checked here, under the removal's own shard-lock
+            // acquisition, in case something acquired a clone in the gap
+            // since the scan above read this key's count.
+            if self.entries.remove_if(&key, |_, arc| Arc::strong_count(arc) == 1).is_none() {
+                break;
             }
         }
     }
@@ -327,6 +397,39 @@ mod tests {
         assert!(cache.latest_version("k").await.is_none());
     }
 
+    /// A single-field write onto an already-expired entry must not
+    /// resurrect the *other* fields left over from before the TTL — only
+    /// the field this particular write actually touches should come back.
+    #[tokio::test]
+    async fn writing_a_single_field_after_expiration_does_not_resurrect_the_rest_of_the_entry() {
+        let cache = Cache::with_limits(16, Duration::from_millis(10));
+        cache.set_version("k", Version::new(1, 0, 0)).await;
+        cache.set_latest_version("k", 99).await;
+        sleep(Duration::from_millis(30));
+
+        cache.set_latest_version("k", 1).await;
+
+        assert!(cache.version("k").await.is_none());
+        assert_eq!(cache.latest_version("k").await, Some(1));
+    }
+
+    /// `Backend::sync` reads `raw_config` through `Cache::lock` as its diff
+    /// base when it has no pinned snapshot of its own. Past the entry's
+    /// TTL, that must still be the last real data written — not `None` —
+    /// or `sync` would fold its events onto an empty document and wipe
+    /// whatever the servers actually hold.
+    #[tokio::test]
+    async fn lock_returns_the_last_real_raw_config_even_past_the_ttl() {
+        let cache = Cache::with_limits(16, Duration::from_millis(10));
+        cache.set_raw_config("k", ApisixStandalone::default()).await;
+        cache.set_latest_version("k", 42).await;
+        sleep(Duration::from_millis(30));
+
+        let entry = cache.lock("k").await;
+        assert!(entry.raw_config.is_some());
+        assert_eq!(entry.latest_version, Some(42));
+    }
+
     fn empty_configuration() -> Configuration {
         Configuration {
             services: None,
@@ -356,7 +459,7 @@ mod tests {
     async fn invalidate_on_a_never_cached_key_does_not_materialize_an_entry() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
         cache.invalidate("k").await;
-        assert!(cache.entries.is_empty());
+        assert_eq!(cache.entries.len(), 0);
     }
 
     /// A holder that grabbed this entry's `Arc` before `invalidate` ran
@@ -413,6 +516,7 @@ mod tests {
         sleep(Duration::from_millis(5));
         cache.set_latest_version("c", 3).await;
 
+        assert_eq!(cache.entries.len(), 2);
         assert!(cache.latest_version("a").await.is_none());
         assert_eq!(cache.latest_version("b").await, Some(2));
         assert_eq!(cache.latest_version("c").await, Some(3));
@@ -425,13 +529,56 @@ mod tests {
         sleep(Duration::from_millis(5));
         cache.set_latest_version("b", 2).await;
         sleep(Duration::from_millis(5));
-        // Re-touch "a" so "b" becomes the least recently touched instead.
-        cache.set_latest_version("a", 10).await;
+        cache.set_latest_version("a", 10).await; // "a" is now the most recently touched
         sleep(Duration::from_millis(5));
-        cache.set_latest_version("c", 3).await;
+        cache.set_latest_version("c", 3).await; // "b" should be evicted instead
 
+        assert_eq!(cache.entries.len(), 2);
         assert_eq!(cache.latest_version("a").await, Some(10));
         assert!(cache.latest_version("b").await.is_none());
         assert_eq!(cache.latest_version("c").await, Some(3));
+    }
+
+    /// An entry that's locked (held by an in-flight caller) must never be
+    /// picked as an eviction victim, even while enough other keys pass
+    /// through to blow well past capacity — the whole point of checking
+    /// `Arc::strong_count` instead of just scanning by recency.
+    #[tokio::test]
+    async fn a_locked_entry_survives_eviction_pressure_from_other_keys() {
+        let cache = Arc::new(Cache::with_limits(2, Duration::from_secs(3600)));
+        cache.set_latest_version("a", 1).await;
+
+        let holder_cache = cache.clone();
+        let (holding_tx, holding_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let holder = tokio::spawn(async move {
+            let _guard = holder_cache.lock("a").await;
+            holding_tx.send(()).unwrap();
+            release_rx.await.unwrap();
+        });
+        holding_rx.await.unwrap(); // the spawned task now holds "a"'s lock
+
+        for i in 0..10 {
+            cache.set_latest_version(&format!("k{i}"), i).await;
+        }
+
+        release_tx.send(()).unwrap();
+        holder.await.unwrap();
+
+        assert_eq!(cache.latest_version("a").await, Some(1));
+    }
+
+    /// `Backend::sync` calls `Cache::lock` directly, without ever going
+    /// through `touch` — models many `sync` calls (successful or not, it
+    /// doesn't matter here) each on a key that's never been cached before,
+    /// which must stay capacity-bounded the same as writes through `touch`
+    /// do.
+    #[tokio::test]
+    async fn repeatedly_locking_new_keys_still_stays_within_capacity() {
+        let cache = Cache::with_limits(2, Duration::from_secs(3600));
+        for i in 0..20 {
+            let _guard = cache.lock(&format!("k{i}")).await;
+        }
+        assert!(cache.entries.len() <= 2, "{}", cache.entries.len());
     }
 }
