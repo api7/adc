@@ -10,12 +10,23 @@ use adc_sdk::BackendError;
 use lru::LruCache;
 
 /// Distinguishes one pooled client from another — `Hash`/`Eq` let it double as the pool key.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 pub struct TlsMaterial {
     pub skip_verify: bool,
     pub ca_cert: Option<String>,
     pub client_cert: Option<String>,
     pub client_key: Option<String>,
+}
+
+impl std::fmt::Debug for TlsMaterial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TlsMaterial")
+            .field("skip_verify", &self.skip_verify)
+            .field("ca_cert", &self.ca_cert)
+            .field("client_cert", &self.client_cert)
+            .field("client_key", &self.client_key.is_some())
+            .finish()
+    }
 }
 
 const DEFAULT_MAX_ENTRIES: usize = 16;
@@ -114,5 +125,17 @@ mod tests {
 
         let b_again = pool.get_client(&material("b")).unwrap();
         assert!(!Arc::ptr_eq(&b, &b_again), "\"b\" should have been evicted and rebuilt");
+    }
+
+    #[test]
+    fn debug_never_prints_the_private_key_but_the_cert_is_fine() {
+        let tls = TlsMaterial {
+            client_key: Some("-----BEGIN PRIVATE KEY-----\nSECRET-KEY\n-----END PRIVATE KEY-----".to_string()),
+            client_cert: Some("-----BEGIN CERTIFICATE-----\nPUBLIC-CERT\n-----END CERTIFICATE-----".to_string()),
+            ..Default::default()
+        };
+        let debug = format!("{tls:?}");
+        assert!(!debug.contains("SECRET-KEY"), "{debug}");
+        assert!(debug.contains("PUBLIC-CERT"), "{debug}");
     }
 }

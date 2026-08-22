@@ -125,6 +125,10 @@ impl Cache {
         self.get_live(key).await?.version
     }
 
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) — dead as far as a plain `--lib` build (no consumer
+    // outside this crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn latest_version(&self, key: &str) -> Option<i64> {
         self.get_live(key).await?.latest_version
     }
@@ -133,6 +137,7 @@ impl Cache {
         self.get_live(key).await?.config
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn raw_config(&self, key: &str) -> Option<ApisixStandalone> {
         self.get_live(key).await?.raw_config
     }
@@ -174,8 +179,9 @@ impl Cache {
         self.touch(key, |entry| entry.raw_config = Some(raw_config)).await;
     }
 
-    pub fn invalidate(&self, key: &str) {
-        self.entries.remove(key);
+    pub async fn invalidate(&self, key: &str) {
+        let mut entry = self.lock(key).await;
+        *entry = CachedEntry::default();
     }
 
     /// A soft, best-effort cap: eviction peeks at each entry's
@@ -314,13 +320,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalidate_removes_every_cached_field_for_that_key() {
+    async fn invalidate_clears_every_cached_field_for_that_key() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
         cache.set_latest_version("k", 1).await;
         cache.set_config("k", empty_configuration()).await;
-        cache.invalidate("k");
+        cache.invalidate("k").await;
         assert!(cache.latest_version("k").await.is_none());
         assert!(cache.config("k").await.is_none());
+    }
+
+    /// A holder that grabbed this entry's `Arc` before `invalidate` ran
+    /// (e.g. a concurrent `sync` mid-write) must still be holding the same
+    /// entry `invalidate` reset, not one orphaned from the map.
+    #[tokio::test]
+    async fn invalidate_keeps_the_same_entry_identity_for_concurrent_holders() {
+        let cache = Cache::with_limits(16, Duration::from_secs(3600));
+        let before = cache.entry("k");
+        cache.invalidate("k").await;
+        let after = cache.entry("k");
+        assert!(Arc::ptr_eq(&before, &after));
     }
 
     #[tokio::test]

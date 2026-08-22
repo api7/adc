@@ -50,7 +50,6 @@ dependencies = [
  "adc-sdk",
  "async-trait",
  "dashmap",
- "indexmap",
  "log",
  "semver",
  "serde",

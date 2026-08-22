@@ -363,9 +363,3 @@ pub struct ApisixStandalone {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream_routes_conf_version: Option<i64>,
 }
-
-/// Server URL -> its admin API token. `IndexMap`, not `HashMap`: several
-/// call sites (picking "the first server" to probe for version/validate)
-/// rely on iteration order matching configuration order, mirroring the TS
-/// backend's own reliance on JS `Map`'s insertion-order iteration.
-pub type ServerTokenMap = indexmap::IndexMap<String, String>;

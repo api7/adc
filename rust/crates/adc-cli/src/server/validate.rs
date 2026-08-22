@@ -34,11 +34,12 @@ pub async fn validate_handler(body: Bytes) -> Response {
     };
     let opts = input.task.opts;
 
-    let tls_issues = schema::validate_tls_material(&opts);
-    if !tls_issues.is_empty() {
+    let mut issues = schema::validate_server_addr(&opts);
+    issues.extend(schema::validate_tls_material(&opts));
+    if !issues.is_empty() {
         return bad_request(json!({
             "success": false, "source": "input",
-            "message": "invalid TLS material", "errors": tls_issues,
+            "message": "invalid request", "errors": issues,
         }));
     }
 

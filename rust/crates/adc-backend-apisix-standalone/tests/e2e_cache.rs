@@ -192,7 +192,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
     let cache_key = "cache-e2e-partial";
 
     // Write independently to server1 (older) ...
-    common::cache().invalidate(cache_key);
+    common::cache().invalidate(cache_key).await;
     let backend1 = backend_for(common::SERVER1, cache_key);
     let events = diff(&service_with_route_config(5432), &empty_configuration());
     assert_eq!(events.len(), 2, "service + route; no consumers in this fixture");
@@ -204,14 +204,14 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
     // able to tell them apart by `X-Last-Modified`.
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    common::cache().invalidate(cache_key);
+    common::cache().invalidate(cache_key).await;
     let backend2 = backend_for(common::SERVER2, cache_key);
     let events = diff(&service_with_route_config(3306), &empty_configuration());
     sync_ok(&backend2, events).await;
 
     // server3 was never written at all — a real 3-way race between an
     // untouched, an older, and a newer instance.
-    common::cache().invalidate(cache_key);
+    common::cache().invalidate(cache_key).await;
     let backend_multi = backend_multi(cache_key);
     let config = dump(&backend_multi).await;
 
@@ -229,7 +229,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
 async fn bypass_cache_discards_stale_state_and_refetches() {
     common::restart_apisix().await;
     let cache_key = "cache-e2e-bypass";
-    common::cache().invalidate(cache_key);
+    common::cache().invalidate(cache_key).await;
 
     let backend = backend(cache_key);
     dump(&backend).await;

@@ -23,9 +23,10 @@ pub async fn sync_handler(body: Bytes) -> Response {
     };
     let opts = input.task.opts;
 
-    let tls_issues = schema::validate_tls_material(&opts);
-    if !tls_issues.is_empty() {
-        return bad_request(json!({"message": "invalid TLS material", "errors": tls_issues}));
+    let mut issues = schema::validate_server_addr(&opts);
+    issues.extend(schema::validate_tls_material(&opts));
+    if !issues.is_empty() {
+        return bad_request(json!({"message": "invalid request", "errors": issues}));
     }
 
     let label_selector = opts.label_selector_or_default();

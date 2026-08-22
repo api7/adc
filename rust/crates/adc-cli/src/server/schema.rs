@@ -164,6 +164,17 @@ impl ValidationIssue {
     }
 }
 
+/// Every entry must parse as a URL — `ServerAddr`'s `#[serde(untagged)]`
+/// only checks the string-vs-array shape, not `z.url()`'s format contract.
+pub fn validate_server_addr(opts: &Opts) -> Vec<ValidationIssue> {
+    opts.server
+        .as_list()
+        .iter()
+        .filter(|server| url::Url::parse(server).is_err())
+        .map(|server| ValidationIssue::new("server", format!("{server:?} is not a valid URL")))
+        .collect()
+}
+
 /// cert/key must be provided together; any of the three, if given, must be PEM.
 pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
@@ -448,5 +459,34 @@ dGhpcyBpcyBub3QgYSB2YWxpZCBwcml2YXRlIGtleSBkZXIsIGp1c3QgcGFkZGluZyBieXRlcyB0byBt
     #[test]
     fn no_tls_material_at_all_is_fine() {
         assert!(validate_tls_material(&opts(|_| {})).is_empty());
+    }
+
+    #[test]
+    fn a_valid_server_url_passes() {
+        assert!(validate_server_addr(&opts(|_| {})).is_empty());
+    }
+
+    #[test]
+    fn a_malformed_single_server_is_rejected() {
+        let opts = opts(|o| o.server = ServerAddr::Single("not a url".to_string()));
+        let issues = validate_server_addr(&opts);
+        assert!(issues.iter().any(|i| i.path == vec!["server"]), "{issues:?}");
+    }
+
+    #[test]
+    fn one_malformed_entry_among_valid_ones_is_still_rejected() {
+        let opts = opts(|o| {
+            o.server = ServerAddr::Multiple(vec!["http://a:9180".to_string(), "not a url".to_string()])
+        });
+        let issues = validate_server_addr(&opts);
+        assert!(issues.iter().any(|i| i.path == vec!["server"]), "{issues:?}");
+    }
+
+    #[test]
+    fn multiple_valid_servers_pass() {
+        let opts = opts(|o| {
+            o.server = ServerAddr::Multiple(vec!["http://a:9180".to_string(), "http://b:9180".to_string()])
+        });
+        assert!(validate_server_addr(&opts).is_empty());
     }
 }

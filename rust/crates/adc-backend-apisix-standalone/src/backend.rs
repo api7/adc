@@ -176,7 +176,7 @@ impl adc_sdk::Backend for Backend {
     /// without needing to hit the servers again.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
-            Cache::global().invalidate(&self.cache_key);
+            Cache::global().invalidate(&self.cache_key).await;
         }
         if let Some(config) = Cache::global().config(&self.cache_key).await {
             return Ok(config);

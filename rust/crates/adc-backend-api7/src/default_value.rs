@@ -316,6 +316,9 @@ fn transform_default(resource_type: ResourceType, mut data: Value) -> Option<Val
             let upstream: typing::Upstream = serde_json::from_value(data).ok()?;
             serde_json::to_value(adc::Upstream::from(upstream)).ok()
         }
+        // ConsumerCredential/StreamRoute among others: no schema-level
+        // default in practice, so the untransformed fallback never actually
+        // needs to bridge their wire/ADC field-name differences.
         _ => Some(data),
     }
 }
