@@ -207,19 +207,20 @@ impl adc_sdk::Backend for Backend {
         Ok(config)
     }
 
-    /// Relies on a `dump` having already primed the cache for this
-    /// `cache_key` — this is why `dump`'s own doc comment calls out that
-    /// contract, and why `events` exists in the first place (it's a diff
-    /// against whatever `dump` just returned). Prefers this instance's own
-    /// `dumped_raw_config`, pinned by that `dump` call, over a fresh read
-    /// of the global cache: a concurrent caller (a `bypass_cache` dump, or
-    /// another sync) could have changed the cached entry for this key in
-    /// the time between this instance's `dump` and this `sync` call, and
-    /// folding `events` onto a document other than the one they were
-    /// diffed against would produce a wrong result. Only falls back to the
-    /// global cache — and then an error — for a `sync` called without a
-    /// preceding `dump` on this same instance, which no documented caller
-    /// does.
+    /// When this instance ran its own `dump` first — the normal case: a
+    /// caller diffs `events` against whatever `dump` just returned, then
+    /// syncs them on the same instance — prefers that `dump`'s pinned
+    /// `dumped_raw_config` over a fresh read of the global cache: a
+    /// concurrent caller (a `bypass_cache` dump, or another sync) could
+    /// have changed the cached entry for this key in the time between
+    /// this instance's `dump` and this `sync` call, and folding `events`
+    /// onto a document other than the one they were diffed against would
+    /// produce a wrong result. Without a pinned snapshot — `events` built
+    /// from something other than this instance's own `dump` (a caller
+    /// applying a known change directly, say) — falls back to whatever's
+    /// in the global cache for this key, or an empty document if there's
+    /// nothing there yet; this is a documented convention, not something
+    /// enforced here.
     async fn sync(
         &self,
         events: Vec<Event>,
@@ -231,10 +232,7 @@ impl adc_sdk::Backend for Backend {
         let mut entry = Cache::global().lock(&self.cache_key).await;
         let old_raw_config = match self.dumped_raw_config.get() {
             Some(raw_config) => raw_config.clone(),
-            None => entry
-                .raw_config
-                .clone()
-                .ok_or_else(|| BackendError::Other(format!("sync({:?}) called with no prior dump", self.cache_key).into()))?,
+            None => entry.raw_config.clone().unwrap_or_default(),
         };
         let latest_known_version = entry.latest_version;
 
