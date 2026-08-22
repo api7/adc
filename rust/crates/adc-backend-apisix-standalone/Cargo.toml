@@ -22,7 +22,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 semver = { workspace = true }
 sha1 = { workspace = true }
-dashmap = "6"
+moka = { version = "0.12", features = ["future"] }
 tokio = { workspace = true, features = ["macros", "sync"] }
 log = { workspace = true }
 tracing = { workspace = true }

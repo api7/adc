@@ -10,10 +10,11 @@
 //! `tokio::sync::Mutex` — they're always read and written in the same
 //! lifecycle anyway (see `crate::backend::Backend::dump`/`sync`), so
 //! there's no case where one legitimately needs to expire, evict, or lock
-//! independently of the others. A single map keyed by `cache_key`, not two
-//! separate ones for data and locking: keeping a lock map in sync with a
-//! data map by hand is its own bug source, and the mutex *is* the entry's
-//! own access control, not a bolted-on second concept.
+//! independently of the others. The outer key -> entry map is a
+//! `moka::future::Cache`, which owns capacity- and idle-time-based
+//! eviction on its own; the mutex inside each entry is a separate concern
+//! moka has no visibility into — it's the entry's own access control, not
+//! something moka manages.
 //!
 //! `Backend::sync` locks the whole entry for its read-modify-write span via
 //! [`Cache::lock`], so two concurrent syncs on the same key can't both read
@@ -23,22 +24,27 @@
 //! reading through `config`/`raw_config` while a `sync` is in flight for
 //! the same key naturally waits for it, rather than reading a half-applied
 //! state.
+//!
+//! Every entry stored here is an `Arc<AsyncMutex<CachedEntry>>`, so a
+//! concurrent holder that cloned the `Arc` before moka evicted or expired
+//! its map entry keeps a perfectly valid reference regardless — nothing
+//! needs to coordinate with an in-flight `sync` for eviction to be safe.
 
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use adc_sdk::resources::Configuration;
-use dashmap::DashMap;
+use moka::future::Cache as MokaCache;
 use semver::Version;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::typing::ApisixStandalone;
 use crate::utils::stable_timestamp;
 
-const DEFAULT_MAX_ENTRIES: usize = 16;
+const DEFAULT_MAX_ENTRIES: u64 = 16;
 const DEFAULT_TTL_MS: u64 = 3_600_000;
 
-fn env_max_entries() -> usize {
+fn env_max_entries() -> u64 {
     std::env::var("ADC_APISIX_STANDALONE_CACHE_MAX")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -68,28 +74,23 @@ pub(crate) struct CachedEntry {
     pub(crate) updated_at: Option<i64>,
 }
 
-impl CachedEntry {
-    fn is_expired(&self, ttl: Duration) -> bool {
-        self.updated_at
-            .is_none_or(|at| stable_timestamp() - at > ttl.as_millis() as i64)
-    }
-}
-
 pub struct Cache {
-    entries: DashMap<String, Arc<AsyncMutex<CachedEntry>>>,
-    max_entries: usize,
-    ttl: Duration,
+    entries: MokaCache<String, Arc<AsyncMutex<CachedEntry>>>,
 }
 
 static GLOBAL: LazyLock<Cache> = LazyLock::new(|| Cache::with_limits(env_max_entries(), env_ttl()));
 
 impl Cache {
-    pub fn with_limits(max_entries: usize, ttl: Duration) -> Self {
-        Self {
-            entries: DashMap::new(),
-            max_entries: max_entries.max(1),
-            ttl,
-        }
+    pub fn with_limits(max_entries: u64, ttl: Duration) -> Self {
+        let entries = MokaCache::builder()
+            .max_capacity(max_entries.max(1))
+            // Idle, not fixed-lifetime: every read or write below goes
+            // through `entry()` (a moka `get_with`), which resets this
+            // clock — matches the old hand-rolled `updated_at` refreshing
+            // on write, extended a bit further to also cover reads.
+            .time_to_idle(ttl)
+            .build();
+        Self { entries }
     }
 
     /// The process-wide singleton every `Backend` instance reads/writes by
@@ -101,8 +102,10 @@ impl Cache {
         &GLOBAL
     }
 
-    fn entry(&self, key: &str) -> Arc<AsyncMutex<CachedEntry>> {
-        self.entries.entry(key.to_string()).or_default().clone()
+    async fn entry(&self, key: &str) -> Arc<AsyncMutex<CachedEntry>> {
+        self.entries
+            .get_with(key.to_string(), async { Arc::new(AsyncMutex::new(CachedEntry::default())) })
+            .await
     }
 
     /// Locks the whole cached entry for `key`, for a caller that needs to
@@ -114,16 +117,20 @@ impl Cache {
     /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
     /// caller elsewhere couldn't do anything with the guard anyway.
     pub(crate) async fn lock(&self, key: &str) -> OwnedMutexGuard<CachedEntry> {
-        self.entry(key).lock_owned().await
+        self.entry(key).await.lock_owned().await
     }
 
-    async fn get_live(&self, key: &str) -> Option<CachedEntry> {
-        let entry = self.lock(key).await;
-        if entry.is_expired(self.ttl) {
-            None
-        } else {
-            Some(entry.clone())
-        }
+    /// Every field, read under one lock acquisition — `Backend::dump`
+    /// uses this (rather than calling `config`/`raw_config` separately) so
+    /// the two values it pins for a later `sync` on the same instance
+    /// are guaranteed to be from the same moment, not two independent
+    /// reads a concurrent writer could interleave between.
+    pub(crate) async fn get_live(&self, key: &str) -> Option<CachedEntry> {
+        // A plain `get`, not `entry()`/`get_with` — reading a key that was
+        // never cached (or has since expired/been evicted) must not
+        // materialize a fresh entry.
+        let entry = self.entries.get(key).await?;
+        Some(entry.lock().await.clone())
     }
 
     pub async fn version(&self, key: &str) -> Option<Version> {
@@ -138,6 +145,11 @@ impl Cache {
         self.get_live(key).await?.latest_version
     }
 
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) now that `dump` reads `get_live` directly instead —
+    // dead as far as a plain `--lib` build (no consumer outside this
+    // crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn config(&self, key: &str) -> Option<Configuration> {
         self.get_live(key).await?.config
     }
@@ -148,12 +160,10 @@ impl Cache {
     }
 
     async fn touch(&self, key: &str, apply: impl FnOnce(&mut CachedEntry)) {
-        {
-            let mut entry = self.lock(key).await;
-            entry.updated_at = Some(stable_timestamp());
-            apply(&mut entry);
-        }
-        self.evict_if_over_capacity();
+        let entry = self.entry(key).await;
+        let mut entry = entry.lock().await;
+        entry.updated_at = Some(stable_timestamp());
+        apply(&mut entry);
     }
 
     pub async fn set_version(&self, key: &str, version: Version) {
@@ -189,44 +199,19 @@ impl Cache {
             .await;
     }
 
+    /// No-op for a never-cached (or already-expired/evicted) key — checked
+    /// via `get`, which doesn't materialize a fresh entry the way
+    /// `entry()`/`get_with` would. For a cached key, resets its contents in
+    /// place rather than removing it from moka's map: a concurrent
+    /// `Backend::sync` that already holds this same `Arc` (e.g. mid-write)
+    /// must keep writing into the entry this call reset, not one orphaned
+    /// from the map.
     pub async fn invalidate(&self, key: &str) {
-        let entry = match self.entries.entry(key.to_string()) {
-            dashmap::mapref::entry::Entry::Occupied(occupied) => occupied.get().clone(),
-            dashmap::mapref::entry::Entry::Vacant(_) => return,
+        let Some(entry) = self.entries.get(key).await else {
+            return;
         };
-        let mut guard = entry.lock_owned().await;
-        *guard = CachedEntry::default();
-    }
-
-    /// A soft, best-effort cap: eviction peeks at each entry's
-    /// `updated_at` via a non-blocking `try_lock`, skipping (not blocking
-    /// on) any entry currently held by an in-flight `dump`/`sync` — that
-    /// one's clearly not idle, so it's in no danger of actually being the
-    /// least-recently-touched one anyway. Under concurrent writers the map
-    /// can therefore transiently hold a couple more entries than
-    /// `max_entries` before the next call trims it back down. That's fine —
-    /// this exists to bound long-run memory growth, not to enforce an exact
-    /// invariant.
-    fn evict_if_over_capacity(&self) {
-        while self.entries.len() > self.max_entries {
-            let oldest = self
-                .entries
-                .iter()
-                .filter_map(|entry| {
-                    Some((
-                        entry.key().clone(),
-                        entry.value().try_lock().ok()?.updated_at,
-                    ))
-                })
-                .min_by_key(|(_, updated_at)| *updated_at)
-                .map(|(key, _)| key);
-            match oldest {
-                Some(key) => {
-                    self.entries.remove(&key);
-                }
-                None => break,
-            }
-        }
+        let mut entry = entry.lock().await;
+        *entry = CachedEntry::default();
     }
 }
 
@@ -356,7 +341,7 @@ mod tests {
     async fn invalidate_on_a_never_cached_key_does_not_materialize_an_entry() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
         cache.invalidate("k").await;
-        assert!(cache.entries.is_empty());
+        assert_eq!(cache.entries.entry_count(), 0);
     }
 
     /// A holder that grabbed this entry's `Arc` before `invalidate` ran
@@ -368,7 +353,7 @@ mod tests {
     async fn invalidate_keeps_the_same_entry_identity_for_concurrent_holders() {
         let cache = Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
         cache.set_version("k", Version::new(1, 0, 0)).await;
-        let before = cache.entry("k");
+        let before = cache.entry("k").await;
 
         let (holding, release) = (
             tokio::sync::oneshot::channel(),
@@ -390,7 +375,7 @@ mod tests {
         holder.await.unwrap();
         invalidating.await.unwrap();
 
-        let after = cache.entry("k");
+        let after = cache.entry("k").await;
         assert!(Arc::ptr_eq(&before, &after));
         assert!(cache.version("k").await.is_none());
     }
@@ -404,34 +389,37 @@ mod tests {
         assert_eq!(cache.latest_version("b").await, Some(2));
     }
 
+    /// Which key moka's own (frequency-aware, not strict-LRU) policy picks
+    /// as the eviction victim isn't something this cache promises — see
+    /// this module's doc comment. What it does promise: the map never
+    /// grows past `max_entries`, and inserting past capacity still
+    /// succeeds (some existing entry always yields).
     #[tokio::test]
-    async fn inserting_past_capacity_evicts_the_least_recently_touched_key() {
+    async fn inserting_past_capacity_never_grows_the_map_past_max_entries() {
         let cache = Cache::with_limits(2, Duration::from_secs(3600));
         cache.set_latest_version("a", 1).await;
+        cache.entries.run_pending_tasks().await;
         sleep(Duration::from_millis(5));
         cache.set_latest_version("b", 2).await;
+        cache.entries.run_pending_tasks().await;
         sleep(Duration::from_millis(5));
         cache.set_latest_version("c", 3).await;
+        cache.entries.run_pending_tasks().await;
 
-        assert!(cache.latest_version("a").await.is_none());
-        assert_eq!(cache.latest_version("b").await, Some(2));
+        assert!(cache.entries.entry_count() <= 2, "{}", cache.entries.entry_count());
         assert_eq!(cache.latest_version("c").await, Some(3));
     }
 
     #[tokio::test]
-    async fn re_touching_a_key_protects_it_from_eviction() {
+    async fn repeated_touches_on_a_couple_of_keys_still_stay_within_capacity() {
         let cache = Cache::with_limits(2, Duration::from_secs(3600));
-        cache.set_latest_version("a", 1).await;
-        sleep(Duration::from_millis(5));
-        cache.set_latest_version("b", 2).await;
-        sleep(Duration::from_millis(5));
-        // Re-touch "a" so "b" becomes the least recently touched instead.
-        cache.set_latest_version("a", 10).await;
-        sleep(Duration::from_millis(5));
-        cache.set_latest_version("c", 3).await;
+        for round in 0..20 {
+            cache.set_latest_version("a", round).await;
+            cache.set_latest_version("b", round).await;
+            cache.set_latest_version("c", round).await;
+        }
+        cache.entries.run_pending_tasks().await;
 
-        assert_eq!(cache.latest_version("a").await, Some(10));
-        assert!(cache.latest_version("b").await.is_none());
-        assert_eq!(cache.latest_version("c").await, Some(3));
+        assert!(cache.entries.entry_count() <= 2, "{}", cache.entries.entry_count());
     }
 }

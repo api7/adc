@@ -60,6 +60,12 @@ pub struct Backend {
     cache_key: String,
     bypass_cache: bool,
     version: OnceCell<Version>,
+    /// Pinned from this instance's own `dump`, if it ran one — so a later
+    /// `sync` on the *same* instance folds events onto the exact document
+    /// they were diffed against, not a fresh (possibly since-changed by a
+    /// concurrent caller) read of the global cache. See `sync`'s doc
+    /// comment.
+    dumped_raw_config: OnceCell<ApisixStandalone>,
 }
 
 impl Backend {
@@ -98,6 +104,7 @@ impl Backend {
             cache_key: opts.cache_key,
             bypass_cache: opts.bypass_cache,
             version: OnceCell::new(),
+            dumped_raw_config: OnceCell::new(),
         })
     }
 
@@ -170,11 +177,23 @@ impl adc_sdk::Backend for Backend {
     /// whatever's cached — `sync` writes its own result back into the same
     /// cache at the end, so a `dump` right before it always sees fresh data
     /// without needing to hit the servers again.
+    ///
+    /// Also pins `raw_config` onto this instance (`dumped_raw_config`) —
+    /// see `sync`'s doc comment for why a later `sync` on this same
+    /// instance prefers that pinned copy over a fresh cache read.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
         }
-        if let Some(config) = Cache::global().config(&self.cache_key).await {
+        // One locked read (`get_live`), not separate `config`/`raw_config`
+        // calls — the two must come from the same moment, or the value
+        // pinned below could already mismatch what's cached.
+        if let Some(entry) = Cache::global().get_live(&self.cache_key).await
+            && let Some(config) = entry.config
+        {
+            if let Some(raw_config) = entry.raw_config {
+                let _ = self.dumped_raw_config.set(raw_config);
+            }
             return Ok(config);
         }
 
@@ -183,16 +202,24 @@ impl adc_sdk::Backend for Backend {
 
         Cache::global().set_latest_version(&self.cache_key, highest_conf_version(&raw_config)).await;
         Cache::global().set_config(&self.cache_key, config.clone()).await;
-        Cache::global().set_raw_config(&self.cache_key, raw_config).await;
+        Cache::global().set_raw_config(&self.cache_key, raw_config.clone()).await;
+        let _ = self.dumped_raw_config.set(raw_config);
         Ok(config)
     }
 
     /// Relies on a `dump` having already primed the cache for this
     /// `cache_key` — this is why `dump`'s own doc comment calls out that
-    /// contract. The lock below guards against a *concurrent* `sync` for
-    /// the same key, not against a cold cache: every caller (the CLI's
-    /// `dump`-then-`sync` pipeline, and any other caller expected to
-    /// follow the same convention) dumps before it syncs.
+    /// contract, and why `events` exists in the first place (it's a diff
+    /// against whatever `dump` just returned). Prefers this instance's own
+    /// `dumped_raw_config`, pinned by that `dump` call, over a fresh read
+    /// of the global cache: a concurrent caller (a `bypass_cache` dump, or
+    /// another sync) could have changed the cached entry for this key in
+    /// the time between this instance's `dump` and this `sync` call, and
+    /// folding `events` onto a document other than the one they were
+    /// diffed against would produce a wrong result. Only falls back to the
+    /// global cache — and then an error — for a `sync` called without a
+    /// preceding `dump` on this same instance, which no documented caller
+    /// does.
     async fn sync(
         &self,
         events: Vec<Event>,
@@ -202,7 +229,13 @@ impl adc_sdk::Backend for Backend {
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
         let mut entry = Cache::global().lock(&self.cache_key).await;
-        let old_raw_config = entry.raw_config.clone().unwrap_or_default();
+        let old_raw_config = match self.dumped_raw_config.get() {
+            Some(raw_config) => raw_config.clone(),
+            None => entry
+                .raw_config
+                .clone()
+                .ok_or_else(|| BackendError::Other(format!("sync({:?}) called with no prior dump", self.cache_key).into()))?,
+        };
         let latest_known_version = entry.latest_version;
 
         match Operator::new(self.servers.clone(), old_raw_config, latest_known_version).sync(events, opts).await {
