@@ -23,7 +23,6 @@ serde_json = { workspace = true }
 semver = { workspace = true }
 sha1 = { workspace = true }
 dashmap = "6"
-indexmap = "2"
 tokio = { workspace = true, features = ["macros", "sync"] }
 log = { workspace = true }
 tracing = { workspace = true }

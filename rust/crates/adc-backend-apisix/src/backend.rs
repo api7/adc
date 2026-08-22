@@ -37,8 +37,8 @@ impl Backend {
     /// (`APISIX/3.9.0`, confirmed strict `MAJOR.MINOR.PATCH` against a real
     /// instance). Falls back to a version high enough to unlock every
     /// version-gated feature when the header is missing or unparseable,
-    /// rather than failing outright — matches the TS backend's own
-    /// fallback. Fetched once and cached for the lifetime of this `Backend`.
+    /// rather than failing outright. Fetched once and cached for the
+    /// lifetime of this `Backend`.
     async fn resolved_version(&self) -> Result<Version, BackendError> {
         let version = self
             .version

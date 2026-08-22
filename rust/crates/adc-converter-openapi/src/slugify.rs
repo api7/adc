@@ -1,7 +1,7 @@
-//! Replicates npm `slugify`'s default-options behavior (`slugify(item)`,
-//! no options object — the only way this crate ever needs it called). Not
-//! a general-purpose slug function: `lower` defaults to `false` upstream,
-//! so casing is preserved, and the allowed character set is wider than the
+//! Replicates a reference `slugify` implementation's default-options
+//! behavior (no options object — the only way this crate ever needs it
+//! called). Not a general-purpose slug function: casing is preserved (not
+//! lowercased), and the allowed character set is wider than the
 //! `[a-z0-9-]` most "slug" crates assume.
 
 use std::collections::HashMap;
@@ -9,8 +9,9 @@ use std::sync::LazyLock;
 
 use unicode_normalization::UnicodeNormalization;
 
-/// The same char->replacement table npm `slugify` embeds (locale overrides
-/// omitted: adc never passes a `locale` option, so they'd never apply).
+/// The same char->replacement table the reference implementation embeds
+/// (locale overrides omitted: adc never passes a `locale` option, so
+/// they'd never apply).
 static CHAR_MAP: LazyLock<HashMap<char, String>> = LazyLock::new(|| {
     let raw: HashMap<String, String> =
         serde_json::from_str(include_str!("slugify_charmap.json")).expect("bundled charmap is valid JSON");
@@ -21,15 +22,16 @@ static CHAR_MAP: LazyLock<HashMap<char, String>> = LazyLock::new(|| {
 /// through beyond `\w` (ASCII alphanumeric + `_`) and `\s`.
 const EXTRA_ALLOWED: &str = "$*+~.()'\"!-:@";
 
-/// ECMAScript's regex `\s`, which isn't quite Rust's Unicode `White_Space`
-/// property: `\s` matches U+FEFF (BOM) which `White_Space` doesn't, and
-/// `White_Space` matches U+0085 (NEL) which `\s` doesn't.
-fn is_ecmascript_whitespace(c: char) -> bool {
+/// The reference implementation's regex `\s` class, which isn't quite
+/// Rust's Unicode `White_Space` property: this matches U+FEFF (BOM) which
+/// `White_Space` doesn't, and `White_Space` matches U+0085 (NEL) which
+/// this doesn't.
+fn is_reference_whitespace(c: char) -> bool {
     (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
 }
 
 fn is_allowed(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_' || is_ecmascript_whitespace(c) || EXTRA_ALLOWED.contains(c)
+    c.is_ascii_alphanumeric() || c == '_' || is_reference_whitespace(c) || EXTRA_ALLOWED.contains(c)
 }
 
 pub fn slugify(input: &str) -> String {
@@ -51,11 +53,11 @@ pub fn slugify(input: &str) -> String {
         mapped.extend(chunk.chars().filter(|&rc| is_allowed(rc)));
     }
 
-    let trimmed = mapped.trim_matches(is_ecmascript_whitespace);
+    let trimmed = mapped.trim_matches(is_reference_whitespace);
     let mut result = String::with_capacity(trimmed.len());
     let mut prev_was_space = false;
     for c in trimmed.chars() {
-        if is_ecmascript_whitespace(c) {
+        if is_reference_whitespace(c) {
             if !prev_was_space {
                 result.push('-');
             }
@@ -86,14 +88,14 @@ mod tests {
     // slugified to nothing, so this is worth pinning down on its own
     // rather than only ever seeing it mixed with survivors.
     #[case::an_input_of_only_disallowed_characters_slugifies_to_empty("/?", "")]
-    // U+FEFF (BOM) is `\s` in ECMAScript even though it isn't Unicode
-    // `White_Space` — must be treated as whitespace to match npm slugify.
+    // U+FEFF (BOM) counts as whitespace here even though it isn't Unicode
+    // `White_Space` — see `is_reference_whitespace`'s doc comment.
     #[case::a_leading_bom_is_trimmed_away_like_whitespace("\u{feff}leading", "leading")]
     #[case::a_bom_in_the_middle_becomes_a_hyphen("a\u{feff}b", "a-b")]
-    // U+0085 (NEL) is Unicode `White_Space` but not ECMAScript `\s` — must
-    // be filtered out like any other disallowed character, not collapsed
-    // into a hyphen.
-    #[case::next_line_is_not_whitespace_to_ecmascript_and_gets_filtered("a\u{85}b", "ab")]
+    // U+0085 (NEL) is Unicode `White_Space` but doesn't count as whitespace
+    // here — must be filtered out like any other disallowed character, not
+    // collapsed into a hyphen.
+    #[case::next_line_is_not_whitespace_here_and_gets_filtered("a\u{85}b", "ab")]
     fn slugify_cases(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(slugify(input), expected);
     }

@@ -141,12 +141,12 @@ impl DifferV4 {
             .map(|e| postprocess_sub_event(local_name, local_id, e))
             .collect();
 
-        // differv4.ts never clones the local item on this path (unlike the remote/delete
-        // path's `prepareRemoteItem`, or update's early `cloneDeep(localItem)`), so nested
-        // MAP-resource items get their own `id` stripped by the *shared* object mutation
-        // that happens while computing `sub_events` above — and that stripping is visible
-        // through `newValue` too, since it's the same object graph. Rust has no implicit
-        // aliasing here, so the same observable effect is reproduced explicitly.
+        // Nested MAP-resource items need their own `id` stripped, and that
+        // stripping has to be visible through `newValue` too, since it
+        // describes the same item. `local_item` isn't cloned before this
+        // point (unlike the remote/delete path's `prepare_remote_item`, or
+        // update's early clone), so stripping it in place here keeps both
+        // views consistent without a separate sync step.
         strip_nested_ids(meta, &mut local_item);
 
         let event = Event::new(resource_type, EventKind::Create { new_value: local_item }, local_id, local_name);

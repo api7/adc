@@ -26,7 +26,7 @@ async fn bootstrap_shared_token() {
     // this file too, alongside the dedicated bootstrap step that runs it
     // first) — skip re-appending to `$GITHUB_ENV` so "exactly once" holds
     // regardless of how many times this binary happens to run.
-    if std::env::var("TOKEN").is_ok() {
+    if matches!(std::env::var("TOKEN"), Ok(token) if !token.is_empty()) {
         return;
     }
 

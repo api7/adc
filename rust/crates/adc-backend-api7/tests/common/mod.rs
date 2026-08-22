@@ -260,7 +260,9 @@ static TOKEN: OnceCell<String> = OnceCell::const_new();
 /// the same dashboard) short-circuits the dance; otherwise it runs once
 /// per test binary and every test shares the result.
 pub async fn token() -> String {
-    if let Ok(token) = env::var("TOKEN") {
+    if let Ok(token) = env::var("TOKEN")
+        && !token.is_empty()
+    {
         return token;
     }
     TOKEN.get_or_init(bootstrap_token).await.clone()

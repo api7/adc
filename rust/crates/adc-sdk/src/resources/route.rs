@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::common::{Expr, Labels, Plugins, Timeout};
 
-/// `remote_addrs` items: IPv4, IPv6, IPv4 CIDR, or IPv6 CIDR. Patterns copied
-/// verbatim from the TS SDK's exported `schema.json` (Zod's own
-/// `z.ipv4()`/`z.ipv6()`/`z.cidrv4()`/`z.cidrv6()`), not hand-rolled here.
-/// The outer `anyOf`+`null` (rather than just the array schema) is what
+/// `remote_addrs` items: IPv4, IPv6, IPv4 CIDR, or IPv6 CIDR — a union of
+/// the four shapes. The outer `anyOf`+`null` (rather than just the array
+/// schema) is what
 /// keeps this field correctly excluded from `required` — `schema_with`
 /// replaces schemars' usual `Option<T>` handling, so it has to be redone
 /// here explicitly (see `common.rs`'s note on `schema_with`).

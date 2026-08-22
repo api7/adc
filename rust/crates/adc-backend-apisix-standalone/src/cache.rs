@@ -70,7 +70,8 @@ pub(crate) struct CachedEntry {
 
 impl CachedEntry {
     fn is_expired(&self, ttl: Duration) -> bool {
-        self.updated_at.is_none_or(|at| stable_timestamp() - at > ttl.as_millis() as i64)
+        self.updated_at
+            .is_none_or(|at| stable_timestamp() - at > ttl.as_millis() as i64)
     }
 }
 
@@ -118,13 +119,21 @@ impl Cache {
 
     async fn get_live(&self, key: &str) -> Option<CachedEntry> {
         let entry = self.lock(key).await;
-        if entry.is_expired(self.ttl) { None } else { Some(entry.clone()) }
+        if entry.is_expired(self.ttl) {
+            None
+        } else {
+            Some(entry.clone())
+        }
     }
 
     pub async fn version(&self, key: &str) -> Option<Version> {
         self.get_live(key).await?.version
     }
 
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) — dead as far as a plain `--lib` build (no consumer
+    // outside this crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn latest_version(&self, key: &str) -> Option<i64> {
         self.get_live(key).await?.latest_version
     }
@@ -133,6 +142,7 @@ impl Cache {
         self.get_live(key).await?.config
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn raw_config(&self, key: &str) -> Option<ApisixStandalone> {
         self.get_live(key).await?.raw_config
     }
@@ -161,7 +171,11 @@ impl Cache {
     /// `*_conf_version` the data plane has already seen (and rejects).
     pub async fn set_latest_version(&self, key: &str, value: i64) {
         self.touch(key, |entry| {
-            entry.latest_version = Some(entry.latest_version.map_or(value, |current| current.max(value)));
+            entry.latest_version = Some(
+                entry
+                    .latest_version
+                    .map_or(value, |current| current.max(value)),
+            );
         })
         .await;
     }
@@ -171,11 +185,17 @@ impl Cache {
     }
 
     pub async fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
-        self.touch(key, |entry| entry.raw_config = Some(raw_config)).await;
+        self.touch(key, |entry| entry.raw_config = Some(raw_config))
+            .await;
     }
 
-    pub fn invalidate(&self, key: &str) {
-        self.entries.remove(key);
+    pub async fn invalidate(&self, key: &str) {
+        let entry = match self.entries.entry(key.to_string()) {
+            dashmap::mapref::entry::Entry::Occupied(occupied) => occupied.get().clone(),
+            dashmap::mapref::entry::Entry::Vacant(_) => return,
+        };
+        let mut guard = entry.lock_owned().await;
+        *guard = CachedEntry::default();
     }
 
     /// A soft, best-effort cap: eviction peeks at each entry's
@@ -192,7 +212,12 @@ impl Cache {
             let oldest = self
                 .entries
                 .iter()
-                .filter_map(|entry| Some((entry.key().clone(), entry.value().try_lock().ok()?.updated_at)))
+                .filter_map(|entry| {
+                    Some((
+                        entry.key().clone(),
+                        entry.value().try_lock().ok()?.updated_at,
+                    ))
+                })
                 .min_by_key(|(_, updated_at)| *updated_at)
                 .map(|(key, _)| key);
             match oldest {
@@ -314,13 +339,60 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalidate_removes_every_cached_field_for_that_key() {
+    async fn invalidate_clears_every_cached_field_for_that_key() {
         let cache = Cache::with_limits(16, Duration::from_secs(3600));
+        cache.set_version("k", Version::new(1, 0, 0)).await;
         cache.set_latest_version("k", 1).await;
         cache.set_config("k", empty_configuration()).await;
-        cache.invalidate("k");
+        cache.set_raw_config("k", ApisixStandalone::default()).await;
+        cache.invalidate("k").await;
+        assert!(cache.version("k").await.is_none());
         assert!(cache.latest_version("k").await.is_none());
         assert!(cache.config("k").await.is_none());
+        assert!(cache.raw_config("k").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn invalidate_on_a_never_cached_key_does_not_materialize_an_entry() {
+        let cache = Cache::with_limits(16, Duration::from_secs(3600));
+        cache.invalidate("k").await;
+        assert!(cache.entries.is_empty());
+    }
+
+    /// A holder that grabbed this entry's `Arc` before `invalidate` ran
+    /// (e.g. a concurrent `sync` mid-write) must still be holding the same
+    /// entry `invalidate` reset, not one orphaned from the map — exercised
+    /// here with a task actually holding the lock while `invalidate` runs,
+    /// not just two sequential, non-overlapping lookups.
+    #[tokio::test]
+    async fn invalidate_keeps_the_same_entry_identity_for_concurrent_holders() {
+        let cache = Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
+        cache.set_version("k", Version::new(1, 0, 0)).await;
+        let before = cache.entry("k");
+
+        let (holding, release) = (
+            tokio::sync::oneshot::channel(),
+            tokio::sync::oneshot::channel(),
+        );
+        let (holding_tx, holding_rx) = holding;
+        let (release_tx, release_rx) = release;
+        let holder_cache = cache.clone();
+        let holder = tokio::spawn(async move {
+            let _guard = holder_cache.lock("k").await;
+            holding_tx.send(()).unwrap();
+            release_rx.await.unwrap();
+        });
+        holding_rx.await.unwrap(); // the spawned task now holds the lock
+
+        let invalidate_cache = cache.clone();
+        let invalidating = tokio::spawn(async move { invalidate_cache.invalidate("k").await });
+        release_tx.send(()).unwrap(); // let the holder drop its guard; invalidate can now proceed
+        holder.await.unwrap();
+        invalidating.await.unwrap();
+
+        let after = cache.entry("k");
+        assert!(Arc::ptr_eq(&before, &after));
+        assert!(cache.version("k").await.is_none());
     }
 
     #[tokio::test]

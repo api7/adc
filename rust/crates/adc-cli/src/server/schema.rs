@@ -164,6 +164,26 @@ impl ValidationIssue {
     }
 }
 
+/// Every entry must be an http(s) URL with a host — `ServerAddr`'s
+/// `#[serde(untagged)]` only checks the string-vs-array shape, not `z.url()`'s
+/// format contract, and a bare `url::Url::parse` still accepts things this
+/// is never going to dispatch a request to (`file:///etc/passwd`, `mailto:`).
+pub fn validate_server_addr(opts: &Opts) -> Vec<ValidationIssue> {
+    opts.server
+        .as_list()
+        .iter()
+        .filter(|server| !is_usable_server_url(server))
+        .map(|server| ValidationIssue::new("server", format!("{server:?} is not a valid URL")))
+        .collect()
+}
+
+fn is_usable_server_url(server: &str) -> bool {
+    let Ok(url) = url::Url::parse(server) else {
+        return false;
+    };
+    matches!(url.scheme(), "http" | "https") && url.host_str().is_some()
+}
+
 /// cert/key must be provided together; any of the three, if given, must be PEM.
 pub fn validate_tls_material(opts: &Opts) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
@@ -448,5 +468,66 @@ dGhpcyBpcyBub3QgYSB2YWxpZCBwcml2YXRlIGtleSBkZXIsIGp1c3QgcGFkZGluZyBieXRlcyB0byBt
     #[test]
     fn no_tls_material_at_all_is_fine() {
         assert!(validate_tls_material(&opts(|_| {})).is_empty());
+    }
+
+    #[test]
+    fn a_valid_server_url_passes() {
+        assert!(validate_server_addr(&opts(|_| {})).is_empty());
+    }
+
+    #[test]
+    fn a_malformed_single_server_is_rejected() {
+        let opts = opts(|o| o.server = ServerAddr::Single("not a url".to_string()));
+        let issues = validate_server_addr(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["server"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn a_non_http_scheme_that_still_parses_as_a_url_is_rejected() {
+        // A real host, unlike `a_url_without_a_host_is_rejected`'s
+        // `mailto:` — isolates the scheme check from the host check.
+        let opts = opts(|o| o.server = ServerAddr::Single("ftp://example.com/resource".to_string()));
+        let issues = validate_server_addr(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["server"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn a_url_without_a_host_is_rejected() {
+        let opts = opts(|o| o.server = ServerAddr::Single("mailto:a@b.com".to_string()));
+        let issues = validate_server_addr(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["server"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn one_malformed_entry_among_valid_ones_is_still_rejected() {
+        let opts = opts(|o| {
+            o.server =
+                ServerAddr::Multiple(vec!["http://a:9180".to_string(), "not a url".to_string()])
+        });
+        let issues = validate_server_addr(&opts);
+        assert!(
+            issues.iter().any(|i| i.path == vec!["server"]),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn multiple_valid_servers_pass() {
+        let opts = opts(|o| {
+            o.server = ServerAddr::Multiple(vec![
+                "http://a:9180".to_string(),
+                "http://b:9180".to_string(),
+            ])
+        });
+        assert!(validate_server_addr(&opts).is_empty());
     }
 }

@@ -1,7 +1,8 @@
 //! Interactive rendering of `SYNC_EVENT_SPAN_NAME`: a "Syncing N
 //! event(s)..." header and a by-event-type counter line — two fixed lines,
-//! redrawn in place, pnpm-style (`Progress: resolved N, reused N,
-//! downloaded N, added N, done`) — plain text, no progress-bar graphic.
+//! redrawn in place, like a package manager's `Progress: resolved N,
+//! reused N, downloaded N, added N, done` line — plain text, no
+//! progress-bar graphic.
 //!
 //! Replaces an earlier per-event-slot design (`N` reusable spinner rows,
 //! `N` = `--request-concurrent`), retired because enough concurrently

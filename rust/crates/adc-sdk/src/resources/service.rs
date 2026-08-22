@@ -13,11 +13,9 @@ use super::upstream::Upstream;
 
 /// `Upstream.name` is optional everywhere in its own schema (it doubles as
 /// `Service.upstream`, the unnamed default), but each entry in
-/// `Service.upstreams[]` needs a name to be addressable — matches the TS SDK's
-/// exported `schema.json`, which shows `upstreams[].items.required ==
-/// ["name"]` even though the base `Upstream` schema has no required list at
-/// all. `allOf` layers the extra `required` on top of `Upstream`'s own
-/// (possibly `$ref`'d) schema rather than trying to mutate it in place. The
+/// `Service.upstreams[]` needs a name to be addressable. `allOf` layers the
+/// extra `required` on top of `Upstream`'s own (possibly `$ref`'d) schema
+/// rather than trying to mutate it in place. The
 /// outer `anyOf`+`null` is needed because `schema_with` disables schemars'
 /// usual `Option<T>` handling (see `common.rs`'s note on `schema_with`) —
 /// `upstreams` is itself optional even though each of its items needs a name.

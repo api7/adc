@@ -128,7 +128,7 @@ impl TryFrom<typing::Service> for adc::Service {
 /// list, via `url`'s authority parser (a throwaway scheme makes a bare
 /// `host:port` parse as one) — reliably distinguishes a bracketed IPv6 host
 /// (`"[::1]:9000"`) from a plain `host:port` pair, which naive
-/// colon-splitting (still what the TS transformer does) can't.
+/// colon-splitting can't.
 fn parse_discovery_map_nodes(map: HashMap<String, i64>) -> Result<Vec<adc::UpstreamNode>, String> {
     map.into_iter()
         .map(|(node, weight)| {
@@ -239,7 +239,7 @@ impl TryFrom<typing::Ssl> for adc::SSL {
 /// models a credential as a one-plugin `Plugins` map); credentials configured
 /// with a plugin outside ADC's supported credential types, or with none at
 /// all, don't convert — callers filter these out with `.ok()` rather than
-/// treating them as fatal, matching the TS transformer silently skipping them.
+/// treating them as fatal.
 impl TryFrom<typing::ConsumerCredential> for adc::ConsumerCredential {
     type Error = String;
 
@@ -591,9 +591,9 @@ pub fn transform_stream_route(
 }
 
 /// Builds a consumer group's wire body, plus its member consumers' own
-/// bodies (each stamped with the group's id) — mirrors the TS transformer's
-/// return shape, though the operator currently only writes the group itself
-/// (member consumers reach it as their own separate `Event`s already).
+/// bodies (each stamped with the group's id) — though the operator
+/// currently only writes the group itself (member consumers reach it as
+/// their own separate `Event`s already).
 /// Unlike every other write-direction conversion, the id here is *derived*
 /// (`generate_id(name)`), not taken from the caller — APISIX's consumer
 /// group has no natural identity of its own beyond its plugin set, so ADC

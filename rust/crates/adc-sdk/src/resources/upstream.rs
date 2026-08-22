@@ -119,9 +119,8 @@ pub struct UpstreamNode {
     #[schemars(range(min = 0))]
     pub weight: i64,
     // A count, not a duration: unlike `Timeout`/`retry_timeout`, there's no
-    // real-world fractional priority — matches the gateway's own schema
-    // (`nodes[].priority` is `type = "integer"`), even though ADC's own Zod
-    // schema doesn't bother declaring `.int()` here.
+    // real-world fractional priority — matches the gateway's own schema,
+    // where `nodes[].priority` is `type = "integer"`.
     #[serde(default)]
     pub priority: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -205,9 +204,8 @@ pub struct UpstreamHealthCheckActive {
     pub r#type: UpstreamHealthCheckType,
     #[serde(default = "default_active_timeout")]
     pub timeout: f64,
-    // A count, not a duration: matches the gateway's own schema
-    // (`concurrency` is `type = "integer"` there), even though ADC's own
-    // Zod schema doesn't bother declaring `.int()` here.
+    // A count, not a duration: matches the gateway's own schema, where
+    // `concurrency` is `type = "integer"`.
     #[serde(default = "default_concurrency")]
     pub concurrency: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
