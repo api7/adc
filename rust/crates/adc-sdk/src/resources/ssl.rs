@@ -7,9 +7,7 @@ use super::common::Labels;
 
 /// A PEM-ish blob (certificate) or a `$secret://`/`$env://` reference in its
 /// place — an `anyOf` union, not a structural type, because the field stays
-/// plain `String` (see `SSLCertificate`'s doc comment). Pattern/lengths
-/// copied from the TS SDK's exported `schema.json` (Zod's own
-/// `z.union([...])` for this field).
+/// plain `String` (see `SSLCertificate`'s doc comment).
 fn certificate_schema(_gen: &mut SchemaGenerator) -> Schema {
     json_schema!({
         "anyOf": [
@@ -19,8 +17,8 @@ fn certificate_schema(_gen: &mut SchemaGenerator) -> Schema {
     })
 }
 
-/// Same shape as `certificate_schema`, but for a private key — TS requires a
-/// shorter minimum length (32 vs 128) for these.
+/// Same shape as `certificate_schema`, but for a private key — a shorter
+/// minimum length (32 vs 128).
 fn pem_key_or_secret_ref_schema(_gen: &mut SchemaGenerator) -> Schema {
     json_schema!({
         "anyOf": [

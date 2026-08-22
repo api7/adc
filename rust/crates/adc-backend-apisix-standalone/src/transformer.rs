@@ -109,9 +109,8 @@ fn stream_route_to_adc(route: &typing::StreamRoute) -> adc::StreamRoute {
 
 /// Zips a certificate list with its matching key list positionally,
 /// falling back to an empty key past the end of a shorter `keys` list
-/// (rather than TS's `keys?.[idx]` producing `undefined`, which would leave
-/// a certificate entry with no key at all) — mirrors
-/// `adc-backend-apisix::transformer`'s identical fix for the same
+/// rather than leaving a certificate entry with no key at all — the same
+/// fix `adc-backend-apisix::transformer` applies for this identical
 /// mismatched-length edge case.
 fn ssl_to_adc(ssl: &typing::Ssl) -> adc::SSL {
     let mut keys = ssl.keys.clone().unwrap_or_default().into_iter();
@@ -142,8 +141,7 @@ fn ssl_to_adc(ssl: &typing::Ssl) -> adc::SSL {
 /// `adc-backend-apisix`); a credential with no plugin configured has
 /// nothing to convert. Unlike `adc-backend-apisix`'s equivalent, this
 /// doesn't reject an unrecognized plugin name or a non-object config —
-/// matching the TS transformer, which casts the plugin name and passes the
-/// config through without validating either.
+/// the plugin name and config pass through unvalidated.
 fn credential_to_adc(credential: &typing::ConsumerCredential, prefix: &str) -> Option<adc::ConsumerCredential> {
     let plugins = credential.plugins.clone()?;
     let (plugin_name, config) = plugins.into_iter().next()?;
@@ -295,9 +293,7 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
     }
 
     // `rest` here intentionally keeps `modifiedIndex` alongside each
-    // plugin's own config keys — matches the TS transformer's `const {id,
-    // ...rest} = pluginMetadata` destructure, which only pulls `id` out and
-    // leaves `modifiedIndex` in `rest`.
+    // plugin's own config keys — only `id` is pulled out separately.
     let mut plugin_metadata = adc::Plugins::new();
     for entry in input.plugin_metadata.iter().flatten() {
         let mut rest = entry.extra.clone();

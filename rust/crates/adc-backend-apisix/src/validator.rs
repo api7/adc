@@ -26,8 +26,7 @@ pub struct Validator {
 /// (`routes`/`services`/`consumers`/`ssls`/`global_rules`/`stream_routes`/
 /// `plugin_metadata`/`upstreams`) — deliberately not every `ResourceType`:
 /// consumer credentials, consumer groups, plugin configs and standalone
-/// upstream events never appear in this payload, matching the TS
-/// validator's own `switch` (no case for them, nothing pushed).
+/// upstream events never appear in this payload; nothing is pushed for them.
 #[derive(Debug, Default, Serialize)]
 struct ValidateRequestBody {
     routes: Vec<typing::Route>,
@@ -210,8 +209,7 @@ fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequest
             | ResourceType::PluginConfig
             | ResourceType::Upstream
             | ResourceType::InternalStreamService => {
-                // Not part of APISIX's validate payload — matches the TS
-                // validator's `switch`, which has no case for these either.
+                // Not part of APISIX's validate payload.
             }
         }
     }

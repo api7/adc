@@ -6,7 +6,7 @@
 //! This module is a separate, explicit pass on top of that same,
 //! already-valid value, checking what `serde` can't express: string
 //! length/format, numeric ranges, and a handful of genuine cross-field
-//! rules. Ported from the TS SDK's Zod schema (`libs/sdk/src/core/schema.ts`).
+//! rules.
 //!
 //! Most rules are declared once, as `#[schemars(...)]` attributes right on
 //! the `resources` structs, and enforced here by compiling that same
@@ -14,10 +14,9 @@
 //! serialized configuration — one declaration, used both to export
 //! `schema.json` (see the `export-schema` binary) and to validate at
 //! runtime, rather than maintaining two separate attribute sets that could
-//! drift apart. Only the rules that are genuinely cross-field (and which,
-//! verified against the TS SDK's own exported `schema.json`, aren't
-//! expressible there either — TS's `.refine()`/`.superRefine()` calls don't
-//! show up in its own JSON Schema export) get hand-written functions below.
+//! drift apart. Only the rules that are genuinely cross-field — and so
+//! aren't expressible as a JSON Schema constraint on a single field at all —
+//! get hand-written functions below.
 
 use std::sync::LazyLock;
 
@@ -51,8 +50,8 @@ impl std::fmt::Display for LintIssue {
 
 /// Runs every semantic rule against an already-structurally-valid
 /// `Configuration`, collecting every violation rather than stopping at the
-/// first one — matches the TS linter's behavior (a Zod `safeParse` collects
-/// every issue in one pass, not fail-fast).
+/// first one, so a caller sees every problem in one pass instead of
+/// fixing and re-running repeatedly.
 pub fn lint(config: &Configuration) -> Vec<LintIssue> {
     let instance = serde_json::to_value(config).expect("Configuration always serializes");
     let mut issues: Vec<LintIssue> = SCHEMA_VALIDATOR
@@ -123,10 +122,10 @@ fn check_cross_field_rules(config: &Configuration, issues: &mut Vec<LintIssue>) 
     }
 }
 
-/// `checks.active`/`checks.passive` interlock isn't ported: `active` is a
-/// required (non-`Option`) field on `UpstreamHealthCheck`, so the TS refine
-/// rule tying it to `passive` is unconditionally true given valid input in
-/// both languages — a dead rule, not a gap.
+/// No `checks.active`/`checks.passive` interlock rule here: `active` is a
+/// required (non-`Option`) field on `UpstreamHealthCheck`, so any rule tying
+/// it to `passive`'s presence would be unconditionally true given valid
+/// input — a dead rule, not a gap.
 fn check_service(service: &Service, path: &[PathSegment], issues: &mut Vec<LintIssue>) {
     if let Some(prefix) = &service.path_prefix
         && !prefix.starts_with('/')
@@ -151,7 +150,7 @@ fn check_service(service: &Service, path: &[PathSegment], issues: &mut Vec<LintI
 }
 
 /// `nodes` and service discovery (`discovery_type`+`service_name`) are
-/// mutually exclusive, and exactly one must be set — matches TS's refine:
+/// mutually exclusive, and exactly one must be set:
 /// `(nodes && !discovery_type && !service_name) || (discovery_type &&
 /// service_name && !nodes)`.
 fn check_upstream_discovery(upstream: &Upstream, path: &[PathSegment], issues: &mut Vec<LintIssue>) {

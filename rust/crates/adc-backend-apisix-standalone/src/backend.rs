@@ -37,8 +37,7 @@ pub struct BackendOptions {
     /// a candidate for `dump`'s "most recently updated" pick.
     pub servers: Vec<String>,
     /// Either one token shared by every server, or exactly as many tokens
-    /// as `servers` (paired up positionally) — matches the TS backend's own
-    /// `opts.token.split(',')` convention.
+    /// as `servers` (paired up positionally).
     pub tokens: Vec<String>,
     /// Identifies this backend's entry in the process-wide config cache
     /// (`crate::cache::Cache`) — callers targeting the same standalone
@@ -53,8 +52,7 @@ pub struct BackendOptions {
 }
 
 /// Stands in for a version that couldn't be determined (missing/unparseable
-/// `Server` header) — high enough to unlock every version-gated code path,
-/// matching the TS backend's own `mockVersion` convention.
+/// `Server` header) — high enough to unlock every version-gated code path.
 const UNKNOWN_VERSION: Version = Version::new(999, 999, 999);
 
 pub struct Backend {
@@ -73,8 +71,7 @@ impl Backend {
         }
         let servers_count = opts.servers.len();
         // A `token` per `server`, positionally paired, when the two lists
-        // are the same length; otherwise every server shares `tokens[0]` —
-        // matches the TS backend's own `opts.token.split(',')` convention.
+        // are the same length; otherwise every server shares `tokens[0]`.
         let paired_tokens = opts.tokens.len() == servers_count;
 
         let servers = opts
@@ -136,8 +133,7 @@ impl Backend {
             })
             .await?;
         // Only cache a genuinely observed version, not the "couldn't tell"
-        // fallback — matches the TS backend's own `semverEQ(version,
-        // mockVersion)` guard.
+        // fallback.
         if *version != UNKNOWN_VERSION {
             Cache::global().set_version(&self.cache_key, version.clone()).await;
         }

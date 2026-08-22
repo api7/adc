@@ -9,8 +9,8 @@
 //! result is always `None` — no single event owns that write), and
 //! `BackendSyncOptions::concurrent` (which bounds how many *events* run at
 //! once in the other two backends) has nothing to bound here; the only
-//! fan-out is across servers, and that's always unbounded — matches the TS
-//! operator's own bare (no concurrency argument) `mergeMap`.
+//! fan-out is across servers, and that's always unbounded — small enough
+//! server counts in practice that there's no need to cap it.
 
 use std::collections::{HashMap, HashSet};
 
@@ -282,8 +282,7 @@ fn from_adc_service(event: &Event, modified_index: i64) -> Result<typing::Servic
 
         hosts: res.hosts,
         // Always points at this service's own id, regardless of whether it
-        // actually has a default upstream — matches the TS operator's own
-        // unconditional `upstream_id: id`. A service with no default
+        // actually has a default upstream. A service with no default
         // upstream simply references an upstream document that was never
         // written; standalone tolerates the dangling reference.
         upstream_id: Some(id),
@@ -421,9 +420,8 @@ fn from_adc_stream_route(event: &Event, modified_index: i64) -> Result<typing::S
 /// appending a second entry with the same id, and symmetrically an
 /// `Update` for an id that isn't there yet still leaves the document with
 /// it rather than silently dropping the write. `Delete` alone stays a
-/// genuine no-op for a missing id (matches the TS operator's own
-/// `findIndex !== -1` guard) — there's nothing sensible to insert for a
-/// deletion. Returns whether `field` actually changed.
+/// genuine no-op for a missing id — there's nothing sensible to insert for
+/// a deletion. Returns whether `field` actually changed.
 fn upsert_or_delete<T>(
     field: &mut Option<Vec<T>>,
     event: &Event,
@@ -514,8 +512,7 @@ fn apply_event(config: &mut ApisixStandalone, increase_version: &mut HashSet<Res
         ResourceType::StreamRoute => {
             upsert_or_delete(&mut config.stream_routes, event, |r| r.id.as_str(), || from_adc_stream_route(event, timestamp))?
         }
-        // Not part of standalone's config document — matches the TS
-        // operator's `fromADC` switch, which has no case for these either.
+        // Not part of standalone's config document.
         ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => false,
     };
 

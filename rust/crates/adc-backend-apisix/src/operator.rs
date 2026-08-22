@@ -46,16 +46,14 @@ impl Operator {
         Self { client, version, retry_policy: RetryPolicy::default() }
     }
 
-    /// Applies `events`. Matches the TS implementation: a version-gate
-    /// rejection (`check_version_support`) is always a normal
-    /// `success: false` result, never an abort, since it's produced before
-    /// the point in the pipeline TS's `catchError`/`exitOnFailure` logic
-    /// applies. An actual `operate` (HTTP) failure, on the other hand,
-    /// aborts the whole call as an `Err` when `exit_on_failure` is set (the
-    /// default) — mirroring RxJS `mergeMap` unsubscribing on error:
-    /// events already dispatched within that group still run to completion
-    /// (there's no cheap way to cancel an in-flight request), but any event
-    /// still queued behind `opts.concurrent`'s limit is dropped and never
+    /// Applies `events`. A version-gate rejection (`check_version_support`)
+    /// is always a normal `success: false` result, never an abort, since
+    /// it's produced before `operate` (the HTTP call) ever runs. An actual
+    /// `operate` failure, on the other hand, aborts the whole call as an
+    /// `Err` when `exit_on_failure` is set (the default): events already
+    /// dispatched within that group still run to completion (there's no
+    /// cheap way to cancel an in-flight request), but any event still
+    /// queued behind `opts.concurrent`'s limit is dropped and never
     /// dispatched at all, and every result — from this group and any
     /// accumulated from earlier ones — is discarded in favor of the single
     /// `Err`.
@@ -240,8 +238,9 @@ mod retry_tests {
 
 /// Buckets events by `(resource_type, event_type)`, preserving each
 /// bucket's internal relative order and ordering buckets themselves by
-/// first appearance — the same "group, don't just chunk consecutive runs"
-/// semantics as the TS operator's `reduce`-into-buckets step.
+/// first appearance — grouping, not just chunking consecutive runs, so an
+/// event can join an earlier bucket even if later events of a different
+/// type came between it and its match.
 fn group_events(events: Vec<Event>) -> Vec<Vec<Event>> {
     let mut groups: Vec<(ResourceType, EventType, Vec<Event>)> = Vec::new();
     'events: for event in events {

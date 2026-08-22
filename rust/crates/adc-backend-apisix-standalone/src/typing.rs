@@ -190,9 +190,8 @@ pub struct ConsumerCredential {
 /// `consumers[]` holds both consumers and their credentials in one flat
 /// array, discriminated by which required field is present: a `Consumer`
 /// always has `username`, a `ConsumerCredential` never does (it has `id` +
-/// `name` instead) — matches the TS union's own runtime discrimination
-/// (`'username' in item`). `#[serde(untagged)]` tries `Consumer` first;
-/// that's only safe because the two shapes' required fields never overlap.
+/// `name` instead). `#[serde(untagged)]` tries `Consumer` first; that's
+/// only safe because the two shapes' required fields never overlap.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ConsumerOrCredential {
@@ -264,9 +263,9 @@ pub struct GlobalRule {
 }
 
 /// A plugin's shared config: `id` + `modifiedIndex` are the only fields
-/// this crate cares about; the rest of the plugin's own config keys pass
-/// through untouched via `extra`, matching the TS schema's `looseObject`
-/// (arbitrary additional keys, shape depends on which plugin it configures).
+/// this crate cares about; the rest of the plugin's own config keys —
+/// arbitrary, shape depends on which plugin it configures — pass through
+/// untouched via `extra`'s `#[serde(flatten)]`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct PluginMetadata {
     #[serde(rename = "modifiedIndex")]

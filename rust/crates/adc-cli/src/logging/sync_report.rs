@@ -1,8 +1,7 @@
 //! Non-interactive (`--verbose 1`) rendering of `SYNC_EVENT_SPAN_NAME`:
-//! periodic running-total snapshot lines (pnpm's `--reporter=append-only`
-//! style) instead of one start+success line per event — the old approach
-//! floods a large sync's log (12000 lines for 6000 events). Failures still
-//! print immediately.
+//! periodic running-total snapshot lines, append-only, instead of one
+//! start+success line per event — the old approach floods a large sync's
+//! log (12000 lines for 6000 events). Failures still print immediately.
 //!
 //! `--verbose 2` goes through `http_debug`/`sync_debug` instead, not this.
 

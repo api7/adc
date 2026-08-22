@@ -103,10 +103,11 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
             match (l, r) {
                 (Value::Array(la), Value::Array(ra)) => diff_array(la, ra, path, changes),
                 (Value::Object(lo), Value::Object(ro)) => diff_object(lo, ro, path, changes),
-                // JS has a single `number` type, so `1 === 1.0`. serde_json::Number keeps
-                // integer and float representations distinct internally, so a plain `l != r`
-                // here would report a spurious edit between e.g. `100` and `100.0` even
-                // though they're the same JSON number. Compare via as_f64() to match JS.
+                // JSON itself has a single numeric type — `100` and `100.0`
+                // are the same JSON number. serde_json::Number keeps integer
+                // and float representations distinct internally, so a plain
+                // `l != r` here would report a spurious edit between the
+                // two. Compare via as_f64() to collapse that distinction.
                 (Value::Number(ln), Value::Number(rn)) => {
                     if ln.as_f64() != rn.as_f64() {
                         changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
