@@ -14,9 +14,11 @@
 //! serialized configuration — one declaration, used both to export
 //! `schema.json` (see the `export-schema` binary) and to validate at
 //! runtime, rather than maintaining two separate attribute sets that could
-//! drift apart. Only the rules that are genuinely cross-field — and so
-//! aren't expressible as a JSON Schema constraint on a single field at all —
-//! get hand-written functions below.
+//! drift apart. Only the rules not represented in that derived schema at
+//! all get hand-written functions below — some genuinely cross-field
+//! (comparing more than one field), others single-field but not expressed
+//! as a schema constraint for other reasons (a custom message, an
+//! allow-list that isn't meant to live in the wire schema, ...).
 
 use std::sync::LazyLock;
 

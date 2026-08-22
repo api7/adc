@@ -140,8 +140,9 @@ fn ssl_to_adc(ssl: &typing::Ssl) -> adc::SSL {
 /// (standalone models a credential as a one-plugin `Plugins` map, same as
 /// `adc-backend-apisix`); a credential with no plugin configured has
 /// nothing to convert. Unlike `adc-backend-apisix`'s equivalent, this
-/// doesn't reject an unrecognized plugin name or a non-object config —
-/// the plugin name and config pass through unvalidated.
+/// doesn't reject an unrecognized plugin name — it passes through
+/// unvalidated. A non-object config isn't rejected either, but it isn't
+/// passed through as-is: it's replaced with an empty map.
 fn credential_to_adc(credential: &typing::ConsumerCredential, prefix: &str) -> Option<adc::ConsumerCredential> {
     let plugins = credential.plugins.clone()?;
     let (plugin_name, config) = plugins.into_iter().next()?;

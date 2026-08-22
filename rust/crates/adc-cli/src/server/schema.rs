@@ -487,7 +487,9 @@ dGhpcyBpcyBub3QgYSB2YWxpZCBwcml2YXRlIGtleSBkZXIsIGp1c3QgcGFkZGluZyBieXRlcyB0byBt
 
     #[test]
     fn a_non_http_scheme_that_still_parses_as_a_url_is_rejected() {
-        let opts = opts(|o| o.server = ServerAddr::Single("file:///etc/passwd".to_string()));
+        // A real host, unlike `a_url_without_a_host_is_rejected`'s
+        // `mailto:` — isolates the scheme check from the host check.
+        let opts = opts(|o| o.server = ServerAddr::Single("ftp://example.com/resource".to_string()));
         let issues = validate_server_addr(&opts);
         assert!(
             issues.iter().any(|i| i.path == vec!["server"]),

@@ -108,6 +108,9 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
                 // and float representations distinct internally, so a plain
                 // `l != r` here would report a spurious edit between the
                 // two. Compare via as_f64() to collapse that distinction.
+                // Known imprecision: two distinct integers past f64's exact
+                // range (2^53) can collide here and be missed — not worth
+                // guarding against for gateway config values.
                 (Value::Number(ln), Value::Number(rn)) => {
                     if ln.as_f64() != rn.as_f64() {
                         changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
