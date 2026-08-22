@@ -120,11 +120,9 @@ impl Cache {
         self.entry(key).await.lock_owned().await
     }
 
-    /// Every field, read under one lock acquisition — `Backend::dump`
-    /// uses this (rather than calling `config`/`raw_config` separately) so
-    /// the two values it pins for a later `sync` on the same instance
-    /// are guaranteed to be from the same moment, not two independent
-    /// reads a concurrent writer could interleave between.
+    /// Every field, read under one lock acquisition, so a caller pinning
+    /// more than one of them (`Backend::dump` does, for `config` and
+    /// `raw_config`) gets values guaranteed to be from the same moment.
     pub(crate) async fn get_live(&self, key: &str) -> Option<CachedEntry> {
         // A plain `get`, not `entry()`/`get_with` — reading a key that was
         // never cached (or has since expired/been evicted) must not
@@ -179,6 +177,11 @@ impl Cache {
     /// sync's clock-rollback guard reads this value to pick its own
     /// timestamp, so a regressed value here could produce a
     /// `*_conf_version` the data plane has already seen (and rejects).
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) now that `Backend::dump` writes all three fields
+    // together via `set_dump_result` instead — dead as far as a plain
+    // `--lib` build (no consumer outside this crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_latest_version(&self, key: &str, value: i64) {
         self.touch(key, |entry| {
             entry.latest_version = Some(
@@ -190,13 +193,28 @@ impl Cache {
         .await;
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_config(&self, key: &str, config: Configuration) {
         self.touch(key, |entry| entry.config = Some(config)).await;
     }
 
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
         self.touch(key, |entry| entry.raw_config = Some(raw_config))
             .await;
+    }
+
+    /// `latest_version`/`config`/`raw_config` together, under one lock
+    /// acquisition, so a concurrent reader (another `dump`'s `get_live`)
+    /// can never observe just some of the three updated and not the
+    /// others.
+    pub async fn set_dump_result(&self, key: &str, latest_version: i64, config: Configuration, raw_config: ApisixStandalone) {
+        self.touch(key, |entry| {
+            entry.latest_version = Some(entry.latest_version.map_or(latest_version, |current| current.max(latest_version)));
+            entry.config = Some(config);
+            entry.raw_config = Some(raw_config);
+        })
+        .await;
     }
 
     /// No-op for a never-cached (or already-expired/evicted) key — checked

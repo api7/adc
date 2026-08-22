@@ -64,8 +64,10 @@ pub struct Backend {
     /// `sync` on the *same* instance folds events onto the exact document
     /// they were diffed against, not a fresh (possibly since-changed by a
     /// concurrent caller) read of the global cache. See `sync`'s doc
-    /// comment.
-    dumped_raw_config: OnceCell<ApisixStandalone>,
+    /// comment. A caller can legitimately `dump`/`sync` more than once on
+    /// the same instance, so every call overwrites this with its own
+    /// result.
+    dumped_raw_config: std::sync::Mutex<Option<ApisixStandalone>>,
 }
 
 impl Backend {
@@ -104,7 +106,7 @@ impl Backend {
             cache_key: opts.cache_key,
             bypass_cache: opts.bypass_cache,
             version: OnceCell::new(),
-            dumped_raw_config: OnceCell::new(),
+            dumped_raw_config: std::sync::Mutex::new(None),
         })
     }
 
@@ -185,14 +187,13 @@ impl adc_sdk::Backend for Backend {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
         }
-        // One locked read (`get_live`), not separate `config`/`raw_config`
-        // calls — the two must come from the same moment, or the value
-        // pinned below could already mismatch what's cached.
+        // `config` and `raw_config` must come from the same moment, or the
+        // value pinned below could mismatch what's cached.
         if let Some(entry) = Cache::global().get_live(&self.cache_key).await
             && let Some(config) = entry.config
         {
             if let Some(raw_config) = entry.raw_config {
-                let _ = self.dumped_raw_config.set(raw_config);
+                *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
             }
             return Ok(config);
         }
@@ -200,10 +201,12 @@ impl adc_sdk::Backend for Backend {
         let version = self.resolved_version().await?;
         let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
 
-        Cache::global().set_latest_version(&self.cache_key, highest_conf_version(&raw_config)).await;
-        Cache::global().set_config(&self.cache_key, config.clone()).await;
-        Cache::global().set_raw_config(&self.cache_key, raw_config.clone()).await;
-        let _ = self.dumped_raw_config.set(raw_config);
+        // A concurrent reader must never observe just some of the three
+        // fields updated and not the others.
+        Cache::global()
+            .set_dump_result(&self.cache_key, highest_conf_version(&raw_config), config.clone(), raw_config.clone())
+            .await;
+        *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
         Ok(config)
     }
 
@@ -230,14 +233,19 @@ impl adc_sdk::Backend for Backend {
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
         let mut entry = Cache::global().lock(&self.cache_key).await;
-        let old_raw_config = match self.dumped_raw_config.get() {
-            Some(raw_config) => raw_config.clone(),
+        let old_raw_config = match self.dumped_raw_config.lock().unwrap().clone() {
+            Some(raw_config) => raw_config,
             None => entry.raw_config.clone().unwrap_or_default(),
         };
         let latest_known_version = entry.latest_version;
 
         match Operator::new(self.servers.clone(), old_raw_config, latest_known_version).sync(events, opts).await {
             Ok(SyncOutcome { results, new_state: Some((timestamp, new_config)) }) => {
+                // Pinned before `new_config` is moved into `new_entry`
+                // below, so a later `sync`/`dump` on this same instance
+                // builds on what this call actually wrote, not the
+                // pre-sync snapshot it started from.
+                *self.dumped_raw_config.lock().unwrap() = Some(new_config.clone());
                 // Built in full before it touches `entry`, then swapped in
                 // as one assignment — a panic while computing the new state
                 // (e.g. inside `to_adc`) leaves the old entry untouched
@@ -265,8 +273,11 @@ impl adc_sdk::Backend for Backend {
                 // pointing at data a live server may have moved past. The
                 // next dump() re-fetches and re-runs `find_latest` to
                 // discover the cluster's real state instead of trusting
-                // stale cache.
+                // stale cache. This instance's own pinned snapshot is now
+                // equally untrustworthy, so it's cleared too — a retry on
+                // the same instance must go through a fresh `dump`.
                 *entry = CachedEntry::default();
+                *self.dumped_raw_config.lock().unwrap() = None;
                 Err(error)
             }
         }
