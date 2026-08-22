@@ -105,6 +105,12 @@ impl Operator {
             error = tracing::field::Empty,
         )
     )]
+    // `Event` carries a resource's full JSON body (`EventKind::Update` alone
+    // holds two `serde_json::Value`s), so the `Err` side is inherently
+    // sizable — boxing it wouldn't help, since `BackendSyncResult` (the `Ok`
+    // side) carries an `Option<Event>` of its own and is already comparably
+    // large.
+    #[allow(clippy::result_large_err)]
     async fn apply(&self, event: Event) -> Result<BackendSyncResult, (Event, BackendError)> {
         let outcome = self.operate(&event).await;
 
