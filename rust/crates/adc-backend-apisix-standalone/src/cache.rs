@@ -79,7 +79,10 @@ pub(crate) struct CachedEntry {
 
 impl CachedEntry {
     fn is_expired(&self, ttl: Duration) -> bool {
-        self.updated_at.is_none_or(|at| stable_timestamp().saturating_sub(at) > ttl.as_millis() as i64)
+        // Compared in u128 throughout: a `ttl.as_millis()` (u128) cast down
+        // to i64 would silently wrap for a configured TTL above i64::MAX
+        // ms, making every entry look immediately expired.
+        self.updated_at.is_none_or(|at| stable_timestamp().saturating_sub(at).max(0) as u128 > ttl.as_millis())
     }
 }
 
@@ -121,8 +124,16 @@ impl Cache {
     /// touches, so ordinary callers never need this directly. Not exposed
     /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
     /// caller elsewhere couldn't do anything with the guard anyway.
+    ///
+    /// Resets an expired entry before returning it, so a caller through
+    /// here sees the same "expired == absent" state `get_live` does,
+    /// rather than reading stale data past its TTL.
     pub(crate) async fn lock(&self, key: &str) -> OwnedMutexGuard<CachedEntry> {
-        self.entry(key).lock_owned().await
+        let mut entry = self.entry(key).lock_owned().await;
+        if entry.is_expired(self.ttl) {
+            *entry = CachedEntry::default();
+        }
+        entry
     }
 
     /// Every field, read under one lock acquisition, so a caller pinning
