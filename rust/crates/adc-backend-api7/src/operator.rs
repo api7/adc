@@ -21,16 +21,14 @@
 use std::collections::HashSet;
 
 use adc_backend_core::{
-    HttpClient, Method, RequestBuilder, concurrent_map, concurrent_map_until_err,
-    encode_path_segment,
+    HttpClient, Method, RequestBuilder, concurrent_map, concurrent_map_until_err, deserialize_event_value,
+    encode_path_segment, missing_parent, to_request_body,
 };
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, ResourceType,
     SYNC_EVENT_SPAN_NAME,
 };
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::transformer;
@@ -239,26 +237,6 @@ fn preprocess_events(events: Vec<Event>) -> Vec<Event> {
             !cascaded_by_service && !cascaded_by_consumer
         })
         .collect()
-}
-
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(
-        format!(
-            "{:?} event for resource {:?} is missing a parent_id",
-            event.resource_type, event.resource_id
-        )
-        .into(),
-    )
-}
-
-fn deserialize_event_value<T: DeserializeOwned>(value: &Value) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone())
-        .map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
-}
-
-fn to_request_body<T: Serialize>(value: T) -> Result<Value, BackendError> {
-    serde_json::to_value(value)
-        .map_err(|e| BackendError::Serialization(format!("encoding request body: {e}")))
 }
 
 fn build_path(event: &Event) -> Result<String, BackendError> {

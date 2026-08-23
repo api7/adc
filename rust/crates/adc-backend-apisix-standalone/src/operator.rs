@@ -14,7 +14,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use adc_backend_core::{HttpClient, Method, concurrent_map, concurrent_map_until_err};
+use adc_backend_core::{
+    HttpClient, Method, concurrent_map, concurrent_map_until_err, deserialize_event_value, missing_parent,
+};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
@@ -157,14 +159,6 @@ fn resolve_sync_timestamp(now: i64, latest_known: Option<i64>) -> i64 {
 
 fn missing_new_value(event: &Event) -> BackendError {
     BackendError::Other(format!("{:?} event for resource {:?} is missing new_value", event.event_type(), event.resource_id).into())
-}
-
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(format!("{:?} event for resource {:?} is missing a parent_id", event.resource_type, event.resource_id).into())
-}
-
-fn deserialize_event_value<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone()).map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
 }
 
 /// `ConsumerCredential` events are keyed by `parentId/credentials/resourceId`

@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method};
+use adc_backend_core::{HttpClient, Method, deserialize_event_value, missing_parent};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendValidateResult, BackendValidationError, Event, EventType, ResourceType,
@@ -104,23 +104,6 @@ fn enrich(raw: RawValidationError, index: &ValidateIndex) -> BackendValidationEr
         error: raw.error,
         event: matched.map(|(_, event)| event.clone()),
     }
-}
-
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(
-        format!(
-            "{:?} event for resource {:?} is missing a parent_id",
-            event.resource_type, event.resource_id
-        )
-        .into(),
-    )
-}
-
-fn deserialize_event_value<T: serde::de::DeserializeOwned>(
-    value: &Value,
-) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone())
-        .map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
 }
 
 fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
