@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method, ResourceFilter, concurrent_map_until_err};
+use adc_backend_core::{HttpClient, Method, RequestBuilder, ResourceFilter, concurrent_map_until_err};
 use adc_sdk::resources::{self as adc, Configuration, LabelValue, Plugins};
 use adc_sdk::{BackendError, ResourceType};
 use indexmap::IndexMap;
@@ -35,6 +35,25 @@ impl Fetcher {
         }
     }
 
+    fn request(&self, method: Method, path: &str) -> Result<RequestBuilder, BackendError> {
+        self.client.request(method, path)
+    }
+
+    /// A top-level collection request: unlike [`Fetcher::request`], this
+    /// also carries `--label-selector`'s query params.
+    fn collection_request(&self, path: &str) -> Result<RequestBuilder, BackendError> {
+        Ok(self.filter.attach_label_selector(self.request(Method::GET, path)?))
+    }
+
+    fn collection_path(resource_type: ResourceType) -> Result<String, BackendError> {
+        let api_name = resource_type_to_api_name(resource_type).ok_or_else(|| {
+            BackendError::Unsupported(format!(
+                "{resource_type:?} has no top-level admin API collection"
+            ))
+        })?;
+        Ok(format!("/apisix/admin/{api_name}"))
+    }
+
     async fn list<T: DeserializeOwned>(
         &self,
         resource_type: ResourceType,
@@ -42,15 +61,8 @@ impl Fetcher {
         if self.filter.is_skip(resource_type) {
             return Ok(Vec::new());
         }
-        let api_name = resource_type_to_api_name(resource_type).ok_or_else(|| {
-            BackendError::Unsupported(format!(
-                "{resource_type:?} has no top-level admin API collection"
-            ))
-        })?;
-        let path = format!("/apisix/admin/{api_name}");
-        let builder = self
-            .filter
-            .attach_label_selector(self.client.request(Method::GET, &path)?);
+        let path = Self::collection_path(resource_type)?;
+        let builder = self.collection_request(&path)?;
         let body: typing::ListResponse<T> = self.client.send_json(builder).await?;
         Ok(body.list.into_iter().map(|item| item.value).collect())
     }
@@ -73,14 +85,17 @@ impl Fetcher {
 
     /// No dedicated PluginConfig resource type to check `is_skip` against —
     /// gated on Route instead, since resolving a route's `plugin_config_id`
-    /// is the only thing this data is ever used for.
+    /// is the only thing this data is ever used for. Not
+    /// `collection_request()`: a route and the plugin_config it references
+    /// are independently labeled, so filtering this fetch by
+    /// `--label-selector` could drop a plugin_config a kept route still
+    /// references — always fetched in full instead, and whichever entries
+    /// end up with no referencing route are simply never used below.
     pub async fn list_plugin_configs(&self) -> Result<Vec<typing::PluginConfig>, BackendError> {
         if self.filter.is_skip(ResourceType::Route) {
             return Ok(Vec::new());
         }
-        let builder = self
-            .filter
-            .attach_label_selector(self.client.request(Method::GET, "/apisix/admin/plugin_configs")?);
+        let builder = self.request(Method::GET, "/apisix/admin/plugin_configs")?;
         let body: typing::ListResponse<typing::PluginConfig> = self.client.send_json(builder).await?;
         Ok(body.list.into_iter().map(|item| item.value).collect())
     }
@@ -88,12 +103,19 @@ impl Fetcher {
     /// A backend may define several `global_rules` entries; their `plugins`
     /// maps are merged into one (later entries win on key collision),
     /// matching how they're consumed — as a single flat set of gateway-wide
-    /// plugins, not as separate rules.
+    /// plugins, not as separate rules. Not `list()`: a global rule has no
+    /// `labels` field of its own, so there's nothing for `--label-selector`
+    /// to match against.
     pub async fn list_global_rules(&self) -> Result<Plugins, BackendError> {
-        let rules: Vec<typing::GlobalRule> = self.list(ResourceType::GlobalRule).await?;
+        if self.filter.is_skip(ResourceType::GlobalRule) {
+            return Ok(Plugins::new());
+        }
+        let path = Self::collection_path(ResourceType::GlobalRule)?;
+        let builder = self.request(Method::GET, &path)?;
+        let body: typing::ListResponse<typing::GlobalRule> = self.client.send_json(builder).await?;
         let mut merged = Plugins::new();
-        for rule in rules {
-            merged.extend(rule.plugins);
+        for item in body.list {
+            merged.extend(item.value.plugins);
         }
         Ok(merged)
     }
@@ -101,19 +123,15 @@ impl Fetcher {
     /// Plugin metadata isn't returned as a `name` field on each item — the
     /// name only appears as the last segment of the etcd key
     /// (`/apisix/plugin_metadata/http-logger`), so it's extracted from
-    /// `ListItem::key` rather than `ListItem::value`.
+    /// `ListItem::key` rather than `ListItem::value`. Not
+    /// `collection_request()`: plugin metadata has no `labels` field of its
+    /// own, so there's nothing for `--label-selector` to match against.
     pub async fn list_plugin_metadata(&self) -> Result<Plugins, BackendError> {
         if self.filter.is_skip(ResourceType::PluginMetadata) {
             return Ok(Plugins::new());
         }
-        let path = format!(
-            "/apisix/admin/{}",
-            resource_type_to_api_name(ResourceType::PluginMetadata)
-                .expect("PluginMetadata always has an api name")
-        );
-        let builder = self
-            .filter
-            .attach_label_selector(self.client.request(Method::GET, &path)?);
+        let path = Self::collection_path(ResourceType::PluginMetadata)?;
+        let builder = self.request(Method::GET, &path)?;
         let body: typing::ListResponse<Plugins> = self.client.send_json(builder).await?;
 
         let mut merged = Plugins::new();
@@ -134,10 +152,7 @@ impl Fetcher {
         if self.filter.is_skip(ResourceType::StreamRoute) {
             return Ok(Vec::new());
         }
-        let builder = self.filter.attach_label_selector(
-            self.client
-                .request(Method::GET, "/apisix/admin/stream_routes")?,
-        );
+        let builder = self.collection_request("/apisix/admin/stream_routes")?;
         let response = self.client.execute(builder).await?;
         if response.status().as_u16() == 404 {
             return Ok(Vec::new());
@@ -521,14 +536,29 @@ mod tests {
         };
         let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter, 10);
 
-        let builder = fetcher.filter.attach_label_selector(
-            fetcher
-                .client
-                .request(Method::GET, "/apisix/admin/services")
-                .unwrap(),
-        );
-        let request = builder.build().unwrap();
+        let request = fetcher.collection_request("/apisix/admin/services").unwrap().build().unwrap();
         assert_eq!(request.url().query(), Some("labels%5Benv%5D=prod"));
+    }
+
+    /// `list_global_rules`/`list_plugin_metadata`/`list_plugin_configs`
+    /// build their own request via `request()`, not `collection_request()`
+    /// — none of the three should have `--label-selector` narrowing what
+    /// comes back: the first two have no `labels` field of their own to
+    /// match against, and plugin_configs must be fetched in full regardless
+    /// (see `list_plugin_configs`'s doc comment).
+    #[test]
+    fn global_rules_plugin_metadata_and_plugin_configs_requests_do_not_carry_the_label_selector() {
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude: HashSet::new(),
+            label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
+        };
+        let fetcher = Fetcher::new(unreachable_client(), Version::new(999, 999, 999), filter, 10);
+
+        for path in ["/apisix/admin/global_rules", "/apisix/admin/plugin_metadata", "/apisix/admin/plugin_configs"] {
+            let request = fetcher.request(Method::GET, path).unwrap().build().unwrap();
+            assert_eq!(request.url().query(), None, "{path}");
+        }
     }
 
     /// A server that ignores the `labels[...]` query param entirely and

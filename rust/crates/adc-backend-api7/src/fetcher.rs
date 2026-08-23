@@ -167,18 +167,25 @@ impl Fetcher {
         self.list("/apisix/admin/ssls").await
     }
 
+    /// Not `list()`/`collection_request()`: a global rule has no `labels`
+    /// field of its own, so there's nothing for `--label-selector` to match
+    /// against.
     pub async fn list_global_rules(&self) -> Result<Vec<typing::GlobalRule>, BackendError> {
         if self.filter.is_skip(ResourceType::GlobalRule) {
             return Ok(Vec::new());
         }
-        self.list("/apisix/admin/global_rules").await
+        let builder = self.request(Method::GET, "/apisix/admin/global_rules")?;
+        let body: typing::ListResponse<typing::GlobalRule> = self.client.send_json(builder).await?;
+        Ok(body.list)
     }
 
+    /// Not `collection_request()`: plugin metadata has no `labels` field of
+    /// its own, so there's nothing for `--label-selector` to match against.
     pub async fn list_plugin_metadata(&self) -> Result<typing::PluginMetadata, BackendError> {
         if self.filter.is_skip(ResourceType::PluginMetadata) {
             return Ok(typing::PluginMetadata::default());
         }
-        let builder = self.collection_request("/apisix/admin/plugin_metadata")?;
+        let builder = self.request(Method::GET, "/apisix/admin/plugin_metadata")?;
         let body: typing::ValueResponse<typing::PluginMetadata> =
             self.client.send_json(builder).await?;
         Ok(body.value)
@@ -403,6 +410,31 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(nested.url().query(), None);
+    }
+
+    /// `list_global_rules`/`list_plugin_metadata` build their own request
+    /// via `request()`, not `collection_request()` — neither resource has a
+    /// `labels` field of its own, so there's nothing for `--label-selector`
+    /// to match against.
+    #[test]
+    fn global_rules_and_plugin_metadata_requests_do_not_carry_the_label_selector() {
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude: HashSet::new(),
+            label_selector: HashMap::from([("env".to_string(), "prod".to_string())]),
+        };
+        let fetcher = Fetcher::new(
+            unreachable_client(),
+            Version::new(999, 999, 999),
+            None,
+            filter,
+            10,
+        );
+
+        for path in ["/apisix/admin/global_rules", "/apisix/admin/plugin_metadata"] {
+            let request = fetcher.request(Method::GET, path).unwrap().build().unwrap();
+            assert_eq!(request.url().query(), None, "{path}");
+        }
     }
 
     #[test]
