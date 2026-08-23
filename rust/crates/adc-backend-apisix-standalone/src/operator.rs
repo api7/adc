@@ -565,18 +565,35 @@ fn apply_event_for_service_inlined_upstream(
             if !diff.iter().any(diff_path_is_upstream) {
                 return Ok(());
             }
-            // `.as_mut()`, not `get_or_insert_with`: there's nothing to
-            // update when no upstream has ever been written, and
-            // materializing an empty `Vec` here would flip
-            // `config.upstreams` from `None` to `Some(vec![])` — a real
-            // (if harmless-looking) change to what gets cached and PUT to
-            // the servers, for an event that changed nothing.
-            if let Some(wire) = build_wire(event)?
-                && let Some(upstreams) = config.upstreams.as_mut()
-                && let Some(slot) = upstreams.iter_mut().find(|item| item.id == event.resource_id)
-            {
-                *slot = wire;
-                increase_version.insert(ResourceType::Upstream);
+            // `build_wire` returning `Some` covers both "still has a default
+            // upstream, its body changed" *and* "just gained one it didn't
+            // have before" — the latter needs `get_or_insert_with` (a real
+            // new entry, not a no-op), matching the CREATE branch above.
+            // `None` means the service just lost its default upstream: the
+            // stale entry has to be removed, or it stays behind forever —
+            // nothing else ever prunes it. Only the removal side stays
+            // `.as_mut()`: if `config.upstreams` is `None`, there's
+            // genuinely nothing to remove, and materializing an empty `Vec`
+            // here would be a real (if harmless-looking) change to what
+            // gets cached and PUT to the servers for an event that changed
+            // nothing on this collection.
+            match build_wire(event)? {
+                Some(wire) => {
+                    let upstreams = config.upstreams.get_or_insert_with(Vec::new);
+                    match upstreams.iter_mut().find(|item| item.id == event.resource_id) {
+                        Some(slot) => *slot = wire,
+                        None => upstreams.push(wire),
+                    }
+                    increase_version.insert(ResourceType::Upstream);
+                }
+                None => {
+                    if let Some(upstreams) = config.upstreams.as_mut()
+                        && let Some(pos) = upstreams.iter().position(|item| item.id == event.resource_id)
+                    {
+                        upstreams.remove(pos);
+                        increase_version.insert(ResourceType::Upstream);
+                    }
+                }
             }
         }
         EventType::Delete => {
@@ -936,16 +953,18 @@ mod tests {
         assert!(!increase_version.contains(&ResourceType::Upstream));
     }
 
-    /// Regression test: an update whose diff touches `upstream` but for
-    /// which no upstream entry exists yet (e.g. `config.upstreams` was
-    /// never populated) must also leave it `None`, for the same reason.
+    /// Regression: an update that gives a service its *first* default
+    /// upstream (no prior entry in `config.upstreams`, possibly no
+    /// `config.upstreams` at all) used to be silently dropped — the
+    /// `Update` branch only ever replaced an existing slot, never inserted
+    /// a new one. This is a real new upstream, not a no-op, so it must be
+    /// created (and `increase_version` bumped) the same as a CREATE would.
     #[test]
-    fn updating_a_services_upstream_with_no_existing_entry_leaves_the_upstreams_field_absent() {
+    fn updating_a_services_upstream_with_no_existing_entry_creates_one() {
         let mut config = empty_config();
         let mut increase_version = HashSet::new();
-        let diff = vec![ValueDiff::Edit {
+        let diff = vec![ValueDiff::New {
             path: vec![PathSegment::Key("upstream".to_string())],
-            lhs: json!({}),
             rhs: json!({}),
         }];
         let service_event = event(
@@ -953,6 +972,86 @@ mod tests {
             EventKind::Update {
                 old_value: json!({ "name": "svc-no-upstream" }),
                 new_value: json!({ "name": "svc-no-upstream", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+                diff: Some(diff),
+            },
+            "svc-no-upstream",
+        );
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &service_event).unwrap();
+
+        let upstreams = config.upstreams.unwrap();
+        assert_eq!(upstreams.len(), 1);
+        assert_eq!(upstreams[0].id, "svc-no-upstream");
+        assert!(increase_version.contains(&ResourceType::Upstream));
+    }
+
+    /// A service losing its default upstream must remove the now-stale
+    /// entry from `config.upstreams`, not leave it behind forever — nothing
+    /// else ever prunes it.
+    #[test]
+    fn updating_a_service_to_remove_its_upstream_deletes_the_existing_entry() {
+        let mut config = empty_config();
+        config.upstreams = Some(vec![typing::Upstream {
+            modified_index: 1,
+            id: "svc-1".to_string(),
+            name: "svc-1".to_string(),
+            desc: None,
+            labels: None,
+            nodes: None,
+            scheme: None,
+            ty: None,
+            hash_on: None,
+            key: None,
+            pass_host: None,
+            upstream_host: None,
+            retries: None,
+            retry_timeout: None,
+            timeout: None,
+            tls: None,
+            keepalive_pool: None,
+            checks: None,
+            discovery_type: None,
+            service_name: None,
+            discovery_args: None,
+        }]);
+        let mut increase_version = HashSet::new();
+        let diff = vec![ValueDiff::Deleted {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            lhs: json!({}),
+        }];
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value: json!({ "name": "svc-1", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+                new_value: json!({ "name": "svc-1" }),
+                diff: Some(diff),
+            },
+            "svc-1",
+        );
+
+        apply_event_for_service_inlined_upstream(&mut config, &mut increase_version, 300, &service_event).unwrap();
+
+        assert!(config.upstreams.unwrap().is_empty());
+        assert!(increase_version.contains(&ResourceType::Upstream));
+    }
+
+    /// The removal side must stay a no-op when there was never an entry to
+    /// begin with — `config.upstreams` must not flip from `None` to
+    /// `Some(vec![])` for an event that changed nothing about this
+    /// collection.
+    #[test]
+    fn updating_a_service_to_remove_an_upstream_that_was_never_recorded_leaves_the_upstreams_field_absent() {
+        let mut config = empty_config();
+        let mut increase_version = HashSet::new();
+        let diff = vec![ValueDiff::Deleted {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            lhs: json!({}),
+        }];
+        let service_event = event(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value: json!({ "name": "svc-no-upstream", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } }),
+                new_value: json!({ "name": "svc-no-upstream" }),
                 diff: Some(diff),
             },
             "svc-no-upstream",

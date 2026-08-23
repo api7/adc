@@ -282,6 +282,11 @@ async fn syncs_and_dumps_ssls() {
     assert_eq!(ssls.len(), 2);
     assert_matches_object(&serde_json::to_value(&ssls[0]).unwrap(), &ssl2_test);
     assert_matches_object(&serde_json::to_value(&ssls[1]).unwrap(), &ssl1_test);
+    // The subset matches above don't check `key` at all (it was removed
+    // from the expected object) — assert directly that it comes back as
+    // the empty string, not the submitted key echoed back.
+    assert_eq!(ssls[0].certificates[0].key, "");
+    assert_eq!(ssls[1].certificates[0].key, "");
 
     ssl1["labels"] = json!({ "test": "test" });
     sync_events(
@@ -326,6 +331,51 @@ async fn syncs_and_dumps_ssls() {
     .unwrap();
     let dump = dump_configuration(&backend).await.unwrap();
     assert!(dump.ssls.is_none_or(|s| s.is_empty()));
+}
+
+/// Regression: writing an SSL with more than one certificate (via
+/// `certs`/`keys` on the wire, per `FromADC.transformSSL`) is a real,
+/// supported write — API7 accepts, stores, and returns all of them (`cert`
+/// *and* `certs` both come back on a real admin API response, confirmed
+/// against a live instance) — but the read-direction conversion used to
+/// only ever recover the first, silently dropping the rest on every dump.
+/// The private key is never echoed back for any of them (real responses
+/// carry no `key`/`keys` field at all), so both come back empty.
+#[tokio::test]
+#[ignore]
+async fn an_ssl_with_multiple_certificates_recovers_all_of_them_on_dump() {
+    let backend = common::backend().await;
+    let cert1 = read_asset("certs/test-ssl1.cer").trim().to_string();
+    let key1 = read_asset("certs/test-ssl1.key").trim().to_string();
+    let cert2 = read_asset("certs/test-ssl2.cer").trim().to_string();
+    let key2 = read_asset("certs/test-ssl2.key").trim().to_string();
+
+    let snis = ["multi-cert.com"];
+    let ssl_name = snis.join(",");
+    let ssl = json!({
+        "snis": snis,
+        "certificates": [
+            { "certificate": cert1, "key": key1 },
+            { "certificate": cert2, "key": key2 },
+        ],
+    });
+
+    sync_events(&backend, vec![create_event(ResourceType::Ssl, &ssl_name, ssl, None)])
+        .await
+        .unwrap();
+
+    let dump = dump_configuration(&backend).await.unwrap();
+    let ssls = dump.ssls.unwrap();
+    assert_eq!(ssls.len(), 1);
+    assert_eq!(ssls[0].certificates.len(), 2, "both certificates should come back on dump");
+    assert_eq!(ssls[0].certificates[0].certificate.trim(), cert1);
+    assert_eq!(ssls[0].certificates[0].key, "");
+    assert_eq!(ssls[0].certificates[1].certificate.trim(), cert2);
+    assert_eq!(ssls[0].certificates[1].key, "");
+
+    sync_events(&backend, vec![delete_event(ResourceType::Ssl, &ssl_name, None)])
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

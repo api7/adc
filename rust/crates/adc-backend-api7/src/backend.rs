@@ -139,8 +139,21 @@ fn coerce_version(value: &str) -> Option<Version> {
         .collect();
     let mut parts = digits_and_dots.splitn(3, '.');
     let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-    let patch = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+    // A component that's *present* but doesn't parse (e.g. the empty string
+    // between two dots, or truncated as `digits_and_dots` cuts the value off
+    // at its first non-digit/non-dot char) fails the whole thing rather than
+    // silently defaulting to 0 — that would misreport a garbled minor/patch
+    // as a clean, low version instead of an unparseable one. Only a
+    // genuinely *omitted* trailing component (`parts.next()` returning
+    // `None`) defaults.
+    let minor = match parts.next() {
+        None => 0,
+        Some(s) => s.parse().ok()?,
+    };
+    let patch = match parts.next() {
+        None => 0,
+        Some(s) => s.parse().ok()?,
+    };
     Some(Version::new(major, minor, patch))
 }
 
@@ -167,5 +180,16 @@ mod tests {
     #[test]
     fn returns_none_for_a_value_with_no_digits_at_all() {
         assert_eq!(coerce_version("dev"), None);
+    }
+
+    /// A present-but-garbled minor component (here, `digits_and_dots` cuts
+    /// the value off right after the dot) must not be mistaken for an
+    /// *omitted* one — that would misreport this as the clean version 3.0.0
+    /// instead of an unparseable value. `resolved_version` treats `None` the
+    /// same way as any other unparseable string: it falls back to
+    /// `Version::new(999, 999, 999)` rather than guessing low.
+    #[test]
+    fn returns_none_for_a_present_but_invalid_minor_component() {
+        assert_eq!(coerce_version("3.dev"), None);
     }
 }

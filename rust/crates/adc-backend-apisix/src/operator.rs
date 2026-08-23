@@ -6,11 +6,13 @@
 //! - A service's default upstream is a *separate* admin-API resource
 //!   (`/apisix/admin/upstreams/{id}`, same id as the service), so a single
 //!   `SERVICE` event can turn into up to two requests, and their order
-//!   matters: creating/updating writes the upstream first (routes/services
-//!   referencing it must find it already there), deleting removes the
-//!   service first (nothing should reference the upstream by the time it's
-//!   removed). An update where only the upstream actually changed skips the
-//!   service request entirely.
+//!   matters: creating/gaining an upstream writes it first (the service's
+//!   own request references it by `upstream_id`, which APISIX validates
+//!   exists), losing/deleting one removes the service (or the service's own
+//!   update, which clears `upstream_id`) first — nothing should reference
+//!   the upstream by the time it's removed. An update where only the
+//!   upstream's *content* changed (not whether it exists at all) skips the
+//!   service request entirely, since `upstream_id` doesn't change either.
 //! - Requests within one event are applied *sequentially* (a service's
 //!   upstream write must complete before its own write starts); events are
 //!   grouped by `(resource_type, event_type)` and applied *sequentially
@@ -322,15 +324,40 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
                 })?;
                 let touches_non_upstream = diff.iter().any(|d| !diff_path_is_upstream(d));
                 let touches_upstream = diff.iter().any(diff_path_is_upstream);
-                if !touches_non_upstream {
+                // A diff entry at exactly `["upstream"]` (not deeper) is a
+                // New/Deleted for the field itself — the upstream's
+                // *presence* changed, which changes the service's own wire
+                // body too (`transform_service` sets `upstream_id` iff
+                // `service.upstream.is_some()`). Skipping the service
+                // request is only safe when presence is unchanged and only
+                // the upstream's content differs further down the tree.
+                let upstream_presence_changed = diff.iter().any(|d| {
+                    matches!(d, ValueDiff::New { path, .. } | ValueDiff::Deleted { path, .. }
+                        if path.as_slice() == [PathSegment::Key("upstream".to_string())])
+                });
+                if !touches_non_upstream && !upstream_presence_changed {
                     paths.pop();
                 }
                 if touches_upstream {
-                    // Still has an upstream: PUT the new body. Lost it
-                    // entirely: nothing to PUT, so DELETE instead — `operate`
-                    // already tolerates a 404 here for the "never had one" case.
-                    let method = if service_has_upstream(event) { Method::PUT } else { Method::DELETE };
-                    paths.insert(0, (upstream_path, RequestKind::Upstream, method));
+                    if service_has_upstream(event) {
+                        // Still has an upstream: create/update it before the
+                        // service request (re)points `upstream_id` at it —
+                        // APISIX rejects a service pointing at a
+                        // nonexistent upstream.
+                        paths.insert(0, (upstream_path, RequestKind::Upstream, Method::PUT));
+                    } else {
+                        // Lost it entirely: the service request above (kept
+                        // in `paths` since presence changed) must detach the
+                        // `upstream_id` reference *before* the upstream is
+                        // deleted, or APISIX rejects the DELETE with "still
+                        // using it" — `operate` already tolerates a 404 here
+                        // for the "never had one" case, but a rejected
+                        // DELETE would just retry against the same
+                        // still-referencing service and exhaust its
+                        // retries, since nothing else in this event would
+                        // ever run that service request afterward.
+                        paths.push((upstream_path, RequestKind::Upstream, Method::DELETE));
+                    }
                 }
             }
         }
@@ -511,8 +538,15 @@ mod tests {
         assert!(requests[0].1.ends_with("/services/svc-no-upstream"), "{}", requests[0].1);
     }
 
+    /// Regression: losing the upstream's *presence* (not just its content)
+    /// changes the service's own wire body too (`upstream_id` gets
+    /// cleared), so — unlike a pure content-only upstream update — the
+    /// service request can't be skipped here. It must also come *before*
+    /// the upstream DELETE: APISIX rejects deleting an upstream a service
+    /// still references, and nothing later in this same event would ever
+    /// run the service request to fix that up.
     #[test]
-    fn service_update_removing_its_upstream_deletes_the_upstream_resource_instead_of_erroring() {
+    fn service_update_removing_its_upstream_detaches_the_reference_before_deleting_it() {
         let old_value = json!({ "name": "svc1", "upstream": { "nodes": [] } });
         let new_value = json!({ "name": "svc1" });
         let diff = vec![ValueDiff::Deleted { path: vec![PathSegment::Key("upstream".to_string())], lhs: old_value["upstream"].clone() }];
@@ -520,15 +554,68 @@ mod tests {
             Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
 
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
-        // Only the upstream field changed, so the service body itself isn't
-        // re-sent (same rule as any other upstream-only update) — just the
-        // DELETE for the upstream that's no longer there.
-        assert_eq!(requests.len(), 1);
+        assert_eq!(requests.len(), 2);
+
         let (method, path, body, kind) = &requests[0];
-        assert!(matches!(kind, RequestKind::Upstream));
+        assert!(matches!(kind, RequestKind::Main), "service request must come first");
+        assert_eq!(*method, Method::PUT);
+        assert_eq!(body.as_ref().unwrap()["upstream_id"], Value::Null);
+        assert!(path.ends_with("/services/svc1"), "{path}");
+
+        let (method, path, body, kind) = &requests[1];
+        assert!(matches!(kind, RequestKind::Upstream), "upstream DELETE must come after");
         assert_eq!(*method, Method::DELETE);
         assert!(body.is_none());
         assert!(path.ends_with("/upstreams/svc1"), "{path}");
+    }
+
+    /// A service update that both changes another field *and* removes its
+    /// upstream — the finding this guards against had this "mixed" case
+    /// working by accident (the service request was never popped, since
+    /// `touches_non_upstream` was already true), but still ordered the
+    /// upstream DELETE *before* the service request that detaches it.
+    #[test]
+    fn service_update_changing_another_field_and_removing_its_upstream_still_detaches_before_deleting() {
+        let old_value = json!({ "name": "svc1", "description": "old", "upstream": { "nodes": [] } });
+        let new_value = json!({ "name": "svc1", "description": "new" });
+        let diff = vec![
+            ValueDiff::Edit { path: vec![PathSegment::Key("description".to_string())], lhs: json!("old"), rhs: json!("new") },
+            ValueDiff::Deleted { path: vec![PathSegment::Key("upstream".to_string())], lhs: old_value["upstream"].clone() },
+        ];
+        let service_event =
+            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+
+        let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(matches!(requests[0].3, RequestKind::Main), "service request must come first");
+        assert!(matches!(requests[1].3, RequestKind::Upstream), "upstream DELETE must come after");
+        assert_eq!(requests[1].0, Method::DELETE);
+    }
+
+    /// The mirror case: gaining an upstream (presence change) also needs
+    /// the service request, and it must come *after* the upstream PUT —
+    /// APISIX rejects a service pointing at a not-yet-existing upstream.
+    #[test]
+    fn service_update_gaining_an_upstream_creates_it_before_pointing_the_service_at_it() {
+        let old_value = json!({ "name": "svc1" });
+        let new_value = json!({ "name": "svc1", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } });
+        let diff = vec![ValueDiff::New { path: vec![PathSegment::Key("upstream".to_string())], rhs: new_value["upstream"].clone() }];
+        let service_event =
+            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+
+        let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
+        assert_eq!(requests.len(), 2);
+
+        let (method, path, _, kind) = &requests[0];
+        assert!(matches!(kind, RequestKind::Upstream), "upstream PUT must come first");
+        assert_eq!(*method, Method::PUT);
+        assert!(path.ends_with("/upstreams/svc1"), "{path}");
+
+        let (method, path, body, kind) = &requests[1];
+        assert!(matches!(kind, RequestKind::Main), "service request must come after");
+        assert_eq!(*method, Method::PUT);
+        assert_eq!(body.as_ref().unwrap()["upstream_id"], "svc1");
+        assert!(path.ends_with("/services/svc1"), "{path}");
     }
 
     #[test]

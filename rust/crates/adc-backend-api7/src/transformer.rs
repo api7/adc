@@ -190,22 +190,33 @@ impl TryFrom<typing::Service> for adc::Service {
 
 impl From<typing::Ssl> for adc::SSL {
     fn from(ssl: typing::Ssl) -> Self {
-        // Only the first certificate/key pair is ever read back, and the
-        // key is always empty — a gateway server never echoes a private
-        // key on read, and additional entries in `certs`/`keys` aren't
-        // recovered here either (unlike `adc_backend_apisix`'s own SSL
-        // read conversion, which does merge them back in). A missing
+        // `origin/main:libs/backend-api7/src/transformer.ts`'s
+        // `ToADC.transformSSL` only ever reads `cert`, dropping `certs`
+        // entirely — but a real API7 admin API response (confirmed against
+        // a live instance, not just this fixture) does return `certs` for
+        // an SSL with more than one certificate, e.g.:
+        // `{"cert": "$env://gc", "certs": ["$env://gc2"], ...}`. That's a
+        // real gap in the TS reference itself, not something to port
+        // faithfully — losing every certificate past the first on every
+        // dump is real data loss. Mirrors `adc_backend_apisix`'s own SSL
+        // read conversion and this crate's own write path
+        // (`TryFrom<adc::SSL> for typing::Ssl` below): `cert`/`certs` pair
+        // up with `key`/`keys` positionally. The key is never actually
+        // populated in practice (API7 doesn't echo it back on read), but
+        // this reads whatever `ssl.key`/`ssl.keys` hold rather than
+        // hardcoding empty, same as the write-side pairing. A missing
         // certificate isn't an error — it just means no certificate to
         // report, so `certificates` comes back empty instead.
-        let certificates = ssl
-            .cert
-            .map(|certificate| {
-                vec![adc::SSLCertificate {
-                    certificate,
-                    key: String::new(),
-                }]
-            })
-            .unwrap_or_default();
+        let mut certificates = Vec::new();
+        if let Some(cert) = ssl.cert {
+            let mut keys = ssl.keys.unwrap_or_default().into_iter();
+            certificates.push(adc::SSLCertificate { certificate: cert, key: ssl.key.unwrap_or_default() });
+            if let Some(certs) = ssl.certs {
+                certificates.extend(
+                    certs.into_iter().map(|certificate| adc::SSLCertificate { certificate, key: keys.next().unwrap_or_default() }),
+                );
+            }
+        }
 
         adc::SSL {
             id: ssl.id,
@@ -524,5 +535,56 @@ mod tests {
     fn an_out_of_range_wire_port_is_rejected_at_deserialization() {
         let json = serde_json::json!({ "server_port": 70_000 });
         assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
+    }
+
+    /// Regression: the read-direction SSL conversion used to only recover
+    /// `cert`, dropping every certificate past the first — confirmed
+    /// against a real API7 admin API response for a multi-cert SSL
+    /// (`{"cert": "$env://gc", "certs": ["$env://gc2"], ...}`), so this
+    /// isn't a hypothetical shape.
+    #[test]
+    fn ssl_from_wire_recovers_every_certificate_and_key_pair() {
+        let wire = typing::Ssl {
+            id: Some("ssl1".to_string()),
+            labels: None,
+            ty: None,
+            cert: Some("cert1".to_string()),
+            certs: Some(vec!["cert2".to_string()]),
+            key: Some("key1".to_string()),
+            keys: Some(vec!["key2".to_string()]),
+            client: None,
+            snis: Some(vec!["example.com".to_string()]),
+            status: Some(1),
+        };
+
+        let ssl = adc::SSL::from(wire);
+
+        assert_eq!(
+            ssl.certificates,
+            vec![
+                adc::SSLCertificate { certificate: "cert1".to_string(), key: "key1".to_string() },
+                adc::SSLCertificate { certificate: "cert2".to_string(), key: "key2".to_string() },
+            ]
+        );
+    }
+
+    #[test]
+    fn ssl_from_wire_with_no_cert_has_no_certificates() {
+        let wire = typing::Ssl {
+            id: Some("ssl1".to_string()),
+            labels: None,
+            ty: None,
+            cert: None,
+            certs: None,
+            key: None,
+            keys: None,
+            client: None,
+            snis: Some(vec!["example.com".to_string()]),
+            status: Some(1),
+        };
+
+        let ssl = adc::SSL::from(wire);
+
+        assert!(ssl.certificates.is_empty());
     }
 }
