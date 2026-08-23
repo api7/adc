@@ -23,7 +23,7 @@ pub mod value_diff;
 
 pub use backend::{
     Backend, BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
-    BackendValidationError, SYNC_EVENT_SPAN_NAME,
+    BackendValidationError, DEFAULT_EXIT_ON_FAILURE, SYNC_EVENT_SPAN_NAME,
 };
 pub use converter::{ConvertError, Converter};
 pub use default_value::DefaultValue;

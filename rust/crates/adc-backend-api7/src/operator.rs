@@ -26,7 +26,7 @@ use adc_backend_core::{
 };
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
-    BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, ResourceType,
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, ResourceType,
     SYNC_EVENT_SPAN_NAME,
 };
 use serde::Serialize;
@@ -61,7 +61,7 @@ impl Operator {
         events: Vec<Event>,
         opts: BackendSyncOptions,
     ) -> Result<Vec<BackendSyncResult>, BackendError> {
-        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
 
         let mut results = Vec::new();
         for group in group_events(preprocess_events(events)) {

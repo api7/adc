@@ -23,8 +23,8 @@
 use adc_backend_core::{HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err, encode_path_segment};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
-    BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, SYNC_EVENT_SPAN_NAME,
-    ValueDiff,
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
+    ResourceType, SYNC_EVENT_SPAN_NAME, ValueDiff,
 };
 use semver::Version;
 use serde::Serialize;
@@ -58,7 +58,7 @@ impl Operator {
     /// accumulated from earlier ones — is discarded in favor of the single
     /// `Err`.
     pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError> {
-        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
 
         let mut results = Vec::new();
         for group in group_events(events) {

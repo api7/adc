@@ -16,7 +16,10 @@ use std::collections::{HashMap, HashSet};
 
 use adc_backend_core::{HttpClient, Method, concurrent_map, concurrent_map_until_err};
 use adc_sdk::resources::{self as adc};
-use adc_sdk::{BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, ValueDiff};
+use adc_sdk::{
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
+    ResourceType, ValueDiff,
+};
 use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
 
@@ -92,7 +95,7 @@ impl Operator {
             }
         };
 
-        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
         let results = if exit_on_failure {
             match concurrent_map_until_err(self.servers.clone(), None, put).await {
                 Ok(results) => results,
