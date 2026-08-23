@@ -14,7 +14,7 @@
 //! same span a future OTel export layer would use unmodified.
 
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use adc_sdk::SYNC_EVENT_SPAN_NAME;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -51,6 +51,24 @@ struct State {
     failed: u64,
 }
 
+impl State {
+    /// See `Frame`'s own doc comment for why this is a clone, not a
+    /// reference.
+    fn snapshot(&self) -> Frame {
+        Frame {
+            header: self.header.clone(),
+            counts: self.counts.clone(),
+            started_at: self.started_at,
+            total: self.total,
+            completed: self.completed,
+            created: self.created,
+            updated: self.updated,
+            deleted: self.deleted,
+            failed: self.failed,
+        }
+    }
+}
+
 /// Call once, right before `Backend::sync`, only when
 /// `progress::interactive() && progress::verbose() > 0` — `interactive()`
 /// alone doesn't rule out `verbose == 0`, which the actual redraw layer
@@ -60,10 +78,6 @@ struct State {
 pub fn start(total: u64) {
     let multi = MultiProgress::new();
 
-    // No `enable_steady_tick`: it spawns a background thread that redraws
-    // outside the `ACTIVE` lock `render()` serializes through — a second,
-    // unsynchronized path into the same draw target, which tore output in
-    // practice. Every redraw now goes through `render()` only.
     let header_style =
         ProgressStyle::with_template("{spinner:.cyan} {msg}").expect("static template is valid");
     let header = multi.add(ProgressBar::new_spinner());
@@ -89,6 +103,32 @@ pub fn start(total: u64) {
         deleted: 0,
         failed: 0,
     });
+
+    spawn_ticker();
+}
+
+/// Not `ProgressBar::enable_steady_tick`: it spawns its own background
+/// thread that would redraw straight through `header`/`counts`, outside the
+/// `ACTIVE` lock every other redraw here serializes through — a second,
+/// unsynchronized path into the same draw target, which tears output in
+/// practice. This polls on the same interval instead, but goes through
+/// `ACTIVE` and `render_frame` like any other redraw. Exits on its own once
+/// `finish` clears `ACTIVE`, so nothing needs to cancel it explicitly.
+fn spawn_ticker() {
+    tokio::spawn(async {
+        // Matches `IndicatifLayer`'s own default tick interval (`tracing_indicatif::pb_manager::TickSettings`),
+        // so this spinner and `progress::stage`'s animate at the same rate.
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        loop {
+            interval.tick().await;
+            let frame = {
+                let guard = ACTIVE.lock().expect("not poisoned");
+                let Some(state) = guard.as_ref() else { return };
+                state.snapshot()
+            };
+            render_frame(&frame);
+        }
+    });
 }
 
 pub fn finish() {
@@ -104,12 +144,11 @@ pub fn finish() {
 }
 
 /// A snapshot of what `render_frame` needs, copied out of `State` while
-/// `ACTIVE`'s lock is held — `multi`/`header`/`counts` are cheap,
-/// `Arc`-backed clones, so the actual redraw (real terminal I/O) then
-/// happens without holding the lock, which would otherwise stall any
-/// concurrent `active_multi_progress()` caller for the duration of a paint.
+/// `ACTIVE`'s lock is held — `header`/`counts` are cheap, `Arc`-backed
+/// clones, so the actual redraw (real terminal I/O) then happens without
+/// holding the lock, which would otherwise stall any concurrent
+/// `active_multi_progress()` caller for the duration of a paint.
 struct Frame {
-    multi: MultiProgress,
     header: ProgressBar,
     counts: ProgressBar,
     started_at: Instant,
@@ -122,7 +161,9 @@ struct Frame {
 }
 
 fn render_frame(frame: &Frame) {
-    // Header has no steady-tick thread anymore; this is its only tick.
+    // Advances the header's own spinner glyph by one frame — its only
+    // source of animation, since it has no steady-tick thread of its own
+    // (see `spawn_ticker`).
     frame.header.tick();
 
     let elapsed = frame.started_at.elapsed();
@@ -169,6 +210,10 @@ where
         }
     }
 
+    /// Updates the counters and prints an error line right away, but
+    /// doesn't itself redraw — that's `spawn_ticker`'s job alone now, so a
+    /// burst of events completing faster than the tick interval can't drive
+    /// the header's spin rate past it.
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
         let Some(span) = ctx.span(&id) else { return };
         if span.metadata().name() != SYNC_EVENT_SPAN_NAME {
@@ -177,7 +222,7 @@ where
         let fields = span.extensions_mut().remove::<SpanFields>();
         let error = fields.as_ref().and_then(|f| f.error.as_deref());
 
-        let frame = {
+        let multi = {
             let mut guard = ACTIVE.lock().expect("not poisoned");
             let Some(state) = guard.as_mut() else { return };
             state.completed += 1;
@@ -191,26 +236,12 @@ where
             } else {
                 state.failed += 1;
             }
-            Frame {
-                multi: state.multi.clone(),
-                header: state.header.clone(),
-                counts: state.counts.clone(),
-                started_at: state.started_at,
-                total: state.total,
-                completed: state.completed,
-                created: state.created,
-                updated: state.updated,
-                deleted: state.deleted,
-                failed: state.failed,
-            }
+            state.multi.clone()
         };
 
         if let Some(error) = error {
             let message = fields.as_ref().map(SpanFields::display).unwrap_or_default();
-            let _ = frame
-                .multi
-                .println(format!("\u{1b}[31m\u{2716}  {message}: {error}\u{1b}[0m"));
+            let _ = multi.println(format!("\u{1b}[31m\u{2716}  {message}: {error}\u{1b}[0m"));
         }
-        render_frame(&frame);
     }
 }
