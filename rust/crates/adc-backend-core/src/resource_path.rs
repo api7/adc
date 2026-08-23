@@ -13,7 +13,7 @@ use adc_sdk::ResourceType;
 /// calling this.
 pub fn resource_type_collection_name(resource_type: ResourceType) -> String {
     match resource_type {
-        ResourceType::PluginMetadata => resource_type.as_str().to_string(),
-        _ => format!("{}s", resource_type.as_str()),
+        ResourceType::PluginMetadata => resource_type.to_string(),
+        _ => format!("{resource_type}s"),
     }
 }

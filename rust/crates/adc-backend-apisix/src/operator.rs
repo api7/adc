@@ -89,7 +89,7 @@ impl Operator {
         name = SYNC_EVENT_SPAN_NAME,
         skip_all,
         fields(
-            resource_type = %event.resource_type.as_str(),
+            resource_type = %event.resource_type,
             resource_name = %event.resource_name,
             event_type = ?event.event_type(),
             success = tracing::field::Empty,

@@ -55,6 +55,12 @@ impl serde::Serialize for ResourceType {
     }
 }
 
+impl std::fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Merge strategies for resource fields, mirroring structured-merge-diff listType semantics.
 ///
 /// These four variants intentionally mirror `field_meta::FieldMeta`'s four variants
