@@ -316,7 +316,6 @@ fn print_diff_summary(events: &[Event]) {
             EventType::Create => created += 1,
             EventType::Delete => deleted += 1,
             EventType::Update => updated += 1,
-            EventType::OnlySubEvents => continue,
         }
         println!(
             "{} {}: \"{}\"",
@@ -335,6 +334,5 @@ fn event_verb(event: &Event) -> &'static str {
         EventType::Create => "create",
         EventType::Delete => "delete",
         EventType::Update => "update",
-        _ => "",
     }
 }

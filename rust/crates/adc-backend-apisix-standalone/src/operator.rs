@@ -450,7 +450,6 @@ fn upsert_or_delete<T>(
                 None => Ok(false),
             }
         }
-        EventType::OnlySubEvents => Ok(false),
     }
 }
 
@@ -591,7 +590,6 @@ fn apply_event_for_service_inlined_upstream(
                 increase_version.insert(ResourceType::Upstream);
             }
         }
-        EventType::OnlySubEvents => {}
     }
     Ok(())
 }
