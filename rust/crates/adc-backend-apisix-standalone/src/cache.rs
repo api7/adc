@@ -429,12 +429,15 @@ mod tests {
         });
         holding_rx.await.unwrap(); // `slow` now holds the lock
 
+        let (attempting_tx, attempting_rx) = tokio::sync::oneshot::channel();
         let fast_cache = cache.clone();
         let fast = tokio::spawn(async move {
+            attempting_tx.send(()).unwrap(); // signals before contending for the lock, still held by `slow`
             let mut entry = fast_cache.lock("k").await; // blocks until `slow` releases
             assert_eq!(entry.latest_version, Some(1)); // sees `slow`'s committed value, not a stale pre-fetch read
             entry.latest_version = Some(2);
         });
+        attempting_rx.await.unwrap(); // `fast` has started waiting on the lock while `slow` still holds it
 
         release_tx.send(()).unwrap(); // let `slow` finish its "fetch" and commit
         slow.await.unwrap();
