@@ -12,8 +12,6 @@ pub enum EventType {
     Create,
     Delete,
     Update,
-    /// Internal use only, the backend does not need to handle such event type
-    OnlySubEvents,
 }
 
 /// The kind of change a differ event represents, together with the payload that
@@ -40,10 +38,6 @@ pub enum EventKind {
         #[serde(skip_serializing_if = "Option::is_none")]
         diff: Option<Vec<ValueDiff>>,
     },
-    /// Internal use only: exists to carry `sub_events` up to the caller during
-    /// tree construction. Never appears in the differ's final flattened event
-    /// list, so it carries no payload of its own.
-    OnlySubEvents,
 }
 
 impl EventKind {
@@ -52,28 +46,27 @@ impl EventKind {
             EventKind::Create { .. } => EventType::Create,
             EventKind::Delete { .. } => EventType::Delete,
             EventKind::Update { .. } => EventType::Update,
-            EventKind::OnlySubEvents => EventType::OnlySubEvents,
         }
     }
 
     pub fn old_value(&self) -> Option<&Value> {
         match self {
             EventKind::Delete { old_value } | EventKind::Update { old_value, .. } => Some(old_value),
-            EventKind::Create { .. } | EventKind::OnlySubEvents => None,
+            EventKind::Create { .. } => None,
         }
     }
 
     pub fn new_value(&self) -> Option<&Value> {
         match self {
             EventKind::Create { new_value } | EventKind::Update { new_value, .. } => Some(new_value),
-            EventKind::Delete { .. } | EventKind::OnlySubEvents => None,
+            EventKind::Delete { .. } => None,
         }
     }
 
     pub fn diff(&self) -> Option<&[ValueDiff]> {
         match self {
             EventKind::Update { diff, .. } => diff.as_deref(),
-            EventKind::Create { .. } | EventKind::Delete { .. } | EventKind::OnlySubEvents => None,
+            EventKind::Create { .. } | EventKind::Delete { .. } => None,
         }
     }
 }

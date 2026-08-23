@@ -17,9 +17,11 @@ type ResourceTuple = (String, String, Value);
 /// this resource's `{listType: Map, nested: true}` fields). `sub_events` is
 /// build-time-only bookkeeping consumed by `DifferV4::diff`, which lifts each
 /// entry up one level into the final flattened list — it never appears on the
-/// public `Event` type itself.
+/// public `Event` type itself. `event` is `None` when this resource itself
+/// didn't change but a nested one did — `handle_update`'s only producer of
+/// that case — so there's nothing of its own to lift alongside `sub_events`.
 struct BuiltEvent {
-    event: Event,
+    event: Option<Event>,
     sub_events: Vec<Event>,
 }
 
@@ -47,13 +49,10 @@ impl DifferV4 {
             result.extend(differ.diff_resource(resource_type, &meta, local_tuples, remote_tuples));
         }
 
-        // Unwrap one level of subEvents and drop ONLY_SUB_EVENTS placeholder
-        // events, which exist only to carry subEvents up to this point.
+        // Unwrap one level of sub_events into the flattened list.
         let mut unwrapped: Vec<Event> = Vec::new();
         for BuiltEvent { event, sub_events } in result {
-            if event.event_type() != EventType::OnlySubEvents {
-                unwrapped.push(event);
-            }
+            unwrapped.extend(event);
             unwrapped.extend(sub_events);
         }
 
@@ -122,7 +121,7 @@ impl DifferV4 {
             .collect();
 
         let event = Event::new(resource_type, EventKind::Delete { old_value: remote_item }, remote_id, remote_name);
-        BuiltEvent { event, sub_events }
+        BuiltEvent { event: Some(event), sub_events }
     }
 
     fn handle_create(
@@ -150,7 +149,7 @@ impl DifferV4 {
         strip_nested_ids(meta, &mut local_item);
 
         let event = Event::new(resource_type, EventKind::Create { new_value: local_item }, local_id, local_name);
-        BuiltEvent { event, sub_events }
+        BuiltEvent { event: Some(event), sub_events }
     }
 
     fn handle_update(
@@ -251,12 +250,12 @@ impl DifferV4 {
 
         let only_sub_events = !sub_events.is_empty() && !plugin_changed && diff.is_none();
 
-        let kind = if only_sub_events {
-            EventKind::OnlySubEvents
+        let event = if only_sub_events {
+            None
         } else {
-            EventKind::Update { old_value: output_remote_item, new_value: output_local_item, diff }
+            let kind = EventKind::Update { old_value: output_remote_item, new_value: output_local_item, diff };
+            Some(Event::new(resource_type, kind, remote_id, remote_name))
         };
-        let event = Event::new(resource_type, kind, remote_id, remote_name);
         Some(BuiltEvent { event, sub_events })
     }
 

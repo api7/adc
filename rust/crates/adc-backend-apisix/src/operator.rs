@@ -344,7 +344,6 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
                     paths.insert(0, (upstream_path, RequestKind::Upstream, method));
                 }
             }
-            EventType::OnlySubEvents => {}
         }
     }
 
