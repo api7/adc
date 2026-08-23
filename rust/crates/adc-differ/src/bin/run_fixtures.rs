@@ -19,31 +19,13 @@ use adc_differ::DifferV4;
 use adc_sdk::{DefaultValue, Event, InternalConfiguration, ResourceType};
 use serde_json::Value;
 
-/// Inverse of `ResourceType::as_str()`. Not exposed by adc-sdk itself since
-/// nothing in the library needs to parse a resource type back from a string.
-fn resource_type_from_str(s: &str) -> Option<ResourceType> {
-    Some(match s {
-        "route" => ResourceType::Route,
-        "service" => ResourceType::Service,
-        "upstream" => ResourceType::Upstream,
-        "ssl" => ResourceType::Ssl,
-        "global_rule" => ResourceType::GlobalRule,
-        "plugin_metadata" => ResourceType::PluginMetadata,
-        "consumer" => ResourceType::Consumer,
-        "consumer_group" => ResourceType::ConsumerGroup,
-        "consumer_credential" => ResourceType::ConsumerCredential,
-        "stream_route" => ResourceType::StreamRoute,
-        "stream_service" => ResourceType::InternalStreamService,
-        _ => return None,
-    })
-}
-
 fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
     let mut default_value = DefaultValue::default();
     if let Some(core) = v.get("core").and_then(Value::as_object) {
         for (k, val) in core {
-            let rt = resource_type_from_str(k)
-                .unwrap_or_else(|| panic!("{context}: unknown resource type {k:?} in defaultValue.core"));
+            let rt: ResourceType = k
+                .parse()
+                .unwrap_or_else(|_| panic!("{context}: unknown resource type {k:?} in defaultValue.core"));
             default_value.core.insert(rt, val.clone());
         }
     }
@@ -107,29 +89,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Every ResourceType variant listed explicitly (not via ResourceType::ALL,
-    // which excludes some of these) so adding a variant without a matching
-    // resource_type_from_str arm fails this test instead of silently falling
-    // through to None at fixture-parsing time.
-    #[test]
-    fn resource_type_from_str_round_trips_every_variant() {
-        for rt in [
-            ResourceType::Route,
-            ResourceType::Service,
-            ResourceType::Upstream,
-            ResourceType::Ssl,
-            ResourceType::GlobalRule,
-            ResourceType::PluginMetadata,
-            ResourceType::Consumer,
-            ResourceType::ConsumerGroup,
-            ResourceType::ConsumerCredential,
-            ResourceType::StreamRoute,
-            ResourceType::InternalStreamService,
-        ] {
-            assert_eq!(resource_type_from_str(rt.as_str()), Some(rt));
-        }
-    }
 
     #[test]
     fn load_config_treats_a_missing_key_as_an_empty_config() {

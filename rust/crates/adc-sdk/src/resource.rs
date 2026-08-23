@@ -58,6 +58,61 @@ impl std::fmt::Display for ResourceType {
     }
 }
 
+/// The inverse of [`ResourceType::as_str`].
+impl std::str::FromStr for ResourceType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "route" => ResourceType::Route,
+            "service" => ResourceType::Service,
+            "upstream" => ResourceType::Upstream,
+            "ssl" => ResourceType::Ssl,
+            "global_rule" => ResourceType::GlobalRule,
+            "plugin_metadata" => ResourceType::PluginMetadata,
+            "consumer" => ResourceType::Consumer,
+            "consumer_group" => ResourceType::ConsumerGroup,
+            "consumer_credential" => ResourceType::ConsumerCredential,
+            "stream_route" => ResourceType::StreamRoute,
+            "stream_service" => ResourceType::InternalStreamService,
+            _ => return Err(()),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every variant listed explicitly (not via `ResourceType::ALL`, which
+    // excludes some of these) so adding a variant without a matching
+    // `from_str` arm fails this test instead of silently falling through to
+    // `Err` at a real call site.
+    #[test]
+    fn every_variant_round_trips_through_as_str_and_from_str() {
+        for rt in [
+            ResourceType::Route,
+            ResourceType::Service,
+            ResourceType::Upstream,
+            ResourceType::Ssl,
+            ResourceType::GlobalRule,
+            ResourceType::PluginMetadata,
+            ResourceType::Consumer,
+            ResourceType::ConsumerGroup,
+            ResourceType::ConsumerCredential,
+            ResourceType::StreamRoute,
+            ResourceType::InternalStreamService,
+        ] {
+            assert_eq!(rt.as_str().parse(), Ok(rt));
+        }
+    }
+
+    #[test]
+    fn an_unrecognized_string_fails_to_parse() {
+        assert_eq!("not_a_real_type".parse::<ResourceType>(), Err(()));
+    }
+}
+
 /// Merge strategies for resource fields, mirroring structured-merge-diff listType semantics.
 ///
 /// These four variants intentionally mirror `field_meta::FieldMeta`'s four variants
