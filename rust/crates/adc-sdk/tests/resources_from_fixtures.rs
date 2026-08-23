@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use adc_sdk::resources::{Consumer, InternalConfiguration, Route, Service, ServiceRoutes, UpstreamHealthCheck, SSL};
+use adc_sdk::resources::{Consumer, FlatConfiguration, Route, Service, ServiceRoutes, UpstreamHealthCheck, SSL};
 use serde_json::Value;
 
 fn fixture(name: &str) -> Value {
@@ -84,13 +84,13 @@ fn deserializes_full_health_check_block() {
 }
 
 #[test]
-fn deserializes_whole_internal_configuration() {
+fn deserializes_whole_flat_configuration() {
     let f = fixture("upstream.creates_and_updates_ssl_before_upstream.json");
-    let local: InternalConfiguration = serde_json::from_value(f["local"].clone()).expect("deserialize local");
+    let local: FlatConfiguration = serde_json::from_value(f["local"].clone()).expect("deserialize local");
     assert_eq!(local.services.map(|s| s.len()), Some(1));
     assert_eq!(local.ssls.map(|s| s.len()), Some(2));
 
-    let remote: InternalConfiguration = serde_json::from_value(f["remote"].clone()).expect("deserialize remote");
+    let remote: FlatConfiguration = serde_json::from_value(f["remote"].clone()).expect("deserialize remote");
     assert_eq!(remote.services.map(|s| s.len()), Some(1));
     assert_eq!(remote.ssls.map(|s| s.len()), Some(1));
 }

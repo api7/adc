@@ -4,18 +4,34 @@
 
 use std::collections::{HashMap, HashSet};
 
-use adc_sdk::{DefaultValue, Event, EventKind, EventType, InternalConfiguration, ResourceType, diff_value, utils::generate_id};
+use adc_sdk::{
+    DefaultValue, Event, EventKind, EventType, ResourceType, resources::FlatConfiguration, diff_value,
+    utils::generate_id,
+};
 use serde_json::{Map, Value, json};
 
 use crate::differ_meta::{CollectionKind, ResourceDifferMeta, differ_meta};
 use crate::field_meta::FieldMeta;
+
+/// This crate's own internal working representation of a full
+/// configuration: a plain `Map<String, Value>` keyed by config field name
+/// (`services`, `routes`, `global_rules`, ...). The differ algorithm treats
+/// resource bodies as opaque structural values rather than strongly-typed
+/// ones, since diffing is a generic structural operation independent of any
+/// one resource's shape.
+///
+/// Not part of this crate's public API — [`FlatConfiguration`] (the typed
+/// counterpart used to parse and validate declarative configuration) is the
+/// public boundary; this `Map` is what it converts to internally before
+/// diffing, and never leaves the crate.
+type InternalConfiguration = Map<String, Value>;
 
 /// (name, id, item) extracted from one resource's raw JSON representation.
 type ResourceTuple = (String, String, Value);
 
 /// An event paired with the nested sub-events discovered while building it (from
 /// this resource's `{listType: Map, nested: true}` fields). `sub_events` is
-/// build-time-only bookkeeping consumed by `DifferV4::diff`, which lifts each
+/// build-time-only bookkeeping consumed by `DifferV4::diff_map`, which lifts each
 /// entry up one level into the final flattened list — it never appears on the
 /// public `Event` type itself. `event` is `None` when this resource itself
 /// didn't change but a nested one did — `handle_update`'s only producer of
@@ -30,7 +46,22 @@ pub struct DifferV4 {
 }
 
 impl DifferV4 {
-    pub fn diff(
+    /// The public entry point: diffs two root-level configurations. Converts
+    /// each into the flattened `InternalConfiguration` map `diff_map` (and
+    /// every recursive sub-call below it) actually operates on — a root
+    /// `FlatConfiguration` has nothing to flatten (a `Configuration` never
+    /// has its own top-level `routes`/`upstreams`/...), so this conversion
+    /// is a plain field copy, not real flattening work.
+    pub fn diff(local: &FlatConfiguration, remote: &FlatConfiguration, default_value: Option<&DefaultValue>) -> Vec<Event> {
+        let local = to_internal_configuration(local);
+        let remote = to_internal_configuration(remote);
+        DifferV4::diff_map(&local, &remote, default_value, None)
+    }
+
+    /// The recursive core: `parent_name` is `Some` only on a sub-call diffing
+    /// one parent resource's own nested collections (see the `handle_*`
+    /// methods below) — always `None` from the public `diff` entry point.
+    fn diff_map(
         local: &InternalConfiguration,
         remote: &InternalConfiguration,
         default_value: Option<&DefaultValue>,
@@ -115,7 +146,7 @@ impl DifferV4 {
         let sub_config = extract_sub_config(meta, &remote_item);
         let empty = InternalConfiguration::new();
         let parent_name = meta.propagates_parent_name.then_some(remote_name);
-        let sub_events = DifferV4::diff(&empty, &sub_config, Some(&self.default_value), parent_name)
+        let sub_events = DifferV4::diff_map(&empty, &sub_config, Some(&self.default_value), parent_name)
             .into_iter()
             .map(|e| postprocess_sub_event(remote_name, remote_id, e))
             .collect();
@@ -135,7 +166,7 @@ impl DifferV4 {
         let sub_config = extract_sub_config(meta, &local_item);
         let empty = InternalConfiguration::new();
         let parent_name = meta.propagates_parent_name.then_some(local_name);
-        let sub_events = DifferV4::diff(&sub_config, &empty, Some(&self.default_value), parent_name)
+        let sub_events = DifferV4::diff_map(&sub_config, &empty, Some(&self.default_value), parent_name)
             .into_iter()
             .map(|e| postprocess_sub_event(local_name, local_id, e))
             .collect();
@@ -195,7 +226,7 @@ impl DifferV4 {
             let remote_sub_config = extract_sub_config(meta, &remote_item);
             let parent_name = meta.propagates_parent_name.then_some(remote_name);
             let nested_events =
-                DifferV4::diff(&local_sub_config, &remote_sub_config, Some(&self.default_value), parent_name);
+                DifferV4::diff_map(&local_sub_config, &remote_sub_config, Some(&self.default_value), parent_name);
             sub_events.extend(
                 nested_events.into_iter().map(|e| postprocess_sub_event(remote_name, remote_id, e)),
             );
@@ -288,6 +319,15 @@ impl DifferV4 {
 
         let changed = checker(&merged_local, &remote_obj) || checker(&remote_obj, &merged_local);
         (changed, Value::Object(merged_local))
+    }
+}
+
+/// `FlatConfiguration` serializes to a JSON object by construction (every
+/// field is a named struct field), so the object cast can't fail.
+fn to_internal_configuration(config: &FlatConfiguration) -> InternalConfiguration {
+    match serde_json::to_value(config).expect("FlatConfiguration always serializes") {
+        Value::Object(map) => map,
+        other => unreachable!("FlatConfiguration must serialize to a JSON object, got {other:?}"),
     }
 }
 
@@ -481,5 +521,30 @@ fn order_priority(resource_type: ResourceType, event_type: EventType) -> u32 {
         (ConsumerCredential, Update) => 32,
 
         _ => u32::MAX,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // `merge_default` is a pure `Value` transform with no resource-specific
+    // meaning of its own, so it's tested directly here rather than through
+    // `DifferV4::diff` — going through a typed `FlatConfiguration` would
+    // force this test's arbitrary field names into a real resource's
+    // `deny_unknown_fields` schema, which isn't what's under test.
+    #[test]
+    fn selectively_merges_objects_in_default_values() {
+        let resource = json!({ "name": "Test Service", "nested": {} });
+        let defaults = json!({ "scalar": "default", "nested": { "present": "default", "missing": { "deep": "default" } } });
+
+        // "scalar": missing from `resource`, not itself an object/array, so
+        // it's filled in from `defaults`.
+        // "nested": present as an (empty) object, so it's recursed into —
+        // "present" (a missing scalar leaf) gets filled in, but "missing"
+        // (a missing *object* leaf) is left absent rather than being
+        // materialized wholesale from `defaults`.
+        let expected = json!({ "name": "Test Service", "scalar": "default", "nested": { "present": "default" } });
+        assert_eq!(merge_default(&resource, &defaults), expected);
     }
 }

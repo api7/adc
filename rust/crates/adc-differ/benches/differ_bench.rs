@@ -5,9 +5,8 @@
 use std::path::PathBuf;
 
 use adc_differ::DifferV4;
-use adc_sdk::InternalConfiguration;
+use adc_sdk::resources::FlatConfiguration;
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use serde_json::Value;
 
 const SCALES: &[(&str, u64)] = &[("small", 100), ("medium", 1_000), ("large", 10_000)];
 const SCENARIOS: &[&str] = &["none", "few", "many"];
@@ -16,13 +15,12 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../benches/fixtures")
 }
 
-fn load(name: &str) -> InternalConfiguration {
+fn load(name: &str) -> FlatConfiguration {
     let path = fixtures_dir().join(name);
     let bytes = std::fs::read(&path).unwrap_or_else(|e| {
         panic!("read {}: {e} (run `cargo run -p adc-differ --example gen_fixtures` first)", path.display())
     });
-    let v: Value = serde_json::from_slice(&bytes).unwrap();
-    v.as_object().cloned().unwrap()
+    serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
 }
 
 fn bench_diff(c: &mut Criterion) {
@@ -35,7 +33,7 @@ fn bench_diff(c: &mut Criterion) {
         for &scenario in SCENARIOS {
             let local = load(&format!("{scale_name}.{scenario}.local.json"));
             group.bench_with_input(BenchmarkId::new(scenario, scale_name), &(local, remote.clone()), |b, (local, remote)| {
-                b.iter(|| DifferV4::diff(std::hint::black_box(local), std::hint::black_box(remote), None, None));
+                b.iter(|| DifferV4::diff(std::hint::black_box(local), std::hint::black_box(remote), None));
             });
         }
     }

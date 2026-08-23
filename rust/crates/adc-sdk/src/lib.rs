@@ -30,15 +30,3 @@ pub use default_value::DefaultValue;
 pub use event::{Event, EventKind, EventType};
 pub use resource::{FieldListType, ResourceType};
 pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value, format_path};
-
-use serde_json::{Map, Value};
-
-/// The differ's working representation of a full configuration: a plain
-/// `Map<String, Value>` keyed by config field name (`services`, `routes`,
-/// `global_rules`, ...). The differ algorithm treats resource bodies as
-/// opaque structural values rather than strongly-typed ones, since diffing
-/// is a generic structural operation independent of any one resource's shape.
-///
-/// Distinct from `resources::InternalConfiguration`, the typed counterpart
-/// used to parse and validate declarative configuration.
-pub type InternalConfiguration = Map<String, Value>;

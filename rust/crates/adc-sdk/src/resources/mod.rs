@@ -10,9 +10,11 @@
 //! which is a separate, later pass on top of this same model.
 //!
 //! Naming note: distinct from `crate::resource` (the differ's `ResourceType`/
-//! `FieldListType` metadata enums) and from `crate::InternalConfiguration`
-//! (the `Map<String, Value>` alias `adc-differ` operates on) — different
-//! modules, different concerns, no relation beyond sharing this crate.
+//! `FieldListType` metadata enums) and from `adc_differ`'s own internal
+//! `InternalConfiguration` (a `Map<String, Value>` alias, private to that
+//! crate) — different crates, different concerns, no relation beyond
+//! `FlatConfiguration` being what `adc-differ` converts into that internal
+//! shape at its public API boundary.
 
 pub mod common;
 pub mod consumer;
@@ -61,13 +63,16 @@ pub struct Configuration {
     pub plugin_metadata: Option<PluginMetadata>,
 }
 
-/// The flattened internal representation: adds top-level
+/// The flattened representation: adds top-level
 /// routes/stream_routes/consumer_credentials/upstreams alongside the nested
 /// sub-resources, so every resource is also reachable directly by its own
-/// collection field.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// collection field. This is the shape `adc-differ` diffs at every recursion
+/// level — the root call converts a `Configuration` into this via `From`,
+/// and each recursive sub-call builds one directly to represent just one
+/// parent resource's own nested collections.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct InternalConfiguration {
+pub struct FlatConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<Service>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -88,4 +93,28 @@ pub struct InternalConfiguration {
     pub consumer_credentials: Option<Vec<ConsumerCredential>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upstreams: Option<Vec<Upstream>>,
+}
+
+/// The root-level starting point for a diff: carries over every field
+/// `FlatConfiguration` also has at the root (nothing to flatten there — a
+/// `Configuration` never has its own top-level `routes`/`upstreams`/
+/// `stream_routes`/`consumer_credentials`; those only appear once the differ
+/// recurses into a service's nested collections). `consumer_groups` has no
+/// counterpart on `FlatConfiguration` and is dropped: it isn't wired into
+/// `adc-differ`'s resource-type table yet, so it's never read from either
+/// shape today.
+impl From<Configuration> for FlatConfiguration {
+    fn from(config: Configuration) -> Self {
+        FlatConfiguration {
+            services: config.services,
+            ssls: config.ssls,
+            consumers: config.consumers,
+            global_rules: config.global_rules,
+            plugin_metadata: config.plugin_metadata,
+            routes: None,
+            stream_routes: None,
+            consumer_credentials: None,
+            upstreams: None,
+        }
+    }
 }

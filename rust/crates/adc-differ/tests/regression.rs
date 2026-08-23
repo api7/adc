@@ -42,7 +42,7 @@ fn resolves_stream_service_default_type_correctly() {
         plugins: HashMap::new(),
     };
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![]);
 }
 
 /// Sibling check: a plain HTTP service (no stream_routes) must still resolve
@@ -59,7 +59,7 @@ fn does_not_apply_stream_service_default_to_http_service() {
         plugins: HashMap::new(),
     };
 
-    let events = DifferV4::diff(&local, &remote, Some(&default_value), None);
+    let events = DifferV4::diff(&local, &remote, Some(&default_value));
     assert_eq!(events.len(), 1);
     let event = &events[0];
     assert_eq!(event.resource_type, ResourceType::Service);

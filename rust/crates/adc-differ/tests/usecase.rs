@@ -62,7 +62,10 @@ fn renames_service_with_nested_routes() {
                     { "id": generate_id("HTTPBIN Service.Anything"), "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
                     { "id": generate_id("HTTPBIN Service.Generate UUID"), "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
                 ],
-                "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
+                "upstream": {
+                    "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }],
+                    "scheme": "http", "type": "roundrobin", "pass_host": "pass",
+                },
             }),
         },
         &old_service_id,
@@ -78,7 +81,10 @@ fn renames_service_with_nested_routes() {
                     { "methods": ["GET"], "name": "Anything", "uris": ["/anything"] },
                     { "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] },
                 ],
-                "upstream": { "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }], "scheme": "http" },
+                "upstream": {
+                    "nodes": [{ "host": "httpbin.org", "port": 80, "priority": 0, "weight": 1 }],
+                    "scheme": "http", "type": "roundrobin", "pass_host": "pass",
+                },
             }),
         },
         &new_service_id,
@@ -102,7 +108,7 @@ fn renames_service_with_nested_routes() {
     create_route2.parent_id = Some(new_service_id.clone());
 
     assert_eq!(
-        DifferV4::diff(&local, &remote, None, None),
+        DifferV4::diff(&local, &remote, None),
         vec![del_route1, del_route2, del_service, create_service, create_route1, create_route2]
     );
 }
@@ -180,5 +186,5 @@ fn selectively_merges_objects_in_default_values_on_a_service() {
         plugins: HashMap::new(),
     };
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![]);
 }

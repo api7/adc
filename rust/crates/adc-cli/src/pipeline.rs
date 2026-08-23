@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use adc_backend_core::{HttpClient, HttpClientConfig, ResourceFilter, TlsConfig};
 use adc_differ::DifferV4;
-use adc_sdk::resources::Configuration;
-use adc_sdk::{Backend, Converter, Event, InternalConfiguration, ResourceType};
+use adc_sdk::resources::{Configuration, FlatConfiguration};
+use adc_sdk::{Backend, Converter, Event, ResourceType};
 
 use crate::cli::BackendArgs;
 use crate::config;
@@ -346,21 +346,9 @@ pub async fn diff(
     remote: &Configuration,
 ) -> Result<Vec<Event>, CliError> {
     let default_value = backend.default_value().await?;
-    let local_map = to_diff_map(local)?;
-    let remote_map = to_diff_map(remote)?;
-    Ok(DifferV4::diff(
-        &local_map,
-        &remote_map,
-        Some(&default_value),
-        None,
-    ))
-}
-
-fn to_diff_map(configuration: &Configuration) -> Result<InternalConfiguration, CliError> {
-    match serde_json::to_value(configuration)? {
-        serde_json::Value::Object(map) => Ok(map),
-        _ => unreachable!("Configuration always serializes to a JSON object"),
-    }
+    let local = FlatConfiguration::from(local.clone());
+    let remote = FlatConfiguration::from(remote.clone());
+    Ok(DifferV4::diff(&local, &remote, Some(&default_value)))
 }
 
 #[cfg(test)]

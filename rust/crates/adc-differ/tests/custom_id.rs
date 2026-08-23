@@ -54,5 +54,5 @@ fn deletes_and_creates_new_resource_when_id_changes() {
         service2_name,
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![del1, del2, create1, create2]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![del1, del2, create1, create2]);
 }

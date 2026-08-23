@@ -75,7 +75,7 @@ fn creates_updates_deletes_consumer_credentials() {
     );
     update.parent_id = Some(consumer_name.to_string());
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![del, create, update]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![del, create, update]);
 }
 
 #[test]
@@ -123,5 +123,5 @@ fn deletes_consumer_credentials_when_consumer_is_deleted() {
     );
     cred_del.parent_id = Some(consumer_name.to_string());
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![consumer_del, cred_del]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![consumer_del, cred_del]);
 }

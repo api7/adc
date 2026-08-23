@@ -12,7 +12,7 @@ use common::{config, ev};
 
 #[test]
 fn empty_input_yields_empty_output() {
-    assert_eq!(DifferV4::diff(&config(json!({})), &config(json!({})), None, None), vec![]);
+    assert_eq!(DifferV4::diff(&config(json!({})), &config(json!({})), None), vec![]);
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn create_resource() {
     let expected =
         ev(ResourceType::Consumer, EventKind::Create { new_value: json!({ "username": name, "plugins": {} }) }, name, name);
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn update_resource() {
         name,
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn delete_resource() {
     let expected =
         ev(ResourceType::Consumer, EventKind::Delete { old_value: json!({ "username": name, "plugins": {} }) }, name, name);
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn sorted_by_event_type() {
     );
 
     // DELETE > UPDATE > CREATE
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![deleted_ev, updated_ev, created_ev]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![deleted_ev, updated_ev, created_ev]);
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn adapts_to_default_core_values() {
         plugins: HashMap::new(),
     };
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![]);
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn adapts_to_default_plugin_values() {
         plugins: HashMap::from([("key-auth".to_string(), json!({ "added": "added" }))]),
     };
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![]);
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn update_resource_add_plugin() {
         name,
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -197,13 +197,17 @@ fn update_resource_update_plugin_with_default_value() {
         name,
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![expected]);
 }
 
 #[test]
 fn generates_hashed_resource_id() {
     let ssl_name = "demo-sni1,demo-sni2";
+    // "type" is a non-`Option` field on `SSL` (defaults to "server") — present
+    // in every value that's round-tripped through the typed resource layer,
+    // even though this literal never sets it explicitly.
     let ssl = json!({
+        "type": "server",
         "snis": ["demo-sni1", "demo-sni2"],
         "certificates": [{ "certificate": "cert", "key": "key" }],
     });
@@ -212,7 +216,7 @@ fn generates_hashed_resource_id() {
 
     let expected = ev(ResourceType::Ssl, EventKind::Create { new_value: ssl }, &generate_id(ssl_name), ssl_name);
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -259,7 +263,7 @@ fn updates_service_nested_route() {
     );
     expected.parent_id = Some(generate_id(service_name));
 
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![expected]);
 }
 
 #[test]
@@ -334,7 +338,7 @@ fn updates_service_and_its_nested_route() {
     );
 
     // ROUTE.UPDATE (10) sorts before SERVICE.UPDATE (12).
-    assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![route_ev, service_ev]);
+    assert_eq!(DifferV4::diff(&local, &remote, None), vec![route_ev, service_ev]);
 }
 
 #[test]
@@ -379,30 +383,7 @@ fn keeps_plugins_when_plugins_not_changed() {
         service_name,
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
-}
-
-#[test]
-fn selectively_merges_objects_in_default_values() {
-    let service_id = generate_id("Test Service");
-    let local = config(json!({ "services": [{ "name": "Test Service", "test1": {} }] }));
-    let remote = config(json!({
-        "services": [{
-            "id": service_id,
-            "name": "Test Service",
-            "test": "test",
-            "test1": { "test2": "test2" },
-        }]
-    }));
-    let default_value = DefaultValue {
-        core: HashMap::from([(
-            ResourceType::Service,
-            json!({ "test": "test", "test1": { "test2": "test2", "test3": { "test4": "test4" } } }),
-        )]),
-        plugins: HashMap::new(),
-    };
-
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![expected]);
 }
 
 #[test]
@@ -424,7 +405,7 @@ fn merges_array_nested_object_defaults_correctly() {
         plugins: HashMap::new(),
     };
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![]);
 }
 
 #[test]
@@ -442,7 +423,7 @@ fn route_and_stream_route_ids_generated_correctly() {
     let local = config(json!({ "services": new_services }));
     let remote = config(json!({ "services": old_services }));
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&DefaultValue::default()), None), vec![]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&DefaultValue::default())), vec![]);
 }
 
 #[test]
@@ -477,5 +458,5 @@ fn boolean_defaults_merged_correctly() {
         "HTTP",
     );
 
-    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value), None), vec![expected]);
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![expected]);
 }

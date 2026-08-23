@@ -16,7 +16,8 @@ use std::env;
 use std::fs;
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, InternalConfiguration, ResourceType};
+use adc_sdk::resources::FlatConfiguration;
+use adc_sdk::{DefaultValue, Event, ResourceType};
 use serde_json::Value;
 
 fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
@@ -38,14 +39,16 @@ fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
 }
 
 /// `None` (the key is absent) is a legitimate empty config; `Some` holding
-/// anything but an object is very likely a malformed fixture and panics
+/// anything that doesn't deserialize as a `FlatConfiguration` (wrong shape,
+/// unknown field, non-object) is very likely a malformed fixture and panics
 /// instead of silently running the differ against an empty config as if
 /// nothing were wrong.
-fn load_config(v: Option<&Value>, context: &str) -> InternalConfiguration {
+fn load_config(v: Option<&Value>, context: &str) -> FlatConfiguration {
     match v {
-        None => InternalConfiguration::default(),
-        Some(Value::Object(obj)) => obj.clone(),
-        Some(other) => panic!("{context} must be an object, got {other}"),
+        None => FlatConfiguration::default(),
+        Some(value) => {
+            serde_json::from_value(value.clone()).unwrap_or_else(|e| panic!("{context}: {e}"))
+        }
     }
 }
 
@@ -75,7 +78,7 @@ fn main() {
             .get("defaultValue")
             .map(|v| parse_default_value(v, &format!("{}: \"defaultValue\"", path.display())));
 
-        let events = DifferV4::diff(&local, &remote, default_value.as_ref(), None);
+        let events = DifferV4::diff(&local, &remote, default_value.as_ref());
         results.insert(name, events);
     }
 
@@ -92,17 +95,17 @@ mod tests {
 
     #[test]
     fn load_config_treats_a_missing_key_as_an_empty_config() {
-        assert_eq!(load_config(None, "ctx"), InternalConfiguration::default());
+        assert_eq!(load_config(None, "ctx"), FlatConfiguration::default());
     }
 
     #[test]
     fn load_config_accepts_an_object() {
         let value = serde_json::json!({"services": []});
-        assert_eq!(load_config(Some(&value), "ctx"), value.as_object().unwrap().clone());
+        assert_eq!(load_config(Some(&value), "ctx"), FlatConfiguration { services: Some(vec![]), ..Default::default() });
     }
 
     #[test]
-    #[should_panic(expected = "must be an object")]
+    #[should_panic(expected = "invalid type")]
     fn load_config_rejects_a_non_object_instead_of_silently_defaulting() {
         let value = serde_json::json!("not an object");
         load_config(Some(&value), "ctx");

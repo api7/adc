@@ -330,18 +330,9 @@ pub fn diff(
     remote: &Configuration,
     default_value: Option<&DefaultValue>,
 ) -> Vec<Event> {
-    fn to_diff_map(configuration: &Configuration) -> adc_sdk::InternalConfiguration {
-        match serde_json::to_value(configuration).expect("Configuration always serializes") {
-            Value::Object(map) => map,
-            _ => unreachable!("Configuration always serializes to a JSON object"),
-        }
-    }
-    adc_differ::DifferV4::diff(
-        &to_diff_map(local),
-        &to_diff_map(remote),
-        default_value,
-        None,
-    )
+    let local = adc_sdk::resources::FlatConfiguration::from(local.clone());
+    let remote = adc_sdk::resources::FlatConfiguration::from(remote.clone());
+    adc_differ::DifferV4::diff(&local, &remote, default_value)
 }
 
 /// A resource's id is derived from its name (and parent, where nested) via

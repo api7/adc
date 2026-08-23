@@ -6,8 +6,8 @@
 use std::path::PathBuf;
 
 use adc_differ::DifferV4;
-use adc_sdk::{EventType, InternalConfiguration, ResourceType};
-use serde_json::Value;
+use adc_sdk::resources::FlatConfiguration;
+use adc_sdk::{EventType, ResourceType};
 
 include!("../fixture_scales.rs");
 
@@ -15,11 +15,10 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../benches/fixtures")
 }
 
-fn load(name: &str) -> InternalConfiguration {
+fn load(name: &str) -> FlatConfiguration {
     let path = fixtures_dir().join(name);
     let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let v: Value = serde_json::from_slice(&bytes).unwrap();
-    v.as_object().cloned().unwrap()
+    serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
 }
 
 #[test]
@@ -27,7 +26,7 @@ fn none_scenario_has_no_diff_at_every_scale() {
     for &(scale, _) in SCALES {
         let local = load(&format!("{scale}.none.local.json"));
         let remote = load(&format!("{scale}.remote.json"));
-        assert_eq!(DifferV4::diff(&local, &remote, None, None), vec![], "scale={scale}");
+        assert_eq!(DifferV4::diff(&local, &remote, None), vec![], "scale={scale}");
     }
 }
 
@@ -37,7 +36,7 @@ fn few_and_many_scenarios_produce_expected_update_events_at_every_scale() {
         for &(scenario, ratio) in CHANGE_RATIOS.iter().filter(|(name, _)| *name != "none") {
             let local = load(&format!("{scale}.{scenario}.local.json"));
             let remote = load(&format!("{scale}.remote.json"));
-            let events = DifferV4::diff(&local, &remote, None, None);
+            let events = DifferV4::diff(&local, &remote, None);
 
             // Each mutated service produces a SERVICE update (description changed)
             // + a ROUTE update (route-a's plugin changed) — see gen_fixtures.rs.

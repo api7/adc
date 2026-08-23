@@ -198,13 +198,9 @@ async fn wait_until_ready(server: &str) {
 /// shows more than just its `upstream` changed), so those scenarios need a
 /// real diff, not a hand-built one with `diff: None`.
 pub fn diff(local: &Configuration, remote: &Configuration) -> Vec<Event> {
-    fn to_diff_map(configuration: &Configuration) -> adc_sdk::InternalConfiguration {
-        match serde_json::to_value(configuration).expect("Configuration always serializes") {
-            Value::Object(map) => map,
-            _ => unreachable!("Configuration always serializes to a JSON object"),
-        }
-    }
-    adc_differ::DifferV4::diff(&to_diff_map(local), &to_diff_map(remote), None::<&DefaultValue>, None)
+    let local = adc_sdk::resources::FlatConfiguration::from(local.clone());
+    let remote = adc_sdk::resources::FlatConfiguration::from(remote.clone());
+    adc_differ::DifferV4::diff(&local, &remote, None::<&DefaultValue>)
 }
 
 /// Reads one `*_conf_version` field straight off `SERVER1`'s admin API —
