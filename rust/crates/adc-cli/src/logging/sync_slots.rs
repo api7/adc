@@ -135,6 +135,11 @@ pub fn finish() {
     let Some(state) = ACTIVE.lock().expect("not poisoned").take() else {
         return;
     };
+    // The last `on_close` calls may have landed after the ticker's most
+    // recent redraw — render once more here so the final tally on screen
+    // matches `state` exactly, instead of `counts.finish()` freezing
+    // whatever message the last tick happened to leave behind.
+    render_frame(&state.snapshot());
     // Header ("Syncing N event(s)...") is just a transient status, cleared
     // once done. Counts is the final tally — sync may have exited early on
     // a failure with some events already applied, so it stays on screen
