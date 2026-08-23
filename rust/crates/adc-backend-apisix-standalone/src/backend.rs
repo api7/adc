@@ -21,6 +21,7 @@ use crate::cache::{Cache, CachedEntry};
 use crate::fetcher::Fetcher;
 use crate::operator::{Operator, SyncOutcome};
 use crate::typing::ApisixStandalone;
+use crate::utils::stable_timestamp;
 
 /// One target server plus the client already configured with its own
 /// (server-specific, since standalone clusters can each carry a different
@@ -187,8 +188,10 @@ impl adc_sdk::Backend for Backend {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
         }
-        // `config` and `raw_config` must come from the same moment, or the
-        // value pinned below could mismatch what's cached.
+        // Cheap fast path: no lock held across anything, so it can't block
+        // a concurrent `sync` on this key. `config` and `raw_config` must
+        // come from the same moment, or the value pinned below could
+        // mismatch what's cached.
         if let Some(entry) = Cache::global().get_live(&self.cache_key).await
             && let Some(config) = entry.config
         {
@@ -198,14 +201,43 @@ impl adc_sdk::Backend for Backend {
             return Ok(config);
         }
 
+        // Resolved before the lock below: it may itself read or write this
+        // same cache_key's cached `version` field, which would deadlock
+        // against a lock this call is about to hold.
         let version = self.resolved_version().await?;
-        let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
 
-        // A concurrent reader must never observe just some of the three
-        // fields updated and not the others.
-        Cache::global()
-            .set_dump_result(&self.cache_key, highest_conf_version(&raw_config), config.clone(), raw_config.clone())
-            .await;
+        // Held across the re-check, the fetch, and the commit below —
+        // `Backend::sync` takes this same per-key lock for its own
+        // read-then-write, so a slow fetch here, started from data read
+        // before this point, can never land after (and silently overwrite)
+        // a `sync` that already committed newer data in the meantime.
+        let mut entry = Cache::global().lock(&self.cache_key).await;
+        if Cache::global().is_fresh(&entry) && let Some(config) = entry.config.clone() {
+            // Someone else populated the cache while this call resolved
+            // the version or waited for this lock.
+            if let Some(raw_config) = entry.raw_config.clone() {
+                *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
+            }
+            return Ok(config);
+        }
+
+        let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
+        let highest = highest_conf_version(&raw_config);
+        // Built in full before it touches `entry`, then swapped in as one
+        // assignment — a panic while computing the new state leaves the
+        // old entry untouched instead of a torn mix of old and new fields.
+        // Applied directly to the guard already held above, not through
+        // `Cache::set_dump_result` — that would try to lock this same key
+        // again and deadlock.
+        let new_entry = CachedEntry {
+            version: entry.version.clone(),
+            latest_version: Some(entry.latest_version.map_or(highest, |current| current.max(highest))),
+            config: Some(config.clone()),
+            raw_config: Some(raw_config.clone()),
+            updated_at: Some(stable_timestamp()),
+        };
+        *entry = new_entry;
+        drop(entry);
         *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
         Ok(config)
     }

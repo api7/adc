@@ -128,12 +128,16 @@ impl Cache {
 
     /// Locks the whole cached entry for `key`, for a caller that needs to
     /// read then later write it as one atomic step spanning more than a
-    /// single field access — see `Backend::sync`'s use of this. Every
-    /// other method here (`raw_config`, `set_raw_config`, ...) takes and
-    /// releases this same lock internally, just for the one field it
-    /// touches, so ordinary callers never need this directly. Not exposed
-    /// outside the crate: `CachedEntry`'s fields are crate-internal, so a
-    /// caller elsewhere couldn't do anything with the guard anyway.
+    /// single field access — see `Backend::sync`'s use of this, and
+    /// `Backend::dump`'s cache-miss path, which holds this same lock across
+    /// its own fetch-and-commit for exactly the same reason: two callers
+    /// racing on the same key must run their whole read-then-write
+    /// sequence one after the other, never interleaved. Every other method
+    /// here (`raw_config`, `set_raw_config`, ...) takes and releases this
+    /// same lock internally, just for the one field it touches, so
+    /// ordinary callers never need this directly. Not exposed outside the
+    /// crate: `CachedEntry`'s fields are crate-internal, so a caller
+    /// elsewhere couldn't do anything with the guard anyway.
     ///
     /// Deliberately does *not* reset an expired entry the way `touch` does:
     /// `Backend::sync` uses this to read the last-known real `raw_config`
@@ -149,6 +153,14 @@ impl Cache {
         let entry = self.entry(key).lock_owned().await;
         self.evict_if_over_capacity();
         entry
+    }
+
+    /// Whether an already-locked entry is still within this cache's TTL —
+    /// for a caller (`Backend::dump`) that holds a guard from `lock` and
+    /// needs the same freshness check `get_live` applies internally,
+    /// without a second lock acquisition.
+    pub(crate) fn is_fresh(&self, entry: &CachedEntry) -> bool {
+        !entry.is_expired(self.ttl)
     }
 
     /// Every field, read under one lock acquisition, so a caller pinning
@@ -243,6 +255,10 @@ impl Cache {
     /// acquisition, so a concurrent reader (another `dump`'s `get_live`)
     /// can never observe just some of the three updated and not the
     /// others.
+    // Only reached through the `test-utils`-gated re-export (see
+    // `crate::tests`) — dead as far as a plain `--lib` build (no consumer
+    // outside this crate's own tests) can tell.
+    #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
     pub async fn set_dump_result(&self, key: &str, latest_version: i64, config: Configuration, raw_config: ApisixStandalone) {
         self.touch(key, |entry| {
             entry.latest_version = Some(entry.latest_version.map_or(latest_version, |current| current.max(latest_version)));
@@ -387,6 +403,51 @@ mod tests {
         tasks.join_all().await;
 
         assert_eq!(counter.load(std::sync::atomic::Ordering::Relaxed), 200);
+    }
+
+    /// Models `Backend::dump`'s cache-miss path (holds the lock across a
+    /// slow "fetch", simulated with a delay, before committing) racing
+    /// `Backend::sync` (holds the same lock, writes immediately) on the
+    /// same key. Whichever side acquires the lock second must see (and
+    /// build its own write on top of) whatever the first side already
+    /// committed — not silently overwrite it with a decision made before
+    /// the first side ever ran. This is the property `Backend::dump`
+    /// holding `Cache::lock` across its own fetch-and-commit depends on.
+    #[tokio::test]
+    async fn a_slow_committer_holding_the_lock_across_its_fetch_cannot_be_clobbered_by_a_concurrent_writer() {
+        let cache = Arc::new(Cache::with_limits(16, Duration::from_secs(3600)));
+
+        let (holding_tx, holding_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+
+        let slow_cache = cache.clone();
+        let slow = tokio::spawn(async move {
+            let mut entry = slow_cache.lock("k").await;
+            holding_tx.send(()).unwrap();
+            release_rx.await.unwrap(); // simulates the in-flight network fetch
+            entry.latest_version = Some(1);
+        });
+        holding_rx.await.unwrap(); // `slow` now holds the lock
+
+        let (attempting_tx, attempting_rx) = tokio::sync::oneshot::channel();
+        let fast_cache = cache.clone();
+        let fast = tokio::spawn(async move {
+            attempting_tx.send(()).unwrap(); // signals before contending for the lock, still held by `slow`
+            let mut entry = fast_cache.lock("k").await; // blocks until `slow` releases
+            assert_eq!(entry.latest_version, Some(1)); // sees `slow`'s committed value, not a stale pre-fetch read
+            entry.latest_version = Some(2);
+        });
+        attempting_rx.await.unwrap(); // `fast` has started waiting on the lock while `slow` still holds it
+
+        release_tx.send(()).unwrap(); // let `slow` finish its "fetch" and commit
+        slow.await.unwrap();
+        fast.await.unwrap();
+
+        // Read through `lock`, not `latest_version`/`get_live`: neither
+        // closure above touched `updated_at`, so the TTL check the latter
+        // applies would otherwise treat this entry as expired regardless
+        // of which write landed.
+        assert_eq!(cache.lock("k").await.latest_version, Some(2));
     }
 
     #[tokio::test]
