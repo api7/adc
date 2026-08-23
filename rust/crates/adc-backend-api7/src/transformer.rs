@@ -198,15 +198,14 @@ impl From<typing::Ssl> for adc::SSL {
         // `{"cert": "$env://gc", "certs": ["$env://gc2"], ...}`. That's a
         // real gap in the TS reference itself, not something to port
         // faithfully — losing every certificate past the first on every
-        // dump is real data loss. Mirrors `adc_backend_apisix`'s own SSL
-        // read conversion and this crate's own write path
+        // dump is real data loss. Mirrors this crate's own write path
         // (`TryFrom<adc::SSL> for typing::Ssl` below): `cert`/`certs` pair
         // up with `key`/`keys` positionally. The key is never actually
         // populated in practice (API7 doesn't echo it back on read), but
         // this reads whatever `ssl.key`/`ssl.keys` hold rather than
-        // hardcoding empty, same as the write-side pairing. A missing
-        // certificate isn't an error — it just means no certificate to
-        // report, so `certificates` comes back empty instead.
+        // hardcoding empty. A missing certificate isn't an error — it just
+        // means no certificate to report, so `certificates` comes back
+        // empty instead.
         let mut certificates = Vec::new();
         if let Some(cert) = ssl.cert {
             let mut keys = ssl.keys.unwrap_or_default().into_iter();
@@ -586,5 +585,65 @@ mod tests {
         let ssl = adc::SSL::from(wire);
 
         assert!(ssl.certificates.is_empty());
+    }
+
+    #[test]
+    fn ssl_to_wire_with_one_certificate_sets_only_the_singular_fields() {
+        let ssl = adc::SSL {
+            id: Some("ssl1".to_string()),
+            labels: None,
+            r#type: adc::SslType::default(),
+            snis: vec!["example.com".to_string()],
+            certificates: vec![adc::SSLCertificate { certificate: "cert1".to_string(), key: "key1".to_string() }],
+            client: None,
+            ssl_protocols: None,
+        };
+
+        let wire = typing::Ssl::try_from(ssl).unwrap();
+
+        assert_eq!(wire.cert.as_deref(), Some("cert1"));
+        assert_eq!(wire.key.as_deref(), Some("key1"));
+        assert_eq!(wire.certs, None);
+        assert_eq!(wire.keys, None);
+    }
+
+    /// The first certificate/key pair goes to the singular `cert`/`key`
+    /// fields; every one after it goes, in order, into `certs`/`keys`.
+    #[test]
+    fn ssl_to_wire_with_multiple_certificates_puts_the_first_in_the_singular_fields_and_the_rest_in_the_plural_ones() {
+        let ssl = adc::SSL {
+            id: Some("ssl1".to_string()),
+            labels: None,
+            r#type: adc::SslType::default(),
+            snis: vec!["example.com".to_string()],
+            certificates: vec![
+                adc::SSLCertificate { certificate: "cert1".to_string(), key: "key1".to_string() },
+                adc::SSLCertificate { certificate: "cert2".to_string(), key: "key2".to_string() },
+            ],
+            client: None,
+            ssl_protocols: None,
+        };
+
+        let wire = typing::Ssl::try_from(ssl).unwrap();
+
+        assert_eq!(wire.cert.as_deref(), Some("cert1"));
+        assert_eq!(wire.key.as_deref(), Some("key1"));
+        assert_eq!(wire.certs, Some(vec!["cert2".to_string()]));
+        assert_eq!(wire.keys, Some(vec!["key2".to_string()]));
+    }
+
+    #[test]
+    fn ssl_to_wire_with_no_certificates_is_rejected() {
+        let ssl = adc::SSL {
+            id: Some("ssl1".to_string()),
+            labels: None,
+            r#type: adc::SslType::default(),
+            snis: vec!["example.com".to_string()],
+            certificates: vec![],
+            client: None,
+            ssl_protocols: None,
+        };
+
+        assert!(typing::Ssl::try_from(ssl).is_err());
     }
 }

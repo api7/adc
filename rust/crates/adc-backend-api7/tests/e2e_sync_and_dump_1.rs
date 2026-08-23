@@ -333,50 +333,18 @@ async fn syncs_and_dumps_ssls() {
     assert!(dump.ssls.is_none_or(|s| s.is_empty()));
 }
 
-/// Regression: writing an SSL with more than one certificate (via
-/// `certs`/`keys` on the wire, per `FromADC.transformSSL`) is a real,
-/// supported write — API7 accepts, stores, and returns all of them (`cert`
-/// *and* `certs` both come back on a real admin API response, confirmed
-/// against a live instance) — but the read-direction conversion used to
-/// only ever recover the first, silently dropping the rest on every dump.
-/// The private key is never echoed back for any of them (real responses
-/// carry no `key`/`keys` field at all), so both come back empty.
-#[tokio::test]
-#[ignore]
-async fn an_ssl_with_multiple_certificates_recovers_all_of_them_on_dump() {
-    let backend = common::backend().await;
-    let cert1 = read_asset("certs/test-ssl1.cer").trim().to_string();
-    let key1 = read_asset("certs/test-ssl1.key").trim().to_string();
-    let cert2 = read_asset("certs/test-ssl2.cer").trim().to_string();
-    let key2 = read_asset("certs/test-ssl2.key").trim().to_string();
-
-    let snis = ["multi-cert.com"];
-    let ssl_name = snis.join(",");
-    let ssl = json!({
-        "snis": snis,
-        "certificates": [
-            { "certificate": cert1, "key": key1 },
-            { "certificate": cert2, "key": key2 },
-        ],
-    });
-
-    sync_events(&backend, vec![create_event(ResourceType::Ssl, &ssl_name, ssl, None)])
-        .await
-        .unwrap();
-
-    let dump = dump_configuration(&backend).await.unwrap();
-    let ssls = dump.ssls.unwrap();
-    assert_eq!(ssls.len(), 1);
-    assert_eq!(ssls[0].certificates.len(), 2, "both certificates should come back on dump");
-    assert_eq!(ssls[0].certificates[0].certificate.trim(), cert1);
-    assert_eq!(ssls[0].certificates[0].key, "");
-    assert_eq!(ssls[0].certificates[1].certificate.trim(), cert2);
-    assert_eq!(ssls[0].certificates[1].key, "");
-
-    sync_events(&backend, vec![delete_event(ResourceType::Ssl, &ssl_name, None)])
-        .await
-        .unwrap();
-}
+// No e2e round-trip test for a multi-certificate SSL: confirmed against a
+// live instance that a single write can never carry more than one
+// certificate at all — API7's admin API validates `cert`+`key` and
+// `certs`+`keys` as mutually exclusive alternatives, *and* `certs`/`keys`
+// are each capped at exactly one item, so no field combination lets one PUT
+// accept two certificates. The read-direction fix (`From<typing::Ssl> for
+// adc::SSL` recovering `cert`+`certs` together) still matters for dumping
+// an *existing* multi-cert SSL — reachable by other means than this
+// backend's own write path — but there's no way to create one through
+// `sync_events` for this suite to round-trip against; see
+// `transformer::tests::ssl_from_wire_recovers_every_certificate_and_key_pair`
+// for that behavior's unit coverage instead.
 
 #[tokio::test]
 #[ignore]
