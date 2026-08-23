@@ -394,9 +394,6 @@ fn merge_default(resource: &Value, defaults: &Value) -> Value {
     let Value::Object(result_map) = &mut result else { return result };
 
     for (key, value) in defaults_map {
-        if key == "__proto__" || key == "constructor" || key == "prototype" {
-            continue;
-        }
         let existing = result_map.get(key).cloned();
         match existing {
             None | Some(Value::Null) => {
