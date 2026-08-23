@@ -2,7 +2,7 @@
 //! `sync`.
 //!
 //! Unlike APISIX, a service's default upstream is embedded directly in its
-//! own body (see `transformer::transform_service`'s doc comment) — a
+//! own body (see `typing::Service`'s `From` impl's doc comment) — a
 //! `SERVICE` event is always exactly one request, not up to two. Named
 //! (non-default) upstreams for canary release still address their own
 //! nested collection (`/apisix/admin/services/{parent}/upstreams/{id}`).
@@ -317,7 +317,7 @@ fn request_body(event: &Event) -> Result<Value, BackendError> {
         ResourceType::Service => {
             let mut service: adc::Service = deserialize_event_value(new_value)?;
             service.id = Some(event.resource_id.clone());
-            to_request_body(transformer::transform_service(service))
+            to_request_body(typing::Service::from(service))
         }
         ResourceType::Route => {
             let mut route: adc::Route = deserialize_event_value(new_value)?;

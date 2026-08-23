@@ -184,7 +184,7 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             ResourceType::Service => {
                 let mut service: adc::Service = deserialize_event_value(new_value)?;
                 service.id = Some(event.resource_id.clone());
-                body.services.push(transformer::transform_service(service));
+                body.services.push(typing::Service::from(service));
                 track(&mut index, "services");
             }
             ResourceType::Route => {
