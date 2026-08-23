@@ -330,18 +330,9 @@ pub fn diff(
     remote: &Configuration,
     default_value: Option<&DefaultValue>,
 ) -> Vec<Event> {
-    fn to_diff_map(configuration: &Configuration) -> adc_sdk::InternalConfiguration {
-        match serde_json::to_value(configuration).expect("Configuration always serializes") {
-            Value::Object(map) => map,
-            _ => unreachable!("Configuration always serializes to a JSON object"),
-        }
-    }
-    adc_differ::DifferV4::diff(
-        &to_diff_map(local),
-        &to_diff_map(remote),
-        default_value,
-        None,
-    )
+    let local = adc_sdk::resources::FlatConfiguration::from(local.clone());
+    let remote = adc_sdk::resources::FlatConfiguration::from(remote.clone());
+    adc_differ::DifferV4::diff(&local, &remote, default_value)
 }
 
 /// A resource's id is derived from its name (and parent, where nested) via
@@ -475,7 +466,6 @@ fn resource_type_from_fixture_str(value: &str) -> ResourceType {
         "upstream" => ResourceType::Upstream,
         "ssl" => ResourceType::Ssl,
         "global_rule" => ResourceType::GlobalRule,
-        "plugin_config" => ResourceType::PluginConfig,
         "plugin_metadata" => ResourceType::PluginMetadata,
         "consumer" => ResourceType::Consumer,
         "consumer_group" => ResourceType::ConsumerGroup,
@@ -578,6 +568,9 @@ fn assert_matches_object_at(actual: &Value, expected: &Value, path: &str) {
         // `json!(60)` literal in a test frequently disagree on exactly
         // this, for a field that's numerically identical either way, so
         // this compares as f64 instead of relying on `Value`'s own `==`.
+        // Known imprecision: two distinct integers past f64's exact range
+        // (2^53) can collide here — not worth guarding against for
+        // gateway config values.
         Value::Number(expected_number) => match actual {
             Value::Number(actual_number) => assert_eq!(
                 actual_number.as_f64(),

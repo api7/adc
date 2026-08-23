@@ -23,22 +23,10 @@ pub mod value_diff;
 
 pub use backend::{
     Backend, BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
-    BackendValidationError, SYNC_EVENT_SPAN_NAME,
+    BackendValidationError, DEFAULT_EXIT_ON_FAILURE, SYNC_EVENT_SPAN_NAME,
 };
 pub use converter::{ConvertError, Converter};
 pub use default_value::DefaultValue;
 pub use event::{Event, EventKind, EventType};
 pub use resource::{FieldListType, ResourceType};
 pub use value_diff::{DiffPath, PathSegment, ValueDiff, diff_value, format_path};
-
-use serde_json::{Map, Value};
-
-/// The differ's working representation of a full configuration: a plain
-/// `Map<String, Value>` keyed by config field name (`services`, `routes`,
-/// `global_rules`, ...). The differ algorithm treats resource bodies as
-/// opaque structural values rather than strongly-typed ones, since diffing
-/// is a generic structural operation independent of any one resource's shape.
-///
-/// Distinct from `resources::InternalConfiguration`, the typed counterpart
-/// used to parse and validate declarative configuration.
-pub type InternalConfiguration = Map<String, Value>;

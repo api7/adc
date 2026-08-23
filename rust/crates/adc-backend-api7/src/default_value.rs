@@ -36,7 +36,7 @@ pub async fn fetch(client: &HttpClient) -> Result<DefaultValue, BackendError> {
 
     let mut core = HashMap::new();
     for (type_name, schema_entry) in schema {
-        let Some(resource_type) = resource_type_from_str(&type_name) else {
+        let Ok(resource_type) = type_name.parse::<ResourceType>() else {
             continue;
         };
         let merged = match schema_entry.get(KEY_ALL_OF).and_then(Value::as_array) {
@@ -157,24 +157,6 @@ fn extract_object_default(schema: &Value) -> Option<Value> {
         }
     }
     Some(Value::Object(defaults))
-}
-
-fn resource_type_from_str(value: &str) -> Option<ResourceType> {
-    Some(match value {
-        "route" => ResourceType::Route,
-        "service" => ResourceType::Service,
-        "upstream" => ResourceType::Upstream,
-        "ssl" => ResourceType::Ssl,
-        "global_rule" => ResourceType::GlobalRule,
-        "plugin_config" => ResourceType::PluginConfig,
-        "plugin_metadata" => ResourceType::PluginMetadata,
-        "consumer" => ResourceType::Consumer,
-        "consumer_group" => ResourceType::ConsumerGroup,
-        "consumer_credential" => ResourceType::ConsumerCredential,
-        "stream_route" => ResourceType::StreamRoute,
-        "stream_service" => ResourceType::InternalStreamService,
-        _ => return None,
-    })
 }
 
 /// A schema-derived default `nodes` entry commonly declares only
@@ -445,12 +427,9 @@ mod tests {
 
     #[test]
     fn recognizes_every_wire_resource_type_name() {
-        assert_eq!(resource_type_from_str("route"), Some(ResourceType::Route));
-        assert_eq!(
-            resource_type_from_str("stream_service"),
-            Some(ResourceType::InternalStreamService)
-        );
-        assert_eq!(resource_type_from_str("not_a_real_type"), None);
+        assert_eq!("route".parse(), Ok(ResourceType::Route));
+        assert_eq!("stream_service".parse(), Ok(ResourceType::InternalStreamService));
+        assert_eq!("not_a_real_type".parse::<ResourceType>(), Err(()));
     }
 
     #[test]

@@ -12,15 +12,15 @@
 //! certificate at all" to send back *out*: the server would just reject an
 //! empty `cert`/`key` string outright. `TryFrom` rejects that case here,
 //! before a doomed request is ever built.
-//! `Service`/`Route`/`StreamRoute`'s write-direction id fields
-//! (`service_id`/`route_id`/`stream_route_id`) and the two conversions that
-//! need more than the resource itself (a route/stream route needs its
-//! parent service's id) are free functions instead of `From` impls, since
-//! `From` only takes one argument.
+//! `Route`/`StreamRoute` are free functions rather than `From` impls: each
+//! needs its parent service's id alongside the resource itself, and `From`
+//! only takes one argument. `Service`/`Route`/`StreamRoute` also each have a
+//! write-direction-only id field (`service_id`/`route_id`/`stream_route_id`)
+//! distinct from the `id` their read-direction conversion produces.
 //!
-//! [`transform_service`] always converts a service's embedded default
-//! upstream through [`typing::Upstream`]'s own `From` impl, exactly like a
-//! standalone named upstream — never assembled directly from the ADC
+//! `typing::Service`'s `From` impl always converts a service's embedded
+//! default upstream through [`typing::Upstream`]'s own `From` impl, exactly
+//! like a standalone named upstream — never assembled directly from the ADC
 //! shape's own fields, since those (`description`, `type` for the
 //! balancer) don't line up with what the wire format expects (`desc`,
 //! `type`), and passing them through unrenamed would silently drop the
@@ -361,36 +361,39 @@ impl From<adc::Upstream> for typing::Upstream {
     }
 }
 
-/// Builds a service's wire body, including its embedded default upstream
-/// (see the module doc comment for why this always goes through
-/// `typing::Upstream`'s `From` impl rather than being assembled directly).
-/// `type` is derived from the upstream's scheme: a `tcp`/`udp`/`tls`
-/// upstream makes the service a `stream` service, anything else `http`.
-pub fn transform_service(service: adc::Service) -> typing::Service {
-    let ty = match service.upstream.as_ref().map(|u| u.scheme) {
-        Some(adc::UpstreamScheme::Tcp | adc::UpstreamScheme::Udp | adc::UpstreamScheme::Tls) => {
-            "stream"
+impl From<adc::Service> for typing::Service {
+    /// Builds a service's wire body, including its embedded default
+    /// upstream (see the module doc comment for why this always goes
+    /// through `typing::Upstream`'s `From` impl rather than being assembled
+    /// directly). `type` is derived from the upstream's scheme: a
+    /// `tcp`/`udp`/`tls` upstream makes the service a `stream` service,
+    /// anything else `http`.
+    fn from(service: adc::Service) -> Self {
+        let ty = match service.upstream.as_ref().map(|u| u.scheme) {
+            Some(adc::UpstreamScheme::Tcp | adc::UpstreamScheme::Udp | adc::UpstreamScheme::Tls) => {
+                "stream"
+            }
+            _ => "http",
+        };
+
+        typing::Service {
+            id: None,
+            service_id: service.id,
+            name: Some(service.name),
+            desc: service.description,
+            labels: transform_labels_to_wire(service.labels),
+            ty: Some(ty.to_string()),
+
+            hosts: service.hosts,
+            upstream: service.upstream.map(typing::Upstream::from),
+            plugins: service.plugins,
+            path_prefix: service.path_prefix,
+            strip_path_prefix: service.strip_path_prefix,
+
+            routes: None,
+            stream_routes: None,
+            upstreams: None,
         }
-        _ => "http",
-    };
-
-    typing::Service {
-        id: None,
-        service_id: service.id,
-        name: Some(service.name),
-        desc: service.description,
-        labels: transform_labels_to_wire(service.labels),
-        ty: Some(ty.to_string()),
-
-        hosts: service.hosts,
-        upstream: service.upstream.map(typing::Upstream::from),
-        plugins: service.plugins,
-        path_prefix: service.path_prefix,
-        strip_path_prefix: service.strip_path_prefix,
-
-        routes: None,
-        stream_routes: None,
-        upstreams: None,
     }
 }
 

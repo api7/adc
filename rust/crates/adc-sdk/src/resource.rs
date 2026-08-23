@@ -6,7 +6,6 @@ pub enum ResourceType {
     Upstream,
     Ssl,
     GlobalRule,
-    PluginConfig,
     PluginMetadata,
     Consumer,
     ConsumerGroup,
@@ -28,7 +27,6 @@ impl ResourceType {
         ResourceType::ConsumerCredential,
         ResourceType::Upstream,
         ResourceType::ConsumerGroup,
-        ResourceType::PluginConfig,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -38,7 +36,6 @@ impl ResourceType {
             ResourceType::Upstream => "upstream",
             ResourceType::Ssl => "ssl",
             ResourceType::GlobalRule => "global_rule",
-            ResourceType::PluginConfig => "plugin_config",
             ResourceType::PluginMetadata => "plugin_metadata",
             ResourceType::Consumer => "consumer",
             ResourceType::ConsumerGroup => "consumer_group",
@@ -52,6 +49,67 @@ impl ResourceType {
 impl serde::Serialize for ResourceType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
+    }
+}
+
+impl std::fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// The inverse of [`ResourceType::as_str`].
+impl std::str::FromStr for ResourceType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "route" => ResourceType::Route,
+            "service" => ResourceType::Service,
+            "upstream" => ResourceType::Upstream,
+            "ssl" => ResourceType::Ssl,
+            "global_rule" => ResourceType::GlobalRule,
+            "plugin_metadata" => ResourceType::PluginMetadata,
+            "consumer" => ResourceType::Consumer,
+            "consumer_group" => ResourceType::ConsumerGroup,
+            "consumer_credential" => ResourceType::ConsumerCredential,
+            "stream_route" => ResourceType::StreamRoute,
+            "stream_service" => ResourceType::InternalStreamService,
+            _ => return Err(()),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every variant listed explicitly (not via `ResourceType::ALL`, which
+    // excludes some of these) so adding a variant without a matching
+    // `from_str` arm fails this test instead of silently falling through to
+    // `Err` at a real call site.
+    #[test]
+    fn every_variant_round_trips_through_as_str_and_from_str() {
+        for rt in [
+            ResourceType::Route,
+            ResourceType::Service,
+            ResourceType::Upstream,
+            ResourceType::Ssl,
+            ResourceType::GlobalRule,
+            ResourceType::PluginMetadata,
+            ResourceType::Consumer,
+            ResourceType::ConsumerGroup,
+            ResourceType::ConsumerCredential,
+            ResourceType::StreamRoute,
+            ResourceType::InternalStreamService,
+        ] {
+            assert_eq!(rt.as_str().parse(), Ok(rt));
+        }
+    }
+
+    #[test]
+    fn an_unrecognized_string_fails_to_parse() {
+        assert_eq!("not_a_real_type".parse::<ResourceType>(), Err(()));
     }
 }
 

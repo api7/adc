@@ -2,7 +2,7 @@
 //! `sync`.
 //!
 //! Unlike APISIX, a service's default upstream is embedded directly in its
-//! own body (see `transformer::transform_service`'s doc comment) — a
+//! own body (see `typing::Service`'s `From` impl's doc comment) — a
 //! `SERVICE` event is always exactly one request, not up to two. Named
 //! (non-default) upstreams for canary release still address their own
 //! nested collection (`/apisix/admin/services/{parent}/upstreams/{id}`).
@@ -21,16 +21,14 @@
 use std::collections::HashSet;
 
 use adc_backend_core::{
-    HttpClient, Method, RequestBuilder, concurrent_map, concurrent_map_until_err,
-    encode_path_segment,
+    HttpClient, Method, RequestBuilder, concurrent_map, concurrent_map_until_err, deserialize_event_value,
+    encode_path_segment, missing_parent, to_request_body,
 };
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
-    BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, ResourceType,
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, ResourceType,
     SYNC_EVENT_SPAN_NAME,
 };
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::transformer;
@@ -61,7 +59,7 @@ impl Operator {
         events: Vec<Event>,
         opts: BackendSyncOptions,
     ) -> Result<Vec<BackendSyncResult>, BackendError> {
-        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
 
         let mut results = Vec::new();
         for group in group_events(preprocess_events(events)) {
@@ -98,7 +96,7 @@ impl Operator {
         name = SYNC_EVENT_SPAN_NAME,
         skip_all,
         fields(
-            resource_type = %event.resource_type.as_str(),
+            resource_type = %event.resource_type,
             resource_name = %event.resource_name,
             event_type = ?event.event_type(),
             success = tracing::field::Empty,
@@ -241,26 +239,6 @@ fn preprocess_events(events: Vec<Event>) -> Vec<Event> {
         .collect()
 }
 
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(
-        format!(
-            "{:?} event for resource {:?} is missing a parent_id",
-            event.resource_type, event.resource_id
-        )
-        .into(),
-    )
-}
-
-fn deserialize_event_value<T: DeserializeOwned>(value: &Value) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone())
-        .map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
-}
-
-fn to_request_body<T: Serialize>(value: T) -> Result<Value, BackendError> {
-    serde_json::to_value(value)
-        .map_err(|e| BackendError::Serialization(format!("encoding request body: {e}")))
-}
-
 fn build_path(event: &Event) -> Result<String, BackendError> {
     let resource_id = encode_path_segment(&event.resource_id)?;
     match event.resource_type {
@@ -317,7 +295,7 @@ fn request_body(event: &Event) -> Result<Value, BackendError> {
         ResourceType::Service => {
             let mut service: adc::Service = deserialize_event_value(new_value)?;
             service.id = Some(event.resource_id.clone());
-            to_request_body(transformer::transform_service(service))
+            to_request_body(typing::Service::from(service))
         }
         ResourceType::Route => {
             let mut route: adc::Route = deserialize_event_value(new_value)?;
@@ -352,7 +330,6 @@ fn request_body(event: &Event) -> Result<Value, BackendError> {
             to_request_body(typing::Upstream::from(upstream))
         }
         ResourceType::ConsumerGroup
-        | ResourceType::PluginConfig
         | ResourceType::InternalStreamService => Err(BackendError::Unsupported(format!(
             "{:?} is not directly syncable by the api7 backend",
             event.resource_type

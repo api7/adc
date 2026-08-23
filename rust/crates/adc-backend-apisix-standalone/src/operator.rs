@@ -14,9 +14,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use adc_backend_core::{HttpClient, Method, concurrent_map, concurrent_map_until_err};
+use adc_backend_core::{
+    HttpClient, Method, concurrent_map, concurrent_map_until_err, deserialize_event_value, missing_parent,
+};
 use adc_sdk::resources::{self as adc};
-use adc_sdk::{BackendError, BackendSyncOptions, BackendSyncResult, Event, EventType, PathSegment, ResourceType, ValueDiff};
+use adc_sdk::{
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
+    ResourceType, ValueDiff,
+};
 use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
 
@@ -92,7 +97,7 @@ impl Operator {
             }
         };
 
-        let exit_on_failure = opts.exit_on_failure.unwrap_or(true);
+        let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
         let results = if exit_on_failure {
             match concurrent_map_until_err(self.servers.clone(), None, put).await {
                 Ok(results) => results,
@@ -154,14 +159,6 @@ fn resolve_sync_timestamp(now: i64, latest_known: Option<i64>) -> i64 {
 
 fn missing_new_value(event: &Event) -> BackendError {
     BackendError::Other(format!("{:?} event for resource {:?} is missing new_value", event.event_type(), event.resource_id).into())
-}
-
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(format!("{:?} event for resource {:?} is missing a parent_id", event.resource_type, event.resource_id).into())
-}
-
-fn deserialize_event_value<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone()).map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
 }
 
 /// `ConsumerCredential` events are keyed by `parentId/credentials/resourceId`
@@ -512,7 +509,7 @@ fn apply_event(config: &mut ApisixStandalone, increase_version: &mut HashSet<Res
             upsert_or_delete(&mut config.stream_routes, event, |r| r.id.as_str(), || from_adc_stream_route(event, timestamp))?
         }
         // Not part of standalone's config document.
-        ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => false,
+        ResourceType::ConsumerGroup | ResourceType::InternalStreamService => false,
     };
 
     if changed {
@@ -625,7 +622,7 @@ fn bump_conf_versions(config: &mut ApisixStandalone, increase_version: &HashSet<
             ResourceType::PluginMetadata => &mut config.plugin_metadata_conf_version,
             ResourceType::Upstream => &mut config.upstreams_conf_version,
             ResourceType::StreamRoute => &mut config.stream_routes_conf_version,
-            ResourceType::ConsumerCredential | ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => continue,
+            ResourceType::ConsumerCredential | ResourceType::ConsumerGroup | ResourceType::InternalStreamService => continue,
         };
         *field = Some(timestamp);
     }

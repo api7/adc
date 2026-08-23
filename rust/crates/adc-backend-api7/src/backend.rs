@@ -44,24 +44,18 @@ impl Backend {
         }
     }
 
-    /// Fetched once and cached for this `Backend`'s lifetime. `"dev"` is a
-    /// known placeholder for an unreleased build and maps to a version
-    /// high enough to unlock every version-gated feature; any other value
-    /// that doesn't coerce to a semver is unexpected and falls back to
-    /// `0.0.0` instead — deliberately the *conservative* direction, since
-    /// assuming the oldest possible version is safer than assuming the
-    /// newest when the actual version genuinely can't be determined.
+    /// Fetched once and cached for this `Backend`'s lifetime. Falls back to
+    /// a version high enough to unlock every version-gated feature whenever
+    /// the value doesn't coerce to a semver — covers the literal `"dev"`
+    /// placeholder API7 returns for an unreleased build, and anything else
+    /// unexpected the same way.
     async fn resolved_version(&self) -> Result<Version, BackendError> {
         let version = self
             .version
             .get_or_try_init(|| async {
                 let request = self.client.request(Method::GET, "/api/version")?;
                 let body: typing::ValueResponse<String> = self.client.send_json(request).await?;
-                Ok::<_, BackendError>(if body.value == "dev" {
-                    Version::new(999, 999, 999)
-                } else {
-                    coerce_version(&body.value).unwrap_or_else(|| Version::new(0, 0, 0))
-                })
+                Ok::<_, BackendError>(coerce_version(&body.value).unwrap_or_else(|| Version::new(999, 999, 999)))
             })
             .await?;
         Ok(version.clone())
@@ -135,7 +129,8 @@ impl adc_sdk::Backend for Backend {
 /// (`"v3.9.10"` -> `3.9.10`) and tolerates a short `major[.minor[.patch]]`
 /// (missing components default to `0`) — the dashboard's `/api/version`
 /// endpoint has been observed returning both a `v`-prefixed value and the
-/// literal string `"dev"` (handled separately, before this is called).
+/// literal string `"dev"`, neither of which has anything for this to
+/// extract, so both return `None` like any other unparseable value.
 fn coerce_version(value: &str) -> Option<Version> {
     let digits_and_dots: String = value
         .chars()

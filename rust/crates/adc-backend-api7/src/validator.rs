@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method};
+use adc_backend_core::{HttpClient, Method, deserialize_event_value, missing_parent};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendValidateResult, BackendValidationError, Event, EventType, ResourceType,
@@ -144,23 +144,6 @@ fn enrich(raw: RawValidationError, index: &ValidateIndex) -> BackendValidationEr
     }
 }
 
-fn missing_parent(event: &Event) -> BackendError {
-    BackendError::Other(
-        format!(
-            "{:?} event for resource {:?} is missing a parent_id",
-            event.resource_type, event.resource_id
-        )
-        .into(),
-    )
-}
-
-fn deserialize_event_value<T: serde::de::DeserializeOwned>(
-    value: &Value,
-) -> Result<T, BackendError> {
-    serde_json::from_value(value.clone())
-        .map_err(|e| BackendError::Serialization(format!("decoding event payload: {e}")))
-}
-
 fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
     let mut body = ValidateRequestBody::default();
     let mut index: ValidateIndex = HashMap::new();
@@ -184,7 +167,7 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             ResourceType::Service => {
                 let mut service: adc::Service = deserialize_event_value(new_value)?;
                 service.id = Some(event.resource_id.clone());
-                body.services.push(transformer::transform_service(service));
+                body.services.push(typing::Service::from(service));
                 track(&mut index, "services");
             }
             ResourceType::Route => {
@@ -237,7 +220,6 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             }
             ResourceType::ConsumerCredential
             | ResourceType::ConsumerGroup
-            | ResourceType::PluginConfig
             | ResourceType::Upstream
             | ResourceType::InternalStreamService => {
                 // Not part of API7's validate payload — see

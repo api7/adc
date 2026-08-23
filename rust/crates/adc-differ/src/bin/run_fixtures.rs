@@ -16,35 +16,17 @@ use std::env;
 use std::fs;
 
 use adc_differ::DifferV4;
-use adc_sdk::{DefaultValue, Event, InternalConfiguration, ResourceType};
+use adc_sdk::resources::FlatConfiguration;
+use adc_sdk::{DefaultValue, Event, ResourceType};
 use serde_json::Value;
-
-/// Inverse of `ResourceType::as_str()`. Not exposed by adc-sdk itself since
-/// nothing in the library needs to parse a resource type back from a string.
-fn resource_type_from_str(s: &str) -> Option<ResourceType> {
-    Some(match s {
-        "route" => ResourceType::Route,
-        "service" => ResourceType::Service,
-        "upstream" => ResourceType::Upstream,
-        "ssl" => ResourceType::Ssl,
-        "global_rule" => ResourceType::GlobalRule,
-        "plugin_config" => ResourceType::PluginConfig,
-        "plugin_metadata" => ResourceType::PluginMetadata,
-        "consumer" => ResourceType::Consumer,
-        "consumer_group" => ResourceType::ConsumerGroup,
-        "consumer_credential" => ResourceType::ConsumerCredential,
-        "stream_route" => ResourceType::StreamRoute,
-        "stream_service" => ResourceType::InternalStreamService,
-        _ => return None,
-    })
-}
 
 fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
     let mut default_value = DefaultValue::default();
     if let Some(core) = v.get("core").and_then(Value::as_object) {
         for (k, val) in core {
-            let rt = resource_type_from_str(k)
-                .unwrap_or_else(|| panic!("{context}: unknown resource type {k:?} in defaultValue.core"));
+            let rt: ResourceType = k
+                .parse()
+                .unwrap_or_else(|_| panic!("{context}: unknown resource type {k:?} in defaultValue.core"));
             default_value.core.insert(rt, val.clone());
         }
     }
@@ -57,14 +39,16 @@ fn parse_default_value(v: &Value, context: &str) -> DefaultValue {
 }
 
 /// `None` (the key is absent) is a legitimate empty config; `Some` holding
-/// anything but an object is very likely a malformed fixture and panics
+/// anything that doesn't deserialize as a `FlatConfiguration` (wrong shape,
+/// unknown field, non-object) is very likely a malformed fixture and panics
 /// instead of silently running the differ against an empty config as if
 /// nothing were wrong.
-fn load_config(v: Option<&Value>, context: &str) -> InternalConfiguration {
+fn load_config(v: Option<&Value>, context: &str) -> FlatConfiguration {
     match v {
-        None => InternalConfiguration::default(),
-        Some(Value::Object(obj)) => obj.clone(),
-        Some(other) => panic!("{context} must be an object, got {other}"),
+        None => FlatConfiguration::default(),
+        Some(value) => {
+            serde_json::from_value(value.clone()).unwrap_or_else(|e| panic!("{context}: {e}"))
+        }
     }
 }
 
@@ -94,7 +78,7 @@ fn main() {
             .get("defaultValue")
             .map(|v| parse_default_value(v, &format!("{}: \"defaultValue\"", path.display())));
 
-        let events = DifferV4::diff(&local, &remote, default_value.as_ref(), None);
+        let events = DifferV4::diff(&local, &remote, default_value.as_ref());
         results.insert(name, events);
     }
 
@@ -109,43 +93,19 @@ fn main() {
 mod tests {
     use super::*;
 
-    // Every ResourceType variant listed explicitly (not via ResourceType::ALL,
-    // which excludes some of these) so adding a variant without a matching
-    // resource_type_from_str arm fails this test instead of silently falling
-    // through to None at fixture-parsing time.
-    #[test]
-    fn resource_type_from_str_round_trips_every_variant() {
-        for rt in [
-            ResourceType::Route,
-            ResourceType::Service,
-            ResourceType::Upstream,
-            ResourceType::Ssl,
-            ResourceType::GlobalRule,
-            ResourceType::PluginConfig,
-            ResourceType::PluginMetadata,
-            ResourceType::Consumer,
-            ResourceType::ConsumerGroup,
-            ResourceType::ConsumerCredential,
-            ResourceType::StreamRoute,
-            ResourceType::InternalStreamService,
-        ] {
-            assert_eq!(resource_type_from_str(rt.as_str()), Some(rt));
-        }
-    }
-
     #[test]
     fn load_config_treats_a_missing_key_as_an_empty_config() {
-        assert_eq!(load_config(None, "ctx"), InternalConfiguration::default());
+        assert_eq!(load_config(None, "ctx"), FlatConfiguration::default());
     }
 
     #[test]
     fn load_config_accepts_an_object() {
         let value = serde_json::json!({"services": []});
-        assert_eq!(load_config(Some(&value), "ctx"), value.as_object().unwrap().clone());
+        assert_eq!(load_config(Some(&value), "ctx"), FlatConfiguration { services: Some(vec![]), ..Default::default() });
     }
 
     #[test]
-    #[should_panic(expected = "must be an object")]
+    #[should_panic(expected = "invalid type")]
     fn load_config_rejects_a_non_object_instead_of_silently_defaulting() {
         let value = serde_json::json!("not an object");
         load_config(Some(&value), "ctx");

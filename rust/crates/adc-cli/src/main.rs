@@ -194,7 +194,7 @@ async fn cmd_sync(args: SyncArgs) -> Result<(), CliError> {
                 Some(event) => println!(
                     "[FAILED] {} {}: \"{}\"",
                     event_verb(event),
-                    event.resource_type.as_str(),
+                    event.resource_type,
                     event.resource_name
                 ),
                 // A backend whose sync granularity is per-server rather
@@ -320,7 +320,7 @@ fn print_diff_summary(events: &[Event]) {
         println!(
             "{} {}: \"{}\"",
             event_verb(event),
-            event.resource_type.as_str(),
+            event.resource_type,
             event.resource_name
         );
     }

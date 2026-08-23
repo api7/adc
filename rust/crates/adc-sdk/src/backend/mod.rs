@@ -32,6 +32,10 @@ pub struct BackendMetadata {
     pub log_scope: Vec<String>,
 }
 
+/// What `BackendSyncOptions.exit_on_failure` resolves to when unset — see
+/// `Backend::sync`'s doc comment.
+pub const DEFAULT_EXIT_ON_FAILURE: bool = true;
+
 #[derive(Debug, Clone, Default)]
 pub struct BackendSyncOptions {
     pub concurrent: Option<usize>,
@@ -120,9 +124,5 @@ pub trait Backend: Send + Sync {
     /// `Unsupported` rather than being a required method.
     async fn validate(&self, _events: &[Event]) -> Result<BackendValidateResult, BackendError> {
         Err(BackendError::Unsupported("validate".into()))
-    }
-
-    async fn support_stream_route(&self) -> Result<bool, BackendError> {
-        Ok(false)
     }
 }
