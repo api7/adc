@@ -125,8 +125,4 @@ pub trait Backend: Send + Sync {
     async fn validate(&self, _events: &[Event]) -> Result<BackendValidateResult, BackendError> {
         Err(BackendError::Unsupported("validate".into()))
     }
-
-    async fn support_stream_route(&self) -> Result<bool, BackendError> {
-        Ok(false)
-    }
 }
