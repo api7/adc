@@ -71,8 +71,18 @@ impl Fetcher {
         self.list(ResourceType::Ssl).await
     }
 
+    /// No dedicated PluginConfig resource type to check `is_skip` against —
+    /// gated on Route instead, since resolving a route's `plugin_config_id`
+    /// is the only thing this data is ever used for.
     pub async fn list_plugin_configs(&self) -> Result<Vec<typing::PluginConfig>, BackendError> {
-        self.list(ResourceType::PluginConfig).await
+        if self.filter.is_skip(ResourceType::Route) {
+            return Ok(Vec::new());
+        }
+        let builder = self
+            .filter
+            .attach_label_selector(self.client.request(Method::GET, "/apisix/admin/plugin_configs")?);
+        let body: typing::ListResponse<typing::PluginConfig> = self.client.send_json(builder).await?;
+        Ok(body.list.into_iter().map(|item| item.value).collect())
     }
 
     /// A backend may define several `global_rules` entries; their `plugins`
@@ -421,7 +431,6 @@ mod tests {
             ResourceType::Route,
             ResourceType::Upstream,
             ResourceType::Ssl,
-            ResourceType::PluginConfig,
             ResourceType::GlobalRule,
             ResourceType::PluginMetadata,
             ResourceType::StreamRoute,

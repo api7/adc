@@ -512,7 +512,7 @@ fn apply_event(config: &mut ApisixStandalone, increase_version: &mut HashSet<Res
             upsert_or_delete(&mut config.stream_routes, event, |r| r.id.as_str(), || from_adc_stream_route(event, timestamp))?
         }
         // Not part of standalone's config document.
-        ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => false,
+        ResourceType::ConsumerGroup | ResourceType::InternalStreamService => false,
     };
 
     if changed {
@@ -625,7 +625,7 @@ fn bump_conf_versions(config: &mut ApisixStandalone, increase_version: &HashSet<
             ResourceType::PluginMetadata => &mut config.plugin_metadata_conf_version,
             ResourceType::Upstream => &mut config.upstreams_conf_version,
             ResourceType::StreamRoute => &mut config.stream_routes_conf_version,
-            ResourceType::ConsumerCredential | ResourceType::ConsumerGroup | ResourceType::PluginConfig | ResourceType::InternalStreamService => continue,
+            ResourceType::ConsumerCredential | ResourceType::ConsumerGroup | ResourceType::InternalStreamService => continue,
         };
         *field = Some(timestamp);
     }

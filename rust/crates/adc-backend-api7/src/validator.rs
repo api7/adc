@@ -237,7 +237,6 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             }
             ResourceType::ConsumerCredential
             | ResourceType::ConsumerGroup
-            | ResourceType::PluginConfig
             | ResourceType::Upstream
             | ResourceType::InternalStreamService => {
                 // Not part of API7's validate payload — see

@@ -166,10 +166,11 @@ pub fn differ_meta(resource_type: ResourceType) -> ResourceDifferMeta {
             fields: &[],
         },
 
-        // CONSUMER_GROUP and PLUGIN_CONFIG are not yet reachable via InternalConfiguration
-        // (no top-level configField, and nothing currently declares them as a nested field);
-        // kept here so the metadata table stays complete over all ResourceType
-        // variants, ready for whenever a nested field declares one of them.
+        // CONSUMER_GROUP is not yet reachable via InternalConfiguration (no
+        // top-level configField, and nothing currently declares it as a
+        // nested field); kept here so the metadata table stays complete over
+        // all ResourceType variants, ready for whenever a nested field
+        // declares one.
         ResourceType::ConsumerGroup => ResourceDifferMeta {
             config_field: None,
             collection_kind: CollectionKind::Array,
@@ -186,21 +187,6 @@ pub fn differ_meta(resource_type: ResourceType) -> ResourceDifferMeta {
                 ("plugins", FieldMeta::ObjectMap),
                 ("consumers", FieldMeta::Map { list_map_key: "username", nested: true, config_key: None }),
             ],
-        },
-
-        ResourceType::PluginConfig => ResourceDifferMeta {
-            config_field: None,
-            collection_kind: CollectionKind::Array,
-            get_name: |r| str_field(r, "name").to_string(),
-            generate_id: |r, _parent| {
-                r.get("id")
-                    .and_then(Value::as_str)
-                    .map(str::to_string)
-                    .unwrap_or_else(|| generate_id(str_field(r, "name")))
-            },
-            propagates_parent_name: false,
-            resolve_default_type: None,
-            fields: &[],
         },
 
         ResourceType::InternalStreamService => unreachable!("internal use only, never diffed directly"),

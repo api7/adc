@@ -429,7 +429,7 @@ fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<V
             }
             to_request_body(wire)
         }
-        ResourceType::PluginConfig | ResourceType::InternalStreamService => {
+        ResourceType::InternalStreamService => {
             Err(BackendError::Unsupported(format!("{:?} is not directly syncable by the apisix backend", event.resource_type)))
         }
     }

@@ -6,7 +6,6 @@ pub enum ResourceType {
     Upstream,
     Ssl,
     GlobalRule,
-    PluginConfig,
     PluginMetadata,
     Consumer,
     ConsumerGroup,
@@ -28,7 +27,6 @@ impl ResourceType {
         ResourceType::ConsumerCredential,
         ResourceType::Upstream,
         ResourceType::ConsumerGroup,
-        ResourceType::PluginConfig,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -38,7 +36,6 @@ impl ResourceType {
             ResourceType::Upstream => "upstream",
             ResourceType::Ssl => "ssl",
             ResourceType::GlobalRule => "global_rule",
-            ResourceType::PluginConfig => "plugin_config",
             ResourceType::PluginMetadata => "plugin_metadata",
             ResourceType::Consumer => "consumer",
             ResourceType::ConsumerGroup => "consumer_group",

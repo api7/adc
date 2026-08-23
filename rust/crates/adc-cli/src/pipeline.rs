@@ -148,7 +148,6 @@ const UNFILTERABLE_RESOURCE_TYPES: &[(&str, ResourceType)] = &[
     ("upstream", ResourceType::Upstream),
     ("stream_route", ResourceType::StreamRoute),
     ("consumer_credential", ResourceType::ConsumerCredential),
-    ("plugin_config", ResourceType::PluginConfig),
 ];
 
 fn warn_on_unfilterable_resource_types(flag: &str, set: &HashSet<ResourceType>) {

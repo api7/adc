@@ -166,7 +166,6 @@ fn resource_type_from_str(value: &str) -> Option<ResourceType> {
         "upstream" => ResourceType::Upstream,
         "ssl" => ResourceType::Ssl,
         "global_rule" => ResourceType::GlobalRule,
-        "plugin_config" => ResourceType::PluginConfig,
         "plugin_metadata" => ResourceType::PluginMetadata,
         "consumer" => ResourceType::Consumer,
         "consumer_group" => ResourceType::ConsumerGroup,

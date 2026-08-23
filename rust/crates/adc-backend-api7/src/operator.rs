@@ -98,7 +98,7 @@ impl Operator {
         name = SYNC_EVENT_SPAN_NAME,
         skip_all,
         fields(
-            resource_type = %event.resource_type.as_str(),
+            resource_type = %event.resource_type,
             resource_name = %event.resource_name,
             event_type = ?event.event_type(),
             success = tracing::field::Empty,
@@ -352,7 +352,6 @@ fn request_body(event: &Event) -> Result<Value, BackendError> {
             to_request_body(typing::Upstream::from(upstream))
         }
         ResourceType::ConsumerGroup
-        | ResourceType::PluginConfig
         | ResourceType::InternalStreamService => Err(BackendError::Unsupported(format!(
             "{:?} is not directly syncable by the api7 backend",
             event.resource_type

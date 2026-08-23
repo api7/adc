@@ -206,7 +206,6 @@ fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequest
             }
             ResourceType::ConsumerCredential
             | ResourceType::ConsumerGroup
-            | ResourceType::PluginConfig
             | ResourceType::Upstream
             | ResourceType::InternalStreamService => {
                 // Not part of APISIX's validate payload.
