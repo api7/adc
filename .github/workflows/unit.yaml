@@ -3,11 +3,9 @@ on:
   push:
     branches:
       - main
-      - rust-next
   pull_request:
     branches:
       - main
-      - rust-next
 jobs:
   test:
     runs-on: ubuntu-latest
