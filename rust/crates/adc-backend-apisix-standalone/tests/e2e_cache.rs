@@ -201,8 +201,13 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
     // ... then a moment later, independently to server2 (newer). A real
     // sleep, not a mocked clock: server2's write must land at a genuinely
     // later wall-clock timestamp than server1's for `find_latest` to be
-    // able to tell them apart by `X-Last-Modified`.
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    // able to tell them apart by `X-Last-Modified` — which is APISIX's own
+    // second-granularity header, not our millisecond `stable_timestamp`, so
+    // the gap has to clear a full second (matches the TS reference's own
+    // `wait(1000)` in this same scenario) or the two can tie and
+    // `find_latest`'s tie-break (whichever probe's response completes
+    // last, not whichever was actually written last) picks arbitrarily.
+    tokio::time::sleep(Duration::from_millis(1100)).await;
 
     common::cache().invalidate(cache_key).await;
     let backend2 = backend_for(common::SERVER2, cache_key);
