@@ -35,7 +35,9 @@ axum = "0.8"
 rustls = "0.23"
 
 [profile.release]
+opt-level = 3
 lto = "fat"
 codegen-units = 1
-strip = true
-panic = "abort"
+debug = true
+strip = false
+panic = "unwind"

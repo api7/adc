@@ -100,3 +100,173 @@ jobs:
           files: |
             release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
             release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
+
+  # --- Rust CLI (adc_rust_*) below. Same release, same tag trigger, built
+  # and packaged independently of the Node-SEA jobs above — see
+  # impl/rust-release.md for why the release profile produces a large
+  # binary and how the debug-info split works.
+  # Both legs build natively on a runner of their own target architecture
+  # (Linux/Windows arm64 hosted runners are GA and free for public repos) —
+  # no cross-toolchain, no `--target`, no `rustup target add`: the default
+  # host toolchain already *is* the target, so `cargo build --release`
+  # alone produces it straight into `target/release/`.
+  adc-rust-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup release flow
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+
+      - name: Setup Rust toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+      # `runner.os` alone doesn't distinguish amd64 from arm64 (both report
+      # "Linux"), so the cache key needs `matrix.arch` too — otherwise the
+      # two architectures' incompatible `target/` dirs would collide.
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+          key: ${{ matrix.arch }}
+      - name: Build adc-cli
+        working-directory: ./rust
+        run: cargo build --release -p adc-cli
+
+      # Splits the release-profile binary (debug=true, strip=false — see
+      # impl/rust-release.md) into a small stripped executable plus a
+      # separate debug-info file a debugger can load alongside it via the
+      # shared Build ID objcopy embeds with --add-gnu-debuglink.
+      - name: Split debug info
+        run: |
+          BIN_DIR=rust/target/release
+          objcopy --only-keep-debug "$BIN_DIR/adc" "$BIN_DIR/adc.debug"
+          objcopy --strip-debug --strip-unneeded "$BIN_DIR/adc"
+          objcopy --add-gnu-debuglink="$BIN_DIR/adc.debug" "$BIN_DIR/adc"
+
+      - name: Compress adc
+        run: |
+          mkdir -p release
+          BIN_DIR=rust/target/release
+          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
+          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.debug
+
+      - name: Upload adc to GitHub release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz
+            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
+
+  adc-rust-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: amd64
+          - os: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup release flow
+        shell: bash
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+
+      - name: Setup Rust toolchain
+        shell: bash
+        run: |
+          rustup update stable
+          rustup default stable
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+          key: ${{ matrix.arch }}
+      - name: Build adc-cli
+        working-directory: ./rust
+        run: cargo build --release -p adc-cli
+
+      # MSVC targets emit debug info as a standalone .pdb next to the .exe
+      # rather than embedding it (unlike DWARF-in-ELF/Mach-O) — nothing to
+      # split here, just collect the two files that are already separate.
+      - name: Compress adc
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $binDir = "rust/target/release"
+          Compress-Archive -Path "$binDir/adc.exe" -DestinationPath "release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip"
+          Compress-Archive -Path "$binDir/adc.pdb" -DestinationPath "release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip"
+
+      - name: Upload adc to GitHub release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip
+            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
+
+  adc-rust-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: amd64
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup release flow
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+
+      - name: Setup Rust toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      - name: Build adc-cli
+        working-directory: ./rust
+        run: cargo build --release -p adc-cli --target ${{ matrix.target }}
+
+      # macOS equivalent of the Linux objcopy split: dsymutil pulls the
+      # DWARF out into a .dSYM bundle, then strip removes it from the
+      # binary itself — the two stay pairable via the binary's UUID.
+      - name: Split debug info
+        run: |
+          BIN_DIR=rust/target/${{ matrix.target }}/release
+          dsymutil "$BIN_DIR/adc" -o "$BIN_DIR/adc.dSYM"
+          strip -S "$BIN_DIR/adc"
+
+      - name: Compress adc
+        run: |
+          mkdir -p release
+          BIN_DIR=rust/target/${{ matrix.target }}/release
+          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
+          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.dSYM
+
+      - name: Upload adc to GitHub release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz
+            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
