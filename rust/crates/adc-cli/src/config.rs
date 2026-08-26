@@ -820,5 +820,26 @@ mod tests {
             let err = merge_files(files).unwrap_err();
             assert!(err.to_string().contains("duplicate global_rule "), "{err}");
         }
+
+        /// `load_local` resolves each file's env var placeholders before
+        /// merging, so two files naming the same resource through different
+        /// placeholders are still caught as a duplicate — not just two
+        /// literally-identical placeholder strings.
+        #[test]
+        fn two_files_whose_placeholders_resolve_to_the_same_service_name_are_a_duplicate() {
+            let lookup = |name: &str| match name {
+                "SVC_A" | "SVC_B" => Some("shared".to_string()),
+                _ => None,
+            };
+            let mut files = vec![
+                (PathBuf::from("a.yaml"), json!({"services": [{"name": "${SVC_A}"}]})),
+                (PathBuf::from("b.yaml"), json!({"services": [{"name": "${SVC_B}"}]})),
+            ];
+            for (_, value) in &mut files {
+                replace_env_vars_with(value, &lookup);
+            }
+            let err = merge_files(files).unwrap_err();
+            assert!(err.to_string().contains("duplicate"), "{err}");
+        }
     }
 }

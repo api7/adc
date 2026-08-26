@@ -241,9 +241,11 @@ pub async fn load_local(
     managed_by_label: bool,
     lint: bool,
 ) -> Result<Configuration, CliError> {
-    let files = config::read_files(files).await?;
+    let mut files = config::read_files(files).await?;
+    for (_, value) in &mut files {
+        config::replace_env_vars(value);
+    }
     let mut merged = config::merge_files(files)?;
-    config::replace_env_vars(&mut merged);
     config::fill_labels(&mut merged, label_selector);
     if managed_by_label {
         config::inject_managed_by_label(&mut merged);
