@@ -333,6 +333,40 @@ mod tests {
     }
 
     #[test]
+    fn a_name_or_description_at_exactly_the_64kb_limit_lints_clean() {
+        let service = Service { name: "0".repeat(64 * 1024), description: Some("0".repeat(64 * 1024)), ..minimal_service() };
+        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        assert_eq!(lint(&config), Vec::new());
+    }
+
+    #[test]
+    fn a_name_or_description_one_character_past_the_64kb_limit_is_rejected() {
+        let service =
+            Service { name: "0".repeat(64 * 1024 + 1), description: Some("0".repeat(64 * 1024 + 1)), ..minimal_service() };
+        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let issues = lint(&config);
+        assert_eq!(issues.len(), 2);
+        assert_eq!(format_path(&issues[0].path), "services[0].name");
+        assert_eq!(format_path(&issues[1].path), "services[0].description");
+    }
+
+    #[test]
+    fn an_id_at_exactly_the_256_character_limit_lints_clean() {
+        let service = Service { id: Some("0".repeat(256)), ..minimal_service() };
+        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        assert_eq!(lint(&config), Vec::new());
+    }
+
+    #[test]
+    fn an_id_one_character_past_the_256_character_limit_is_rejected_by_the_schema() {
+        let service = Service { id: Some("0".repeat(257)), ..minimal_service() };
+        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let issues = lint(&config);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(format_path(&issues[0].path), "services[0].id");
+    }
+
+    #[test]
     fn an_id_with_disallowed_characters_is_rejected_by_the_schema() {
         let service = Service { id: Some("not valid!".into()), ..minimal_service() };
         let config = Configuration { services: Some(vec![service]), ..empty_config() };

@@ -342,6 +342,34 @@ mod tests {
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     }
 
+    /// The two tests above exercise `status_router` in isolation; this binds
+    /// it to a real ephemeral port and speaks HTTP to it, the same way
+    /// `run()` does — the custom status listen port `--listen-status`
+    /// selects is a real, independent socket, not just a router.
+    #[tokio::test]
+    async fn status_listener_serves_real_requests_on_its_own_port() {
+        let ready = Arc::new(AtomicBool::new(false));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let server = tokio::spawn(async move {
+            axum::serve(listener, status_router(ready))
+                .with_graceful_shutdown(wait_for_shutdown(shutdown_rx))
+                .await
+                .unwrap();
+        });
+
+        let response = reqwest::Client::new()
+            .get(format!("http://{addr}/healthz/ready"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
+
+        let _ = shutdown_tx.send(true);
+        server.await.unwrap();
+    }
+
     #[tokio::test]
     async fn sync_rejects_malformed_input_with_400() {
         let (status, body) = send(adc_router(), "PUT", "/sync", r#"{"not":"valid"}"#).await;
