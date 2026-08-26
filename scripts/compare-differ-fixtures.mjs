@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-command TS/Rust differ parity check (impl/rustify.md phase 1, items 1.2-1.4).
+// One-command TS/Rust differ parity check.
 //
 // Runs the same fixtures/differ/*.json inputs through both DifferV4
 // implementations (TS via vitest, Rust via `cargo run`) and structurally
