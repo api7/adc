@@ -88,7 +88,7 @@ export class ToADC {
       return;
     return ADCSDK.utils.recursiveOmitUndefined<ADCSDK.ConsumerCredential>({
       id: credential.id,
-      name: credential.name,
+      name: credential.name ?? credential.id!,
       description: credential.desc,
       labels: credential.labels,
       type: pluginName as ADCSDK.ConsumerCredential['type'],
@@ -113,7 +113,7 @@ export class ToADC {
       labels: ssl.labels,
 
       type: ssl.type,
-      snis: ssl.sni ? [ssl.sni] : ssl.snis ?? [],
+      snis: ssl.sni ? [ssl.sni] : (ssl.snis ?? []),
       certificates: certificates,
       client: ssl.client
         ? {

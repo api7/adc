@@ -292,10 +292,20 @@ fn ssl_with_a_redacted_key_degrades_to_an_empty_placeholder_instead_of_failing()
 }
 
 #[test]
+fn consumer_credential_falls_back_to_id_when_name_is_absent() {
+    let mut plugins = adc::Plugins::new();
+    plugins.insert("key-auth".into(), json!({ "key": "secret" }));
+    let credential = typing::ConsumerCredential { id: Some("jack-key".into()), name: None, desc: None, labels: None, plugins: Some(plugins) };
+
+    let adc_credential: adc::ConsumerCredential = credential.try_into().unwrap();
+    assert_eq!(adc_credential.name, "jack-key");
+}
+
+#[test]
 fn consumer_credential_only_converts_recognized_plugins() {
     let mut plugins = adc::Plugins::new();
     plugins.insert("key-auth".into(), json!({ "key": "secret" }));
-    let credential = typing::ConsumerCredential { id: Some("c1".into()), name: "c1".into(), desc: None, labels: None, plugins: Some(plugins) };
+    let credential = typing::ConsumerCredential { id: Some("c1".into()), name: Some("c1".into()), desc: None, labels: None, plugins: Some(plugins) };
 
     let adc_credential: adc::ConsumerCredential = credential.try_into().unwrap();
     assert_eq!(adc_credential.r#type, "key-auth");
@@ -306,7 +316,7 @@ fn consumer_credential_only_converts_recognized_plugins() {
 fn consumer_credential_rejects_unsupported_plugins() {
     let mut plugins = adc::Plugins::new();
     plugins.insert("proxy-rewrite".into(), json!({}));
-    let credential = typing::ConsumerCredential { id: None, name: "c1".into(), desc: None, labels: None, plugins: Some(plugins) };
+    let credential = typing::ConsumerCredential { id: None, name: Some("c1".into()), desc: None, labels: None, plugins: Some(plugins) };
 
     assert!(adc::ConsumerCredential::try_from(credential).is_err());
 }
@@ -325,8 +335,8 @@ fn consumer_drops_credentials_that_fail_to_convert_but_keeps_the_rest() {
         group_id: None,
         plugins: None,
         credentials: Some(vec![
-            typing::ConsumerCredential { id: Some("good".into()), name: "good".into(), desc: None, labels: None, plugins: Some(good) },
-            typing::ConsumerCredential { id: Some("bad".into()), name: "bad".into(), desc: None, labels: None, plugins: Some(bad) },
+            typing::ConsumerCredential { id: Some("good".into()), name: Some("good".into()), desc: None, labels: None, plugins: Some(good) },
+            typing::ConsumerCredential { id: Some("bad".into()), name: Some("bad".into()), desc: None, labels: None, plugins: Some(bad) },
         ]),
     };
 

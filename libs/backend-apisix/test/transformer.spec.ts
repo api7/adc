@@ -57,4 +57,19 @@ describe('Transformer', () => {
       },
     });
   });
+
+  it('should fall back consumer credential name to id when APISIX returns none', () => {
+    const toADC = new ToADC();
+    expect(
+      toADC.transformConsumerCredential({
+        id: 'jack-key',
+        plugins: { 'key-auth': { key: 'secret' } },
+      }),
+    ).toEqual({
+      id: 'jack-key',
+      name: 'jack-key',
+      type: 'key-auth',
+      config: { key: 'secret' },
+    });
+  });
 });
