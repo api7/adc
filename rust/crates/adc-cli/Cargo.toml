@@ -25,6 +25,7 @@ serde_yaml_ng = "0.10"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "net", "signal", "sync", "process", "time"] }
 glob = "0.3"
+regex = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 dotenvy = "0.15"
 tracing-indicatif = "0.3"

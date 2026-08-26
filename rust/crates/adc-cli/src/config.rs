@@ -8,9 +8,11 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use adc_sdk::ResourceType;
 use adc_sdk::resources::Configuration;
+use regex::Regex;
 use serde_json::Value;
 
 use crate::error::CliError;
@@ -165,6 +167,45 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
     }
 
     Ok(Value::Object(merged))
+}
+
+/// Expands `${VAR}` placeholders in every string value throughout `config`
+/// (recursing into arrays and object values, but never object *keys* — a
+/// key like `"${GLOBAL_PLUGIN}"` stays literal) using the process
+/// environment. A variable that's unset or empty expands to `""`. `\${VAR}`
+/// is a literal escape: the backslash is dropped and `${VAR}` is left in
+/// place, never substituted.
+pub fn replace_env_vars(config: &mut Value) {
+    replace_env_vars_with(config, &|name| std::env::var(name).ok());
+}
+
+fn replace_env_vars_with(config: &mut Value, lookup: &dyn Fn(&str) -> Option<String>) {
+    match config {
+        Value::String(s) => *s = expand_env_vars(s, lookup),
+        Value::Array(items) => items.iter_mut().for_each(|item| replace_env_vars_with(item, lookup)),
+        Value::Object(map) => map.values_mut().for_each(|item| replace_env_vars_with(item, lookup)),
+        _ => {}
+    }
+}
+
+const ESCAPED_ENV_VAR_PLACEHOLDER: &str = "__ESCAPED_ENV_VAR_PLACEHOLDER__";
+
+static ENV_VAR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$\{([0-9A-Za-z_]+)\}").expect("valid regex"));
+static ESCAPED_ENV_VAR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\\\$\{([0-9A-Za-z_]+)\}").expect("valid regex"));
+static RESTORE_ESCAPED_ENV_VAR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!("{ESCAPED_ENV_VAR_PLACEHOLDER}([0-9A-Za-z_]+){ESCAPED_ENV_VAR_PLACEHOLDER}")).expect("valid regex")
+});
+
+fn expand_env_vars(value: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+    // `\${VAR}` occurrences are swapped out for a placeholder first so the
+    // unescaped-substitution pass below can't touch them, then restored
+    // (backslash dropped) at the end.
+    let protected = ESCAPED_ENV_VAR
+        .replace_all(value, |caps: &regex::Captures| format!("{ESCAPED_ENV_VAR_PLACEHOLDER}{}{ESCAPED_ENV_VAR_PLACEHOLDER}", &caps[1]));
+    let substituted =
+        ENV_VAR.replace_all(&protected, |caps: &regex::Captures| lookup(&caps[1]).unwrap_or_default());
+    RESTORE_ESCAPED_ENV_VAR.replace_all(&substituted, |caps: &regex::Captures| format!("${{{}}}", &caps[1])).into_owned()
 }
 
 /// The field this resource is deduplicated by — missing, wrong-typed, or
@@ -409,6 +450,51 @@ mod tests {
 
         let json = serde_json::to_string(&value).unwrap();
         assert_eq!(json, r#"{"apple":{"a":2,"z":1},"mango":[{"b":2,"y":1}],"zebra":1}"#);
+    }
+
+    #[test]
+    fn replace_env_vars_expands_placeholders_throughout_nested_arrays_and_objects_but_not_object_keys() {
+        let lookup = |name: &str| match name {
+            "NAME" => Some("name".to_string()),
+            "SECRET" => Some("secret".to_string()),
+            "CERT" | "KEY" => Some("-----".to_string()),
+            "NOTE" => Some("note".to_string()),
+            _ => None,
+        };
+        let mut config = json!({
+            "services": [
+                { "name": "Test ${NAME}", "routes": [{ "name": "Test ${NAME}", "uris": ["/test/${NAME}"] }] },
+                { "name": "Test escape \\${NAME}" },
+            ],
+            "consumers": [{ "username": "TEST_${NAME}", "plugins": { "key-auth": { "key": "${SECRET}" } } }],
+            "ssls": [{ "snis": ["test.com"], "certificates": [{ "certificate": "${CERT}", "key": "${KEY}" }] }],
+            "global_rules": { "${GLOBAL_PLUGIN}": { "key": "${SECRET}" } },
+            "plugin_metadata": { "file-logger": { "log_format": { "note": "${NOTE}" } } },
+        });
+
+        replace_env_vars_with(&mut config, &lookup);
+
+        assert_eq!(
+            config,
+            json!({
+                "services": [
+                    { "name": "Test name", "routes": [{ "name": "Test name", "uris": ["/test/name"] }] },
+                    { "name": "Test escape ${NAME}" },
+                ],
+                "consumers": [{ "username": "TEST_name", "plugins": { "key-auth": { "key": "secret" } } }],
+                "ssls": [{ "snis": ["test.com"], "certificates": [{ "certificate": "-----", "key": "-----" }] }],
+                // The key itself is never substituted, only values.
+                "global_rules": { "${GLOBAL_PLUGIN}": { "key": "secret" } },
+                "plugin_metadata": { "file-logger": { "log_format": { "note": "note" } } },
+            })
+        );
+    }
+
+    #[test]
+    fn replace_env_vars_expands_an_unset_variable_to_an_empty_string() {
+        let mut config = json!({ "name": "prefix-${MISSING}-suffix" });
+        replace_env_vars_with(&mut config, &|_| None);
+        assert_eq!(config, json!({ "name": "prefix--suffix" }));
     }
 
     fn labels(pairs: &[(&str, &str)]) -> Labels {
