@@ -291,6 +291,21 @@ pub async fn backend() -> adc_backend_api7::Backend {
     )
 }
 
+pub async fn backend_with_label_selector(
+    label_selector: std::collections::HashMap<String, String>,
+) -> adc_backend_api7::Backend {
+    adc_backend_api7::Backend::new(
+        client().await,
+        gateway_group(),
+        &token().await,
+        adc_backend_core::ResourceFilter {
+            label_selector,
+            ..Default::default()
+        },
+        10,
+    )
+}
+
 pub async fn sync_events(
     backend: &adc_backend_api7::Backend,
     events: Vec<Event>,

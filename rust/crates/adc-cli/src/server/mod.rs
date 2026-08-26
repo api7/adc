@@ -418,6 +418,64 @@ mod tests {
         assert_eq!(json["source"], "lint");
     }
 
+    /// A minimal stand-in for the two admin API endpoints a `PUT /validate`
+    /// request touches on `adc_backend_apisix::Backend`: the version probe
+    /// (`resolved_version` GETs this to read APISIX's version off the
+    /// `Server` response header — a plain 200 with no such header falls
+    /// back to its own "assume newest" sentinel) and `/configs/validate`
+    /// itself, whose response body `Validator::validate` never inspects on
+    /// success. This exercises the handler's own success-path response
+    /// shape, not the gateway's own validation logic — that's
+    /// `adc-backend-apisix`'s own e2e suite's job, against a real instance.
+    async fn spawn_validate_always_succeeds_backend() -> SocketAddr {
+        let router = Router::new()
+            .route("/apisix/admin/routes", axum::routing::get(|| async { StatusCode::OK }))
+            .route("/apisix/admin/configs/validate", axum::routing::post(|| async { StatusCode::OK }));
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        addr
+    }
+
+    #[tokio::test]
+    async fn validate_succeeds_with_an_empty_configuration() {
+        let addr = spawn_validate_always_succeeds_backend().await;
+        let body = serde_json::json!({
+            "task": {
+                "opts": {"backend": "apisix", "server": format!("http://{addr}"), "token": "t", "cacheKey": "default"},
+                "config": {},
+            }
+        })
+        .to_string();
+        let (status, json) = send(adc_router(), "PUT", "/validate", &body).await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["success"], true);
+        assert_eq!(json["source"], "validate");
+        assert_eq!(json["errors"], serde_json::json!([]));
+    }
+
+    #[tokio::test]
+    async fn validate_succeeds_with_a_populated_configuration() {
+        let addr = spawn_validate_always_succeeds_backend().await;
+        let body = serde_json::json!({
+            "task": {
+                "opts": {"backend": "apisix", "server": format!("http://{addr}"), "token": "t", "cacheKey": "default"},
+                "config": {
+                    "consumers": [{
+                        "username": "test-consumer",
+                        "plugins": {"limit-count": {"count": 10, "time_window": 60}},
+                    }],
+                },
+            }
+        })
+        .to_string();
+        let (status, json) = send(adc_router(), "PUT", "/validate", &body).await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["success"], true);
+        assert_eq!(json["source"], "validate");
+        assert_eq!(json["errors"], serde_json::json!([]));
+    }
+
     #[tokio::test]
     async fn http_listener_serves_real_requests_end_to_end() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -509,6 +567,109 @@ mod tests {
         task.abort();
     }
 
+    /// Plain HTTPS (no `--ca-cert-file`, so no client certificate is
+    /// required) — distinct from the mTLS listener above, which rejects
+    /// exactly this same no-client-cert connection.
+    async fn spawn_https_listener(app: Router) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let config = build_rustls_config(&tls_asset("server.cer"), &tls_asset("server.key"), None).unwrap();
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_config(Arc::new(config));
+        let handle = axum_server::Handle::new();
+        let server_handle = handle.clone();
+        let task = tokio::spawn(async move {
+            axum_server::tls_rustls::bind_rustls("127.0.0.1:0".parse().unwrap(), tls_config)
+                .handle(server_handle)
+                .serve(app.into_make_service())
+                .await
+                .unwrap();
+        });
+        let addr = handle.listening().await.expect("server should have bound");
+        (addr, task)
+    }
+
+    #[tokio::test]
+    async fn https_listener_without_a_ca_cert_serves_real_requests_with_no_client_certificate() {
+        let (addr, task) = spawn_https_listener(adc_router()).await;
+        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build().unwrap();
+
+        let response = client
+            .put(format!("https://{addr}/sync"))
+            .header("content-type", "application/json")
+            .body("{}")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+        task.abort();
+    }
+
+    /// A dumb stand-in for a real backend gateway, self-signed with the same
+    /// CA as `spawn_https_listener`/`spawn_https_mtls_listener` — every
+    /// request gets the same trivial 200, since these tests only care
+    /// whether the *TLS handshake* to it trusts (or fails to trust) the
+    /// signing CA, not whether it behaves like a real admin API.
+    async fn spawn_fake_backend_gateway() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let config = build_rustls_config(&tls_asset("server.cer"), &tls_asset("server.key"), None).unwrap();
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_config(Arc::new(config));
+        let handle = axum_server::Handle::new();
+        let server_handle = handle.clone();
+        let app = Router::new().fallback(|| async { (StatusCode::OK, "{}") });
+        let task = tokio::spawn(async move {
+            axum_server::tls_rustls::bind_rustls("127.0.0.1:0".parse().unwrap(), tls_config)
+                .handle(server_handle)
+                .serve(app.into_make_service())
+                .await
+                .unwrap();
+        });
+        let addr = handle.listening().await.expect("server should have bound");
+        (addr, task)
+    }
+
+    #[tokio::test]
+    async fn sync_fails_with_a_certificate_error_when_no_ca_cert_is_given_for_an_https_backend() {
+        let (addr, task) = spawn_fake_backend_gateway().await;
+        let body = serde_json::json!({
+            "task": {
+                "opts": {"backend": "apisix", "server": format!("https://{addr}"), "token": "t", "cacheKey": "default"},
+                "config": {},
+            }
+        })
+        .to_string();
+        let (status, json) = send(adc_router(), "PUT", "/sync", &body).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{json}");
+        let message = json["message"].as_str().unwrap_or_default().to_lowercase();
+        assert!(
+            message.contains("certificate") || message.contains("unknownissuer") || message.contains("unable to verify"),
+            "expected a TLS certificate error, got: {json}"
+        );
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn sync_no_longer_fails_on_certificate_verification_once_the_signing_ca_cert_is_provided() {
+        let (addr, task) = spawn_fake_backend_gateway().await;
+        let ca_cert = std::fs::read_to_string(tls_asset("ca.cer")).unwrap();
+        let body = serde_json::json!({
+            "task": {
+                "opts": {
+                    "backend": "apisix", "server": format!("https://{addr}"), "token": "t", "cacheKey": "default",
+                    "caCert": ca_cert,
+                },
+                "config": {},
+            }
+        })
+        .to_string();
+        // The fake backend doesn't implement the real admin API, so this may
+        // still fail for unrelated reasons — the only thing under test is
+        // that it no longer fails on certificate verification.
+        let (_status, json) = send(adc_router(), "PUT", "/sync", &body).await;
+        let message = json["message"].as_str().unwrap_or_default().to_lowercase();
+        assert!(
+            !message.contains("certificate") && !message.contains("unknownissuer") && !message.contains("unable to verify"),
+            "expected no TLS certificate error, got: {json}"
+        );
+        task.abort();
+    }
+
     #[tokio::test]
     async fn unix_listener_removes_a_stale_socket_and_sets_0o660_permissions() {
         let dir = std::env::temp_dir().join(format!("adc-server-test-{}", uuid::Uuid::new_v4()));
@@ -544,6 +705,60 @@ mod tests {
         assert!(became_ready, "server never became ready");
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o660);
+
+        let _ = shutdown_tx.send(true);
+        server.await.unwrap().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The setup test above only proves the socket gets bound with the
+    /// right permissions — this proves a real client can actually round-trip
+    /// a request through it, the same way `http_listener_serves_real_requests_end_to_end`
+    /// does for the TCP listener. `UnixStream` + a hand-written HTTP/1.1
+    /// request line is used instead of pulling in a Unix-socket-aware HTTP
+    /// client crate just for this one test.
+    #[tokio::test]
+    async fn unix_listener_serves_real_requests_end_to_end() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let dir = std::env::temp_dir().join(format!("adc-server-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("adc.sock");
+
+        let args = IngressServerArgs {
+            listen: url::Url::parse(&format!("unix://{}", path.display())).unwrap(),
+            listen_status: 0,
+            ca_cert_file: None,
+            tls_cert_file: None,
+            tls_key_file: None,
+        };
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let ready = Arc::new(AtomicBool::new(false));
+        let server = tokio::spawn({
+            let ready = ready.clone();
+            async move { serve_unix(&args, adc_router(), shutdown_rx, ready).await }
+        });
+
+        let mut became_ready = false;
+        for _ in 0..100 {
+            if ready.load(Ordering::Acquire) {
+                became_ready = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(became_ready, "server never became ready");
+
+        let mut stream = tokio::net::UnixStream::connect(&path).await.unwrap();
+        // An empty JSON object is a malformed `/sync` body (missing `task`),
+        // matching `sync_rejects_malformed_input_with_400` — proving a real
+        // request reaches the handler and gets a real response, not just
+        // that a connection can be opened.
+        let request = "PUT /sync HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}";
+        stream.write_all(request.as_bytes()).await.unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 400"), "{response}");
 
         let _ = shutdown_tx.send(true);
         server.await.unwrap().unwrap();

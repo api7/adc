@@ -497,6 +497,59 @@ mod tests {
         assert_eq!(config, json!({ "name": "prefix--suffix" }));
     }
 
+    #[test]
+    fn strip_ids_removes_id_from_every_resource_and_its_nested_collections() {
+        let mut config = json!({
+            "services": [
+                {
+                    "id": "test_service1",
+                    "name": "TestService1",
+                    "routes": [{ "id": "test_route", "name": "TestRoute", "uris": ["/test"] }],
+                    "upstreams": [{ "id": "test_upstream", "name": "TestUpstream" }],
+                },
+                {
+                    "id": "test_service2",
+                    "name": "TestService2",
+                    "stream_routes": [{ "id": "test_stream_route", "name": "TestStreamRoute" }],
+                },
+            ],
+            "ssls": [{ "id": "test_ssl", "snis": ["test"], "certificates": [] }],
+            "consumers": [{
+                "id": "test_consumer",
+                "username": "test",
+                "credentials": [{ "id": "test_credential", "name": "TestCredential" }],
+            }],
+            "consumer_groups": [{
+                "id": "test_group",
+                "name": "TestGroup",
+                "consumers": [{ "id": "test_consumer2", "username": "test2" }],
+            }],
+            // Never touched: these are maps keyed by plugin/resource name,
+            // not arrays of `id`-bearing items.
+            "global_rules": { "id-looking-key": { "id": "not-a-resource-id" } },
+        });
+
+        strip_ids(&mut config);
+
+        assert_eq!(
+            config,
+            json!({
+                "services": [
+                    {
+                        "name": "TestService1",
+                        "routes": [{ "name": "TestRoute", "uris": ["/test"] }],
+                        "upstreams": [{ "name": "TestUpstream" }],
+                    },
+                    { "name": "TestService2", "stream_routes": [{ "name": "TestStreamRoute" }] },
+                ],
+                "ssls": [{ "snis": ["test"], "certificates": [] }],
+                "consumers": [{ "username": "test", "credentials": [{ "name": "TestCredential" }] }],
+                "consumer_groups": [{ "name": "TestGroup", "consumers": [{ "username": "test2" }] }],
+                "global_rules": { "id-looking-key": { "id": "not-a-resource-id" } },
+            })
+        );
+    }
+
     fn labels(pairs: &[(&str, &str)]) -> Labels {
         pairs
             .iter()
