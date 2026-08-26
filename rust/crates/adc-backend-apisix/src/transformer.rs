@@ -367,10 +367,14 @@ fn extract_name_label(labels: &Option<adc::Labels>, key: &str) -> Option<String>
 
 impl From<typing::StreamRoute> for adc::StreamRoute {
     fn from(route: typing::StreamRoute) -> Self {
-        // APISIX's stream routes have no `name` field at all; ADC smuggles
-        // one through a magic label when writing, and recovers it here when
-        // reading back, falling back to `id` if it was never set that way.
-        let name = extract_name_label(&route.labels, typing::ADC_NAME_LABEL)
+        // Native `name` wins when present (APISIX >= 3.13.0). Older servers,
+        // and routes never re-synced since upgrading past 3.13.0, only have
+        // the magic label ADC used to smuggle a name through; `id` is the
+        // last resort when neither was ever set.
+        let name = route
+            .name
+            .clone()
+            .or_else(|| extract_name_label(&route.labels, typing::ADC_NAME_LABEL))
             .unwrap_or_else(|| route.id.clone().unwrap_or_default());
         let labels = route
             .labels
@@ -618,25 +622,56 @@ impl From<adc::SSL> for typing::Ssl {
     }
 }
 
-/// Builds a stream route's wire body. `inject_name` gates whether ADC's name
-/// gets smuggled through the `__ADC_NAME` label (older APISIX versions
-/// don't support labels on stream routes at all, so the caller only sets
-/// this once it's confirmed the target version does — APISIX >= 3.8.0).
+/// How a stream route's ADC name gets persisted, decided by the caller from
+/// the target APISIX version and threaded through to
+/// [`transform_stream_route`]:
+/// - `Unsupported`: below 3.8.0, stream routes don't even support `labels`,
+///   so the name can't be persisted at all.
+/// - `Label`: `[3.8.0, 3.13.0)` — `labels` exist but there's no native
+///   `name` field yet, so ADC smuggles one through the `__ADC_NAME` label.
+/// - `Native`: `>= 3.13.0` — written straight to the (now native) `name`
+///   field; no label needed. A route last synced under `Label` mode still
+///   carries the old label until it's synced again under `Native`, at which
+///   point this stops re-adding it and it falls off on its own — see
+///   `impl From<typing::StreamRoute> for adc::StreamRoute`'s read side,
+///   which prefers the native field but still falls back to the label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StreamRouteNameMode {
+    Unsupported,
+    Label,
+    Native,
+}
+
+impl StreamRouteNameMode {
+    pub fn for_version(version: &semver::Version) -> Self {
+        if *version >= semver::Version::new(3, 13, 0) {
+            Self::Native
+        } else if *version >= semver::Version::new(3, 8, 0) {
+            Self::Label
+        } else {
+            Self::Unsupported
+        }
+    }
+}
+
+/// Builds a stream route's wire body. See [`StreamRouteNameMode`] for how
+/// `name_mode` decides where ADC's name ends up.
 pub fn transform_stream_route(
     route: adc::StreamRoute,
     parent_id: String,
-    inject_name: bool,
+    name_mode: StreamRouteNameMode,
 ) -> typing::StreamRoute {
     let mut labels = transform_labels_to_apisix(route.labels).unwrap_or_default();
-    if inject_name {
+    if name_mode == StreamRouteNameMode::Label {
         labels.insert(
             typing::ADC_NAME_LABEL.to_string(),
-            LabelValue::Single(route.name),
+            LabelValue::Single(route.name.clone()),
         );
     }
 
     typing::StreamRoute {
         id: None,
+        name: (name_mode == StreamRouteNameMode::Native).then_some(route.name),
         desc: route.description,
         labels: (!labels.is_empty()).then_some(labels),
 

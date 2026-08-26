@@ -106,7 +106,10 @@ fn enrich(raw: RawValidationError, index: &ValidateIndex) -> BackendValidationEr
     }
 }
 
-fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
+fn build_request(
+    events: &[Event],
+    version: &Version,
+) -> Result<(ValidateRequestBody, ValidateIndex), BackendError> {
     let mut body = ValidateRequestBody::default();
     let mut index: ValidateIndex = HashMap::new();
 
@@ -154,9 +157,10 @@ fn build_request(events: &[Event], version: &Version) -> Result<(ValidateRequest
                     .parent_id
                     .clone()
                     .ok_or_else(|| missing_parent(event))?;
-                let inject_name = *version >= Version::new(3, 8, 0);
-                body.stream_routes
-                    .push(transformer::transform_stream_route(route, parent_id, inject_name));
+                let name_mode = transformer::StreamRouteNameMode::for_version(version);
+                body.stream_routes.push(transformer::transform_stream_route(
+                    route, parent_id, name_mode,
+                ));
                 track(&mut index, "stream_routes");
             }
             ResourceType::Consumer => {
@@ -209,7 +213,9 @@ mod tests {
     fn stream_route_create(id: &str) -> Event {
         let mut event = Event::new(
             ResourceType::StreamRoute,
-            EventKind::Create { new_value: json!({ "name": id }) },
+            EventKind::Create {
+                new_value: json!({ "name": id }),
+            },
             id,
             id,
         );
@@ -219,15 +225,28 @@ mod tests {
 
     #[test]
     fn stream_route_omits_the_name_label_below_3_8_0() {
-        let (body, _) = build_request(&[stream_route_create("sr1")], &Version::new(3, 7, 0)).unwrap();
+        let (body, _) =
+            build_request(&[stream_route_create("sr1")], &Version::new(3, 7, 0)).unwrap();
         assert!(body.stream_routes[0].labels.is_none());
     }
 
     #[test]
     fn stream_route_injects_the_name_label_at_or_above_3_8_0() {
-        let (body, _) = build_request(&[stream_route_create("sr1")], &Version::new(3, 8, 0)).unwrap();
-        let labels = body.stream_routes[0].labels.as_ref().expect("name label injected");
+        let (body, _) =
+            build_request(&[stream_route_create("sr1")], &Version::new(3, 8, 0)).unwrap();
+        let labels = body.stream_routes[0]
+            .labels
+            .as_ref()
+            .expect("name label injected");
         assert!(labels.contains_key(typing::ADC_NAME_LABEL));
+    }
+
+    #[test]
+    fn stream_route_uses_the_native_name_field_at_or_above_3_13_0() {
+        let (body, _) =
+            build_request(&[stream_route_create("sr1")], &Version::new(3, 13, 0)).unwrap();
+        assert_eq!(body.stream_routes[0].name.as_deref(), Some("sr1"));
+        assert!(body.stream_routes[0].labels.is_none());
     }
 
     #[test]

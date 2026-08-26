@@ -8,7 +8,7 @@
 //! Single-threaded because tests share one APISIX/etcd instance and each
 //! cleans up its own resources rather than sandboxing into a namespace.
 
-use adc_backend_apisix::tests::{Fetcher, Operator};
+use adc_backend_apisix::tests::{Fetcher, Operator, typing};
 use adc_sdk::{BackendSyncOptions, Event, EventKind, ResourceType};
 use semver::Version;
 use serde_json::json;
@@ -329,12 +329,17 @@ async fn syncs_a_stream_route_then_reads_it_back() {
         .expect("stream route was not written");
     assert_eq!(route.server_port, Some(33061));
     let adc_route: adc_sdk::resources::StreamRoute = route.clone().into();
-    if apisix_version() >= Version::new(3, 8, 0) {
-        // Recovered from the __ADC_NAME label injected on write (APISIX
-        // stream routes have no native `name` field, and that label is only
-        // written from 3.8.0 on) — proves the read/write round trip for
-        // that trick actually works against a real server, not just our
-        // own mock. Matches the TS suite's own `Dump (>=3.8.0)` case.
+    if apisix_version() >= Version::new(3, 13, 0) {
+        // Written straight to the native `name` field — no label needed.
+        assert_eq!(route.name.as_deref(), Some("e2e-stream-route"));
+        assert!(route.labels.as_ref().is_none_or(|labels| !labels.contains_key(typing::ADC_NAME_LABEL)));
+        assert_eq!(adc_route.name, "e2e-stream-route");
+    } else if apisix_version() >= Version::new(3, 8, 0) {
+        // Recovered from the __ADC_NAME label injected on write (no native
+        // `name` field below 3.13.0, and that label is only written from
+        // 3.8.0 on) — proves the read/write round trip for that trick
+        // actually works against a real server, not just our own mock.
+        // Matches the TS suite's own `Dump (>=3.8.0)` case.
         assert_eq!(adc_route.name, "e2e-stream-route");
     } else {
         // Below 3.8.0 no label is ever written, so recovery falls back to
@@ -354,6 +359,89 @@ async fn syncs_a_stream_route_then_reads_it_back() {
             .iter()
             .all(|r| r.id.as_deref() != Some(stream_route_id))
     );
+}
+
+/// A stream route written under the pre-3.13.0 `__ADC_NAME` label scheme
+/// (simulated here with a raw Admin API call, standing in for a route ADC
+/// itself wrote before either it or the server was upgraded) must still
+/// read its name correctly from a server that now supports the native
+/// field — and re-syncing it should migrate it to the native field,
+/// dropping the label.
+#[tokio::test]
+#[ignore]
+async fn a_legacy_label_named_stream_route_migrates_to_the_native_name_field() {
+    if apisix_version() < Version::new(3, 13, 0) {
+        eprintln!("skipping: the native stream route name field requires apisix >= 3.13.0");
+        return;
+    }
+
+    let mut cleanup = Cleanup::default();
+    let service_id = "e2e-svc-stream-migrate";
+    let stream_route_id = "e2e-stream-route-migrate";
+
+    sync_ok(vec![create(
+        ResourceType::Service,
+        service_id,
+        json!({ "name": "e2e stream migrate service", "upstream": { "nodes": [{ "host": "127.0.0.1", "port": 1980, "weight": 1 }] } }),
+    )])
+    .await;
+    cleanup.push(delete(ResourceType::StreamRoute, stream_route_id));
+    cleanup.push(delete(ResourceType::Service, service_id));
+
+    // Written directly, bypassing ADC entirely: only the legacy label
+    // carries a name, no native `name` field at all.
+    let http = client();
+    http.send(
+        http.request(
+            adc_backend_core::Method::PUT,
+            &format!("/apisix/admin/stream_routes/{stream_route_id}"),
+        )
+        .unwrap()
+        .json(&json!({
+            "server_port": 33062,
+            "service_id": service_id,
+            "labels": { "__ADC_NAME": "legacy-stream-route" },
+        })),
+    )
+    .await
+    .unwrap();
+
+    let stream_routes = fetcher().list_stream_routes().await.unwrap();
+    let route = stream_routes
+        .iter()
+        .find(|r| r.id.as_deref() == Some(stream_route_id))
+        .expect("stream route was not written");
+    assert!(route.name.is_none(), "no native name should exist yet");
+    let adc_route: adc_sdk::resources::StreamRoute = route.clone().into();
+    assert_eq!(adc_route.name, "legacy-stream-route");
+
+    // Re-syncing through ADC against a >= 3.13.0 server writes the native
+    // field instead of the label.
+    let mut migrate_event = create(
+        ResourceType::StreamRoute,
+        stream_route_id,
+        json!({ "name": "legacy-stream-route", "server_port": 33062 }),
+    );
+    migrate_event.parent_id = Some(service_id.to_string());
+    sync_ok(vec![migrate_event]).await;
+
+    let stream_routes = fetcher().list_stream_routes().await.unwrap();
+    let route = stream_routes
+        .iter()
+        .find(|r| r.id.as_deref() == Some(stream_route_id))
+        .expect("stream route disappeared after migrating sync");
+    assert_eq!(route.name.as_deref(), Some("legacy-stream-route"));
+    assert!(
+        route.labels.as_ref().is_none_or(|labels| !labels.contains_key(typing::ADC_NAME_LABEL)),
+        "the legacy label must be gone once the route has the native name"
+    );
+
+    sync_ok(vec![
+        delete(ResourceType::StreamRoute, stream_route_id),
+        delete(ResourceType::Service, service_id),
+    ])
+    .await;
+    cleanup.disarm();
 }
 
 #[tokio::test]

@@ -6,8 +6,9 @@ import { join } from 'node:path';
 import { gte, lt } from 'semver';
 
 import { BackendAPISIX } from '../src';
-import { defaultBackendOptions } from './support/constants';
+import { defaultBackendOptions, server, token } from './support/constants';
 import {
+  cleanup,
   conditionalDescribe,
   conditionalIt,
   createEvent,
@@ -271,6 +272,88 @@ describe('Sync and Dump - 1', () => {
           backend,
         )) as ADCSDK.Configuration;
         expect(result.services).toHaveLength(0);
+      });
+    },
+  );
+
+  // A stream route written under the pre-3.13.0 __ADC_NAME label scheme
+  // (simulated here with a raw Admin API call, standing in for a route ADC
+  // itself wrote before either it or the server was upgraded) must still
+  // read its name correctly from a server that now supports the native
+  // field — and re-syncing it should migrate it to the native field,
+  // dropping the label.
+  conditionalDescribe(semverCondition(gte, '3.13.0'))(
+    'Migrate a legacy label-named stream route to the native name field',
+    () => {
+      const serviceName = 'stream-migrate-service';
+      const streamRouteId = 'stream-migrate-route';
+
+      afterAll(() => cleanup(backend));
+
+      it('should recover the name and migrate it on re-sync', async () => {
+        await syncEvents(backend, [
+          createEvent(ADCSDK.ResourceType.SERVICE, serviceName, {
+            name: serviceName,
+            upstream: {
+              nodes: [{ host: '127.0.0.1', port: 1980, weight: 1 }],
+            },
+          } as ADCSDK.Service),
+        ]);
+
+        const dumpedService = ((await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration).services!.find(
+          (service) => service.name === serviceName,
+        )!;
+
+        // Written directly, bypassing ADC entirely: only the legacy label
+        // carries a name, no native `name` field at all.
+        const putResponse = await fetch(
+          `${server}/apisix/admin/stream_routes/${streamRouteId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'X-API-KEY': token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              server_port: 33063,
+              service_id: dumpedService.id,
+              labels: { __ADC_NAME: 'legacy-stream-route' },
+            }),
+          },
+        );
+        expect(putResponse.ok).toBe(true);
+
+        const beforeMigration = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        const beforeRoute = beforeMigration.services!.find(
+          (service) => service.name === serviceName,
+        )!.stream_routes![0];
+        expect(beforeRoute.name).toEqual('legacy-stream-route');
+
+        // Re-syncing through ADC against a >= 3.13.0 server writes the
+        // native field instead of the label.
+        let migrateEvent = createEvent(
+          ADCSDK.ResourceType.STREAM_ROUTE,
+          'legacy-stream-route',
+          { name: 'legacy-stream-route', server_port: 33063 } as ADCSDK.StreamRoute,
+          serviceName,
+        );
+        migrateEvent = { ...migrateEvent, resourceId: streamRouteId };
+        await syncEvents(backend, [migrateEvent]);
+
+        const getResponse = await fetch(
+          `${server}/apisix/admin/stream_routes/${streamRouteId}`,
+          { headers: { 'X-API-KEY': token } },
+        );
+        expect(getResponse.ok).toBe(true);
+        const raw = (await getResponse.json()) as {
+          value: { name?: string; labels?: Record<string, string> };
+        };
+        expect(raw.value.name).toEqual('legacy-stream-route');
+        expect(raw.value.labels?.__ADC_NAME).toBeUndefined();
       });
     },
   );

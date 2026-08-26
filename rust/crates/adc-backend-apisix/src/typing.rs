@@ -29,9 +29,11 @@ use serde_json::Value;
 
 pub const ADC_UPSTREAM_SERVICE_ID_LABEL: &str = "__ADC_UPSTREAM_SERVICE_ID";
 
-/// Label a stream route's ADC name is smuggled through, since APISIX
-/// stream routes have no native `name` field — see `transformer::
-/// transform_stream_route`'s doc comment.
+/// Label a stream route's ADC name was smuggled through on APISIX versions
+/// before 3.13.0, which had no native `name` field for stream routes — see
+/// `transformer::StreamRouteNameMode`'s doc comment. Still read as a
+/// fallback on newer servers, for routes never re-synced since the field
+/// became native.
 pub const ADC_NAME_LABEL: &str = "__ADC_NAME";
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -233,6 +235,11 @@ pub struct StreamRouteProtocol {
 pub struct StreamRoute {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Native as of APISIX 3.13.0 (absent, and unrecognized, on older
+    /// servers) — see `transformer::StreamRouteNameMode` for how ADC decides
+    /// which of this or the `ADC_NAME_LABEL` magic label to use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub desc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

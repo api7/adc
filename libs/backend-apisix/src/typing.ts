@@ -135,9 +135,12 @@ export interface GlobalRule {
 export type PluginMetadata = ADCPluginMetadata;
 export interface StreamRoute {
   id: string;
+  // Native as of APISIX 3.13.0 (absent, and unrecognized, on older
+  // servers) — see FromADC.transformStreamRoute's doc comment for how ADC
+  // decides between this and the __ADC_NAME magic label.
+  name?: string;
   desc?: string;
   labels?: Labels;
-  //name: string; // As of 3.9.1, APISIX does not support name on the stream route
 
   remote_addr?: string;
   server_addr?: string;
