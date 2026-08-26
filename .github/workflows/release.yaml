@@ -101,15 +101,6 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
             release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
 
-  # --- Rust CLI (adc_rust_*) below. Same release, same tag trigger, built
-  # and packaged independently of the Node-SEA jobs above — see
-  # impl/rust-release.md for why the release profile produces a large
-  # binary and how the debug-info split works.
-  # Both legs build natively on a runner of their own target architecture
-  # (Linux/Windows arm64 hosted runners are GA and free for public repos) —
-  # no cross-toolchain, no `--target`, no `rustup target add`: the default
-  # host toolchain already *is* the target, so `cargo build --release`
-  # alone produces it straight into `target/release/`.
   adc-rust-linux:
     strategy:
       fail-fast: false
@@ -133,9 +124,6 @@ jobs:
         run: |
           rustup update stable
           rustup default stable
-      # `runner.os` alone doesn't distinguish amd64 from arm64 (both report
-      # "Linux"), so the cache key needs `matrix.arch` too — otherwise the
-      # two architectures' incompatible `target/` dirs would collide.
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> target
@@ -144,10 +132,6 @@ jobs:
         working-directory: ./rust
         run: cargo build --release -p adc-cli
 
-      # Splits the release-profile binary (debug=true, strip=false — see
-      # impl/rust-release.md) into a small stripped executable plus a
-      # separate debug-info file a debugger can load alongside it via the
-      # shared Build ID objcopy embeds with --add-gnu-debuglink.
       - name: Split debug info
         run: |
           BIN_DIR=rust/target/release
@@ -203,9 +187,6 @@ jobs:
         working-directory: ./rust
         run: cargo build --release -p adc-cli
 
-      # MSVC targets emit debug info as a standalone .pdb next to the .exe
-      # rather than embedding it (unlike DWARF-in-ELF/Mach-O) — nothing to
-      # split here, just collect the two files that are already separate.
       - name: Compress adc
         shell: pwsh
         run: |
@@ -253,9 +234,6 @@ jobs:
         working-directory: ./rust
         run: cargo build --release -p adc-cli --target ${{ matrix.target }}
 
-      # macOS equivalent of the Linux objcopy split: dsymutil pulls the
-      # DWARF out into a .dSYM bundle, then strip removes it from the
-      # binary itself — the two stay pairable via the binary's UUID.
       - name: Split debug info
         run: |
           BIN_DIR=rust/target/${{ matrix.target }}/release
