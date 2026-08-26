@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::common::{Labels, Timeout};
+use super::route::HttpMethod;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub enum UpstreamBalancer {
@@ -94,6 +95,9 @@ fn default_active_timeout() -> f64 {
 }
 fn default_concurrency() -> i64 {
     10
+}
+fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
 }
 fn default_http_path() -> String {
     "/".to_string()
@@ -214,19 +218,42 @@ pub struct UpstreamHealthCheckActive {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(range(min = 1))]
     pub port: Option<u16>,
+    #[serde(default = "default_http_method")]
+    pub http_method: HttpMethod,
     #[serde(default = "default_http_path")]
     pub http_path: String,
-    #[serde(default = "default_true")]
-    pub https_verify_certificate: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(length(min = 1))]
-    pub http_request_headers: Option<Vec<String>>,
+    pub http_req_headers: Option<Vec<String>>,
+    #[serde(default)]
+    pub http_req_body: String,
+    #[serde(default = "default_true")]
+    pub https_verify_certificate: bool,
     // The wrapping object itself is only `.optional()` (no `.default()`), so
     // absence stays `None` — only fields *inside* it (once present) default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub healthy: Option<UpstreamHealthCheckActiveHealthy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unhealthy: Option<UpstreamHealthCheckActiveUnhealthy>,
+}
+
+impl Default for UpstreamHealthCheckActive {
+    fn default() -> Self {
+        Self {
+            r#type: UpstreamHealthCheckType::default(),
+            timeout: default_active_timeout(),
+            concurrency: default_concurrency(),
+            host: None,
+            port: None,
+            http_method: default_http_method(),
+            http_path: default_http_path(),
+            http_req_headers: None,
+            http_req_body: String::new(),
+            https_verify_certificate: default_true(),
+            healthy: None,
+            unhealthy: None,
+        }
+    }
 }
 
 fn default_true() -> bool {

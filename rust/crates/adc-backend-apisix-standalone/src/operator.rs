@@ -192,6 +192,28 @@ fn stringify_label_value(value: adc::LabelValue) -> String {
     }
 }
 
+/// ADC's `http_req_headers` maps to the wire's `req_headers`; every other
+/// active health check field is named the same.
+fn health_check_from_adc(checks: adc::UpstreamHealthCheck) -> typing::UpstreamHealthCheck {
+    typing::UpstreamHealthCheck {
+        active: typing::UpstreamHealthCheckActive {
+            ty: Some(checks.active.r#type),
+            timeout: Some(checks.active.timeout),
+            concurrency: Some(checks.active.concurrency),
+            host: checks.active.host,
+            port: checks.active.port,
+            http_method: Some(checks.active.http_method),
+            http_path: Some(checks.active.http_path),
+            req_headers: checks.active.http_req_headers,
+            http_req_body: Some(checks.active.http_req_body),
+            https_verify_certificate: Some(checks.active.https_verify_certificate),
+            healthy: checks.active.healthy,
+            unhealthy: checks.active.unhealthy,
+        },
+        passive: checks.passive,
+    }
+}
+
 /// Builds an upstream's wire body from its ADC shape, minus `id`/
 /// `modifiedIndex`/`name` (every caller overwrites those with values that
 /// come from the owning `Event`, not from the upstream resource itself —
@@ -229,7 +251,7 @@ fn from_adc_upstream_wire(res: &adc::Upstream, parent_id: Option<&str>) -> typin
         tls: res.tls.clone(),
         keepalive_pool: res.keepalive_pool.clone(),
 
-        checks: res.checks.clone(),
+        checks: res.checks.clone().map(health_check_from_adc),
         discovery_type: res.discovery_type.clone(),
         service_name: res.service_name.clone(),
         discovery_args: res.discovery_args.clone(),
@@ -1175,5 +1197,20 @@ mod tests {
         }
         let results = tasks.join_all().await;
         assert_eq!(results.len(), 200);
+    }
+
+    #[test]
+    fn adc_http_req_headers_maps_back_to_active_health_check_req_headers() {
+        let checks = adc::UpstreamHealthCheck {
+            active: adc::UpstreamHealthCheckActive {
+                http_req_headers: Some(vec!["X-Foo: bar".to_string()]),
+                http_req_body: "ping".to_string(),
+                ..Default::default()
+            },
+            passive: None,
+        };
+        let wire = health_check_from_adc(checks);
+        assert_eq!(wire.active.req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(wire.active.http_req_body, Some("ping".to_string()));
     }
 }

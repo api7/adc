@@ -20,8 +20,9 @@
 use std::collections::HashMap;
 
 use adc_sdk::resources::{
-    Expr, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer, UpstreamHealthCheck,
-    UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    Expr, HttpMethod, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
+    UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -88,6 +89,43 @@ where
         Some(Value::Object(map)) if map.is_empty() => Ok(Some(Vec::new())),
         Some(other) => serde_json::from_value(other).map(Some).map_err(serde::de::Error::custom),
     }
+}
+
+/// APISIX config file's wire field is `req_headers`; ADC's is
+/// `http_req_headers`. Every other field is named the same.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheckActive {
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<UpstreamHealthCheckType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concurrency: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_method: Option<HttpMethod>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub req_headers: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_req_body: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub https_verify_certificate: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthy: Option<UpstreamHealthCheckActiveHealthy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unhealthy: Option<UpstreamHealthCheckActiveUnhealthy>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheck {
+    pub active: UpstreamHealthCheckActive,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passive: Option<UpstreamHealthCheckPassive>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

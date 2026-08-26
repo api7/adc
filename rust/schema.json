@@ -425,15 +425,15 @@
           "minimum": 1,
           "maximum": 65535
         },
+        "http_method": {
+          "$ref": "#/$defs/HttpMethod",
+          "default": "GET"
+        },
         "http_path": {
           "type": "string",
           "default": "/"
         },
-        "https_verify_certificate": {
-          "type": "boolean",
-          "default": true
-        },
-        "http_request_headers": {
+        "http_req_headers": {
           "type": [
             "array",
             "null"
@@ -442,6 +442,14 @@
             "type": "string"
           },
           "minItems": 1
+        },
+        "http_req_body": {
+          "type": "string",
+          "default": ""
+        },
+        "https_verify_certificate": {
+          "type": "boolean",
+          "default": true
         },
         "healthy": {
           "anyOf": [
@@ -472,6 +480,21 @@
         "http",
         "https",
         "tcp"
+      ]
+    },
+    "HttpMethod": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+        "CONNECT",
+        "TRACE",
+        "PURGE"
       ]
     },
     "UpstreamHealthCheckActiveHealthy": {
@@ -949,21 +972,6 @@
       "required": [
         "name",
         "uris"
-      ]
-    },
-    "HttpMethod": {
-      "type": "string",
-      "enum": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "HEAD",
-        "OPTIONS",
-        "CONNECT",
-        "TRACE",
-        "PURGE"
       ]
     },
     "StreamRoute": {

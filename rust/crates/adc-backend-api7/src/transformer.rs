@@ -120,6 +120,52 @@ impl TryFrom<typing::Route> for adc::Route {
     }
 }
 
+/// `req_headers` on the wire is `http_req_headers` in ADC; every other
+/// active health check field is named the same.
+fn health_check_to_adc(checks: typing::UpstreamHealthCheck) -> adc::UpstreamHealthCheck {
+    let default = adc::UpstreamHealthCheckActive::default();
+    adc::UpstreamHealthCheck {
+        active: adc::UpstreamHealthCheckActive {
+            r#type: checks.active.ty.unwrap_or(default.r#type),
+            timeout: checks.active.timeout.unwrap_or(default.timeout),
+            concurrency: checks.active.concurrency.unwrap_or(default.concurrency),
+            host: checks.active.host,
+            port: checks.active.port,
+            http_method: checks.active.http_method.unwrap_or(default.http_method),
+            http_path: checks.active.http_path.unwrap_or(default.http_path),
+            http_req_headers: checks.active.req_headers,
+            http_req_body: checks.active.http_req_body.unwrap_or(default.http_req_body),
+            https_verify_certificate: checks
+                .active
+                .https_verify_certificate
+                .unwrap_or(default.https_verify_certificate),
+            healthy: checks.active.healthy,
+            unhealthy: checks.active.unhealthy,
+        },
+        passive: checks.passive,
+    }
+}
+
+fn health_check_from_adc(checks: adc::UpstreamHealthCheck) -> typing::UpstreamHealthCheck {
+    typing::UpstreamHealthCheck {
+        active: typing::UpstreamHealthCheckActive {
+            ty: Some(checks.active.r#type),
+            timeout: Some(checks.active.timeout),
+            concurrency: Some(checks.active.concurrency),
+            host: checks.active.host,
+            port: checks.active.port,
+            http_method: Some(checks.active.http_method),
+            http_path: Some(checks.active.http_path),
+            req_headers: checks.active.http_req_headers,
+            http_req_body: Some(checks.active.http_req_body),
+            https_verify_certificate: Some(checks.active.https_verify_certificate),
+            healthy: checks.active.healthy,
+            unhealthy: checks.active.unhealthy,
+        },
+        passive: checks.passive,
+    }
+}
+
 impl From<typing::Upstream> for adc::Upstream {
     fn from(upstream: typing::Upstream) -> Self {
         adc::Upstream {
@@ -131,7 +177,7 @@ impl From<typing::Upstream> for adc::Upstream {
             r#type: upstream.ty.unwrap_or_default(),
             hash_on: upstream.hash_on,
             key: upstream.key,
-            checks: upstream.checks,
+            checks: upstream.checks.map(health_check_to_adc),
             nodes: upstream.nodes,
             scheme: upstream.scheme.unwrap_or_default(),
             retries: upstream.retries,
@@ -354,7 +400,7 @@ impl From<adc::Upstream> for typing::Upstream {
             ty: Some(upstream.r#type),
             hash_on: upstream.hash_on,
             key: upstream.key,
-            checks: upstream.checks,
+            checks: upstream.checks.map(health_check_from_adc),
 
             discovery_type: upstream.discovery_type,
             service_name: upstream.service_name,
@@ -645,5 +691,90 @@ mod tests {
         };
 
         assert!(typing::Ssl::try_from(ssl).is_err());
+    }
+
+    #[test]
+    fn active_health_check_req_headers_maps_to_adc_http_req_headers() {
+        let checks = typing::UpstreamHealthCheck {
+            active: typing::UpstreamHealthCheckActive {
+                ty: Some(adc_sdk::resources::UpstreamHealthCheckType::Http),
+                req_headers: Some(vec!["X-Foo: bar".to_string()]),
+                http_req_body: Some("ping".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let adc = health_check_to_adc(checks);
+        assert_eq!(adc.active.http_req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(adc.active.http_req_body, "ping");
+    }
+
+    #[test]
+    fn adc_http_req_headers_maps_back_to_active_health_check_req_headers() {
+        let checks = adc::UpstreamHealthCheck {
+            active: adc::UpstreamHealthCheckActive {
+                http_req_headers: Some(vec!["X-Foo: bar".to_string()]),
+                http_req_body: "ping".to_string(),
+                ..Default::default()
+            },
+            passive: None,
+        };
+        let wire = health_check_from_adc(checks);
+        assert_eq!(wire.active.req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(wire.active.http_req_body, Some("ping".to_string()));
+    }
+
+    /// Regression: a service's embedded default upstream used to bypass
+    /// `typing::Upstream`'s `From` impl, so its `http_req_headers` never got
+    /// mapped to `req_headers` on the wire.
+    #[test]
+    fn service_from_adc_maps_inline_upstream_http_req_headers_to_req_headers() {
+        let service = adc::Service {
+            id: Some("svc1".to_string()),
+            name: "svc1".to_string(),
+            description: None,
+            labels: None,
+            hosts: None,
+            routes: None,
+            upstream: Some(adc::Upstream {
+                id: None,
+                name: None,
+                description: None,
+                labels: None,
+                r#type: adc::UpstreamBalancer::default(),
+                hash_on: None,
+                key: None,
+                checks: Some(adc::UpstreamHealthCheck {
+                    active: adc::UpstreamHealthCheckActive {
+                        http_req_headers: Some(vec!["X-Foo: bar".to_string()]),
+                        http_req_body: "ping".to_string(),
+                        ..Default::default()
+                    },
+                    passive: None,
+                }),
+                nodes: None,
+                scheme: adc::UpstreamScheme::default(),
+                retries: None,
+                retry_timeout: None,
+                timeout: None,
+                tls: None,
+                keepalive_pool: None,
+                pass_host: adc::UpstreamPassHost::default(),
+                upstream_host: None,
+                service_name: None,
+                discovery_type: None,
+                discovery_args: None,
+            }),
+            upstreams: None,
+            plugins: None,
+            path_prefix: None,
+            strip_path_prefix: None,
+        };
+
+        let wire = typing::Service::from(service);
+
+        let checks = wire.upstream.unwrap().checks.unwrap();
+        assert_eq!(checks.active.req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(checks.active.http_req_body, Some("ping".to_string()));
     }
 }

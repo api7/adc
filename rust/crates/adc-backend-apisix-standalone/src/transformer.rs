@@ -39,6 +39,32 @@ fn strip_service_id_label(labels: Option<adc::Labels>) -> Option<adc::Labels> {
         .filter(|labels| !labels.is_empty())
 }
 
+/// `req_headers` on the wire is `http_req_headers` in ADC; every other
+/// active health check field is named the same.
+fn health_check_to_adc(checks: typing::UpstreamHealthCheck) -> adc::UpstreamHealthCheck {
+    let default = adc::UpstreamHealthCheckActive::default();
+    adc::UpstreamHealthCheck {
+        active: adc::UpstreamHealthCheckActive {
+            r#type: checks.active.ty.unwrap_or(default.r#type),
+            timeout: checks.active.timeout.unwrap_or(default.timeout),
+            concurrency: checks.active.concurrency.unwrap_or(default.concurrency),
+            host: checks.active.host,
+            port: checks.active.port,
+            http_method: checks.active.http_method.unwrap_or(default.http_method),
+            http_path: checks.active.http_path.unwrap_or(default.http_path),
+            http_req_headers: checks.active.req_headers,
+            http_req_body: checks.active.http_req_body.unwrap_or(default.http_req_body),
+            https_verify_certificate: checks
+                .active
+                .https_verify_certificate
+                .unwrap_or(default.https_verify_certificate),
+            healthy: checks.active.healthy,
+            unhealthy: checks.active.unhealthy,
+        },
+        passive: checks.passive,
+    }
+}
+
 /// Builds an upstream's ADC shape, minus `id` (callers that need one set
 /// it themselves — a service's own default upstream never gets one, a
 /// named upstream does) and always carrying `name` (callers building a
@@ -55,7 +81,7 @@ fn wire_upstream_to_adc(upstream: &typing::Upstream) -> adc::Upstream {
         r#type: upstream.ty.unwrap_or_default(),
         hash_on: upstream.hash_on.clone(),
         key: upstream.key.clone(),
-        checks: upstream.checks.clone(),
+        checks: upstream.checks.clone().map(health_check_to_adc),
         nodes: upstream.nodes.clone(),
         scheme: upstream.scheme.unwrap_or_default(),
         retries: upstream.retries,
@@ -330,5 +356,21 @@ mod tests {
             "server_port": 70_000,
         });
         assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
+    }
+
+    #[test]
+    fn active_health_check_req_headers_maps_to_adc_http_req_headers() {
+        let checks = typing::UpstreamHealthCheck {
+            active: typing::UpstreamHealthCheckActive {
+                ty: Some(adc_sdk::resources::UpstreamHealthCheckType::Http),
+                req_headers: Some(vec!["X-Foo: bar".to_string()]),
+                http_req_body: Some("ping".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let adc = health_check_to_adc(checks);
+        assert_eq!(adc.active.http_req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(adc.active.http_req_body, "ping");
     }
 }

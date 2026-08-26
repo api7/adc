@@ -12,16 +12,16 @@
 //! any risk of an explicit `null` being interpreted differently than an
 //! absent key.
 //!
-//! Nested shapes that are structurally identical between APISIX's wire
-//! format and ADC's model (health checks, node lists, timeouts, plugin
-//! maps, labels) are reused directly from `adc_sdk::resources` rather than
-//! duplicated.
+//! Nested shapes structurally identical to `adc_sdk::resources` (node
+//! lists, timeouts, plugin maps, labels) are reused directly; active health
+//! checks are not (see `UpstreamHealthCheckActive` below).
 
 use std::collections::HashMap;
 
 use adc_sdk::resources::{
-    Expr, Labels, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer, UpstreamHealthCheck,
-    UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    Expr, HttpMethod, Labels, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
+    UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -266,6 +266,43 @@ pub struct StreamRoute {
 pub enum UpstreamNodes {
     List(Vec<UpstreamNode>),
     Map(HashMap<String, i64>),
+}
+
+/// APISIX's wire field is `req_headers`; ADC's is `http_req_headers`. Every
+/// other field is named the same.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheckActive {
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<UpstreamHealthCheckType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concurrency: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_method: Option<HttpMethod>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub req_headers: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_req_body: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub https_verify_certificate: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthy: Option<UpstreamHealthCheckActiveHealthy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unhealthy: Option<UpstreamHealthCheckActiveUnhealthy>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheck {
+    pub active: UpstreamHealthCheckActive,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passive: Option<UpstreamHealthCheckPassive>,
 }
 
 /// Shared between the top-level `/apisix/admin/upstreams` list entry and an

@@ -8,15 +8,16 @@
 //! `None` fields via `skip_serializing_if` rather than sending explicit
 //! `null`s, matching `adc-backend-apisix::typing`'s own convention.
 //!
-//! Nested shapes structurally identical to APISIX's own admin API (health
-//! checks, node lists, timeouts, plugin maps, TLS) are reused directly from
+//! Nested shapes structurally identical to APISIX's own admin API (node
+//! lists, timeouts, plugin maps, TLS) are reused directly from
 //! `adc_sdk::resources` rather than duplicated — API7 Enterprise's
 //! per-gateway-group admin API is APISIX-compatible for everything below
 //! the resource envelope. `labels` is the one exception: every resource's
 //! wire `labels` is a plain string map (unlike ADC's own string-or-array
 //! `Labels`), with a multi-value label round-tripped as a JSON-array-shaped
 //! string rather than a nested JSON array — see `transformer`'s label
-//! conversion functions.
+//! conversion functions. Active health checks are also not reused (see
+//! `UpstreamHealthCheckActive` below).
 //!
 //! `Route`/`Service`/`StreamRoute` read a resource's own id back as `id`,
 //! but write it under a differently-named field instead
@@ -28,8 +29,9 @@
 use std::collections::HashMap;
 
 use adc_sdk::resources::{
-    Expr, Plugins, SslClient, SslType, Timeout, UpstreamBalancer, UpstreamHealthCheck,
-    UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    Expr, HttpMethod, Plugins, SslClient, SslType, Timeout, UpstreamBalancer, UpstreamHealthCheckActiveHealthy,
+    UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive, UpstreamHealthCheckType, UpstreamKeepalivePool,
+    UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -250,6 +252,43 @@ pub struct GlobalRule {
 }
 
 pub type PluginMetadata = Plugins;
+
+/// API7's wire field is `req_headers`; ADC's is `http_req_headers`. Every
+/// other field is named the same.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheckActive {
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<UpstreamHealthCheckType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concurrency: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_method: Option<HttpMethod>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub req_headers: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_req_body: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub https_verify_certificate: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthy: Option<UpstreamHealthCheckActiveHealthy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unhealthy: Option<UpstreamHealthCheckActiveUnhealthy>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct UpstreamHealthCheck {
+    pub active: UpstreamHealthCheckActive,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passive: Option<UpstreamHealthCheckPassive>,
+}
 
 /// Shared between the top-level `/apisix/admin/upstreams` list entry and an
 /// upstream inlined directly into a service/route body — mirrors
