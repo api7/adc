@@ -77,7 +77,7 @@ export interface Service {
 }
 export interface ConsumerCredential {
   id?: string;
-  name: string;
+  name?: string;
   desc?: string;
   labels?: Labels;
 

@@ -132,14 +132,26 @@ impl TryFrom<typing::Service> for adc::Service {
 fn parse_discovery_map_nodes(map: HashMap<String, i64>) -> Result<Vec<adc::UpstreamNode>, String> {
     map.into_iter()
         .map(|(node, weight)| {
-            let url = Url::parse(&format!("adc://{node}")).map_err(|_| format!("invalid upstream node {node:?}"))?;
-            let host = match url.host().ok_or_else(|| format!("upstream node {node:?} has no host"))? {
+            let url = Url::parse(&format!("adc://{node}"))
+                .map_err(|_| format!("invalid upstream node {node:?}"))?;
+            let host = match url
+                .host()
+                .ok_or_else(|| format!("upstream node {node:?} has no host"))?
+            {
                 Host::Domain(host) => host.to_string(),
                 Host::Ipv4(ip) => ip.to_string(),
                 Host::Ipv6(ip) => ip.to_string(),
             };
-            let port = url.port().ok_or_else(|| format!("upstream node {node:?} has no port"))?;
-            Ok(adc::UpstreamNode { host, port, weight, priority: 0, metadata: None })
+            let port = url
+                .port()
+                .ok_or_else(|| format!("upstream node {node:?} has no port"))?;
+            Ok(adc::UpstreamNode {
+                host,
+                port,
+                weight,
+                priority: 0,
+                metadata: None,
+            })
         })
         .collect()
 }
@@ -197,9 +209,7 @@ impl TryFrom<typing::Upstream> for adc::Upstream {
         let nodes = match upstream.nodes {
             None => None,
             Some(typing::UpstreamNodes::List(nodes)) => Some(nodes),
-            Some(typing::UpstreamNodes::Map(map)) => {
-                Some(parse_discovery_map_nodes(map)?)
-            }
+            Some(typing::UpstreamNodes::Map(map)) => Some(parse_discovery_map_nodes(map)?),
         };
 
         // The service-association label is fetcher-internal bookkeeping
@@ -304,9 +314,16 @@ impl TryFrom<typing::ConsumerCredential> for adc::ConsumerCredential {
             ));
         };
 
+        let name = credential.name.unwrap_or_else(|| {
+            credential
+                .id
+                .clone()
+                .expect("APISIX always assigns credentials an id")
+        });
+
         Ok(adc::ConsumerCredential {
             id: credential.id,
-            name: credential.name,
+            name,
             description: credential.desc,
             labels: credential.labels,
             r#type: plugin_name,
@@ -564,7 +581,7 @@ impl From<adc::ConsumerCredential> for typing::ConsumerCredential {
 
         typing::ConsumerCredential {
             id: credential.id,
-            name: credential.name,
+            name: Some(credential.name),
             desc: credential.description,
             labels: transform_labels_to_apisix(credential.labels),
             plugins: Some(plugins),
@@ -730,7 +747,10 @@ mod tests {
             ..Default::default()
         };
         let adc = health_check_to_adc(checks);
-        assert_eq!(adc.active.http_req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(
+            adc.active.http_req_headers,
+            Some(vec!["X-Foo: bar".to_string()])
+        );
         assert_eq!(adc.active.http_req_body, "ping");
     }
 
@@ -745,7 +765,10 @@ mod tests {
             passive: None,
         };
         let wire = health_check_from_adc(checks);
-        assert_eq!(wire.active.req_headers, Some(vec!["X-Foo: bar".to_string()]));
+        assert_eq!(
+            wire.active.req_headers,
+            Some(vec!["X-Foo: bar".to_string()])
+        );
         assert_eq!(wire.active.http_req_body, Some("ping".to_string()));
     }
 }

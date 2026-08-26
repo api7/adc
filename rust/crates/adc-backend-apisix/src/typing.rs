@@ -20,8 +20,9 @@ use std::collections::HashMap;
 
 use adc_sdk::resources::{
     Expr, HttpMethod, Labels, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer,
-    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
-    UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy,
+    UpstreamHealthCheckPassive, UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode,
+    UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -125,7 +126,8 @@ pub struct Service {
 pub struct ConsumerCredential {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub desc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
