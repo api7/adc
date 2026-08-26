@@ -2,19 +2,51 @@
 
 Use ADC in a CI/CD pipeline to validate and deploy declarative Apache APISIX or API7 Enterprise configuration. The pipeline checks proposed configuration, shows the expected gateway changes, waits for the required approval, and then reconciles the target gateway with the reviewed files.
 
-The CI/CD runner deploys the configuration by running ADC and connecting to the gateway Admin API. Unlike Argo CD or Flux, ADC does not continuously watch a Git repository for changes. ADC configuration files are not Kubernetes resources, so run ADC in a separate CI job when you also use a Kubernetes GitOps controller.
+The CI/CD runner deploys configuration by running ADC and calling the gateway Admin API. ADC does not watch a Git repository and `adc.yaml` is not a Kubernetes resource, so Argo CD and Flux cannot apply it. If you also use a Kubernetes GitOps controller, run ADC in a separate CI job.
 
 ## Prerequisites
 
-- Install ADC on the CI/CD runner or use the published `api7/adc` container image. Pin a released version instead of using a floating tag.
+- Install ADC on the CI/CD runner or use the published `api7/adc` container image. Pin a released version instead of `latest` or `dev`.
 - Store the declarative configuration in version control. See [Use ADC for Declarative Configuration](./workflow.md) to create or adopt an `adc.yaml` file.
 - Ensure that the runner can reach the target Admin API.
-- Create a separate credential for the pipeline. Grant it only the permissions required for its target gateway group or environment when the backend supports scoped credentials.
-- Decide which resources each pipeline owns before its first deployment.
+- Create a dedicated credential for the pipeline. Restrict it to the target gateway group or environment when the backend can scope that identity.
+- Decide which resources each pipeline owns before its first deployment. See [Label Selector](./label-selector.md) if more than one team or tool shares a backend.
 
 The examples use ADC `0.29.0` and a file at `gateway/adc.yaml`. Change the version and path to match your repository.
 
 > **Apache APISIX backend:** The ADC Apache APISIX backend is experimental. Although current APISIX releases are tested, some APISIX resources or equivalent configuration forms do not round-trip to an identical representation and can produce a persistent diff. Validate the exact resource types and APISIX version used by your pipeline before adopting automatic production synchronization. See [Apache APISIX backend notes](../../libs/backend-apisix/README.md).
+
+## Run ADC in CI
+
+Install a pinned ADC release on the runner, or run the published image. The image is available from Docker Hub (`api7/adc`) and GitHub Container Registry (`ghcr.io/api7/adc`) for `linux/amd64` and `linux/arm64`.
+
+ADC writes `diff.yaml` into the current working directory, so mount the repository and set the container workdir to that mount. The image entrypoint looks up `main.cjs` relative to the workdir, so override the entrypoint and call `/home/nonroot/main.cjs`.
+
+The image runs as uid `65532`. Do not run it as the host user: `/home/nonroot` is not world-readable, so the binary would be unreachable. Make the mounted directory writable by uid `65532` so ADC can create `diff.yaml` (for example, `chmod a+w .` on a GitHub Actions checkout):
+
+```bash
+ADC_IMAGE=api7/adc:0.29.0
+
+docker run --rm \
+  -v "${PWD}:/work" \
+  -w /work \
+  --entrypoint /nodejs/bin/node \
+  -e ADC_BACKEND \
+  -e ADC_SERVER \
+  -e ADC_TOKEN \
+  -e ADC_GATEWAY_GROUP \
+  "$ADC_IMAGE" \
+  /home/nonroot/main.cjs lint -f gateway/adc.yaml
+```
+
+Reuse the same `docker run` options for `validate`, `diff`, `sync`, and `dump`. Mount CA and mutual TLS files read-only when those files are not already in the repository:
+
+```bash
+-v "/path/to/gateway-ca.pem:/certs/gateway-ca.pem:ro" \
+-e ADC_CA_CERT_FILE=/certs/gateway-ca.pem
+```
+
+For stronger supply-chain reproducibility, pin the image digest recorded by your artifact policy in addition to the release version.
 
 ## Define an Ownership Scope
 
@@ -30,9 +62,9 @@ adc diff \
 
 ADC injects the selector labels into the local resources and compares them only with remote resources carrying the same labels. Use the same selector for `validate`, `diff`, `sync`, and scheduled drift checks.
 
-For API7 Enterprise, also select the target gateway group with `ADC_GATEWAY_GROUP` or `--gateway-group`. A gateway group separates runtime targets, while a label selector can divide ownership within that group.
+For API7 Enterprise, also set the target gateway group with `ADC_GATEWAY_GROUP` or `--gateway-group`. If you omit it, ADC uses `default`. A gateway group selects the runtime target; a label selector can divide ownership within that group.
 
-> **Note:** ADC adds the `managed-by=adc` label to supported local resources by default, but that label alone does not limit the command scope. Use an explicit `--label-selector` whenever a backend or gateway group contains resources owned by another team or tool.
+> **Note:** ADC adds the `managed-by=adc` label to supported local resources by default, but that label is not used as a default selector. Without `--label-selector`, `adc sync` still reconciles every resource in the command scope, including resources created outside ADC. Use an explicit selector whenever a backend or gateway group contains resources owned by another team or tool.
 
 Label selectors operate on top-level resources. They cannot divide ownership of routes nested in the same service, and they do not scope `global_rules` or `plugin_metadata`. See [Label Selector](./label-selector.md) before sharing a backend between pipelines.
 
@@ -47,9 +79,9 @@ Configure backend connection settings as protected CI/CD secrets instead of comm
 | `ADC_TOKEN`         | Admin API key | Dashboard API token           |
 | `ADC_GATEWAY_GROUP` | Not used      | Target gateway group          |
 
-Use a trusted CA certificate with `ADC_CA_CERT_FILE` when the endpoint uses a private certificate authority. Store a client certificate and key in protected secrets if the endpoint requires mutual TLS. Do not use `ADC_TLS_SKIP_VERIFY` in a production pipeline.
+Use a trusted CA certificate with `ADC_CA_CERT_FILE` when the endpoint uses a private certificate authority. Store a client certificate and key in `ADC_TLS_CLIENT_CERT_FILE` and `ADC_TLS_CLIENT_KEY_FILE` if the endpoint requires mutual TLS. Do not use `ADC_TLS_SKIP_VERIFY` in a production pipeline.
 
-Do not expose write-capable credentials to workflows triggered from untrusted forks. Run local lint checks without secrets for all pull requests, and restrict backend validation, planning, and deployment jobs to trusted code and protected environments.
+Do not expose write-capable credentials to workflows triggered from untrusted forks. Run local lint checks without secrets for every pull request, and restrict backend validation, planning, and deployment jobs to trusted code and protected environments.
 
 ## Check Pull Requests
 
@@ -59,7 +91,7 @@ Run `lint` for every proposed change. It verifies ADC syntax and schema rules wi
 adc lint -f gateway/adc.yaml
 ```
 
-For trusted pull requests, also validate against a non-production backend and produce a diff:
+For trusted pull requests, also produce a diff against a non-production backend. Run `validate` first when the backend supports it:
 
 ```bash
 adc validate \
@@ -71,17 +103,19 @@ adc diff \
   --label-selector team=catalog,env=staging
 ```
 
-`validate` catches backend-specific errors without applying the proposed changes. `diff` prints a summary and writes the complete machine-readable plan to `diff.yaml`. Upload `diff.yaml` as a CI artifact so reviewers can inspect creates, updates, and deletions.
+`validate` asks the backend to check the proposed resources without applying them. It requires API7 Enterprise 3.9.10 or later. On Apache APISIX, ADC calls `/apisix/admin/configs/validate`; if that endpoint is missing, the command fails and you should skip `validate` on that version. `diff` prints a summary and writes the complete machine-readable plan to `diff.yaml`. Upload `diff.yaml` as a CI artifact so reviewers can inspect creates, updates, and deletions.
 
-`adc diff` exits successfully when it finds differences. If a policy requires the job to fail on drift, inspect `diff.yaml` explicitly as shown in [Detect Drift](#detect-drift).
+ADC has no apply-plan command. Reviewers inspect `diff.yaml`; they do not apply that file. `adc diff` also exits successfully when it finds differences. If a policy requires the job to fail on drift, inspect `diff.yaml` explicitly as shown in [Detect Drift](#detect-drift).
 
 ## Plan and Deploy a Change
 
-Keep planning and deployment as separate jobs. The plan job validates the files and publishes `diff.yaml`. The deployment job should require the appropriate environment approval, recalculate the diff against the latest backend state, and then synchronize the reviewed configuration.
+Keep planning and deployment as separate jobs. The plan job publishes `diff.yaml`. Include `validate` in that job when the backend supports it. The deployment job should require environment approval, recalculate the diff against the latest backend state, and then synchronize the reviewed configuration.
 
-Use the same version, files, backend, gateway group, resource filters, and label selector in both jobs. If any of these inputs differ, the approved plan does not describe the deployment scope.
+Use the same ADC version, files, backend, gateway group, resource filters, and label selector in both jobs. If any of these inputs differ, the approved plan does not describe the deployment scope.
 
 ### Plan
+
+Omit `validate` when the backend does not implement it.
 
 ```bash
 adc validate \
@@ -97,7 +131,7 @@ Review `diff.yaml`, paying particular attention to `delete` events. A large or u
 
 ### Deploy
 
-After approval, recalculate the plan and apply the desired state:
+After approval, recalculate the plan from the reviewed files. Compare that live plan with the approved artifact, or re-review it, before `sync`. If the live plan contains unexpected operations, stop and run the plan job again instead of synchronizing a different change set:
 
 ```bash
 adc validate \
@@ -121,37 +155,9 @@ concurrency:
   cancel-in-progress: false
 ```
 
-Do not cancel a deployment after `adc sync` has started. ADC sends resource operations through the Admin API and does not apply the entire plan as one atomic transaction. If a runner or request fails partway through, preserve the logs, correct the failure, and run the same desired configuration again to converge the backend.
+Do not cancel a deployment after `adc sync` has started. ADC sends resource operations through the Admin API and does not apply the entire plan as one atomic transaction. Concurrent requests can succeed before a later request fails. If a runner or request fails partway through, preserve the logs, correct the failure, and run the same desired configuration again to converge the backend.
 
 Use `--request-concurrent` to reduce request concurrency when the Admin API is rate limited. It changes request parallelism, not the ownership or deletion scope.
-
-## Run ADC from a Container
-
-The ADC image is published to Docker Hub and GitHub Container Registry for `linux/amd64` and `linux/arm64`. The following helper runs a pinned image and mounts the repository at `/work`:
-
-```bash
-ADC_IMAGE=api7/adc:0.29.0
-
-docker run --rm \
-  -v "${PWD}:/work" \
-  -w /work \
-  --entrypoint /nodejs/bin/node \
-  -e ADC_BACKEND \
-  -e ADC_SERVER \
-  -e ADC_TOKEN \
-  -e ADC_GATEWAY_GROUP \
-  "$ADC_IMAGE" \
-  /home/nonroot/main.cjs lint -f gateway/adc.yaml
-```
-
-The explicit entrypoint keeps the repository as the working directory while running the image's ADC executable at `/home/nonroot/main.cjs`. Add the same `docker run` options for `validate`, `diff`, and `sync`. Mount CA and mutual TLS files read-only when those files are not already in the repository:
-
-```bash
--v "${RUNNER_TEMP}/gateway-ca.pem:/certs/gateway-ca.pem:ro" \
--e ADC_CA_CERT_FILE=/certs/gateway-ca.pem
-```
-
-For stronger supply-chain reproducibility, pin the image digest recorded by your artifact policy in addition to the release version.
 
 ## Verify a Deployment
 
@@ -169,7 +175,7 @@ For configuration that round-trips without backend normalization, `diff.yaml` sh
 []
 ```
 
-If the same diff remains after a successful sync, inspect whether the backend populated defaults or normalized an equivalent configuration form. Align the source file with a stable ADC representation when possible, and test the result again. Do not suppress every repeated event: it could also indicate a failed operation or real drift.
+If the same diff remains after a successful sync, inspect whether the backend populated defaults or normalized an equivalent configuration form. Align the source file with a stable ADC representation when possible, and test the result again. Do not enable a failing drift job, and do not suppress repeated events blindly: a persistent diff can also indicate a failed operation or real drift. Apache APISIX often fills defaults such as route `priority` and upstream `hash_on`; see [Apache APISIX backend notes](../../libs/backend-apisix/README.md).
 
 Then run application-level smoke tests through the gateway. ADC verifies and reconciles gateway configuration, but it does not prove that upstream applications, DNS, certificates, or external dependencies behave as expected.
 
@@ -195,7 +201,7 @@ Upload `diff.yaml` even when the job fails. Investigate whether the difference c
 Gateway configuration should be rolled back from the same version-controlled source of truth:
 
 1. Revert the configuration commit or select a previously approved revision.
-2. Run `lint`, `validate`, and `diff` against the target backend.
+2. Run `lint` and `diff` against the target backend. Run `validate` when the backend supports it.
 3. Review the rollback plan for destructive changes.
 4. Run `sync` with the same ownership scope used for deployment.
 5. Confirm that `diff.yaml` is empty and repeat the application smoke tests.
@@ -209,7 +215,17 @@ adc dump \
   -o gateway-backup.yaml
 ```
 
-Treat a dump as sensitive configuration. Store it in an access-controlled artifact location and define a retention policy.
+Treat a dump as sensitive configuration. Store it in an access-controlled artifact location and define a retention policy. Dumped files can include empty `global_rules` and `plugin_metadata` maps. Those resources are not limited by `--label-selector`, so do not sync a dump back until you have removed keys you do not own.
+
+## Map the Model onto Your CI System
+
+Provider YAML differs, but the job boundaries should not:
+
+- Every pull request: `lint` only, with no Admin API credentials.
+- Trusted code only: `diff` against a non-production backend (and `validate` when supported), then upload `diff.yaml`.
+- Protected production environment: recalculate the plan, review unexpected operations, then `sync`.
+- One concurrency group per ownership scope for jobs that can call `sync`. Do not cancel an in-progress sync when a newer job is queued.
+- Scheduled drift detection: `diff` only. Do not grant that job permission to `sync`.
 
 ## Related
 

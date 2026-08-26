@@ -130,7 +130,7 @@ Run `adc validate` when you want backend-side validation without applying change
 adc validate -f adc.yaml
 ```
 
-`validate` asks the backend to validate the resources described by the local file. This is useful in CI because it catches issues that only the target backend can know, such as unsupported plugin configuration.
+`validate` asks the backend to validate the resources described by the local file. This is useful in CI because it catches issues that only the target backend can know, such as unsupported plugin configuration. Skip it when the backend version does not implement configuration validation; see [Manage Gateway Configuration in CI/CD](./ci-cd.md).
 
 ## Preview Changes
 
@@ -172,16 +172,7 @@ Plain OpenAPI documents describe APIs, not gateway-specific behavior. Add `x-adc
 
 ## Suggested CI Flow
 
-For a pull request or deployment pipeline, use this order:
-
-```bash
-adc lint -f adc.yaml
-adc validate -f adc.yaml
-adc diff -f adc.yaml
-adc sync -f adc.yaml
-```
-
-Run `sync` only after the diff has been reviewed or approved by your release process.
+`lint`, `validate`, `diff`, and `sync` are the building blocks, but they are not a complete production pipeline on their own. Lint every pull request without credentials. After review, plan against the target backend (`validate` when the backend supports it, then `diff`), then sync only from an approved job that uses the same ownership scope.
 
 See [Manage Gateway Configuration in CI/CD](./ci-cd.md) for production guidance on ownership scopes, protected credentials, plan artifacts, deployment approvals, drift detection, verification, and rollback.
 
