@@ -308,7 +308,7 @@ describe('Sync and Dump - 1', () => {
 
         // Written directly, bypassing ADC entirely: only the legacy label
         // carries a name, no native `name` field at all.
-        await fetch(
+        const putResponse = await fetch(
           `${server}/apisix/admin/stream_routes/${streamRouteId}`,
           {
             method: 'PUT',
@@ -323,6 +323,7 @@ describe('Sync and Dump - 1', () => {
             }),
           },
         );
+        expect(putResponse.ok).toBe(true);
 
         const beforeMigration = (await dumpConfiguration(
           backend,
@@ -343,10 +344,12 @@ describe('Sync and Dump - 1', () => {
         migrateEvent = { ...migrateEvent, resourceId: streamRouteId };
         await syncEvents(backend, [migrateEvent]);
 
-        const raw = (await fetch(
+        const getResponse = await fetch(
           `${server}/apisix/admin/stream_routes/${streamRouteId}`,
           { headers: { 'X-API-KEY': token } },
-        ).then((res) => res.json())) as {
+        );
+        expect(getResponse.ok).toBe(true);
+        const raw = (await getResponse.json()) as {
           value: { name?: string; labels?: Record<string, string> };
         };
         expect(raw.value.name).toEqual('legacy-stream-route');
