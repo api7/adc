@@ -1,0 +1,18 @@
+{
+  "local": {
+    "services": [{
+      "id": "service1", "name": "service1",
+      "upstreams": [{ "name": "upstream1", "nodes": [{ "host": "upstream1", "port": 80, "weight": 1 }] }]
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "service1", "name": "service1",
+      "upstreams": [{
+        "id": "0e5284aa9759d2e539945346fa400b04cc746f42",
+        "name": "upstream1",
+        "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }]
+      }]
+    }]
+  }
+}

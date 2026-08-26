@@ -1,0 +1,23 @@
+{
+  "local": {
+    "services": [{
+      "name": "Test Service",
+      "path_prefix": "/test",
+      "plugins": { "test": { "testKey": "serviceNewValue" } },
+      "routes": [{ "name": "Test Route", "uris": ["/test"], "plugins": { "test": { "testKey": "newValue" } } }]
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "5139f1c19641e214d3b9c57949d1578c2482b940",
+      "name": "Test Service",
+      "plugins": { "test": { "testKey": "serviceOldValue" } },
+      "routes": [{
+        "id": "68141a72af05053071ea8c70a42c3b0fcd710b4c",
+        "name": "Test Route",
+        "uris": ["/test"],
+        "plugins": { "test": { "testKey": "oldValue" } }
+      }]
+    }]
+  }
+}

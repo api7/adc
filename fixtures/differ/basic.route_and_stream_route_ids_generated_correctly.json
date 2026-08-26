@@ -1,0 +1,23 @@
+{
+  "local": {
+    "services": [
+      { "name": "HTTP", "routes": [{ "name": "HTTP 1", "uris": ["/1"] }] },
+      { "name": "Stream", "stream_routes": [{ "name": "Stream 1", "server_port": 5432 }] }
+    ]
+  },
+  "remote": {
+    "services": [
+      {
+        "id": "f40b27d6b8b9a4fc3827264c1da16a04ecf4d094",
+        "name": "HTTP",
+        "routes": [{ "id": "f9e217f5cef4955ffce8d8da8b8e17918f85deb7", "name": "HTTP 1", "uris": ["/1"] }]
+      },
+      {
+        "id": "df063869e11d7a9aa132cd4a984f7b5eb870d656",
+        "name": "Stream",
+        "stream_routes": [{ "id": "05a5e25f718f3fd8d9d3b02e39bdf6e8ab274220", "name": "Stream 1", "server_port": 5432 }]
+      }
+    ]
+  },
+  "defaultValue": {}
+}

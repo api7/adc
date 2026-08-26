@@ -1,0 +1,28 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+x-adc-name: custom-name
+servers:
+  - url: https://httpbin.org
+paths:
+  /anything:
+    servers:
+      - url: https://httpbin.net
+    get:
+      servers:
+        - url: https://httpbin.com
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

@@ -1,0 +1,41 @@
+{
+  "local": {
+    "services": [{
+      "id": "test",
+      "name": "test",
+      "routes": [],
+      "upstream": { "type": "roundrobin", "nodes": [{ "host": "127.0.0.1", "port": 80, "weight": 1 }] },
+      "upstreams": [{
+        "name": "upstream-with-client-cert",
+        "type": "roundrobin",
+        "nodes": [{ "host": "127.0.0.1", "port": 80, "weight": 1 }],
+        "tls": { "client_cert_id": "test" }
+      }]
+    }],
+    "ssls": [
+      {
+        "id": "test",
+        "snis": ["test1.com", "test2.com"],
+        "certificates": [{ "certificate": "CERT", "key": "KEY" }]
+      },
+      {
+        "id": "test2",
+        "snis": ["test3.com", "test4.com"],
+        "certificates": [{ "certificate": "CERT", "key": "KEY" }]
+      }
+    ]
+  },
+  "remote": {
+    "services": [{
+      "id": "test",
+      "name": "test",
+      "routes": [],
+      "upstream": { "type": "roundrobin", "nodes": [{ "host": "127.0.0.1", "port": 80, "weight": 1 }] }
+    }],
+    "ssls": [{
+      "id": "test2",
+      "snis": ["test3.com", "test4.com", "test5.com"],
+      "certificates": [{ "certificate": "CERT", "key": "KEY" }]
+    }]
+  }
+}

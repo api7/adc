@@ -1,0 +1,48 @@
+[package]
+name = "adc-cli"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "adc"
+path = "src/main.rs"
+
+[dependencies]
+adc-sdk = { path = "../adc-sdk" }
+adc-differ = { path = "../adc-differ" }
+adc-backend-core = { path = "../adc-backend-core" }
+adc-backend-apisix = { path = "../adc-backend-apisix" }
+adc-backend-api7 = { path = "../adc-backend-api7" }
+adc-backend-apisix-standalone = { path = "../adc-backend-apisix-standalone" }
+adc-converter-openapi = { path = "../adc-converter-openapi" }
+clap = { version = "4", features = ["derive", "env"] }
+humantime = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml_ng = "0.10"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "net", "signal", "sync", "process", "time"] }
+glob = "0.3"
+regex = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+dotenvy = "0.15"
+tracing-indicatif = "0.3"
+tracing = { workspace = true }
+indicatif = "0.18"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+http = "1"
+axum = { workspace = true }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { workspace = true }
+rustls-pemfile = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+uuid = { version = "1", features = ["v4"] }
+lru = "0.12"
+url = { workspace = true }
+http-body-util = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+libc = "0.2"

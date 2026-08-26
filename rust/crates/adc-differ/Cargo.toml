@@ -1,0 +1,21 @@
+[package]
+name = "adc-differ"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+adc-sdk = { path = "../adc-sdk" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.7"
+
+[[bin]]
+name = "run_fixtures"
+path = "src/bin/run_fixtures.rs"
+
+[[bench]]
+name = "differ_bench"
+harness = false

@@ -1,0 +1,4 @@
+{
+  "local": {},
+  "remote": { "consumers": [{ "username": "alice", "plugins": {} }] }
+}

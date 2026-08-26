@@ -1,0 +1,31 @@
+[package]
+name = "adc-backend-api7"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+# Exposes `adc_backend_api7::tests`, the internal building blocks this
+# crate's own `tests/*.rs` integration tests reach into — never meant to be
+# enabled by a real consumer. Off by default so it doesn't leak into the
+# crate's normal public API surface; the dev-dependency below turns it back
+# on for the crate's own test builds.
+test-utils = []
+
+[dependencies]
+adc-sdk = { path = "../adc-sdk" }
+adc-backend-core = { path = "../adc-backend-core" }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+semver = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+adc-backend-api7 = { path = ".", features = ["test-utils"] }
+adc-differ = { path = "../adc-differ" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
+axum = { workspace = true }

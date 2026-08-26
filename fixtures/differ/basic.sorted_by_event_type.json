@@ -1,0 +1,14 @@
+{
+  "local": {
+    "consumers": [
+      { "username": "createConsumer", "plugins": {} },
+      { "username": "updatedConsumer", "plugins": { "key-auth": {} } }
+    ]
+  },
+  "remote": {
+    "consumers": [
+      { "username": "updatedConsumer", "plugins": {} },
+      { "username": "deletedConsumer", "plugins": {} }
+    ]
+  }
+}
