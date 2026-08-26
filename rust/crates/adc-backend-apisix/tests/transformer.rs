@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use adc_backend_apisix::tests::transformer::{transform_consumer_group, transform_route, transform_service, transform_stream_route};
+use adc_backend_apisix::tests::transformer::{
+    StreamRouteNameMode, transform_consumer_group, transform_route, transform_service,
+    transform_stream_route,
+};
 use adc_backend_apisix::tests::typing;
 use adc_sdk::resources::{self as adc, LabelValue};
 use serde_json::json;
@@ -66,27 +69,65 @@ fn adc_upstream() -> adc::Upstream {
 }
 
 fn adc_ssl() -> adc::SSL {
-    adc::SSL { id: None, labels: None, r#type: adc::SslType::default(), snis: vec![], certificates: vec![], client: None, ssl_protocols: None }
+    adc::SSL {
+        id: None,
+        labels: None,
+        r#type: adc::SslType::default(),
+        snis: vec![],
+        certificates: vec![],
+        client: None,
+        ssl_protocols: None,
+    }
 }
 
 fn adc_credential(name: &str, ty: &str) -> adc::ConsumerCredential {
-    adc::ConsumerCredential { id: None, name: name.to_string(), description: None, labels: None, r#type: ty.to_string(), config: serde_json::Map::new() }
+    adc::ConsumerCredential {
+        id: None,
+        name: name.to_string(),
+        description: None,
+        labels: None,
+        r#type: ty.to_string(),
+        config: serde_json::Map::new(),
+    }
 }
 
 fn adc_stream_route(name: &str) -> adc::StreamRoute {
-    adc::StreamRoute { id: None, name: name.to_string(), description: None, labels: None, plugins: None, remote_addr: None, server_addr: None, server_port: None, sni: None }
+    adc::StreamRoute {
+        id: None,
+        name: name.to_string(),
+        description: None,
+        labels: None,
+        plugins: None,
+        remote_addr: None,
+        server_addr: None,
+        server_port: None,
+        sni: None,
+    }
 }
 
 fn adc_consumer_group(name: &str) -> adc::ConsumerGroup {
-    adc::ConsumerGroup { id: None, name: name.to_string(), description: None, labels: None, plugins: None, consumers: None }
+    adc::ConsumerGroup {
+        id: None,
+        name: name.to_string(),
+        description: None,
+        labels: None,
+        plugins: None,
+        consumers: None,
+    }
 }
 
 fn route(id: &str) -> typing::Route {
-    typing::Route { id: id.to_string(), ..Default::default() }
+    typing::Route {
+        id: id.to_string(),
+        ..Default::default()
+    }
 }
 
 fn service(id: &str) -> typing::Service {
-    typing::Service { id: id.to_string(), ..Default::default() }
+    typing::Service {
+        id: id.to_string(),
+        ..Default::default()
+    }
 }
 
 fn upstream() -> typing::Upstream {
@@ -129,14 +170,22 @@ fn route_parses_recognized_http_methods() {
     let mut route = route("r1");
     route.methods = Some(vec!["GET".into(), "POST".into()]);
     let adc_route: adc::Route = route.try_into().unwrap();
-    assert_eq!(adc_route.methods, Some(vec![adc::HttpMethod::Get, adc::HttpMethod::Post]));
+    assert_eq!(
+        adc_route.methods,
+        Some(vec![adc::HttpMethod::Get, adc::HttpMethod::Post])
+    );
 }
 
 #[test]
 fn upstream_list_nodes_pass_through_unchanged() {
     let mut upstream = upstream();
-    upstream.nodes =
-        Some(typing::UpstreamNodes::List(vec![adc::UpstreamNode { host: "10.0.0.1".into(), port: 8080, weight: 1, priority: 0, metadata: None }]));
+    upstream.nodes = Some(typing::UpstreamNodes::List(vec![adc::UpstreamNode {
+        host: "10.0.0.1".into(),
+        port: 8080,
+        weight: 1,
+        priority: 0,
+        metadata: None,
+    }]));
     let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
     let nodes = adc_upstream.nodes.unwrap();
     assert_eq!(nodes.len(), 1);
@@ -147,7 +196,10 @@ fn upstream_list_nodes_pass_through_unchanged() {
 #[test]
 fn upstream_discovery_map_nodes_parse_host_and_port() {
     let mut upstream = upstream();
-    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("10.0.0.1:9000".to_string(), 5)])));
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([(
+        "10.0.0.1:9000".to_string(),
+        5,
+    )])));
     let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
     let nodes = adc_upstream.nodes.unwrap();
     assert_eq!(nodes.len(), 1);
@@ -159,7 +211,10 @@ fn upstream_discovery_map_nodes_parse_host_and_port() {
 #[test]
 fn upstream_discovery_map_nodes_without_a_port_is_rejected() {
     let mut upstream = upstream();
-    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("10.0.0.1".to_string(), 1)])));
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([(
+        "10.0.0.1".to_string(),
+        1,
+    )])));
     let result: Result<adc::Upstream, String> = upstream.try_into();
     assert!(result.is_err());
 }
@@ -167,7 +222,10 @@ fn upstream_discovery_map_nodes_without_a_port_is_rejected() {
 #[test]
 fn upstream_discovery_map_nodes_parse_bracketed_ipv6_host_and_port() {
     let mut upstream = upstream();
-    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("[::1]:9000".to_string(), 5)])));
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([(
+        "[::1]:9000".to_string(),
+        5,
+    )])));
     let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
     let nodes = adc_upstream.nodes.unwrap();
     assert_eq!(nodes.len(), 1);
@@ -179,7 +237,10 @@ fn upstream_discovery_map_nodes_parse_bracketed_ipv6_host_and_port() {
 #[test]
 fn upstream_discovery_map_nodes_bracketed_ipv6_without_a_port_is_rejected() {
     let mut upstream = upstream();
-    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([("[::1]".to_string(), 1)])));
+    upstream.nodes = Some(typing::UpstreamNodes::Map(HashMap::from([(
+        "[::1]".to_string(),
+        1,
+    )])));
     let result: Result<adc::Upstream, String> = upstream.try_into();
     assert!(result.is_err());
 }
@@ -188,7 +249,10 @@ fn upstream_discovery_map_nodes_bracketed_ipv6_without_a_port_is_rejected() {
 fn upstream_strips_the_service_association_label_but_keeps_others() {
     let mut upstream = upstream();
     upstream.labels = Some(HashMap::from([
-        (typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(), LabelValue::Single("svc1".into())),
+        (
+            typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(),
+            LabelValue::Single("svc1".into()),
+        ),
         ("env".to_string(), LabelValue::Single("prod".into())),
     ]));
     let adc_upstream: adc::Upstream = upstream.try_into().unwrap();
@@ -242,8 +306,14 @@ fn ssl_pairs_the_primary_and_additional_certificates() {
     assert_eq!(
         adc_ssl.certificates,
         vec![
-            adc::SSLCertificate { certificate: "CERT_A".into(), key: "KEY_A".into() },
-            adc::SSLCertificate { certificate: "CERT_B".into(), key: "KEY_B".into() },
+            adc::SSLCertificate {
+                certificate: "CERT_A".into(),
+                key: "KEY_A".into()
+            },
+            adc::SSLCertificate {
+                certificate: "CERT_B".into(),
+                key: "KEY_B".into()
+            },
         ]
     );
 }
@@ -288,7 +358,13 @@ fn ssl_with_a_redacted_key_degrades_to_an_empty_placeholder_instead_of_failing()
         status: 1,
     };
     let adc_ssl: adc::SSL = ssl.try_into().unwrap();
-    assert_eq!(adc_ssl.certificates, vec![adc::SSLCertificate { certificate: "CERT_A".into(), key: String::new() }]);
+    assert_eq!(
+        adc_ssl.certificates,
+        vec![adc::SSLCertificate {
+            certificate: "CERT_A".into(),
+            key: String::new()
+        }]
+    );
 }
 
 #[test]
@@ -348,7 +424,14 @@ fn consumer_drops_credentials_that_fail_to_convert_but_keeps_the_rest() {
 
 #[test]
 fn consumer_with_credentials_never_fetched_stays_none_not_empty() {
-    let consumer = typing::Consumer { username: "alice".into(), desc: None, labels: None, group_id: None, plugins: None, credentials: None };
+    let consumer = typing::Consumer {
+        username: "alice".into(),
+        desc: None,
+        labels: None,
+        group_id: None,
+        plugins: None,
+        credentials: None,
+    };
     let adc_consumer: adc::Consumer = consumer.into();
     assert!(adc_consumer.credentials.is_none());
 }
@@ -357,9 +440,13 @@ fn consumer_with_credentials_never_fetched_stays_none_not_empty() {
 fn stream_route_recovers_its_name_from_the_magic_label_and_strips_it() {
     let route = typing::StreamRoute {
         id: Some("sr1".into()),
+        name: None,
         desc: None,
         labels: Some(HashMap::from([
-            ("__ADC_NAME".to_string(), LabelValue::Single("my-stream-route".into())),
+            (
+                "__ADC_NAME".to_string(),
+                LabelValue::Single("my-stream-route".into()),
+            ),
             ("env".to_string(), LabelValue::Single("prod".into())),
         ])),
         remote_addr: None,
@@ -384,6 +471,7 @@ fn stream_route_recovers_its_name_from_the_magic_label_and_strips_it() {
 fn stream_route_without_the_magic_label_falls_back_to_id() {
     let route = typing::StreamRoute {
         id: Some("sr1".into()),
+        name: None,
         desc: None,
         labels: None,
         remote_addr: None,
@@ -401,6 +489,34 @@ fn stream_route_without_the_magic_label_falls_back_to_id() {
 }
 
 #[test]
+fn stream_route_prefers_the_native_name_over_the_magic_label() {
+    let route = typing::StreamRoute {
+        id: Some("sr1".into()),
+        name: Some("native-name".into()),
+        desc: None,
+        labels: Some(HashMap::from([(
+            "__ADC_NAME".to_string(),
+            LabelValue::Single("stale-label-name".into()),
+        )])),
+        remote_addr: None,
+        server_addr: None,
+        server_port: None,
+        sni: None,
+        upstream: None,
+        upstream_id: None,
+        service_id: None,
+        plugins: None,
+        protocol: None,
+    };
+    let adc_route: adc::StreamRoute = route.into();
+    assert_eq!(adc_route.name, "native-name");
+    assert!(
+        adc_route.labels.is_none(),
+        "the stale magic label must still be stripped"
+    );
+}
+
+#[test]
 fn write_route_carries_parent_id_and_stringifies_methods() {
     let mut route = adc_route("r1");
     route.uris = vec!["/foo".into()];
@@ -409,7 +525,10 @@ fn write_route_carries_parent_id_and_stringifies_methods() {
     let wire = transform_route(route, "svc1".into());
     assert_eq!(wire.service_id.as_deref(), Some("svc1"));
     assert_eq!(wire.uris, Some(vec!["/foo".to_string()]));
-    assert_eq!(wire.methods, Some(vec!["GET".to_string(), "POST".to_string()]));
+    assert_eq!(
+        wire.methods,
+        Some(vec!["GET".to_string(), "POST".to_string()])
+    );
     assert_eq!(wire.status, Some(1));
 }
 
@@ -418,7 +537,10 @@ fn write_route_labels_are_plain_strings_arrays_get_json_stringified() {
     let mut route = adc_route("r1");
     route.labels = Some(HashMap::from([
         ("env".to_string(), LabelValue::Single("prod".into())),
-        ("team".to_string(), LabelValue::Multiple(vec!["a".into(), "b".into()])),
+        (
+            "team".to_string(),
+            LabelValue::Multiple(vec!["a".into(), "b".into()]),
+        ),
     ]));
 
     let wire = transform_route(route, "svc1".into());
@@ -434,7 +556,10 @@ fn write_service_splits_into_service_and_matching_upstream() {
     service.upstream = Some(adc_upstream());
 
     let (wire_service, wire_upstream) = transform_service(service);
-    assert!(wire_service.upstream.is_none(), "upstream must not be inlined into the service body");
+    assert!(
+        wire_service.upstream.is_none(),
+        "upstream must not be inlined into the service body"
+    );
     assert_eq!(wire_service.upstream_id.as_deref(), Some("svc1"));
 
     let wire_upstream = wire_upstream.expect("service had a default upstream");
@@ -464,8 +589,14 @@ fn write_upstream_never_carries_its_own_id() {
 fn write_ssl_splits_certificates_into_primary_and_additional() {
     let mut ssl = adc_ssl();
     ssl.certificates = vec![
-        adc::SSLCertificate { certificate: "CERT_A".into(), key: "KEY_A".into() },
-        adc::SSLCertificate { certificate: "CERT_B".into(), key: "KEY_B".into() },
+        adc::SSLCertificate {
+            certificate: "CERT_A".into(),
+            key: "KEY_A".into(),
+        },
+        adc::SSLCertificate {
+            certificate: "CERT_B".into(),
+            key: "KEY_B".into(),
+        },
     ];
 
     let wire: typing::Ssl = ssl.into();
@@ -479,7 +610,10 @@ fn write_ssl_splits_certificates_into_primary_and_additional() {
 #[test]
 fn write_ssl_with_a_single_certificate_omits_certs_and_keys() {
     let mut ssl = adc_ssl();
-    ssl.certificates = vec![adc::SSLCertificate { certificate: "CERT_A".into(), key: "KEY_A".into() }];
+    ssl.certificates = vec![adc::SSLCertificate {
+        certificate: "CERT_A".into(),
+        key: "KEY_A".into(),
+    }];
 
     let wire: typing::Ssl = ssl.into();
     assert!(wire.certs.is_none());
@@ -494,23 +628,62 @@ fn write_consumer_credential_wraps_type_and_config_into_a_plugins_map() {
     let wire: typing::ConsumerCredential = credential.into();
     let plugins = wire.plugins.unwrap();
     assert_eq!(plugins.len(), 1);
-    assert_eq!(plugins.get("key-auth").and_then(|v| v.get("key")), Some(&json!("secret")));
+    assert_eq!(
+        plugins.get("key-auth").and_then(|v| v.get("key")),
+        Some(&json!("secret"))
+    );
 }
 
 #[test]
-fn write_stream_route_injects_the_name_label_when_requested() {
+fn write_stream_route_injects_the_name_label_in_label_mode() {
     let route = adc_stream_route("my-stream-route");
-    let wire = transform_stream_route(route, "svc1".into(), true);
+    let wire = transform_stream_route(route, "svc1".into(), StreamRouteNameMode::Label);
     let labels = wire.labels.unwrap();
-    assert_eq!(labels.get("__ADC_NAME"), Some(&LabelValue::Single("my-stream-route".to_string())));
+    assert_eq!(
+        labels.get("__ADC_NAME"),
+        Some(&LabelValue::Single("my-stream-route".to_string()))
+    );
+    assert!(wire.name.is_none());
     assert_eq!(wire.service_id.as_deref(), Some("svc1"));
 }
 
 #[test]
-fn write_stream_route_omits_the_name_label_when_not_requested() {
+fn write_stream_route_omits_the_name_label_when_unsupported() {
     let route = adc_stream_route("my-stream-route");
-    let wire = transform_stream_route(route, "svc1".into(), false);
+    let wire = transform_stream_route(route, "svc1".into(), StreamRouteNameMode::Unsupported);
     assert!(wire.labels.is_none());
+    assert!(wire.name.is_none());
+}
+
+#[test]
+fn write_stream_route_uses_the_native_name_field_in_native_mode() {
+    let route = adc_stream_route("my-stream-route");
+    let wire = transform_stream_route(route, "svc1".into(), StreamRouteNameMode::Native);
+    assert_eq!(wire.name.as_deref(), Some("my-stream-route"));
+    assert!(
+        wire.labels.is_none(),
+        "native mode must not also inject the magic label"
+    );
+}
+
+#[test]
+fn stream_route_name_mode_picks_the_right_tier_by_version() {
+    assert_eq!(
+        StreamRouteNameMode::for_version(&semver::Version::new(3, 7, 0)),
+        StreamRouteNameMode::Unsupported
+    );
+    assert_eq!(
+        StreamRouteNameMode::for_version(&semver::Version::new(3, 8, 0)),
+        StreamRouteNameMode::Label
+    );
+    assert_eq!(
+        StreamRouteNameMode::for_version(&semver::Version::new(3, 12, 0)),
+        StreamRouteNameMode::Label
+    );
+    assert_eq!(
+        StreamRouteNameMode::for_version(&semver::Version::new(3, 13, 0)),
+        StreamRouteNameMode::Native
+    );
 }
 
 #[test]
@@ -518,13 +691,22 @@ fn write_consumer_group_derives_its_id_from_the_name_and_injects_adc_name() {
     let group = adc_consumer_group("my-group");
     let (wire, _consumers) = transform_consumer_group(group);
     assert_eq!(wire.id, adc_sdk::utils::generate_id("my-group"));
-    assert_eq!(wire.labels.unwrap().get("ADC_NAME"), Some(&LabelValue::Single("my-group".to_string())));
+    assert_eq!(
+        wire.labels.unwrap().get("ADC_NAME"),
+        Some(&LabelValue::Single("my-group".to_string()))
+    );
 }
 
 #[test]
 fn write_consumer_group_stamps_its_id_onto_member_consumers() {
     let mut group = adc_consumer_group("my-group");
-    group.consumers = Some(vec![adc::Consumer { username: "alice".into(), description: None, labels: None, plugins: None, credentials: None }]);
+    group.consumers = Some(vec![adc::Consumer {
+        username: "alice".into(),
+        description: None,
+        labels: None,
+        plugins: None,
+        credentials: None,
+    }]);
 
     let (wire_group, consumers) = transform_consumer_group(group);
     assert_eq!(consumers.len(), 1);

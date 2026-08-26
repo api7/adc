@@ -1,7 +1,34 @@
 import * as ADCSDK from '@api7/adc-sdk';
 import { filter, isEmpty, omit, unset } from 'lodash-es';
+import { SemVer, gte as semVerGTE } from 'semver';
 
 import * as typing from './typing';
+
+/**
+ * How a stream route's ADC name gets persisted, decided by the caller from
+ * the target APISIX version (see {@link streamRouteNameModeForVersion}) and
+ * passed to {@link FromADC.transformStreamRoute}:
+ * - `unsupported`: below 3.8.0, stream routes don't even support `labels`,
+ *   so the name can't be persisted at all.
+ * - `label`: `[3.8.0, 3.13.0)` — `labels` exist but there's no native
+ *   `name` field yet, so ADC smuggles one through the `__ADC_NAME` label.
+ * - `native`: `>= 3.13.0` — written straight to the (now native) `name`
+ *   field; no label needed. A route last synced under `label` mode still
+ *   carries the old label until it's synced again under `native` mode, at
+ *   which point this stops re-adding it and it falls off on its own — see
+ *   {@link ToADC.transformStreamRoute}'s read side, which prefers the
+ *   native field but still falls back to the label.
+ */
+export type StreamRouteNameMode = 'unsupported' | 'label' | 'native';
+
+export const streamRouteNameModeForVersion = (
+  version: SemVer,
+): StreamRouteNameMode =>
+  semVerGTE(version, '3.13.0')
+    ? 'native'
+    : semVerGTE(version, '3.8.0')
+      ? 'label'
+      : 'unsupported';
 
 export class ToADC {
   private static transformLabels(
@@ -159,7 +186,12 @@ export class ToADC {
   ): ADCSDK.StreamRoute {
     return ADCSDK.utils.recursiveOmitUndefined({
       id: streamRoute.id,
-      name: streamRoute.labels?.__ADC_NAME ?? streamRoute.id,
+      // Native `name` wins when present (APISIX >= 3.13.0). Older servers,
+      // and routes never re-synced since upgrading past 3.13.0, only have
+      // the magic label ADC used to smuggle a name through; `id` is the
+      // last resort when neither was ever set.
+      name:
+        streamRoute.name ?? streamRoute.labels?.__ADC_NAME ?? streamRoute.id,
       description: streamRoute.desc,
       labels: ToADC.transformLabels(streamRoute.labels),
 
@@ -412,18 +444,20 @@ export class FromADC {
   public transformStreamRoute(
     streamRoute: ADCSDK.StreamRoute,
     parentId: string,
-    injectName = true,
+    nameMode: StreamRouteNameMode = 'label',
   ): typing.StreamRoute {
     const labels = FromADC.transformLabels(streamRoute.labels);
     return ADCSDK.utils.recursiveOmitUndefined({
       id: undefined,
+      name: nameMode === 'native' ? streamRoute.name : undefined,
       desc: streamRoute.description,
-      labels: injectName
-        ? {
-            ...labels,
-            __ADC_NAME: streamRoute.name,
-          }
-        : labels,
+      labels:
+        nameMode === 'label'
+          ? {
+              ...labels,
+              __ADC_NAME: streamRoute.name,
+            }
+          : labels,
       plugins: streamRoute.plugins,
       remote_addr: streamRoute.remote_addr,
       server_addr: streamRoute.server_addr,

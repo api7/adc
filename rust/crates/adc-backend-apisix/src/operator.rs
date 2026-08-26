@@ -23,13 +23,13 @@
 //!   creates, matching the differ's own topological ordering.
 
 use adc_backend_core::{
-    HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err, deserialize_event_value,
-    encode_path_segment, missing_parent, to_request_body,
+    HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err,
+    deserialize_event_value, encode_path_segment, missing_parent, to_request_body,
 };
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
-    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
-    ResourceType, SYNC_EVENT_SPAN_NAME, ValueDiff,
+    BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType,
+    PathSegment, ResourceType, SYNC_EVENT_SPAN_NAME, ValueDiff,
 };
 use semver::Version;
 use serde_json::Value;
@@ -46,7 +46,11 @@ pub struct Operator {
 
 impl Operator {
     pub fn new(client: HttpClient, version: Version) -> Self {
-        Self { client, version, retry_policy: RetryPolicy::default() }
+        Self {
+            client,
+            version,
+            retry_policy: RetryPolicy::default(),
+        }
     }
 
     /// Applies `events`. A version-gate rejection (`check_version_support`)
@@ -60,20 +64,33 @@ impl Operator {
     /// dispatched at all, and every result — from this group and any
     /// accumulated from earlier ones — is discarded in favor of the single
     /// `Err`.
-    pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError> {
+    pub async fn sync(
+        &self,
+        events: Vec<Event>,
+        opts: BackendSyncOptions,
+    ) -> Result<Vec<BackendSyncResult>, BackendError> {
         let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
 
         let mut results = Vec::new();
         for group in group_events(events) {
             if exit_on_failure {
-                let group_results = concurrent_map_until_err(group, opts.concurrent, |event| self.apply(event)).await.map_err(|(_, error)| error)?;
+                let group_results =
+                    concurrent_map_until_err(group, opts.concurrent, |event| self.apply(event))
+                        .await
+                        .map_err(|(_, error)| error)?;
                 results.extend(group_results);
             } else {
-                let group_results = concurrent_map(group, opts.concurrent, |event| self.apply(event)).await;
+                let group_results =
+                    concurrent_map(group, opts.concurrent, |event| self.apply(event)).await;
                 for outcome in group_results {
                     match outcome {
                         Ok(result) => results.push(result),
-                        Err((event, error)) => results.push(BackendSyncResult { success: false, event: Some(event), error: Some(error), server: None }),
+                        Err((event, error)) => results.push(BackendSyncResult {
+                            success: false,
+                            event: Some(event),
+                            error: Some(error),
+                            server: None,
+                        }),
                     }
                 }
             }
@@ -130,25 +147,44 @@ impl Operator {
     #[allow(clippy::result_large_err)]
     async fn apply_inner(&self, event: Event) -> Result<BackendSyncResult, (Event, BackendError)> {
         if let Err(error) = self.check_version_support(&event) {
-            log::warn!("skipping {:?} {:?} \"{}\": {error}", event.event_type(), event.resource_type, event.resource_name);
-            return Ok(BackendSyncResult { success: false, event: Some(event), error: Some(error), server: None });
+            log::warn!(
+                "skipping {:?} {:?} \"{}\": {error}",
+                event.event_type(),
+                event.resource_type,
+                event.resource_name
+            );
+            return Ok(BackendSyncResult {
+                success: false,
+                event: Some(event),
+                error: Some(error),
+                server: None,
+            });
         }
 
         match self.operate(&event).await {
-            Ok(()) => Ok(BackendSyncResult { success: true, event: Some(event), error: None, server: None }),
+            Ok(()) => Ok(BackendSyncResult {
+                success: true,
+                event: Some(event),
+                error: None,
+                server: None,
+            }),
             Err(error) => Err((event, error)),
         }
     }
 
     fn check_version_support(&self, event: &Event) -> Result<(), BackendError> {
-        if event.resource_type == ResourceType::StreamRoute && self.version < Version::new(3, 7, 0) {
+        if event.resource_type == ResourceType::StreamRoute && self.version < Version::new(3, 7, 0)
+        {
             return Err(BackendError::Unsupported(
                 "stream routes are not supported on apisix versions below 3.7.0".to_string(),
             ));
         }
-        if event.resource_type == ResourceType::ConsumerCredential && self.version < Version::new(3, 11, 0) {
+        if event.resource_type == ResourceType::ConsumerCredential
+            && self.version < Version::new(3, 11, 0)
+        {
             return Err(BackendError::Unsupported(
-                "consumer credentials are not supported on apisix versions below 3.11.0".to_string(),
+                "consumer credentials are not supported on apisix versions below 3.11.0"
+                    .to_string(),
             ));
         }
         Ok(())
@@ -218,13 +254,19 @@ mod retry_tests {
 
     #[test]
     fn a_plain_4xx_api_error_is_not_retriable() {
-        let err = BackendError::Api { status: 400, message: "bad config".into() };
+        let err = BackendError::Api {
+            status: 400,
+            message: "bad config".into(),
+        };
         assert!(!is_retriable(&err));
     }
 
     #[test]
     fn a_5xx_api_error_is_still_retriable() {
-        let err = BackendError::Api { status: 502, message: "bad gateway".into() };
+        let err = BackendError::Api {
+            status: 502,
+            message: "bad gateway".into(),
+        };
         assert!(is_retriable(&err));
     }
 
@@ -262,18 +304,27 @@ fn group_events(events: Vec<Event>) -> Vec<Vec<Event>> {
 fn main_path(event: &Event) -> Result<String, BackendError> {
     let resource_id = encode_path_segment(&event.resource_id)?;
     if event.resource_type == ResourceType::ConsumerCredential {
-        let parent_id = event.parent_id.as_deref().ok_or_else(|| missing_parent(event))?;
+        let parent_id = event
+            .parent_id
+            .as_deref()
+            .ok_or_else(|| missing_parent(event))?;
         let parent_id = encode_path_segment(parent_id)?;
-        return Ok(format!("/apisix/admin/consumers/{parent_id}/credentials/{resource_id}"));
+        return Ok(format!(
+            "/apisix/admin/consumers/{parent_id}/credentials/{resource_id}"
+        ));
     }
-    let api_name = resource_type_to_api_name(event.resource_type)
-        .expect("ConsumerCredential is the only resource type with no api name, and it's handled above");
+    let api_name = resource_type_to_api_name(event.resource_type).expect(
+        "ConsumerCredential is the only resource type with no api name, and it's handled above",
+    );
     Ok(format!("/apisix/admin/{api_name}/{resource_id}"))
 }
 
 fn diff_path_is_upstream(diff: &ValueDiff) -> bool {
     let path = match diff {
-        ValueDiff::New { path, .. } | ValueDiff::Deleted { path, .. } | ValueDiff::Edit { path, .. } | ValueDiff::Array { path, .. } => path,
+        ValueDiff::New { path, .. }
+        | ValueDiff::Deleted { path, .. }
+        | ValueDiff::Edit { path, .. }
+        | ValueDiff::Array { path, .. } => path,
     };
     matches!(path.first(), Some(PathSegment::Key(key)) if key == "upstream")
 }
@@ -301,16 +352,27 @@ type BuiltRequest = (Method, String, Option<Value>, RequestKind);
 /// `transform_service` returns `None` when it doesn't, which the upstream
 /// sub-request must turn into a DELETE (nothing to PUT) rather than an error.
 fn service_has_upstream(event: &Event) -> bool {
-    event.kind.new_value().and_then(|v| v.get("upstream")).is_some_and(|v| !v.is_null())
+    event
+        .kind
+        .new_value()
+        .and_then(|v| v.get("upstream"))
+        .is_some_and(|v| !v.is_null())
 }
 
 fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>, BackendError> {
     let is_delete = event.event_type() == EventType::Delete;
-    let main_method = if is_delete { Method::DELETE } else { Method::PUT };
+    let main_method = if is_delete {
+        Method::DELETE
+    } else {
+        Method::PUT
+    };
     let mut paths = vec![(main_path(event)?, RequestKind::Main, main_method)];
 
     if event.resource_type == ResourceType::Service {
-        let upstream_path = format!("/apisix/admin/upstreams/{}", encode_path_segment(&event.resource_id)?);
+        let upstream_path = format!(
+            "/apisix/admin/upstreams/{}",
+            encode_path_segment(&event.resource_id)?
+        );
         match event.event_type() {
             EventType::Delete => paths.push((upstream_path, RequestKind::Upstream, Method::DELETE)),
             EventType::Create => {
@@ -320,7 +382,13 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
             }
             EventType::Update => {
                 let diff = event.kind.diff().filter(|d| !d.is_empty()).ok_or_else(|| {
-                    BackendError::Other(format!("service {:?} update event is missing diff info", event.resource_id).into())
+                    BackendError::Other(
+                        format!(
+                            "service {:?} update event is missing diff info",
+                            event.resource_id
+                        )
+                        .into(),
+                    )
                 })?;
                 let touches_non_upstream = diff.iter().any(|d| !diff_path_is_upstream(d));
                 let touches_upstream = diff.iter().any(diff_path_is_upstream);
@@ -366,7 +434,11 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
     paths
         .into_iter()
         .map(|(path, kind, method)| {
-            let body = if method == Method::DELETE { None } else { Some(request_body(event, kind, version)?) };
+            let body = if method == Method::DELETE {
+                None
+            } else {
+                Some(request_body(event, kind, version)?)
+            };
             Ok((method, path, body, kind))
         })
         .collect()
@@ -375,11 +447,22 @@ fn build_requests(event: &Event, version: &Version) -> Result<Vec<BuiltRequest>,
 /// Builds the JSON body for one request. For a `SERVICE` event this is
 /// called once per request path, and `kind` says which of the (up to two)
 /// it's building for.
-fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<Value, BackendError> {
-    let new_value = event.kind.new_value().ok_or_else(|| BackendError::Other("create/update event is missing new_value".into()))?;
+fn request_body(
+    event: &Event,
+    kind: RequestKind,
+    version: &Version,
+) -> Result<Value, BackendError> {
+    let new_value = event
+        .kind
+        .new_value()
+        .ok_or_else(|| BackendError::Other("create/update event is missing new_value".into()))?;
 
     match event.resource_type {
-        ResourceType::Consumer => to_request_body(typing::Consumer::from(deserialize_event_value::<adc::Consumer>(new_value)?)),
+        ResourceType::Consumer => {
+            to_request_body(typing::Consumer::from(deserialize_event_value::<
+                adc::Consumer,
+            >(new_value)?))
+        }
         ResourceType::ConsumerGroup => {
             let group: adc::ConsumerGroup = deserialize_event_value(new_value)?;
             let (mut wire, _consumers) = transformer::transform_consumer_group(group);
@@ -397,7 +480,9 @@ fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<V
             credential.id = Some(event.resource_id.clone());
             to_request_body(typing::ConsumerCredential::from(credential))
         }
-        ResourceType::GlobalRule => Ok(serde_json::json!({ "plugins": { event.resource_id.clone(): new_value.clone() } })),
+        ResourceType::GlobalRule => {
+            Ok(serde_json::json!({ "plugins": { event.resource_id.clone(): new_value.clone() } }))
+        }
         ResourceType::PluginMetadata => Ok(new_value.clone()),
         ResourceType::Route => {
             // The differ's event carries the authoritative id
@@ -407,7 +492,10 @@ fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<V
             // the URL, including when the body's id is empty.
             let mut route: adc::Route = deserialize_event_value(new_value)?;
             route.id = Some(event.resource_id.clone());
-            let parent_id = event.parent_id.clone().ok_or_else(|| missing_parent(event))?;
+            let parent_id = event
+                .parent_id
+                .clone()
+                .ok_or_else(|| missing_parent(event))?;
             to_request_body(transformer::transform_route(route, parent_id))
         }
         ResourceType::Service => {
@@ -417,7 +505,13 @@ fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<V
             match kind {
                 RequestKind::Upstream => {
                     let upstream = wire_upstream.ok_or_else(|| {
-                        BackendError::Other(format!("service {:?} has no default upstream to write", event.resource_id).into())
+                        BackendError::Other(
+                            format!(
+                                "service {:?} has no default upstream to write",
+                                event.resource_id
+                            )
+                            .into(),
+                        )
                     })?;
                     to_request_body(upstream)
                 }
@@ -431,23 +525,32 @@ fn request_body(event: &Event, kind: RequestKind, version: &Version) -> Result<V
         }
         ResourceType::StreamRoute => {
             let route: adc::StreamRoute = deserialize_event_value(new_value)?;
-            let parent_id = event.parent_id.clone().ok_or_else(|| missing_parent(event))?;
-            let inject_name = *version >= Version::new(3, 8, 0);
-            to_request_body(transformer::transform_stream_route(route, parent_id, inject_name))
+            let parent_id = event
+                .parent_id
+                .clone()
+                .ok_or_else(|| missing_parent(event))?;
+            let name_mode = transformer::StreamRouteNameMode::for_version(version);
+            to_request_body(transformer::transform_stream_route(
+                route, parent_id, name_mode,
+            ))
         }
         ResourceType::Upstream => {
             let upstream: adc::Upstream = deserialize_event_value(new_value)?;
             let mut wire = typing::Upstream::from(upstream);
             if let Some(parent_id) = &event.parent_id {
                 let mut labels = wire.labels.unwrap_or_default();
-                labels.insert(typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(), adc::LabelValue::Single(parent_id.clone()));
+                labels.insert(
+                    typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(),
+                    adc::LabelValue::Single(parent_id.clone()),
+                );
                 wire.labels = Some(labels);
             }
             to_request_body(wire)
         }
-        ResourceType::InternalStreamService => {
-            Err(BackendError::Unsupported(format!("{:?} is not directly syncable by the apisix backend", event.resource_type)))
-        }
+        ResourceType::InternalStreamService => Err(BackendError::Unsupported(format!(
+            "{:?} is not directly syncable by the apisix backend",
+            event.resource_type
+        ))),
     }
 }
 
@@ -463,7 +566,13 @@ mod tests {
     }
 
     fn create(rt: ResourceType, id: &str) -> Event {
-        event(rt, EventKind::Create { new_value: json!({}) }, id)
+        event(
+            rt,
+            EventKind::Create {
+                new_value: json!({}),
+            },
+            id,
+        )
     }
 
     #[test]
@@ -471,7 +580,13 @@ mod tests {
         let route1 = create(ResourceType::Route, "r1");
         let consumer = create(ResourceType::Consumer, "c1");
         let route2 = create(ResourceType::Route, "r2");
-        let ssl_delete = event(ResourceType::Ssl, EventKind::Delete { old_value: json!({}) }, "s1");
+        let ssl_delete = event(
+            ResourceType::Ssl,
+            EventKind::Delete {
+                old_value: json!({}),
+            },
+            "s1",
+        );
 
         let groups = group_events(vec![route1, consumer, route2, ssl_delete]);
 
@@ -492,7 +607,13 @@ mod tests {
     #[test]
     fn same_resource_type_but_different_event_type_gets_its_own_group() {
         let create_route = create(ResourceType::Route, "r1");
-        let delete_route = event(ResourceType::Route, EventKind::Delete { old_value: json!({}) }, "r2");
+        let delete_route = event(
+            ResourceType::Route,
+            EventKind::Delete {
+                old_value: json!({}),
+            },
+            "r2",
+        );
 
         let groups = group_events(vec![create_route, delete_route]);
 
@@ -515,7 +636,9 @@ mod tests {
         // path (built from `event.resource_id`) and APISIX will reject it.
         let group_event = Event::new(
             ResourceType::ConsumerGroup,
-            EventKind::Create { new_value: json!({ "name": "renamed-group" }) },
+            EventKind::Create {
+                new_value: json!({ "name": "renamed-group" }),
+            },
             "stable-id",
             "renamed-group",
         );
@@ -530,12 +653,22 @@ mod tests {
     fn service_create_without_an_upstream_produces_only_the_main_request() {
         let service_event = event(
             ResourceType::Service,
-            EventKind::Create { new_value: json!({ "name": "svc-no-upstream" }) },
+            EventKind::Create {
+                new_value: json!({ "name": "svc-no-upstream" }),
+            },
             "svc-no-upstream",
         );
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
-        assert_eq!(requests.len(), 1, "no upstream request should be generated for a service with no upstream");
-        assert!(requests[0].1.ends_with("/services/svc-no-upstream"), "{}", requests[0].1);
+        assert_eq!(
+            requests.len(),
+            1,
+            "no upstream request should be generated for a service with no upstream"
+        );
+        assert!(
+            requests[0].1.ends_with("/services/svc-no-upstream"),
+            "{}",
+            requests[0].1
+        );
     }
 
     /// Regression: losing the upstream's *presence* (not just its content)
@@ -549,21 +682,38 @@ mod tests {
     fn service_update_removing_its_upstream_detaches_the_reference_before_deleting_it() {
         let old_value = json!({ "name": "svc1", "upstream": { "nodes": [] } });
         let new_value = json!({ "name": "svc1" });
-        let diff = vec![ValueDiff::Deleted { path: vec![PathSegment::Key("upstream".to_string())], lhs: old_value["upstream"].clone() }];
-        let service_event =
-            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+        let diff = vec![ValueDiff::Deleted {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            lhs: old_value["upstream"].clone(),
+        }];
+        let service_event = Event::new(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value,
+                new_value,
+                diff: Some(diff),
+            },
+            "svc1",
+            "svc1",
+        );
 
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 2);
 
         let (method, path, body, kind) = &requests[0];
-        assert!(matches!(kind, RequestKind::Main), "service request must come first");
+        assert!(
+            matches!(kind, RequestKind::Main),
+            "service request must come first"
+        );
         assert_eq!(*method, Method::PUT);
         assert_eq!(body.as_ref().unwrap()["upstream_id"], Value::Null);
         assert!(path.ends_with("/services/svc1"), "{path}");
 
         let (method, path, body, kind) = &requests[1];
-        assert!(matches!(kind, RequestKind::Upstream), "upstream DELETE must come after");
+        assert!(
+            matches!(kind, RequestKind::Upstream),
+            "upstream DELETE must come after"
+        );
         assert_eq!(*method, Method::DELETE);
         assert!(body.is_none());
         assert!(path.ends_with("/upstreams/svc1"), "{path}");
@@ -575,20 +725,43 @@ mod tests {
     /// `touches_non_upstream` was already true), but still ordered the
     /// upstream DELETE *before* the service request that detaches it.
     #[test]
-    fn service_update_changing_another_field_and_removing_its_upstream_still_detaches_before_deleting() {
-        let old_value = json!({ "name": "svc1", "description": "old", "upstream": { "nodes": [] } });
+    fn service_update_changing_another_field_and_removing_its_upstream_still_detaches_before_deleting()
+     {
+        let old_value =
+            json!({ "name": "svc1", "description": "old", "upstream": { "nodes": [] } });
         let new_value = json!({ "name": "svc1", "description": "new" });
         let diff = vec![
-            ValueDiff::Edit { path: vec![PathSegment::Key("description".to_string())], lhs: json!("old"), rhs: json!("new") },
-            ValueDiff::Deleted { path: vec![PathSegment::Key("upstream".to_string())], lhs: old_value["upstream"].clone() },
+            ValueDiff::Edit {
+                path: vec![PathSegment::Key("description".to_string())],
+                lhs: json!("old"),
+                rhs: json!("new"),
+            },
+            ValueDiff::Deleted {
+                path: vec![PathSegment::Key("upstream".to_string())],
+                lhs: old_value["upstream"].clone(),
+            },
         ];
-        let service_event =
-            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+        let service_event = Event::new(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value,
+                new_value,
+                diff: Some(diff),
+            },
+            "svc1",
+            "svc1",
+        );
 
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 2);
-        assert!(matches!(requests[0].3, RequestKind::Main), "service request must come first");
-        assert!(matches!(requests[1].3, RequestKind::Upstream), "upstream DELETE must come after");
+        assert!(
+            matches!(requests[0].3, RequestKind::Main),
+            "service request must come first"
+        );
+        assert!(
+            matches!(requests[1].3, RequestKind::Upstream),
+            "upstream DELETE must come after"
+        );
         assert_eq!(requests[1].0, Method::DELETE);
     }
 
@@ -599,20 +772,37 @@ mod tests {
     fn service_update_gaining_an_upstream_creates_it_before_pointing_the_service_at_it() {
         let old_value = json!({ "name": "svc1" });
         let new_value = json!({ "name": "svc1", "upstream": { "nodes": [{"host":"1.1.1.1","port":80,"weight":1}] } });
-        let diff = vec![ValueDiff::New { path: vec![PathSegment::Key("upstream".to_string())], rhs: new_value["upstream"].clone() }];
-        let service_event =
-            Event::new(ResourceType::Service, EventKind::Update { old_value, new_value, diff: Some(diff) }, "svc1", "svc1");
+        let diff = vec![ValueDiff::New {
+            path: vec![PathSegment::Key("upstream".to_string())],
+            rhs: new_value["upstream"].clone(),
+        }];
+        let service_event = Event::new(
+            ResourceType::Service,
+            EventKind::Update {
+                old_value,
+                new_value,
+                diff: Some(diff),
+            },
+            "svc1",
+            "svc1",
+        );
 
         let requests = build_requests(&service_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 2);
 
         let (method, path, _, kind) = &requests[0];
-        assert!(matches!(kind, RequestKind::Upstream), "upstream PUT must come first");
+        assert!(
+            matches!(kind, RequestKind::Upstream),
+            "upstream PUT must come first"
+        );
         assert_eq!(*method, Method::PUT);
         assert!(path.ends_with("/upstreams/svc1"), "{path}");
 
         let (method, path, body, kind) = &requests[1];
-        assert!(matches!(kind, RequestKind::Main), "service request must come after");
+        assert!(
+            matches!(kind, RequestKind::Main),
+            "service request must come after"
+        );
         assert_eq!(*method, Method::PUT);
         assert_eq!(body.as_ref().unwrap()["upstream_id"], "svc1");
         assert!(path.ends_with("/services/svc1"), "{path}");
@@ -622,7 +812,11 @@ mod tests {
     fn service_update_with_no_diff_is_rejected_instead_of_silently_sending_nothing() {
         let service_event = Event::new(
             ResourceType::Service,
-            EventKind::Update { old_value: json!({}), new_value: json!({}), diff: None },
+            EventKind::Update {
+                old_value: json!({}),
+                new_value: json!({}),
+                diff: None,
+            },
             "svc1",
             "svc1",
         );
@@ -634,7 +828,9 @@ mod tests {
         let route_event = {
             let mut e = event(
                 ResourceType::Route,
-                EventKind::Create { new_value: json!({ "name": "r1", "uris": ["/x"] }) },
+                EventKind::Create {
+                    new_value: json!({ "name": "r1", "uris": ["/x"] }),
+                },
                 "a/../b",
             );
             e.parent_id = Some("svc1".to_string());
@@ -642,7 +838,11 @@ mod tests {
         };
         let requests = build_requests(&route_event, &Version::new(3, 17, 0)).unwrap();
         assert_eq!(requests.len(), 1);
-        assert!(requests[0].1.starts_with("/apisix/admin/routes/"), "{}", requests[0].1);
+        assert!(
+            requests[0].1.starts_with("/apisix/admin/routes/"),
+            "{}",
+            requests[0].1
+        );
         assert!(!requests[0].1.contains("/../"), "{}", requests[0].1);
     }
 }
