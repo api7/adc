@@ -37,7 +37,7 @@ axum = { workspace = true }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 rustls = { workspace = true }
 rustls-pemfile = "2"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-tls", "json"] }
 uuid = { version = "1", features = ["v4"] }
 lru = "0.16"
 url = { workspace = true }
