@@ -51,7 +51,7 @@ async fn main() {
         Command::Lint(args) => cmd_lint(args).await,
         Command::Validate(args) => cmd_validate(args).await,
         Command::Convert(args) => cmd_convert(args).await,
-        Command::IngressSync => Err(CliError::msg("adc ingress-sync: not yet implemented")),
+        Command::IngressSync => Err(CliError::msg("adc ingress-sync: deprecated")),
         Command::IngressServer(args) => server::run(args).await,
     };
 
