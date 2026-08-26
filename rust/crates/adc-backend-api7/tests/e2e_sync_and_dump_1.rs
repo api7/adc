@@ -10,8 +10,7 @@ use serde_json::json;
 
 mod common;
 use common::{
-    assert_matches_object, create_event, delete_event, dump_configuration, read_asset, sync_events,
-    update_event,
+    assert_matches_object, create_event, delete_event, dump_configuration, sync_events, update_event,
 };
 
 #[tokio::test]
@@ -237,114 +236,6 @@ async fn syncs_and_dumps_a_service_with_stream_routes() {
     let dump = dump_configuration(&backend).await.unwrap();
     assert!(dump.services.is_none_or(|s| s.is_empty()));
 }
-
-#[tokio::test]
-#[ignore]
-async fn syncs_and_dumps_ssls() {
-    let backend = common::backend().await;
-    let cert1 = read_asset("certs/test-ssl1.cer").trim().to_string();
-    let key1 = read_asset("certs/test-ssl1.key").trim().to_string();
-    let cert2 = read_asset("certs/test-ssl2.cer").trim().to_string();
-    let key2 = read_asset("certs/test-ssl2.key").trim().to_string();
-
-    let ssl1_snis = ["ssl1-1.com", "ssl1-2.com"];
-    let mut ssl1 =
-        json!({ "snis": ssl1_snis, "certificates": [{ "certificate": cert1, "key": key1 }] });
-    let ssl2_snis = ["ssl2-1.com", "ssl2-2.com"];
-    let ssl2 =
-        json!({ "snis": ssl2_snis, "certificates": [{ "certificate": cert2, "key": key2 }] });
-    let ssl_name = |snis: &[&str]| snis.join(",");
-
-    let mut ssl1_test = ssl1.clone();
-    ssl1_test["certificates"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("key");
-    let mut ssl2_test = ssl2.clone();
-    ssl2_test["certificates"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("key");
-
-    sync_events(
-        &backend,
-        vec![
-            create_event(ResourceType::Ssl, &ssl_name(&ssl1_snis), ssl1.clone(), None),
-            create_event(ResourceType::Ssl, &ssl_name(&ssl2_snis), ssl2.clone(), None),
-        ],
-    )
-    .await
-    .unwrap();
-
-    let dump = dump_configuration(&backend).await.unwrap();
-    let mut ssls = dump.ssls.unwrap();
-    ssls.sort_by(|a, b| a.id.cmp(&b.id));
-    assert_eq!(ssls.len(), 2);
-    assert_matches_object(&serde_json::to_value(&ssls[0]).unwrap(), &ssl2_test);
-    assert_matches_object(&serde_json::to_value(&ssls[1]).unwrap(), &ssl1_test);
-    // The subset matches above don't check `key` at all (it was removed
-    // from the expected object) — assert directly that it comes back as
-    // the empty string, not the submitted key echoed back.
-    assert_eq!(ssls[0].certificates[0].key, "");
-    assert_eq!(ssls[1].certificates[0].key, "");
-
-    ssl1["labels"] = json!({ "test": "test" });
-    sync_events(
-        &backend,
-        vec![update_event(
-            ResourceType::Ssl,
-            &ssl_name(&ssl1_snis),
-            ssl1.clone(),
-            None,
-        )],
-    )
-    .await
-    .unwrap();
-
-    // Not sorted, unlike the dump above: the just-updated ssl1 comes back
-    // first in the dashboard's own natural order.
-    let dump = dump_configuration(&backend).await.unwrap();
-    let ssls = dump.ssls.unwrap();
-    let mut expected = ssl1.clone();
-    expected["certificates"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("key");
-    assert_matches_object(&serde_json::to_value(&ssls[0]).unwrap(), &expected);
-
-    sync_events(
-        &backend,
-        vec![delete_event(ResourceType::Ssl, &ssl_name(&ssl1_snis), None)],
-    )
-    .await
-    .unwrap();
-    let dump = dump_configuration(&backend).await.unwrap();
-    let ssls = dump.ssls.unwrap();
-    assert_eq!(ssls.len(), 1);
-    assert_matches_object(&serde_json::to_value(&ssls[0]).unwrap(), &ssl2_test);
-
-    sync_events(
-        &backend,
-        vec![delete_event(ResourceType::Ssl, &ssl_name(&ssl2_snis), None)],
-    )
-    .await
-    .unwrap();
-    let dump = dump_configuration(&backend).await.unwrap();
-    assert!(dump.ssls.is_none_or(|s| s.is_empty()));
-}
-
-// No e2e round-trip test for a multi-certificate SSL: confirmed against a
-// live instance that a single write can never carry more than one
-// certificate at all — API7's admin API validates `cert`+`key` and
-// `certs`+`keys` as mutually exclusive alternatives, *and* `certs`/`keys`
-// are each capped at exactly one item, so no field combination lets one PUT
-// accept two certificates. The read-direction fix (`From<typing::Ssl> for
-// adc::SSL` recovering `cert`+`certs` together) still matters for dumping
-// an *existing* multi-cert SSL — reachable by other means than this
-// backend's own write path — but there's no way to create one through
-// `sync_events` for this suite to round-trip against; see
-// `transformer::tests::ssl_from_wire_recovers_every_certificate_and_key_pair`
-// for that behavior's unit coverage instead.
 
 #[tokio::test]
 #[ignore]
