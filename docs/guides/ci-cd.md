@@ -103,7 +103,7 @@ adc diff \
   --label-selector team=catalog,env=staging
 ```
 
-`validate` asks the backend to check the proposed resources without applying them. It requires API7 Enterprise 3.9.10 or later. On Apache APISIX, ADC calls `/apisix/admin/configs/validate`; if that endpoint is missing, the command fails and you should skip `validate` on that version. `diff` prints a summary and writes the complete machine-readable plan to `diff.yaml`. Upload `diff.yaml` as a CI artifact so reviewers can inspect creates, updates, and deletions.
+`validate` asks the backend to check the proposed resources without applying them. It requires API7 Enterprise 3.9.10 or later, or Apache APISIX 3.17 or later. On older APISIX versions the Admin API has no `/apisix/admin/configs/validate` endpoint and the command fails; skip `validate` then. `diff` prints a summary and writes the complete machine-readable plan to `diff.yaml`. Upload `diff.yaml` as a CI artifact so reviewers can inspect creates, updates, and deletions.
 
 ADC has no apply-plan command. Reviewers inspect `diff.yaml`; they do not apply that file. `adc diff` also exits successfully when it finds differences. If a policy requires the job to fail on drift, inspect `diff.yaml` explicitly as shown in [Detect Drift](#detect-drift).
 
@@ -175,7 +175,7 @@ For configuration that round-trips without backend normalization, `diff.yaml` sh
 []
 ```
 
-If the same diff remains after a successful sync, inspect whether the backend populated defaults or normalized an equivalent configuration form. Align the source file with a stable ADC representation when possible, and test the result again. Do not enable a failing drift job, and do not suppress repeated events blindly: a persistent diff can also indicate a failed operation or real drift. Apache APISIX often fills defaults such as route `priority` and upstream `hash_on`; see [Apache APISIX backend notes](../../libs/backend-apisix/README.md).
+If the same diff remains after a successful sync, inspect whether the backend populated defaults or normalized an equivalent configuration form. Align the source file with a stable ADC representation when possible, and test the result again. Do not enable a failing drift job, and do not suppress repeated events blindly: a persistent diff can also indicate a failed operation or real drift. Some Apache APISIX versions fill defaults such as route `priority` and upstream `hash_on`; see [Apache APISIX backend notes](../../libs/backend-apisix/README.md). Test the exact APISIX version your pipeline uses before treating an empty `diff.yaml` as the expected post-sync result.
 
 Then run application-level smoke tests through the gateway. ADC verifies and reconciles gateway configuration, but it does not prove that upstream applications, DNS, certificates, or external dependencies behave as expected.
 
