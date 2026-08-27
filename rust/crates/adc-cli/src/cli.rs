@@ -38,7 +38,7 @@ pub enum Command {
     #[command(hide = true)]
     IngressSync,
     /// run the local ingress server
-    #[command(hide = true)]
+    #[command(hide = true, alias = "server")]
     IngressServer(IngressServerArgs),
 }
 
@@ -296,4 +296,24 @@ fn existing_file(raw: &str) -> Result<PathBuf, String> {
 /// only ever deals with bytes already in memory, never a path.
 fn read_file_bytes(raw: &str) -> Result<Vec<u8>, String> {
     std::fs::read(raw).map_err(|e| format!("{raw}: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Older deployment manifests (e.g. apisix-ingress-controller's) invoke
+    // this subcommand as `server`, from before it was renamed.
+    #[test]
+    fn server_is_still_accepted_as_an_alias_for_ingress_server() {
+        let cli = Cli::try_parse_from(["adc", "server"]).unwrap();
+        assert!(matches!(cli.command, Command::IngressServer(_)));
+    }
+
+    // The alias must not shadow the real name it stands in for.
+    #[test]
+    fn ingress_server_still_works_under_its_own_name() {
+        let cli = Cli::try_parse_from(["adc", "ingress-server"]).unwrap();
+        assert!(matches!(cli.command, Command::IngressServer(_)));
+    }
 }
