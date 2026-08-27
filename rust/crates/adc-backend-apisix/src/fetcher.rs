@@ -143,15 +143,11 @@ impl Fetcher {
         Ok(merged)
     }
 
-    /// Stream routes are an optional APISIX feature, and a `GET` on the
-    /// collection has no inputs that could be malformed, so any 4xx here
-    /// means "this instance has no stream routes to fetch" rather than a
-    /// bad request: a 404 when the endpoint doesn't exist on this
-    /// build, a 400 (`stream mode is disabled, can not add stream routes`)
-    /// when the build supports stream routes but the instance has stream
-    /// mode turned off. An auth failure still surfaces as
-    /// [`BackendError::Auth`], and a 5xx is still a real error, same as
-    /// [`Fetcher::list`].
+    /// Stream routes are an optional APISIX feature. Only a 404 (endpoint
+    /// absent on this build) or a 400 (`stream mode is disabled, can not
+    /// add stream routes` — stream mode turned off) yield an empty list.
+    /// Everything else propagates: 401/403 as [`BackendError::Auth`], any
+    /// other 4xx/5xx as [`BackendError::Api`], same as [`Fetcher::list`].
     pub async fn list_stream_routes(&self) -> Result<Vec<typing::StreamRoute>, BackendError> {
         if self.filter.is_skip(ResourceType::StreamRoute) {
             return Ok(Vec::new());
