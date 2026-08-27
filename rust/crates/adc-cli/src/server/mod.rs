@@ -7,6 +7,7 @@ mod backend;
 pub mod logging;
 mod schema;
 mod sync;
+mod sync_lock;
 mod validate;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};

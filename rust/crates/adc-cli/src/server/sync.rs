@@ -11,7 +11,7 @@ use axum::response::{IntoResponse, Response};
 use serde_json::{Value, json};
 
 use super::schema::{self, SyncInput};
-use super::{backend, bad_request, internal_error};
+use super::{backend, bad_request, internal_error, sync_lock};
 use crate::config;
 use crate::error::CliError;
 use crate::pipeline;
@@ -78,6 +78,20 @@ async fn run(
     exclude: &HashSet<ResourceType>,
     label_selector: &HashMap<String, String>,
 ) -> Result<Value, CliError> {
+    let is_apisix_standalone = backend_kind == "apisix-standalone";
+
+    // apisix-standalone folds every sync into one shared full document keyed
+    // by `cache_key` (see adc-backend-apisix-standalone::backend) — diffing
+    // against a dump and applying that diff has to happen as one unit, or a
+    // second concurrent sync for the same cache_key can diff against the
+    // same stale dump and silently overwrite what the first one just wrote.
+    // Held across dump+diff+sync below, released when `run` returns.
+    let _standalone_guard = if is_apisix_standalone {
+        Some(sync_lock::lock(&opts.cache_key).await)
+    } else {
+        None
+    };
+
     let gateway = backend::build_backend(opts)?;
     let remote = pipeline::load_remote(gateway.as_ref(), include, exclude, label_selector).await?;
     let events = pipeline::diff(gateway.as_ref(), &local, &remote).await?;
@@ -86,7 +100,6 @@ async fn run(
         exit_on_failure: Some(false),
     };
 
-    let is_apisix_standalone = backend_kind == "apisix-standalone";
     let events_for_output = is_apisix_standalone.then(|| events.clone());
     let results = gateway.sync(events, sync_opts).await?;
     Ok(match events_for_output {
