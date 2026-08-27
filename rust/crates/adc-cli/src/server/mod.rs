@@ -59,6 +59,11 @@ fn status_router(ready: Arc<AtomicBool>) -> Router {
 }
 
 pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
+    #[cfg(windows)]
+    if args.listen.scheme() == "unix" {
+        return Err(CliError::msg("--listen with a unix:// address is not supported on Windows"));
+    }
+
     // `signal()` registers synchronously, unlike `ctrl_c()` (an async fn
     // that only registers on first poll) — called first to close the race
     // where an early SIGINT hits before a spawned ctrl_c task gets polled.
