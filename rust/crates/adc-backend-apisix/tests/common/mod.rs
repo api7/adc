@@ -9,11 +9,22 @@ use adc_backend_apisix::Backend as ApisixBackend;
 use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 
 pub const SERVER: &str = "http://localhost:19180";
+/// The `apisix_no_stream` compose instance — same admin key, started
+/// without stream proxy enabled.
+pub const SERVER_NO_STREAM: &str = "http://localhost:39180";
 pub const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
 
 pub fn client() -> HttpClient {
+    client_for(SERVER)
+}
+
+pub fn client_no_stream() -> HttpClient {
+    client_for(SERVER_NO_STREAM)
+}
+
+fn client_for(server: &str) -> HttpClient {
     HttpClient::new(HttpClientConfig {
-        server: SERVER.to_string(),
+        server: server.to_string(),
         token: TOKEN.to_string(),
         timeout: None,
         tls: TlsConfig::default(),
