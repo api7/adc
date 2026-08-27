@@ -36,6 +36,7 @@ rustls = "0.23"
 http = "1"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "query"] }
 serde_yaml_ng = "0.10"
+dashmap = "6"
 
 [profile.release]
 opt-level = 3

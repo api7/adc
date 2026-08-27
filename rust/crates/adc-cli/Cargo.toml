@@ -33,6 +33,7 @@ tracing = { workspace = true }
 indicatif = "0.18"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 http = { workspace = true }
+dashmap = { workspace = true }
 axum = { workspace = true }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 rustls = { workspace = true }
