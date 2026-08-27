@@ -10,6 +10,7 @@ mod sync;
 mod validate;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+#[cfg(unix)]
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 use std::sync::Arc;
@@ -58,11 +59,20 @@ fn status_router(ready: Arc<AtomicBool>) -> Router {
 }
 
 pub async fn run(args: IngressServerArgs) -> Result<(), CliError> {
+    #[cfg(windows)]
+    if args.listen.scheme() == "unix" {
+        return Err(CliError::msg("--listen with a unix:// address is not supported on Windows"));
+    }
+
     // `signal()` registers synchronously, unlike `ctrl_c()` (an async fn
     // that only registers on first poll) — called first to close the race
     // where an early SIGINT hits before a spawned ctrl_c task gets polled.
+    #[cfg(unix)]
     let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
         .map_err(|e| CliError::msg(format!("failed to install SIGINT handler: {e}")))?;
+    #[cfg(windows)]
+    let mut sigint = tokio::signal::windows::ctrl_c()
+        .map_err(|e| CliError::msg(format!("failed to install Ctrl+C handler: {e}")))?;
 
     let app = adc_router();
 
@@ -119,7 +129,10 @@ async fn serve_adc(
     ready: Arc<AtomicBool>,
 ) -> Result<(), CliError> {
     match args.listen.scheme() {
+        #[cfg(unix)]
         "unix" => serve_unix(args, app, shutdown, ready).await,
+        #[cfg(windows)]
+        "unix" => Err(CliError::msg("--listen with a unix:// address is not supported on Windows")),
         "https" => serve_https(args, app, shutdown, ready).await,
         _ => serve_http(args, app, shutdown, ready).await,
     }
@@ -146,6 +159,7 @@ async fn serve_http(
 /// one gets `0o660` permissions once bound. The socket file itself is
 /// removed again on shutdown so a normal restart doesn't depend on this
 /// stale-file cleanup happening next time.
+#[cfg(unix)]
 async fn serve_unix(
     args: &IngressServerArgs,
     app: Router,
@@ -698,6 +712,7 @@ mod tests {
         task.abort();
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn unix_listener_removes_a_stale_socket_and_sets_0o660_permissions() {
         let dir = std::env::temp_dir().join(format!("adc-server-test-{}", uuid::Uuid::new_v4()));
@@ -745,6 +760,7 @@ mod tests {
     /// does for the TCP listener. `UnixStream` + a hand-written HTTP/1.1
     /// request line is used instead of pulling in a Unix-socket-aware HTTP
     /// client crate just for this one test.
+    #[cfg(unix)]
     #[tokio::test]
     async fn unix_listener_serves_real_requests_end_to_end() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
