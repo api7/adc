@@ -100,13 +100,14 @@ mod tests {
         let app = axum::Router::new().fallback(axum::routing::any(|| async {
             (axum::http::StatusCode::OK, "{}")
         }));
-        let addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let listener = std::net::TcpListener::bind(addr).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
+        let listener = listener.into_std().unwrap();
         let handle = axum_server::Handle::new();
         let server_handle = handle.clone();
         let task = tokio::spawn(async move {
             axum_server::from_tcp_rustls(listener, tls_config)
+                .expect("failed to configure rustls acceptor")
                 .handle(server_handle)
                 .serve(app.into_make_service())
                 .await

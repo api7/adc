@@ -9,7 +9,7 @@ rust-version.workspace = true
 adc-sdk = { path = "../adc-sdk" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml_ng = "0.10"
+serde_yaml_ng = { workspace = true }
 unicode-normalization = "0.1"
 url = { workspace = true }
 regex = { workspace = true }
@@ -17,4 +17,4 @@ thiserror = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]
-rstest = "0.23"
+rstest = "0.26.1"
