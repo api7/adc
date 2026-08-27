@@ -30,3 +30,4 @@ url = { workspace = true }
 adc-backend-apisix = { path = ".", features = ["test-utils"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
 axum = { workspace = true }
+rstest = { workspace = true }
