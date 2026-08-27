@@ -17,4 +17,4 @@ thiserror = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]
-rstest = "0.26.1"
+rstest = { workspace = true }

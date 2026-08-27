@@ -143,21 +143,27 @@ impl Fetcher {
         Ok(merged)
     }
 
-    /// Stream routes are an optional APISIX feature: on a version/build
-    /// that doesn't support them, the endpoint itself may not exist. Only a
-    /// 404 here is treated as "no stream routes" — anything else
-    /// (authentication/authorization failure, a 5xx) is a real error, same
-    /// as [`Fetcher::list`].
+    /// Stream routes are an optional APISIX feature, and a `GET` on the
+    /// collection has no inputs that could be malformed, so any 4xx here
+    /// means "this instance has no stream routes to fetch" rather than a
+    /// bad request: a 404 when the endpoint doesn't exist on this
+    /// build, a 400 (`stream mode is disabled, can not add stream routes`)
+    /// when the build supports stream routes but the instance has stream
+    /// mode turned off. An auth failure still surfaces as
+    /// [`BackendError::Auth`], and a 5xx is still a real error, same as
+    /// [`Fetcher::list`].
     pub async fn list_stream_routes(&self) -> Result<Vec<typing::StreamRoute>, BackendError> {
         if self.filter.is_skip(ResourceType::StreamRoute) {
             return Ok(Vec::new());
         }
         let builder = self.collection_request("/apisix/admin/stream_routes")?;
         let response = self.client.execute(builder).await?;
-        if response.status().as_u16() == 404 {
-            return Ok(Vec::new());
-        }
-        let response = HttpClient::require_success(response).await?;
+        let response = match HttpClient::require_success(response).await {
+            Ok(response) => response,
+            Err(BackendError::NotFound(_)) => return Ok(Vec::new()),
+            Err(BackendError::Api { status: 400, .. }) => return Ok(Vec::new()),
+            Err(e) => return Err(e),
+        };
         let body: typing::ListResponse<typing::StreamRoute> =
             response.json().await.map_err(|e| {
                 BackendError::Serialization(format!(
@@ -423,6 +429,7 @@ mod tests {
     use std::collections::HashSet;
 
     use adc_backend_core::{HttpClientConfig, TlsConfig};
+    use rstest::rstest;
 
     use super::*;
 
@@ -608,5 +615,65 @@ mod tests {
 
         let names: Vec<String> = configuration.services.unwrap().into_iter().map(|s| s.name).collect();
         assert_eq!(names, vec!["matches"]);
+    }
+
+    /// A server whose `/apisix/admin/stream_routes` always answers with a
+    /// fixed status (and an APISIX-shaped error body), and which answers
+    /// everything else generically.
+    async fn spawn_server_with_stream_routes_status(status: u16) -> String {
+        let status = axum::http::StatusCode::from_u16(status).unwrap();
+        let router = axum::Router::new()
+            .route(
+                "/apisix/admin/stream_routes",
+                axum::routing::get(move || async move {
+                    (status, axum::Json(serde_json::json!({ "error_msg": "stream routes error" })))
+                }),
+            )
+            .fallback(axum::routing::any(|| async { axum::Json(serde_json::json!({ "list": [] })) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        format!("http://{addr}")
+    }
+
+    /// A 404 (endpoint absent on this build) or a 400 (`stream mode is
+    /// disabled`) both mean "no stream routes" and must leave the dump
+    /// intact; an auth failure or a 5xx is still a real error.
+    #[rstest]
+    #[case(404, true)]
+    #[case(400, true)]
+    #[case(401, false)]
+    #[case(500, false)]
+    #[tokio::test]
+    async fn list_stream_routes_swallows_only_the_absent_statuses(
+        #[case] status: u16,
+        #[case] treated_as_absent: bool,
+    ) {
+        let server = spawn_server_with_stream_routes_status(status).await;
+        let client = HttpClient::new(HttpClientConfig {
+            server,
+            token: "test-token".to_string(),
+            timeout: None,
+            tls: TlsConfig::default(),
+        })
+        .unwrap();
+        let filter = ResourceFilter {
+            include: HashSet::new(),
+            exclude: HashSet::new(),
+            label_selector: HashMap::new(),
+        };
+        let fetcher = Fetcher::new(client, Version::new(999, 999, 999), filter, 10);
+
+        let list_result = fetcher.list_stream_routes().await;
+        let dump_result = fetcher.dump().await;
+        if treated_as_absent {
+            assert!(list_result.unwrap().is_empty());
+            assert_eq!(dump_result.unwrap().services, None);
+        } else {
+            assert!(list_result.is_err(), "{list_result:?}");
+            assert!(dump_result.is_err(), "{dump_result:?}");
+        }
     }
 }
