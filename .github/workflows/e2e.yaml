@@ -31,6 +31,7 @@ jobs:
   apisix:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.2.2
@@ -49,6 +50,7 @@ jobs:
           - 3.15.0
           - 3.16.0
           - 3.17.0
+          - 3.18.0
           - dev
     steps:
       - name: Determine APISIX image tag
@@ -79,10 +81,22 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix:test
+
+      # Run the Rust port's E2E tests against the same live apisix instance
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      - name: Run Rust E2E tests
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-apisix -- --ignored --test-threads=1
   apisix-standalone:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/apisix-standalone') || github.event_name == 'push'
     strategy:
+      fail-fast: false
       matrix:
         version:
           - 3.13.0
@@ -90,6 +104,7 @@ jobs:
           - 3.15.0
           - 3.16.0
           - 3.17.0
+          - 3.18.0
           - dev
     steps:
       - name: Determine APISIX image tag
@@ -120,6 +135,28 @@ jobs:
       # Run E2E tests
       - name: Run E2E tests
         run: npx nx run backend-apisix-standalone:test
+
+      # Run the Rust port's E2E tests against the same live cluster. Each
+      # test function restarts every instance itself before it starts
+      # (see adc-backend-apisix-standalone's tests/common/mod.rs), so
+      # running after the TS suite here is safe — nothing from the TS
+      # suite's own state survives into the Rust tests.
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      - name: Run Rust E2E tests
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-apisix-standalone -- --ignored --test-threads=1
+      # Only useful when the step above fails: a bare 404 from an admin API
+      # request gives no clue why on its own — the container's own error
+      # log does.
+      - name: Dump APISIX standalone container logs
+        if: failure()
+        working-directory: ./libs/backend-apisix-standalone/e2e/assets
+        run: docker compose logs --no-color
   api7:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
@@ -129,7 +166,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [3.5.5, 3.6.1, 3.7.8, 3.8.23, 3.9.14, 3.10.1, dev]
+        version: [3.5.5, 3.6.1, 3.7.8, 3.8.23, 3.9.19, 3.10.6, dev]
     steps:
       - name: Determine API7 image and license
         run: |
@@ -174,3 +211,91 @@ jobs:
       # Run API7 E2E tests
       - name: Run E2E tests
         run: npx nx run backend-api7:test
+  api7-rust:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'test/api7') || github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [3.5.5, 3.6.1, 3.7.8, 3.8.23, 3.9.19, 3.10.6, dev]
+    steps:
+      - name: Determine API7 image and license
+        run: |
+          if [ "${{ matrix.version }}" = "dev" ]; then
+            echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
+            echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
+            echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
+            {
+              echo "BACKEND_API7_LICENSE<<EOLICENSE"
+              echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"
+              echo "EOLICENSE"
+            } >> $GITHUB_ENV
+          else
+            echo "BACKEND_API7_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
+            echo "API7_DASHBOARD_IMAGE=api7/api7-ee-3-integrated" >> $GITHUB_ENV
+            echo "API7_IMAGE_TAG=v${{ matrix.version }}" >> $GITHUB_ENV
+            {
+              echo "BACKEND_API7_LICENSE<<EOLICENSE"
+              echo "${{ secrets.BACKEND_API7_LICENSE }}"
+              echo "EOLICENSE"
+            } >> $GITHUB_ENV
+          fi
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Login to GHCR
+        if: matrix.version == 'dev'
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Runs on its own dashboard instance, independent of the `api7` job's
+      # (rather than reusing that job's live instance after the TS suite runs)
+      # — the Rust e2e suite's `common::client()` performs its own admin
+      # login / password rotation / license activation / token minting on
+      # first use (see adc-backend-api7's tests/common/mod.rs), which would
+      # collide with the TS suite doing the same dance against a shared
+      # instance.
+      - name: Setup API7 Instance via Docker Compose
+        working-directory: ./libs/backend-api7/e2e/assets
+        run: |
+          if [ "${{ matrix.version }}" = "dev" ]; then docker compose pull; fi
+          docker compose up -d
+
+      # Run the Rust port's E2E tests
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> target
+      # Each test file below is its own process with no state shared
+      # between them, but they all talk to the one dashboard instance
+      # started above — so the admin login / password rotation / license
+      # activation / token minting dance runs here exactly once, and its
+      # result is shared with every other test file as `TOKEN` (see
+      # tests/e2e_init.rs), instead of each independently repeating it
+      # against a dashboard the first one to run already mutated.
+      - name: Bootstrap a shared API7 token
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-api7 --test e2e_init -- --ignored
+      - name: Run Rust E2E tests
+        working-directory: ./rust
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo test -p adc-backend-api7 -- --ignored --test-threads=1
+      # Only useful when the step above fails: `BackendError::Api`'s
+      # message is empty for a 500 with no response body, which the
+      # dashboard's own logs can actually explain.
+      - name: Dump API7 dashboard logs
+        if: failure()
+        working-directory: ./libs/backend-api7/e2e/assets
+        run: docker compose logs --no-color

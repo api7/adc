@@ -1,0 +1,24 @@
+{
+  "local": {
+    "services": [{
+      "name": "HTTPBIN Service1",
+      "routes": [
+        { "name": "Anything", "methods": ["GET"], "uris": ["/anything"] },
+        { "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] }
+      ],
+      "upstream": { "scheme": "http", "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 1, "priority": 0 }] }
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "5ce4033cfe1015450e0b81186f7d54b9327cc302",
+      "name": "HTTPBIN Service",
+      "description": "",
+      "routes": [
+        { "id": "5f2de5df1a292b4c8a73f0ec23271233d75707c6", "name": "Anything", "methods": ["GET"], "uris": ["/anything"] },
+        { "id": "ed048a2f75fe33eab67319810fbb94bb778d7d97", "name": "Generate UUID", "methods": ["GET"], "uris": ["/uuid"] }
+      ],
+      "upstream": { "scheme": "http", "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 1, "priority": 0 }] }
+    }]
+  }
+}

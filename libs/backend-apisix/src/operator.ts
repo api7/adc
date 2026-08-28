@@ -18,9 +18,9 @@ import {
   tap,
   throwError,
 } from 'rxjs';
-import { SemVer, gte as semVerGTE, lt as semVerLT } from 'semver';
+import { SemVer, lt as semVerLT } from 'semver';
 
-import { FromADC } from './transformer';
+import { FromADC, streamRouteNameModeForVersion } from './transformer';
 import * as typing from './typing';
 import { capitalizeFirstLetter, resourceTypeToAPIName } from './utils';
 
@@ -267,7 +267,7 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
         const route = fromADC.transformStreamRoute(
           event.newValue as ADCSDK.StreamRoute,
           event.parentId!,
-          semVerGTE(version, '3.8.0'),
+          streamRouteNameModeForVersion(version),
         );
         if (event.parentId) route.service_id = event.parentId;
         return route;

@@ -1,0 +1,8 @@
+{
+  "local": {
+    "ssls": [
+      { "snis": ["demo-sni1", "demo-sni2"], "certificates": [{ "certificate": "cert", "key": "key" }] }
+    ]
+  },
+  "remote": {}
+}

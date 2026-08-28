@@ -1,0 +1,33 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+x-adc-upstream-defaults:
+  hash_on: vars
+  key: root-key
+  retries: 3
+paths:
+  /anything:
+    x-adc-upstream-defaults:
+      key: path-key
+    get:
+      x-adc-upstream-defaults:
+        retries: 30
+      servers:
+        - url: https://httpbin.org/
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

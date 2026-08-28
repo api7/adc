@@ -31,6 +31,12 @@
           "configFile": "libs/differ/vitest.config.ts"
         }
       },
+      "dump-fixtures": {
+        "executor": "@nx/vitest:test",
+        "options": {
+          "configFile": "libs/differ/vitest.fixtures.config.ts"
+        }
+      },
       "build": {
         "executor": "@nx/esbuild:esbuild",
         "outputs": [

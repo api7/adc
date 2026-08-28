@@ -1,0 +1,34 @@
+info:
+  title: httpbin.org
+  description: httpbin.org description
+servers:
+  - url: https://httpbin.org/
+    x-adc-upstream-node-defaults:
+      priority: 1
+      metadata: { tag: root }
+  - url: https://httpbin.com/
+    x-adc-upstream-node-defaults:
+      priority: 2
+paths:
+  /anything:
+    get:
+      servers:
+        - url: https://httpbin.org/
+          x-adc-upstream-node-defaults:
+            priority: 10
+            metadata: { tag: override }
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}
+    put:
+      tags:
+        - Anything
+      summary: Returns anything passed in request data.
+      responses:
+        "200":
+          description: Anything passed in request
+          content: {}

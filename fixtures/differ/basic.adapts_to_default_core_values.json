@@ -1,0 +1,5 @@
+{
+  "local": { "consumers": [{ "username": "alice", "plugins": {} }] },
+  "remote": { "consumers": [{ "username": "alice", "description": "", "plugins": {} }] },
+  "defaultValue": { "core": { "consumer": { "description": "" } }, "plugins": {} }
+}

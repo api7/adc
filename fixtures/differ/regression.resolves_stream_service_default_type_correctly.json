@@ -1,0 +1,21 @@
+{
+  "local": {
+    "services": [{
+      "name": "Stream Service",
+      "stream_routes": [{ "name": "sr1", "server_port": 1234 }]
+    }]
+  },
+  "remote": {
+    "services": [{
+      "id": "e9e977eea9d9be80fca918a8fbcb2b5a1f59daaa",
+      "name": "Stream Service",
+      "description": "",
+      "stream_routes": [{
+        "id": "84e978cc4af2135ce17431d69659898d248850bf",
+        "name": "sr1",
+        "server_port": 1234
+      }]
+    }]
+  },
+  "defaultValue": { "core": { "stream_service": { "description": "" } }, "plugins": {} }
+}

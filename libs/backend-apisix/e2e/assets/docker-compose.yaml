@@ -26,6 +26,19 @@ services:
     networks:
       apisix:
 
+  apisix_no_stream:
+    image: apache/apisix:${BACKEND_APISIX_IMAGE:-3.9.0-debian}
+    restart: always
+    volumes:
+      - ./apisix_conf/no_stream.yaml:/usr/local/apisix/conf/config.yaml:ro
+    depends_on:
+      - etcd
+    ports:
+      - "39180:9180/tcp"
+      - "39080:9080/tcp"
+    networks:
+      apisix:
+
   etcd:
     image: bitnamilegacy/etcd:3.6
     restart: always

@@ -1,0 +1,128 @@
+//! The `Backend` trait: the interface every gateway integration (APISIX,
+//! api7, apisix-standalone) implements, and the shared result/error types
+//! that flow across it. `adc-sdk` only defines the contract — concrete
+//! implementations live in their own crates and depend on this one.
+
+mod error;
+
+pub use error::BackendError;
+
+use async_trait::async_trait;
+use semver::Version;
+
+use crate::{DefaultValue, Event, resources::Configuration};
+
+/// The `tracing` span name a `Backend::sync` implementation should wrap
+/// each individual event's application in — a real span (entered for that
+/// event's whole lifetime, closed when it's done), not a synthetic
+/// start/finish pair faked out of two plain events. This is the contract
+/// callers (the CLI's progress display, and eventually any
+/// `tracing-opentelemetry` export) rely on to find "one synced event" in
+/// the trace: match on this exact span name, don't rely on a private
+/// convention re-typed at each call site. Fields are left to each
+/// implementation to declare (this crate doesn't prescribe a schema for
+/// them), but should be plain data — no pre-formatted display text.
+pub const SYNC_EVENT_SPAN_NAME: &str = "sync_event";
+
+/// Static, non-behavioral facts about a `Backend` implementation, used by the
+/// CLI to scope log output (e.g. `[APISIX]`) without the trait needing a
+/// `name()`-shaped method per concern.
+#[derive(Debug, Clone, Default)]
+pub struct BackendMetadata {
+    pub log_scope: Vec<String>,
+}
+
+/// What `BackendSyncOptions.exit_on_failure` resolves to when unset — see
+/// `Backend::sync`'s doc comment.
+pub const DEFAULT_EXIT_ON_FAILURE: bool = true;
+
+#[derive(Debug, Clone, Default)]
+pub struct BackendSyncOptions {
+    pub concurrent: Option<usize>,
+    pub exit_on_failure: Option<bool>,
+}
+
+#[derive(Debug)]
+pub struct BackendSyncResult {
+    pub success: bool,
+    /// `None` for a backend whose sync granularity is coarser than "one
+    /// event, one result" — apisix-standalone applies a whole batch of
+    /// events as a single atomic document write per server, so one result
+    /// there describes that write, not any single event within it.
+    pub event: Option<Event>,
+    pub error: Option<BackendError>,
+    pub server: Option<String>,
+}
+
+/// `resource_type` stays a raw string, not `ResourceType`: it's whatever the
+/// backend's own validation response echoes back, which isn't guaranteed to
+/// map onto one of our known resource types (an unrecognized value must
+/// degrade gracefully — carry the string through, leave `event`/
+/// `resource_name` unset — rather than fail the whole validate call).
+#[derive(Debug, Clone)]
+pub struct BackendValidationError {
+    pub resource_type: String,
+    pub resource_id: Option<String>,
+    pub resource_name: Option<String>,
+    pub index: usize,
+    pub error: String,
+    pub event: Option<Event>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BackendValidateResult {
+    pub success: bool,
+    pub error_message: Option<String>,
+    pub errors: Vec<BackendValidationError>,
+}
+
+/// A gateway integration. Implementations own their own connection state
+/// (HTTP client, credentials, target server) — none of that is threaded
+/// through trait methods here, since it varies by backend (e.g.
+/// apisix-standalone has no notion of a remote server to `ping`, only a
+/// local cache to read/write).
+///
+/// `dyn Backend` is the CLI's dispatch mechanism for "which backend did the
+/// user configure", so methods stay object-safe (boxed futures via
+/// `#[async_trait]`, no generics).
+///
+/// No event-subscription method here for task-progress/debug-request
+/// reporting: those are jobs `tracing` instrumentation already covers —
+/// a task's start/done is a `tracing` span's enter/exit, a debug request
+/// log is a `tracing::debug!` call at the request site — so implementations
+/// emit spans/events directly rather than through a bespoke bus on this
+/// trait.
+#[async_trait]
+pub trait Backend: Send + Sync {
+    fn metadata(&self) -> BackendMetadata;
+
+    async fn ping(&self) -> Result<(), BackendError>;
+
+    async fn version(&self) -> Result<Version, BackendError>;
+
+    async fn default_value(&self) -> Result<DefaultValue, BackendError>;
+
+    async fn dump(&self) -> Result<Configuration, BackendError>;
+
+    /// Applies `events`. Failures are captured as individual
+    /// `BackendSyncResult`s with `success: false` rather than failing the
+    /// whole call — *unless* `opts.exit_on_failure` is set (the default):
+    /// then the first failure aborts the whole call and is returned as
+    /// `Err`, discarding any results accumulated so far, instead of
+    /// completing with a partial list. Concurrency (per
+    /// `opts.concurrent`) is an implementation detail of each backend, not
+    /// something the trait signature encodes — as is the granularity of
+    /// each result: most backends apply one event per request and report
+    /// one result per event, but a backend whose admin API only accepts a
+    /// whole document at once (apisix-standalone) reports one result per
+    /// *server* instead, with `BackendSyncResult::event` left `None` since
+    /// no single event owns that write.
+    async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError>;
+
+    /// Not every backend can pre-validate events against the remote server
+    /// before applying them, so this defaults to rejecting with
+    /// `Unsupported` rather than being a required method.
+    async fn validate(&self, _events: &[Event]) -> Result<BackendValidateResult, BackendError> {
+        Err(BackendError::Unsupported("validate".into()))
+    }
+}
