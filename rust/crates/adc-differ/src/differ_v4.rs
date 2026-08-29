@@ -324,7 +324,7 @@ impl DifferV4 {
 
 /// `FlatConfiguration` serializes to a JSON object by construction (every
 /// field is a named struct field), so the object cast can't fail.
-fn to_internal_configuration(config: &FlatConfiguration) -> InternalConfiguration {
+pub(crate) fn to_internal_configuration(config: &FlatConfiguration) -> InternalConfiguration {
     match serde_json::to_value(config).expect("FlatConfiguration always serializes") {
         Value::Object(map) => map,
         other => unreachable!("FlatConfiguration must serialize to a JSON object, got {other:?}"),
