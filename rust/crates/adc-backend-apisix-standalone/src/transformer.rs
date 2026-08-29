@@ -319,13 +319,14 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
         }
     }
 
-    // `rest` here intentionally keeps `modifiedIndex` alongside each
-    // plugin's own config keys — only `id` is pulled out separately.
+    // `modifiedIndex` is APISIX's own per-entry version counter, not part of
+    // the declarative model — a client never sends it. Kept out of the
+    // modelled view so a re-dump diffs equal against the config that was
+    // last synced, instead of showing a phantom `plugin_metadata` change
+    // (and bumping `plugin_metadata_conf_version`) on every sync.
     let mut plugin_metadata = adc::Plugins::new();
     for entry in input.plugin_metadata.iter().flatten() {
-        let mut rest = entry.extra.clone();
-        rest.insert("modifiedIndex".to_string(), Value::from(entry.modified_index));
-        plugin_metadata.insert(entry.id.clone(), Value::Object(rest));
+        plugin_metadata.insert(entry.id.clone(), Value::Object(entry.extra.clone()));
     }
 
     adc::Configuration {
@@ -356,6 +357,31 @@ mod tests {
             "server_port": 70_000,
         });
         assert!(serde_json::from_value::<typing::StreamRoute>(json).is_err());
+    }
+
+    /// `modifiedIndex` is APISIX's own version counter; a client never
+    /// sends it, so leaking it into the modelled view made every re-dump
+    /// diff unequal against the last-synced config — a phantom
+    /// `plugin_metadata` change on every sync.
+    #[test]
+    fn to_adc_omits_plugin_metadata_modified_index() {
+        let extra = serde_json::json!({ "log_format": { "host": "$host" } })
+            .as_object()
+            .unwrap()
+            .clone();
+        let wire = typing::ApisixStandalone {
+            plugin_metadata: Some(vec![typing::PluginMetadata {
+                modified_index: 42,
+                id: "http-logger".to_string(),
+                extra,
+            }]),
+            ..Default::default()
+        };
+
+        let entry = to_adc(&wire).plugin_metadata.unwrap().get("http-logger").unwrap().clone();
+
+        assert!(entry.get("modifiedIndex").is_none(), "modifiedIndex leaked into the modelled view: {entry}");
+        assert_eq!(entry["log_format"]["host"], "$host");
     }
 
     #[test]

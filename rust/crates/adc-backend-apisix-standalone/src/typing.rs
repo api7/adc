@@ -17,12 +17,13 @@
 //! should be ignored, not rejected. `Serialize` omits `None` fields via
 //! `skip_serializing_if` rather than sending explicit `null`s.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use adc_sdk::resources::{
     Expr, HttpMethod, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer,
-    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
-    UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy,
+    UpstreamHealthCheckPassive, UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode,
+    UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -36,7 +37,7 @@ use serde_json::{Map, Value};
 /// usage, so it's redefined here rather than imported).
 pub const ADC_UPSTREAM_SERVICE_ID_LABEL: &str = "__ADC_UPSTREAM_SERVICE_ID";
 
-pub type StandaloneLabels = HashMap<String, String>;
+pub type StandaloneLabels = BTreeMap<String, String>;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Route {
@@ -80,14 +81,18 @@ pub struct Route {
 /// stored with an empty `nodes: []` can come back as `nodes: {}`. A plain
 /// `Vec<UpstreamNode>` would reject that outright, so this accepts either
 /// shape and normalizes `{}` to an empty vec.
-fn deserialize_upstream_nodes<'de, D>(deserializer: D) -> Result<Option<Vec<UpstreamNode>>, D::Error>
+fn deserialize_upstream_nodes<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<UpstreamNode>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     match Option::<Value>::deserialize(deserializer)? {
         None | Some(Value::Null) => Ok(None),
         Some(Value::Object(map)) if map.is_empty() => Ok(Some(Vec::new())),
-        Some(other) => serde_json::from_value(other).map(Some).map_err(serde::de::Error::custom),
+        Some(other) => serde_json::from_value(other)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
     }
 }
 

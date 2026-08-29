@@ -12,7 +12,7 @@
 //! fan-out is across servers, and that's always unbounded — small enough
 //! server counts in practice that there's no need to cap it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use adc_backend_core::{
     HttpClient, Method, concurrent_map, concurrent_map_until_err, deserialize_event_value, missing_parent,
@@ -226,7 +226,7 @@ fn from_adc_upstream_wire(res: &adc::Upstream, parent_id: Option<&str>) -> typin
     let mut labels = from_adc_labels(res.labels.clone());
     if let Some(parent_id) = parent_id {
         labels
-            .get_or_insert_with(HashMap::new)
+            .get_or_insert_with(BTreeMap::new)
             .insert(typing::ADC_UPSTREAM_SERVICE_ID_LABEL.to_string(), parent_id.to_string());
     }
 
