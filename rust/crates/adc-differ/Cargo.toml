@@ -11,11 +11,20 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.8.2"
+proptest = { workspace = true }
 
 [[bin]]
 name = "run_fixtures"
 path = "src/bin/run_fixtures.rs"
 
 [[bench]]
-name = "differ_bench"
+name = "diff_bench"
+harness = false
+
+[[bench]]
+name = "apply_bench"
+harness = false
+
+[[bench]]
+name = "ideal_equal_bench"
 harness = false

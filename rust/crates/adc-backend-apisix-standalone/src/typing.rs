@@ -17,12 +17,13 @@
 //! should be ignored, not rejected. `Serialize` omits `None` fields via
 //! `skip_serializing_if` rather than sending explicit `null`s.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use adc_sdk::resources::{
     Expr, HttpMethod, Plugins, SslClient, SslProtocol, SslType, Timeout, UpstreamBalancer,
-    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
-    UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy,
+    UpstreamHealthCheckPassive, UpstreamHealthCheckType, UpstreamKeepalivePool, UpstreamNode,
+    UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -36,9 +37,9 @@ use serde_json::{Map, Value};
 /// usage, so it's redefined here rather than imported).
 pub const ADC_UPSTREAM_SERVICE_ID_LABEL: &str = "__ADC_UPSTREAM_SERVICE_ID";
 
-pub type StandaloneLabels = HashMap<String, String>;
+pub type StandaloneLabels = BTreeMap<String, String>;
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Route {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -77,23 +78,51 @@ pub struct Route {
 
 /// APISIX's cjson encodes an empty Lua table as a JSON object (`{}`)
 /// instead of an array — a standalone config document read back after being
-/// stored with an empty `nodes: []` can come back as `nodes: {}`. A plain
-/// `Vec<UpstreamNode>` would reject that outright, so this accepts either
-/// shape and normalizes `{}` to an empty vec.
-fn deserialize_upstream_nodes<'de, D>(deserializer: D) -> Result<Option<Vec<UpstreamNode>>, D::Error>
+/// stored with an empty array can come back as `{}` where a `Vec` was
+/// expected. Normalizes that (and an explicit `null`, which `#[serde(default)]`
+/// alone doesn't cover — that only fills in a *missing* key, not a present
+/// one holding `null`) to an empty vec instead of rejecting it.
+fn array_tolerating_empty_object<T: serde::de::DeserializeOwned>(value: Value) -> Result<Vec<T>, serde_json::Error> {
+    match value {
+        Value::Null => Ok(Vec::new()),
+        Value::Object(map) if map.is_empty() => Ok(Vec::new()),
+        other => serde_json::from_value(other),
+    }
+}
+
+fn deserialize_array_tolerating_empty_object<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    array_tolerating_empty_object(Value::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+}
+
+/// `#[serde(default)]` alone only fills in a *missing* `conf_version` key —
+/// a present key holding `null` still fails to deserialize into a bare
+/// `i64`. Falls back to `0` for that case too.
+fn deserialize_conf_version<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<i64>::deserialize(deserializer)?.unwrap_or(0))
+}
+
+fn deserialize_upstream_nodes<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<UpstreamNode>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     match Option::<Value>::deserialize(deserializer)? {
         None | Some(Value::Null) => Ok(None),
-        Some(Value::Object(map)) if map.is_empty() => Ok(Some(Vec::new())),
-        Some(other) => serde_json::from_value(other).map(Some).map_err(serde::de::Error::custom),
+        Some(other) => array_tolerating_empty_object(other).map(Some).map_err(serde::de::Error::custom),
     }
 }
 
 /// APISIX config file's wire field is `req_headers`; ADC's is
 /// `http_req_headers`. Every other field is named the same.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct UpstreamHealthCheckActive {
     #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
     pub ty: Option<UpstreamHealthCheckType>,
@@ -121,14 +150,14 @@ pub struct UpstreamHealthCheckActive {
     pub unhealthy: Option<UpstreamHealthCheckActiveUnhealthy>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct UpstreamHealthCheck {
     pub active: UpstreamHealthCheckActive,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passive: Option<UpstreamHealthCheckPassive>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Upstream {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -179,7 +208,7 @@ pub struct Upstream {
     pub discovery_args: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Service {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -198,7 +227,7 @@ pub struct Service {
     pub plugins: Option<Plugins>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Consumer {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -211,7 +240,7 @@ pub struct Consumer {
     pub plugins: Option<Plugins>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct ConsumerCredential {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -230,7 +259,7 @@ pub struct ConsumerCredential {
 /// always has `username`, a `ConsumerCredential` never does (it has `id` +
 /// `name` instead). `#[serde(untagged)]` tries `Consumer` first; that's
 /// only safe because the two shapes' required fields never overlap.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ConsumerOrCredential {
     Consumer(Consumer),
@@ -238,14 +267,32 @@ pub enum ConsumerOrCredential {
 }
 
 impl ConsumerOrCredential {
-    /// The key `crate::operator` matches against to find "the entry this
-    /// event refers to" — a consumer's `username`, or a credential's `id`
-    /// (already `parentId/credentials/resourceId`-shaped, see
-    /// `crate::operator::generate_id_from_event`).
+    /// The key `crate::operator::stamp_versions` matches entries by — a
+    /// consumer's `username`, or a credential's `id` (already
+    /// `parentId/credentials/resourceId`-shaped, see
+    /// `crate::transformer::credential_to_wire`).
     pub fn identity(&self) -> &str {
         match self {
             ConsumerOrCredential::Consumer(consumer) => &consumer.username,
             ConsumerOrCredential::Credential(credential) => &credential.id,
+        }
+    }
+
+    /// The `modifiedIndex` slot for whichever variant this is — lets
+    /// `crate::operator::stamp_versions` treat `Vec<ConsumerOrCredential>`
+    /// the same generic way it treats every other collection, instead of a
+    /// bespoke case just for this one mixed-variant type.
+    pub fn modified_index(&self) -> i64 {
+        match self {
+            ConsumerOrCredential::Consumer(consumer) => consumer.modified_index,
+            ConsumerOrCredential::Credential(credential) => credential.modified_index,
+        }
+    }
+
+    pub fn modified_index_mut(&mut self) -> &mut i64 {
+        match self {
+            ConsumerOrCredential::Consumer(consumer) => &mut consumer.modified_index,
+            ConsumerOrCredential::Credential(credential) => &mut credential.modified_index,
         }
     }
 
@@ -264,7 +311,7 @@ impl ConsumerOrCredential {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Ssl {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -291,7 +338,7 @@ pub struct Ssl {
     pub status: i64,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct GlobalRule {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -304,7 +351,7 @@ pub struct GlobalRule {
 /// this crate cares about; the rest of the plugin's own config keys —
 /// arbitrary, shape depends on which plugin it configures — pass through
 /// untouched via `extra`'s `#[serde(flatten)]`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct PluginMetadata {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -313,7 +360,7 @@ pub struct PluginMetadata {
     pub extra: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StreamRouteProtocolLogger {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -322,7 +369,7 @@ pub struct StreamRouteProtocolLogger {
     pub conf: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StreamRouteProtocol {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -333,7 +380,7 @@ pub struct StreamRouteProtocol {
     pub logger: Option<Vec<StreamRouteProtocolLogger>>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct StreamRoute {
     #[serde(rename = "modifiedIndex")]
     pub modified_index: i64,
@@ -362,41 +409,79 @@ pub struct StreamRoute {
 
 /// The whole `/apisix/admin/configs` document: every resource type's array,
 /// plus a per-collection `${collection}_conf_version` version number bumped
-/// whenever that collection changes (see `crate::operator`). All fields are
-/// optional since a fresh standalone instance's config starts out empty.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+/// whenever that collection changes (see `crate::operator`). Every array and
+/// every `conf_version` is always present — `#[serde(default)]` tolerates an
+/// older/fresh document that omits one on read, and this crate always writes
+/// all 16 explicitly (`[]`/`0`, not an omitted field) rather than leaving it
+/// to the reader to tell "empty" apart from "not sent".
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct ApisixStandalone {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub routes: Option<Vec<Route>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub services: Option<Vec<Service>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consumers: Option<Vec<ConsumerOrCredential>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ssls: Option<Vec<Ssl>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub global_rules: Option<Vec<GlobalRule>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub plugin_metadata: Option<Vec<PluginMetadata>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub upstreams: Option<Vec<Upstream>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_routes: Option<Vec<StreamRoute>>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub routes: Vec<Route>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub services: Vec<Service>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub consumers: Vec<ConsumerOrCredential>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub ssls: Vec<Ssl>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub global_rules: Vec<GlobalRule>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub plugin_metadata: Vec<PluginMetadata>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub upstreams: Vec<Upstream>,
+    #[serde(default, deserialize_with = "deserialize_array_tolerating_empty_object")]
+    pub stream_routes: Vec<StreamRoute>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub routes_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub services_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consumers_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ssls_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub global_rules_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub plugin_metadata_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub upstreams_conf_version: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_routes_conf_version: Option<i64>,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub routes_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub services_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub consumers_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub ssls_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub global_rules_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub plugin_metadata_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub upstreams_conf_version: i64,
+    #[serde(default, deserialize_with = "deserialize_conf_version")]
+    pub stream_routes_conf_version: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_conf_version_defaults_to_zero() {
+        let wire: ApisixStandalone = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(wire.routes_conf_version, 0);
+    }
+
+    #[test]
+    fn an_explicit_null_conf_version_falls_back_to_zero_instead_of_failing_to_deserialize() {
+        let wire: ApisixStandalone = serde_json::from_value(serde_json::json!({ "routes_conf_version": null })).unwrap();
+        assert_eq!(wire.routes_conf_version, 0);
+    }
+
+    #[test]
+    fn a_missing_array_field_defaults_to_empty() {
+        let wire: ApisixStandalone = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(wire.routes, vec![]);
+    }
+
+    #[test]
+    fn an_explicit_null_array_field_falls_back_to_empty_instead_of_failing_to_deserialize() {
+        let wire: ApisixStandalone = serde_json::from_value(serde_json::json!({ "routes": null })).unwrap();
+        assert_eq!(wire.routes, vec![]);
+    }
+
+    #[test]
+    fn a_cjson_empty_object_in_place_of_an_array_deserializes_as_empty() {
+        let wire: ApisixStandalone = serde_json::from_value(serde_json::json!({ "routes": {} })).unwrap();
+        assert_eq!(wire.routes, vec![]);
+    }
 }

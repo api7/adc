@@ -15,6 +15,7 @@ test-utils = []
 
 [dependencies]
 adc-sdk = { path = "../adc-sdk" }
+adc-differ = { path = "../adc-differ" }
 adc-backend-core = { path = "../adc-backend-core" }
 adc-backend-apisix = { path = "../adc-backend-apisix" }
 async-trait = { workspace = true }
@@ -29,5 +30,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 adc-backend-apisix-standalone = { path = ".", features = ["test-utils"] }
-adc-differ = { path = "../adc-differ" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "process"] }
+proptest = { workspace = true }
+sha1 = { workspace = true }
+reqwest = { workspace = true }

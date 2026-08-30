@@ -78,11 +78,11 @@ fn service_with_named_upstreams(nd1_host: &str) -> adc::Service {
 }
 
 async fn assert_original_layout() {
-    let raw = common::cache().raw_config(CACHE_KEY).await.expect("sync populated the raw config cache");
+    let raw = common::raw_config().await;
     let service_id = generate_id("test");
-    assert_eq!(raw.services.as_ref().unwrap()[0].id, service_id);
-    let upstreams = raw.upstreams.expect("default + 2 named upstreams were written");
-    assert_eq!(upstreams.len(), 3);
+    assert_eq!(raw.services[0].id, service_id);
+    let upstreams = raw.upstreams;
+    assert_eq!(upstreams.len(), 3, "default + 2 named upstreams were written");
     let default_upstream = upstreams.iter().find(|u| u.name == "test").expect("the service's own default upstream");
     let nd1 = upstreams.iter().find(|u| u.name == "nd-upstream1").expect("nd-upstream1");
     let nd2 = upstreams.iter().find(|u| u.name == "nd-upstream2").expect("nd-upstream2");
@@ -122,6 +122,12 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
 
     assert_original_layout().await;
 
+    let raw_before = common::raw_config().await;
+    let nd1_index_before = raw_before.upstreams.iter().find(|u| u.name == "nd-upstream1").unwrap().modified_index;
+    let nd2_index_before = raw_before.upstreams.iter().find(|u| u.name == "nd-upstream2").unwrap().modified_index;
+    let default_index_before = raw_before.upstreams.iter().find(|u| u.name == "test").unwrap().modified_index;
+    let services_conf_version_before = raw_before.services_conf_version;
+
     // Change nd-upstream1's node host; nd-upstream2 and the default
     // upstream must be untouched.
     let updated_service = service_with_named_upstreams("8.8.8.8");
@@ -129,8 +135,8 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     let events = diff(&Configuration { services: Some(vec![updated_service]), ..empty_configuration() }, &before);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config(CACHE_KEY).await.unwrap();
-    let upstreams = raw.upstreams.unwrap();
+    let raw = common::raw_config().await;
+    let upstreams = raw.upstreams;
     assert_eq!(upstreams.len(), 3);
     let nd1 = upstreams.iter().find(|u| u.name == "nd-upstream1").expect("nd-upstream1");
     assert_eq!(
@@ -138,6 +144,14 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
         Some(&generate_id("test"))
     );
     assert_eq!(nd1.nodes.as_ref().unwrap()[0].host, "8.8.8.8");
+    assert!(nd1.modified_index > nd1_index_before, "nd-upstream1's own modifiedIndex must bump");
+
+    let nd2_index_after = upstreams.iter().find(|u| u.name == "nd-upstream2").unwrap().modified_index;
+    let default_index_after = upstreams.iter().find(|u| u.name == "test").unwrap().modified_index;
+    assert_eq!(nd2_index_after, nd2_index_before, "the unrelated nd-upstream2's modifiedIndex must not move");
+    assert_eq!(default_index_after, default_index_before, "the service's own default upstream's modifiedIndex must not move");
+    assert_eq!(raw.services_conf_version, services_conf_version_before, "a named-upstream-only change must not bump services_conf_version");
+    assert_eq!(raw.upstreams_conf_version, nd1.modified_index, "upstreams_conf_version must reflect nd-upstream1's fresh timestamp");
 
     let config = common::cache().config(CACHE_KEY).await.unwrap();
     let services = config.services.unwrap();

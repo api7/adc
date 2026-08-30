@@ -192,17 +192,37 @@ impl DifferV4 {
         local_item: Value,
         remote_item: Value,
     ) -> Option<BuiltEvent> {
+        // Resolved from the pristine `local_item`, before anything below
+        // mutates it — safe to do this early since `apply_atomic_strips`
+        // never touches `stream_routes` (the only field any resolver
+        // inspects; SERVICE is the only type with one, and its own fields
+        // are all `Map`, never `Array`, so the strip is a no-op for it).
+        let default_type = meta.resolve_default_type.map(|f| f(&local_item)).unwrap_or(resource_type);
+        let default_value = self.default_value.core.get(&default_type).cloned().unwrap_or_else(|| json!({}));
+
+        // `local_item`/`remote_item` arrive with `id` already stripped by
+        // the caller, so this is an apples-to-apples check: raw-equal here
+        // means every deterministic step below (nested sub-resource
+        // diffing, plugin diffing, the final `diff_value`) would run on
+        // identical inputs on both sides and find nothing — skips all of
+        // it instead of re-discovering that. Gated on `default_value`
+        // being empty too: `merge_default` only ever touches `local_item`,
+        // not `remote_item`, so when a default is actually configured, two
+        // raw-identical items that both omit the defaulted field would
+        // still produce a real event once merged (adding the default to
+        // `local_item` alone) — this fast path must not skip that.
+        // Doesn't help SSL much either way: `apply_atomic_strips` below
+        // strips its private key from both sides first, so an unchanged
+        // SSL resource's raw items are rarely equal before that strip even
+        // happens.
+        if local_item == remote_item && is_empty_value(&default_value) {
+            return None;
+        }
         let original_local_item = local_item.clone();
         let mut local_item = local_item;
         let mut remote_item = remote_item;
 
         apply_atomic_strips(meta, &mut local_item, &mut remote_item);
-
-        // Resolve the default-value type *before* nested fields are stripped below:
-        // SERVICE's resolver inspects `stream_routes`, which is itself one of the
-        // nested MAP fields about to be removed from local_item.
-        let default_type = meta.resolve_default_type.map(|f| f(&local_item)).unwrap_or(resource_type);
-        let default_value = self.default_value.core.get(&default_type).cloned().unwrap_or_else(|| json!({}));
 
         // Compute sub-events and strip nested MAP-resource fields (routes/upstreams/...)
         // from local_item/remote_item *before* merge_default runs below. This is a pure
@@ -324,7 +344,7 @@ impl DifferV4 {
 
 /// `FlatConfiguration` serializes to a JSON object by construction (every
 /// field is a named struct field), so the object cast can't fail.
-fn to_internal_configuration(config: &FlatConfiguration) -> InternalConfiguration {
+pub(crate) fn to_internal_configuration(config: &FlatConfiguration) -> InternalConfiguration {
     match serde_json::to_value(config).expect("FlatConfiguration always serializes") {
         Value::Object(map) => map,
         other => unreachable!("FlatConfiguration must serialize to a JSON object, got {other:?}"),

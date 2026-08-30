@@ -97,10 +97,38 @@ async fn syncs_and_dumps_consumers_with_credentials() {
     assert_eq!(credentials.len(), 1);
     assert_eq!(credentials[0].name, cred2_name);
 
+    // --- A second, wholly unrelated consumer: updating consumer1's own
+    //     plugins must not move consumer2's modifiedIndex at all. ---
+    let consumer2_name = "consumer2";
+    sync_ok(&backend, vec![create_event(ResourceType::Consumer, consumer2_name, json!({ "username": consumer2_name }), None)]).await;
+
+    let raw = common::raw_config().await;
+    let consumer1_index_before = raw.consumers.iter().find_map(|c| c.as_consumer().filter(|c| c.username == consumer_name)).unwrap().modified_index;
+    let consumer2_index_before = raw.consumers.iter().find_map(|c| c.as_consumer().filter(|c| c.username == consumer2_name)).unwrap().modified_index;
+
+    sync_ok(
+        &backend,
+        vec![update_event(
+            ResourceType::Consumer,
+            consumer_name,
+            json!({ "username": consumer_name, "plugins": { "limit-count": { "count": 10, "time_window": 60 } } }),
+            json!({ "username": consumer_name }),
+            None,
+        )],
+    )
+    .await;
+
+    let raw = common::raw_config().await;
+    let consumer1_index_after = raw.consumers.iter().find_map(|c| c.as_consumer().filter(|c| c.username == consumer_name)).unwrap().modified_index;
+    let consumer2_index_after = raw.consumers.iter().find_map(|c| c.as_consumer().filter(|c| c.username == consumer2_name)).unwrap().modified_index;
+    assert!(consumer1_index_after > consumer1_index_before, "updating consumer1's plugins must bump its own modifiedIndex");
+    assert_eq!(consumer2_index_after, consumer2_index_before, "the unrelated consumer2's modifiedIndex must not move");
+
     sync_ok(
         &backend,
         vec![
             delete_event(ResourceType::Consumer, consumer_name, None),
+            delete_event(ResourceType::Consumer, consumer2_name, None),
             delete_event(ResourceType::ConsumerCredential, cred2_name, Some(consumer_name)),
         ],
     )

@@ -57,6 +57,10 @@ async fn creates_dumps_updates_and_deletes_global_rules() {
     let version_after = raw_conf_version("global_rules_conf_version").await.expect("global_rules_conf_version should be present once the document exists");
     assert_eq!(version_before, version_after, "resyncing unchanged global rules must not bump the conf_version");
 
+    let raw = common::raw_config().await;
+    let plugin1_index_before = raw.global_rules.iter().find(|g| g.id == plugin1_name).unwrap().modified_index;
+    let plugin2_index_before = raw.global_rules.iter().find(|g| g.id == plugin2_name).unwrap().modified_index;
+
     sync_ok(
         &backend,
         vec![update_event(ResourceType::GlobalRule, plugin1_name, json!({ "enable": false }), json!({}), None)],
@@ -67,6 +71,13 @@ async fn creates_dumps_updates_and_deletes_global_rules() {
     let global_rules = config.global_rules.expect("global rules still exist");
     assert_eq!(global_rules.get(plugin1_name).and_then(|v| v.get("enable")), Some(&json!(false)));
     assert_eq!(global_rules.get(plugin2_name).and_then(|v| v.get("prefer_name")), Some(&json!(true)));
+
+    let raw = common::raw_config().await;
+    let plugin1_index_after = raw.global_rules.iter().find(|g| g.id == plugin1_name).unwrap().modified_index;
+    let plugin2_index_after = raw.global_rules.iter().find(|g| g.id == plugin2_name).unwrap().modified_index;
+    assert!(plugin1_index_after > plugin1_index_before, "updating plugin1's global rule must bump its own modifiedIndex");
+    assert_eq!(plugin2_index_after, plugin2_index_before, "the unrelated plugin2 global rule's modifiedIndex must not move");
+    assert_eq!(raw.global_rules_conf_version, plugin1_index_after);
 
     sync_ok(
         &backend,

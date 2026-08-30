@@ -220,6 +220,24 @@ pub async fn raw_conf_version(field: &str) -> Option<i64> {
     body.get(field).and_then(Value::as_i64)
 }
 
+/// The whole standalone config document, straight off `SERVER1`'s admin
+/// API — same rationale as [`raw_conf_version`]: this crate's own cache
+/// only remembers per-resource version numbers (`Cache::versions`), not
+/// resource content, so a test asserting on actual wire content (a node's
+/// host, a label, `nodes == []`, ...) has to read it from the server
+/// directly.
+pub async fn raw_config() -> adc_backend_apisix_standalone::tests::typing::ApisixStandalone {
+    let client = HttpClient::new(HttpClientConfig {
+        server: SERVER1.to_string(),
+        token: TOKEN.to_string(),
+        timeout: None,
+        tls: TlsConfig::default(),
+    })
+    .unwrap();
+    let request = client.request(Method::GET, "/apisix/admin/configs").unwrap();
+    client.send_json(request).await.unwrap()
+}
+
 /// An `adc::Upstream` with every field at its zero value — shared starting
 /// point for tests that only care about a couple of fields, via struct
 /// update syntax (`..common::base_upstream()`).

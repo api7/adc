@@ -6,7 +6,7 @@
 //! "find the latest server + full dump" bootstrap on every request.
 //!
 //! One entry per `cache_key`, holding all four cached values together
-//! (version/latest_version/config/raw_config) behind a single per-key
+//! (version/latest_version/config/versions) behind a single per-key
 //! `tokio::sync::Mutex` — they're always read and written in the same
 //! lifecycle anyway (see `crate::backend::Backend::dump`/`sync`), so
 //! there's no case where one legitimately needs to expire, evict, or lock
@@ -17,7 +17,7 @@
 //! the same starting snapshot and silently discard one another's changes.
 //! Every other accessor below takes the same per-key lock too, just briefly
 //! (one field, not a multi-step operation) — which also means a `dump`
-//! reading through `config`/`raw_config` while a `sync` is in flight for
+//! reading through `config`/`versions` while a `sync` is in flight for
 //! the same key naturally waits for it, rather than reading a half-applied
 //! state.
 //!
@@ -40,7 +40,7 @@ use dashmap::mapref::entry::Entry;
 use semver::Version;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use crate::typing::ApisixStandalone;
+use crate::operator::WireVersions;
 use crate::utils::stable_timestamp;
 
 const DEFAULT_MAX_ENTRIES: usize = 16;
@@ -68,7 +68,7 @@ pub(crate) struct CachedEntry {
     pub(crate) version: Option<Version>,
     pub(crate) latest_version: Option<i64>,
     pub(crate) config: Option<Configuration>,
-    pub(crate) raw_config: Option<ApisixStandalone>,
+    pub(crate) versions: Option<WireVersions>,
     /// Milliseconds since the Unix epoch, from [`stable_timestamp`] — the
     /// same clock `Operator::sync`'s own conf-version timestamps come from,
     /// so a successful sync's write-back reuses that call's timestamp
@@ -133,18 +133,19 @@ impl Cache {
     /// its own fetch-and-commit for exactly the same reason: two callers
     /// racing on the same key must run their whole read-then-write
     /// sequence one after the other, never interleaved. Every other method
-    /// here (`raw_config`, `set_raw_config`, ...) takes and releases this
+    /// here (`versions`, `set_versions`, ...) takes and releases this
     /// same lock internally, just for the one field it touches, so
     /// ordinary callers never need this directly. Not exposed outside the
     /// crate: `CachedEntry`'s fields are crate-internal, so a caller
     /// elsewhere couldn't do anything with the guard anyway.
     ///
     /// Deliberately does *not* reset an expired entry the way `touch` does:
-    /// `Backend::sync` uses this to read the last-known real `raw_config`
-    /// as its diff base when it has no pinned snapshot of its own, and a
-    /// stale-but-genuine document there is far safer than treating "past
-    /// TTL" as "no server state exists", which would fold `sync`'s events
-    /// onto an empty document and wipe whatever the servers actually hold.
+    /// `Backend::sync` uses this to read the last-known real `versions`
+    /// as its stamping baseline when it has no pinned snapshot of its own,
+    /// and stale-but-genuine values there are far safer than treating "past
+    /// TTL" as "no server state exists", which would stamp every resource
+    /// as freshly created and bump every collection's `conf_version` for no
+    /// real reason.
     /// Runs eviction on the way out regardless: unlike `touch`, this can
     /// materialize a fresh entry for a key that's never been cached (e.g.
     /// a `Backend::sync` with no prior `dump`) without going through
@@ -165,7 +166,7 @@ impl Cache {
 
     /// Every field, read under one lock acquisition, so a caller pinning
     /// more than one of them (`Backend::dump` does, for `config` and
-    /// `raw_config`) gets values guaranteed to be from the same moment.
+    /// `versions`) gets values guaranteed to be from the same moment.
     pub(crate) async fn get_live(&self, key: &str) -> Option<CachedEntry> {
         // A plain `get`, not `entry()` — reading a key that was never
         // cached must not materialize a fresh entry.
@@ -196,8 +197,8 @@ impl Cache {
     }
 
     #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
-    pub async fn raw_config(&self, key: &str) -> Option<ApisixStandalone> {
-        self.get_live(key).await?.raw_config
+    pub async fn versions(&self, key: &str) -> Option<WireVersions> {
+        self.get_live(key).await?.versions
     }
 
     async fn touch(&self, key: &str, apply: impl FnOnce(&mut CachedEntry)) {
@@ -246,12 +247,11 @@ impl Cache {
     }
 
     #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
-    pub async fn set_raw_config(&self, key: &str, raw_config: ApisixStandalone) {
-        self.touch(key, |entry| entry.raw_config = Some(raw_config))
-            .await;
+    pub async fn set_versions(&self, key: &str, versions: WireVersions) {
+        self.touch(key, |entry| entry.versions = Some(versions)).await;
     }
 
-    /// `latest_version`/`config`/`raw_config` together, under one lock
+    /// `latest_version`/`config`/`versions` together, under one lock
     /// acquisition, so a concurrent reader (another `dump`'s `get_live`)
     /// can never observe just some of the three updated and not the
     /// others.
@@ -259,11 +259,11 @@ impl Cache {
     // `crate::tests`) — dead as far as a plain `--lib` build (no consumer
     // outside this crate's own tests) can tell.
     #[cfg_attr(not(feature = "test-utils"), allow(dead_code))]
-    pub async fn set_dump_result(&self, key: &str, latest_version: i64, config: Configuration, raw_config: ApisixStandalone) {
+    pub async fn set_dump_result(&self, key: &str, latest_version: i64, config: Configuration, versions: WireVersions) {
         self.touch(key, |entry| {
             entry.latest_version = Some(entry.latest_version.map_or(latest_version, |current| current.max(latest_version)));
             entry.config = Some(config);
-            entry.raw_config = Some(raw_config);
+            entry.versions = Some(versions);
         })
         .await;
     }
@@ -474,20 +474,21 @@ mod tests {
         assert_eq!(cache.latest_version("k").await, Some(1));
     }
 
-    /// `Backend::sync` reads `raw_config` through `Cache::lock` as its diff
-    /// base when it has no pinned snapshot of its own. Past the entry's
-    /// TTL, that must still be the last real data written — not `None` —
-    /// or `sync` would fold its events onto an empty document and wipe
-    /// whatever the servers actually hold.
+    /// `Backend::sync` reads `versions` through `Cache::lock` as its
+    /// stamping baseline when it has no pinned snapshot of its own. Past
+    /// the entry's TTL, that must still be the last real data written —
+    /// not `None` — or `sync` would stamp every resource as freshly
+    /// created and bump every collection's `conf_version` for no real
+    /// reason.
     #[tokio::test]
-    async fn lock_returns_the_last_real_raw_config_even_past_the_ttl() {
+    async fn lock_returns_the_last_real_versions_even_past_the_ttl() {
         let cache = Cache::with_limits(16, Duration::from_millis(10));
-        cache.set_raw_config("k", ApisixStandalone::default()).await;
+        cache.set_versions("k", WireVersions::default()).await;
         cache.set_latest_version("k", 42).await;
         sleep(Duration::from_millis(30));
 
         let entry = cache.lock("k").await;
-        assert!(entry.raw_config.is_some());
+        assert!(entry.versions.is_some());
         assert_eq!(entry.latest_version, Some(42));
     }
 
@@ -508,12 +509,12 @@ mod tests {
         cache.set_version("k", Version::new(1, 0, 0)).await;
         cache.set_latest_version("k", 1).await;
         cache.set_config("k", empty_configuration()).await;
-        cache.set_raw_config("k", ApisixStandalone::default()).await;
+        cache.set_versions("k", WireVersions::default()).await;
         cache.invalidate("k").await;
         assert!(cache.version("k").await.is_none());
         assert!(cache.latest_version("k").await.is_none());
         assert!(cache.config("k").await.is_none());
-        assert!(cache.raw_config("k").await.is_none());
+        assert!(cache.versions("k").await.is_none());
     }
 
     #[tokio::test]

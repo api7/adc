@@ -14,7 +14,7 @@ pub mod tests {
     pub use crate::backend::StandaloneServer;
     pub use crate::cache::Cache;
     pub use crate::fetcher::Fetcher;
-    pub use crate::operator::Operator;
+    pub use crate::operator::{Operator, WireVersions};
 
     pub mod transformer {
         pub use crate::transformer::*;

@@ -46,7 +46,7 @@ pub type PluginMetadata = Plugins;
 /// The external, user-facing declarative config file shape: nested
 /// sub-resources embedded under their parent, no top-level
 /// routes/upstreams/consumer_credentials.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Configuration {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -115,6 +115,27 @@ impl From<Configuration> for FlatConfiguration {
             stream_routes: None,
             consumer_credentials: None,
             upstreams: None,
+        }
+    }
+}
+
+/// Converts the internal `FlatConfiguration` back into the public
+/// `Configuration` type — drops the flattened `routes`/`stream_routes`/
+/// `consumer_credentials`/`upstreams`.
+impl From<FlatConfiguration> for Configuration {
+    fn from(flat: FlatConfiguration) -> Self {
+        debug_assert!(flat.routes.is_none());
+        debug_assert!(flat.stream_routes.is_none());
+        debug_assert!(flat.consumer_credentials.is_none());
+        debug_assert!(flat.upstreams.is_none());
+
+        Configuration {
+            services: flat.services,
+            ssls: flat.ssls,
+            consumers: flat.consumers,
+            consumer_groups: None,
+            global_rules: flat.global_rules,
+            plugin_metadata: flat.plugin_metadata,
         }
     }
 }
