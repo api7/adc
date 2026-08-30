@@ -274,6 +274,12 @@ async fn bypass_cache_discards_stale_state_and_refetches() {
 /// single dead instance (the pure-logic half of this — an all-unreachable
 /// probe still fails outright — is covered without a live cluster, in
 /// `fetcher.rs`'s own `a_single_unreachable_server_fails_the_whole_dump`).
+/// The dead server is listed *first*: `Backend::resolved_version` tries
+/// `self.servers` in that order and returns on the first success, so
+/// listing the live one first would let this test pass without ever
+/// exercising `resolved_version`'s own skip-and-continue fallback — only
+/// `probe_reachable`'s (which probes every server concurrently regardless
+/// of list order).
 #[tokio::test]
 #[ignore]
 async fn a_dump_tolerates_one_unreachable_server_among_several() {
@@ -285,7 +291,7 @@ async fn a_dump_tolerates_one_unreachable_server_among_several() {
     sync_ok(&backend_for(common::SERVER1, cache_key), diff(&synced, &empty_configuration())).await;
     common::cache().invalidate(cache_key).await;
 
-    let opts = common::backend_options(vec![common::SERVER1.to_string(), "http://127.0.0.1:1".to_string()], cache_key);
+    let opts = common::backend_options(vec!["http://127.0.0.1:1".to_string(), common::SERVER1.to_string()], cache_key);
     let backend = Backend::new(opts).unwrap();
 
     let config = dump(&backend).await;

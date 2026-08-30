@@ -39,14 +39,13 @@ impl Fetcher {
     pub async fn dump(&self) -> Result<(Configuration, ApisixStandalone), BackendError> {
         let reachable = self.probe_reachable().await?;
         // `reachable` is never empty here — `probe_reachable` already
-        // turned that case into the `Err` propagated above.
-        let target = pick_latest(reachable.clone()).unwrap_or_else(|| reachable[0].0.clone());
-        let client = &self
-            .servers
-            .iter()
-            .find(|s| s.server == target)
-            .expect("target came from probing self.servers, so it's one of them")
-            .client;
+        // turned that case into the `Err` propagated above. Indices into
+        // `self.servers`, not URLs — two entries can share the same
+        // `server` URL (paired with different tokens), so re-selecting by
+        // URL could silently pick a different `StandaloneServer` than the
+        // one that actually answered the probe.
+        let target = pick_latest(reachable.clone()).unwrap_or(reachable[0].0);
+        let client = &self.servers[target].client;
 
         let request = client.request(Method::GET, ENDPOINT_CONFIG)?;
         let raw_config: ApisixStandalone = client.send_json(request).await?;
@@ -65,10 +64,16 @@ impl Fetcher {
     /// of them could be reached (propagating whichever probe's error
     /// happened to be seen last — with every server down, which one's
     /// error surfaces isn't meaningful).
-    async fn probe_reachable(&self) -> Result<Vec<(String, i64)>, BackendError> {
+    async fn probe_reachable(&self) -> Result<Vec<(usize, i64)>, BackendError> {
         let method = if version_supports_head(&self.version) { Method::HEAD } else { Method::GET };
 
-        let probe = |server: StandaloneServer| {
+        // Carries each server's index in `self.servers` through the probe
+        // instead of its URL — `concurrent_map` completes in whatever
+        // order the responses actually arrive, not input order, so this is
+        // the only way `dump()` can later go straight back to the exact
+        // `StandaloneServer` that answered (see its own comment for why
+        // that matters).
+        let probe = |(index, server): (usize, StandaloneServer)| {
             let method = method.clone();
             async move {
                 let request = server.client.request(method, ENDPOINT_CONFIG)?;
@@ -79,10 +84,11 @@ impl Fetcher {
                     .and_then(|value| value.to_str().ok())
                     .and_then(|value| value.parse::<i64>().ok())
                     .unwrap_or(0);
-                Ok::<_, BackendError>((server.server, timestamp))
+                Ok::<_, BackendError>((index, timestamp))
             }
         };
-        let results = concurrent_map(self.servers.clone(), None, probe).await;
+        let indexed = self.servers.iter().cloned().enumerate().collect();
+        let results = concurrent_map(indexed, None, probe).await;
 
         let mut reachable = Vec::with_capacity(results.len());
         let mut last_error = None;
@@ -109,8 +115,11 @@ impl Fetcher {
 /// which *real* server wins a genuine tie is still not a documented,
 /// wall-clock-meaningful rule. `None` iff every entry is `0` (a fresh
 /// cluster no server has ever accepted a write on) or `results` is empty.
-fn pick_latest(results: Vec<(String, i64)>) -> Option<String> {
-    let mut latest: Option<(String, i64)> = None;
+/// Generic over what identifies a server (a URL in this file's own tests,
+/// an index into `self.servers` in `dump`'s real use) — the tie-break and
+/// zero-filtering logic doesn't care which.
+fn pick_latest<T>(results: Vec<(T, i64)>) -> Option<T> {
+    let mut latest: Option<(T, i64)> = None;
     for (server, timestamp) in results {
         if latest.as_ref().is_none_or(|(_, best)| timestamp >= *best) {
             latest = Some((server, timestamp));
@@ -156,7 +165,7 @@ mod tests {
 
     #[test]
     fn no_probes_at_all_has_no_latest() {
-        assert_eq!(pick_latest(vec![]), None);
+        assert_eq!(pick_latest::<String>(vec![]), None);
     }
 
     #[test]
