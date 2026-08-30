@@ -52,6 +52,13 @@ pub struct BackendSyncResult {
     pub event: Option<Event>,
     pub error: Option<BackendError>,
     pub server: Option<String>,
+    /// Whether this backend can, and did, confirm the write was actually
+    /// picked up by the data plane rather than merely accepted for later
+    /// processing — `None` for every backend that makes no such
+    /// distinction (everything but apisix-standalone, today, and even
+    /// there only when talking to a cluster new enough to wait for that
+    /// confirmation). Never meaningful when `success` is `false`.
+    pub confirmed: Option<bool>,
 }
 
 /// `resource_type` stays a raw string, not `ResourceType`: it's whatever the

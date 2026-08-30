@@ -8,6 +8,7 @@ use axum::Json;
 use axum::body::Bytes;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::schema::{self, SyncInput};
@@ -102,13 +103,21 @@ async fn run(
     })
 }
 
-fn status_of(total: usize, successes: usize, failures: usize) -> &'static str {
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum SyncStatus {
+    Success,
+    AllFailed,
+    PartialFailure,
+}
+
+fn status_of(total: usize, successes: usize, failures: usize) -> SyncStatus {
     if total == successes {
-        "success"
+        SyncStatus::Success
     } else if total == failures {
-        "all_failed"
+        SyncStatus::AllFailed
     } else {
-        "partial_failure"
+        SyncStatus::PartialFailure
     }
 }
 
@@ -155,10 +164,33 @@ fn output_for_apisix_standalone(events: &[Event], results: &[BackendSyncResult])
         "endpoint_status": results.iter().map(|r| json!({
             "server": r.server,
             "success": r.success,
+            "confirmation": confirmation_of(r),
             "reason": r.error.as_ref().map(|e| e.to_string()),
             "requested_at": now,
         })).collect::<Vec<_>>(),
     })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Confirmation {
+    Applied,
+    Accepted,
+}
+
+/// `null` for a failed write (nothing was confirmed *or* accepted) or a
+/// backend/cluster that never reports the distinction (`confirmed: None`)
+/// — `Applied` when the write was confirmed picked up by the data plane,
+/// `Accepted` when it was only accepted for later processing.
+fn confirmation_of(result: &BackendSyncResult) -> Option<Confirmation> {
+    if !result.success {
+        return None;
+    }
+    match result.confirmed {
+        Some(true) => Some(Confirmation::Applied),
+        Some(false) => Some(Confirmation::Accepted),
+        None => None,
+    }
 }
 
 fn simplify_event(event: &Event) -> Value {
@@ -182,4 +214,43 @@ fn lint_issue_json(issue: &adc_sdk::lint::LintIssue) -> Value {
         "path": issue.path.iter().map(ToString::to_string).collect::<Vec<_>>(),
         "message": issue.message,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result(success: bool, confirmed: Option<bool>) -> BackendSyncResult {
+        BackendSyncResult { success, event: None, error: None, server: Some("s1".to_string()), confirmed }
+    }
+
+    #[test]
+    fn a_failed_write_has_no_confirmation_regardless_of_what_confirmed_says() {
+        assert!(confirmation_of(&result(false, Some(true))).is_none());
+        assert!(confirmation_of(&result(false, None)).is_none());
+    }
+
+    #[test]
+    fn a_backend_that_never_reports_the_distinction_has_no_confirmation() {
+        assert!(confirmation_of(&result(true, None)).is_none());
+    }
+
+    #[test]
+    fn a_confirmed_write_serializes_to_applied() {
+        let confirmation = confirmation_of(&result(true, Some(true))).unwrap();
+        assert_eq!(serde_json::to_value(confirmation).unwrap(), json!("applied"));
+    }
+
+    #[test]
+    fn a_merely_accepted_write_serializes_to_accepted() {
+        let confirmation = confirmation_of(&result(true, Some(false))).unwrap();
+        assert_eq!(serde_json::to_value(confirmation).unwrap(), json!("accepted"));
+    }
+
+    #[test]
+    fn status_of_serializes_to_the_three_snake_case_values() {
+        assert_eq!(serde_json::to_value(status_of(2, 2, 0)).unwrap(), json!("success"));
+        assert_eq!(serde_json::to_value(status_of(2, 0, 2)).unwrap(), json!("all_failed"));
+        assert_eq!(serde_json::to_value(status_of(2, 1, 1)).unwrap(), json!("partial_failure"));
+    }
 }
