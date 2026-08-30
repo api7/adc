@@ -63,6 +63,13 @@ fn config_with_services(services: Vec<adc::Service>) -> Configuration {
 #[tokio::test]
 #[ignore]
 async fn syncs_and_dumps_a_stream_service_with_stream_routes() {
+    // Stream routes are a newer standalone feature — same cutoff
+    // `e2e_cache.rs` and `e2e_conf_version_isolation.rs` already check
+    // against; nothing to test on a version that doesn't have them at all.
+    if common::apisix_version() <= semver::Version::new(3, 13, 0) {
+        return;
+    }
+
     common::restart_apisix().await;
     let backend = backend("stream-route-e2e");
     dump(&backend).await;
