@@ -57,6 +57,9 @@ jobs:
       - name: Clippy
         working-directory: ./rust
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Generate differ benchmark fixtures
+        working-directory: ./rust
+        run: cargo run -p adc-differ --example gen_fixtures
       - name: Run unit tests
         working-directory: ./rust
         run: cargo test --workspace
