@@ -80,12 +80,6 @@ async fn run(
 ) -> Result<Value, CliError> {
     let is_apisix_standalone = backend_kind == "apisix-standalone";
 
-    // apisix-standalone folds every sync into one shared full document keyed
-    // by `cache_key` (see adc-backend-apisix-standalone::backend) — diffing
-    // against a dump and applying that diff has to happen as one unit, or a
-    // second concurrent sync for the same cache_key can diff against the
-    // same stale dump and silently overwrite what the first one just wrote.
-    // Held across dump+diff+sync below, released when `run` returns.
     let _standalone_guard = if is_apisix_standalone {
         Some(sync_lock::lock(&opts.cache_key).await)
     } else {

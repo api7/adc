@@ -17,7 +17,7 @@
 //! from the typed `adc_sdk::resources` side would drift from `diff` the
 //! moment one of the two is updated without the other.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use adc_sdk::resources::FlatConfiguration;
 use adc_sdk::{Event, EventKind, ResourceType};
@@ -32,24 +32,30 @@ type InternalConfiguration = Map<String, Value>;
 /// See the module doc comment.
 pub fn apply(events: &[Event], base: &FlatConfiguration) -> FlatConfiguration {
     let mut doc = to_internal_configuration(base);
-    apply_events(&mut doc, events, None);
+    // Grouped once, up front, rather than `apply_events` re-scanning all of
+    // `events` by `parent_id` on every recursive call — with N resources
+    // each nesting their own sub-events, that scan-per-parent made the
+    // whole walk O(events * parents) instead of O(events + parents).
+    let mut by_parent: HashMap<Option<&str>, Vec<&Event>> = HashMap::new();
+    for event in events {
+        by_parent.entry(event.parent_id.as_deref()).or_default().push(event);
+    }
+    apply_events(&mut doc, &by_parent, None);
     serde_json::from_value(Value::Object(doc)).unwrap_or_else(|e| {
         panic!("apply produced a document that failed to deserialize back into FlatConfiguration: {e}")
     })
 }
 
-/// Applies every event in `events` whose `parent_id` matches `parent_id` —
-/// the resources living directly in `container` — then recurses into each
-/// of those resources' own nested collections (if any) for the events that
+/// Applies every event whose `parent_id` matches `parent_id` — the
+/// resources living directly in `container` — then recurses into each of
+/// those resources' own nested collections (if any) for the events that
 /// belong one level deeper, keyed by that resource's own id as the new
 /// `parent_id`. `None` at the root; `Some(id)` when `container` is standing
 /// in for one specific parent resource's nested fields (see the loop below).
-fn apply_events(container: &mut InternalConfiguration, events: &[Event], parent_id: Option<&str>) {
+fn apply_events(container: &mut InternalConfiguration, events_by_parent: &HashMap<Option<&str>, Vec<&Event>>, parent_id: Option<&str>) {
     let mut by_type: HashMap<ResourceType, Vec<&Event>> = HashMap::new();
-    for event in events {
-        if event.parent_id.as_deref() == parent_id {
-            by_type.entry(event.resource_type).or_default().push(event);
-        }
+    for &event in events_by_parent.get(&parent_id).into_iter().flatten() {
+        by_type.entry(event.resource_type).or_default().push(event);
     }
     for (resource_type, type_events) in by_type {
         apply_to_collection(container, resource_type, &type_events);
@@ -86,7 +92,7 @@ fn apply_events(container: &mut InternalConfiguration, events: &[Event], parent_
                 if let Some(existing) = item_map.remove(*field_name) {
                     nested_doc.insert(nested_key.to_string(), existing);
                 }
-                apply_events(&mut nested_doc, events, Some(item_id.as_str()));
+                apply_events(&mut nested_doc, events_by_parent, Some(item_id.as_str()));
                 if let Some(value) = nested_doc.remove(nested_key) {
                     item_map.insert((*field_name).to_string(), value);
                 }
@@ -131,10 +137,18 @@ fn apply_to_collection(container: &mut InternalConfiguration, resource_type: Res
                 Some(Value::Array(items)) => items,
                 _ => Vec::new(),
             };
+            // Indexed once up front rather than scanning `items` per event
+            // (the previous `.iter_mut().find()`/`.retain()` per event made
+            // a sync touching many resources in a large collection
+            // quadratic — O(events * items) instead of O(events + items)).
+            let mut index: HashMap<String, usize> =
+                items.iter().enumerate().map(|(i, item)| ((meta.generate_id)(item, None), i)).collect();
+            let mut deleted: HashSet<&str> = HashSet::new();
+
             for event in events {
                 match &event.kind {
                     EventKind::Delete { .. } => {
-                        items.retain(|item| (meta.generate_id)(item, None) != event.resource_id);
+                        deleted.insert(event.resource_id.as_str());
                     }
                     EventKind::Create { new_value } | EventKind::Update { new_value, .. } => {
                         let mut item = new_value.clone();
@@ -149,15 +163,27 @@ fn apply_to_collection(container: &mut InternalConfiguration, resource_type: Res
                         // — fully populate it during the recursive pass in
                         // `apply_events`).
                         strip_own_nested_fields(&mut item, &meta);
-                        match items.iter_mut().find(|existing| (meta.generate_id)(existing, None) == event.resource_id) {
-                            Some(slot) => {
-                                carry_over_nested_fields(slot, &mut item, &meta);
-                                *slot = item;
+                        match index.get(&event.resource_id) {
+                            Some(&i) => {
+                                carry_over_nested_fields(&items[i], &mut item, &meta);
+                                items[i] = item;
                             }
-                            None => items.push(item),
+                            None => {
+                                index.insert(event.resource_id.clone(), items.len());
+                                items.push(item);
+                            }
                         }
+                        // A resource id can't legitimately get both a
+                        // Delete and a Create/Update within one diff's
+                        // events, but this guards against a stale entry
+                        // rather than relying on that.
+                        deleted.remove(event.resource_id.as_str());
                     }
                 }
+            }
+
+            if !deleted.is_empty() {
+                items.retain(|item| !deleted.contains((meta.generate_id)(item, None).as_str()));
             }
             if !items.is_empty() {
                 container.insert(config_field.to_string(), Value::Array(items));

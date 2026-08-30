@@ -9,7 +9,7 @@ use adc_sdk::{BackendSyncOptions, ResourceType};
 use serde_json::json;
 
 mod common;
-use common::{backend, base_service, base_upstream, create_event, delete_event, diff, empty_configuration};
+use common::{backend, base_service, base_upstream, create_event, delete_event, diff, empty_configuration, update_event};
 
 async fn dump(backend: &Backend) -> Configuration {
     backend.dump().await.unwrap()
@@ -60,6 +60,10 @@ async fn syncs_and_dumps_services_with_no_routes() {
     let dumped2 = services.iter().find(|s| s.name == "service2").expect("service2 exists");
     assert_eq!(dumped2.hosts, None);
 
+    let raw = common::raw_config().await;
+    let service1_index_before = raw.services.iter().find(|s| s.name == "service1").unwrap().modified_index;
+    let service2_index_before = raw.services.iter().find(|s| s.name == "service2").unwrap().modified_index;
+
     let before = dump(&backend).await;
     let updated_service1 = adc::Service { description: Some("desc".to_string()), ..service1.clone() };
     let events = diff(&config_with_services(vec![updated_service1, service2.clone()]), &before);
@@ -69,6 +73,12 @@ async fn syncs_and_dumps_services_with_no_routes() {
     let services = config.services.expect("services still exist");
     let dumped2 = services.iter().find(|s| s.name == "service2").expect("service2 untouched by service1's update");
     assert_eq!(dumped2.description, None);
+
+    let raw = common::raw_config().await;
+    let service1_index_after = raw.services.iter().find(|s| s.name == "service1").unwrap().modified_index;
+    let service2_index_after = raw.services.iter().find(|s| s.name == "service2").unwrap().modified_index;
+    assert!(service1_index_after > service1_index_before, "updating service1 must bump its own modifiedIndex");
+    assert_eq!(service2_index_after, service2_index_before, "the unrelated service2's modifiedIndex must not move");
 
     sync_ok(&backend, vec![delete_event(ResourceType::Service, "service1", None)]).await;
     let config = dump(&backend).await;
@@ -121,6 +131,29 @@ async fn syncs_and_dumps_a_service_with_routes() {
     assert_eq!(routes[1].name, route2_name);
     assert_eq!(routes[1].uris, vec!["/route2".to_string()]);
 
+    // --- Update route1 only: route2's own modifiedIndex must not move. ---
+    let raw = common::raw_config().await;
+    let route1_index_before = raw.routes.iter().find(|r| r.name == route1_name).unwrap().modified_index;
+    let route2_index_before = raw.routes.iter().find(|r| r.name == route2_name).unwrap().modified_index;
+
+    sync_ok(
+        &backend,
+        vec![update_event(
+            ResourceType::Route,
+            route1_name,
+            json!({ "name": route1_name, "uris": ["/route1-updated"] }),
+            json!({ "name": route1_name, "uris": ["/route1"] }),
+            Some(service_name),
+        )],
+    )
+    .await;
+
+    let raw = common::raw_config().await;
+    let route1_index_after = raw.routes.iter().find(|r| r.name == route1_name).unwrap().modified_index;
+    let route2_index_after = raw.routes.iter().find(|r| r.name == route2_name).unwrap().modified_index;
+    assert!(route1_index_after > route1_index_before, "updating route1 must bump its own modifiedIndex");
+    assert_eq!(route2_index_after, route2_index_before, "the unrelated route2's modifiedIndex must not move");
+
     sync_ok(&backend, vec![delete_event(ResourceType::Route, route1_name, Some(service_name))]).await;
     let config = dump(&backend).await;
     let services = config.services.unwrap();
@@ -163,9 +196,9 @@ async fn syncs_a_service_with_a_service_discovery_upstream_and_no_static_nodes()
     let events = diff(&config_with_services(vec![service]), &before);
     sync_ok(&backend, events).await;
 
-    let raw = common::cache().raw_config("service-e2e-discovery").await.expect("dump/sync populate the raw config cache");
-    let upstreams = raw.upstreams.expect("the service's default upstream was written");
-    assert_eq!(upstreams.len(), 1);
+    let raw = common::raw_config().await;
+    let upstreams = raw.upstreams;
+    assert_eq!(upstreams.len(), 1, "the service's default upstream was written");
     assert_eq!(upstreams[0].nodes, None, "a discovery-based upstream has no static node list");
     assert_eq!(upstreams[0].discovery_type.as_deref(), Some(registry_name));
     assert_eq!(upstreams[0].service_name.as_deref(), Some(service_name));

@@ -96,6 +96,16 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
         (Some(l), None) => changes.push(ValueDiff::Deleted { path: path.to_vec(), lhs: l.clone() }),
         (None, None) => {}
         (Some(l), Some(r)) => {
+            // Equal subtrees can't contain a diff at any depth — skips the
+            // rest of this call's own object/array walk (and every nested
+            // one beneath it) instead of visiting a subtree just to
+            // rediscover it matches. Not free itself (`==` on a large
+            // subtree is its own O(size) walk), so this roughly halves the
+            // comparison cost rather than eliminating it — see
+            // `ideal_equal_bench` for the measured ceiling.
+            if l == r {
+                return;
+            }
             if real_type_of(l) != real_type_of(r) {
                 changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
                 return;

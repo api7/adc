@@ -192,6 +192,18 @@ impl DifferV4 {
         local_item: Value,
         remote_item: Value,
     ) -> Option<BuiltEvent> {
+        // `local_item`/`remote_item` arrive with `id` already stripped by
+        // the caller, so this is an apples-to-apples check: raw-equal here
+        // means every deterministic step below (default merging, nested
+        // sub-resource diffing, plugin diffing, the final `diff_value`)
+        // would run on identical inputs on both sides and find nothing —
+        // skips all of it instead of re-discovering that. Doesn't help SSL
+        // much: `apply_atomic_strips` below strips its private key from
+        // both sides first, so an unchanged SSL resource's raw items are
+        // rarely equal before that strip even happens.
+        if local_item == remote_item {
+            return None;
+        }
         let original_local_item = local_item.clone();
         let mut local_item = local_item;
         let mut remote_item = remote_item;

@@ -19,8 +19,7 @@ use tokio::sync::OnceCell;
 
 use crate::cache::{Cache, CachedEntry};
 use crate::fetcher::Fetcher;
-use crate::operator::{Operator, SyncOutcome};
-use crate::typing::ApisixStandalone;
+use crate::operator::{Operator, SyncOutcome, SyncedState, WireVersions};
 use crate::utils::stable_timestamp;
 
 /// One target server plus the client already configured with its own
@@ -62,13 +61,24 @@ pub struct Backend {
     bypass_cache: bool,
     version: OnceCell<Version>,
     /// Pinned from this instance's own `dump`, if it ran one — so a later
-    /// `sync` on the *same* instance folds events onto the exact document
-    /// they were diffed against, not a fresh (possibly since-changed by a
-    /// concurrent caller) read of the global cache. See `sync`'s doc
-    /// comment. A caller can legitimately `dump`/`sync` more than once on
-    /// the same instance, so every call overwrites this with its own
-    /// result.
-    dumped_raw_config: std::sync::Mutex<Option<ApisixStandalone>>,
+    /// `sync` on the *same* instance reconstructs the desired config
+    /// against the exact baseline `events` were diffed against, not a
+    /// fresh (possibly since-changed by a concurrent caller) read of the
+    /// global cache. See `sync`'s doc comment. A caller can legitimately
+    /// `dump`/`sync` more than once on the same instance, so every call
+    /// overwrites this with its own result. Always set together (same
+    /// moment, same lock) with `dumped_versions` below — both come from
+    /// the same `CachedEntry`.
+    dumped_desired: std::sync::Mutex<Option<Configuration>>,
+    /// The `modifiedIndex`/`*_conf_version` values the wire document last
+    /// actually written for this `cache_key` carried — what
+    /// `crate::operator::stamp_versions` carries forward for a resource
+    /// `events` doesn't touch. Pinned for the same reason, and under the
+    /// same rules, as `dumped_desired`; derived from
+    /// `crate::cache::CachedEntry::versions` (or the freshly-written wire
+    /// document, after a `sync`) rather than held onto directly — nothing
+    /// here needs the wire document itself, only what it carried.
+    dumped_versions: std::sync::Mutex<Option<WireVersions>>,
 }
 
 impl Backend {
@@ -107,7 +117,8 @@ impl Backend {
             cache_key: opts.cache_key,
             bypass_cache: opts.bypass_cache,
             version: OnceCell::new(),
-            dumped_raw_config: std::sync::Mutex::new(None),
+            dumped_desired: std::sync::Mutex::new(None),
+            dumped_versions: std::sync::Mutex::new(None),
         })
     }
 
@@ -181,22 +192,24 @@ impl adc_sdk::Backend for Backend {
     /// cache at the end, so a `dump` right before it always sees fresh data
     /// without needing to hit the servers again.
     ///
-    /// Also pins `raw_config` onto this instance (`dumped_raw_config`) —
-    /// see `sync`'s doc comment for why a later `sync` on this same
-    /// instance prefers that pinned copy over a fresh cache read.
+    /// Also pins `config`/derived versions onto this instance
+    /// (`dumped_desired`/`dumped_versions`) — see `sync`'s doc comment for
+    /// why a later `sync` on this same instance prefers those pinned copies
+    /// over a fresh cache read.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
         }
         // Cheap fast path: no lock held across anything, so it can't block
-        // a concurrent `sync` on this key. `config` and `raw_config` must
-        // come from the same moment, or the value pinned below could
+        // a concurrent `sync` on this key. `config` and `versions` must
+        // come from the same moment, or the values pinned below could
         // mismatch what's cached.
         if let Some(entry) = Cache::global().get_live(&self.cache_key).await
             && let Some(config) = entry.config
         {
-            if let Some(raw_config) = entry.raw_config {
-                *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
+            *self.dumped_desired.lock().unwrap() = Some(config.clone());
+            if let Some(versions) = entry.versions {
+                *self.dumped_versions.lock().unwrap() = Some(versions);
             }
             return Ok(config);
         }
@@ -215,14 +228,24 @@ impl adc_sdk::Backend for Backend {
         if Cache::global().is_fresh(&entry) && let Some(config) = entry.config.clone() {
             // Someone else populated the cache while this call resolved
             // the version or waited for this lock.
-            if let Some(raw_config) = entry.raw_config.clone() {
-                *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
+            *self.dumped_desired.lock().unwrap() = Some(config.clone());
+            if let Some(versions) = entry.versions.clone() {
+                *self.dumped_versions.lock().unwrap() = Some(versions);
             }
             return Ok(config);
         }
 
+        // `config` here is a re-modelled view of the dumped wire document
+        // (`to_adc`), not a previously-cached *desired* config — this only
+        // runs on the bootstrap (or a `bypass_cache`/`InvalidateADCCache`
+        // re-seed), and there is no prior desired config to prefer over it
+        // yet. See `crate::transformer::transform_to_wire`'s doc comment
+        // for why every *later* `sync` caches the desired config directly
+        // instead. `raw_config` itself is only needed transiently, to seed
+        // `versions` — nothing here holds onto the wire document itself.
         let (config, raw_config) = Fetcher::new(self.servers.clone(), version).dump().await?;
-        let highest = highest_conf_version(&raw_config);
+        let versions = WireVersions::from_wire(&raw_config);
+        let highest = versions.highest_conf_version();
         // Built in full before it touches `entry`, then swapped in as one
         // assignment — a panic while computing the new state leaves the
         // old entry untouched instead of a torn mix of old and new fields.
@@ -233,29 +256,30 @@ impl adc_sdk::Backend for Backend {
             version: entry.version.clone(),
             latest_version: Some(entry.latest_version.map_or(highest, |current| current.max(highest))),
             config: Some(config.clone()),
-            raw_config: Some(raw_config.clone()),
+            versions: Some(versions.clone()),
             updated_at: Some(stable_timestamp()),
         };
         *entry = new_entry;
         drop(entry);
-        *self.dumped_raw_config.lock().unwrap() = Some(raw_config);
+        *self.dumped_desired.lock().unwrap() = Some(config.clone());
+        *self.dumped_versions.lock().unwrap() = Some(versions);
         Ok(config)
     }
 
     /// When this instance ran its own `dump` first — the normal case: a
     /// caller diffs `events` against whatever `dump` just returned, then
     /// syncs them on the same instance — prefers that `dump`'s pinned
-    /// `dumped_raw_config` over a fresh read of the global cache: a
-    /// concurrent caller (a `bypass_cache` dump, or another sync) could
-    /// have changed the cached entry for this key in the time between
-    /// this instance's `dump` and this `sync` call, and folding `events`
-    /// onto a document other than the one they were diffed against would
-    /// produce a wrong result. Without a pinned snapshot — `events` built
-    /// from something other than this instance's own `dump` (a caller
-    /// applying a known change directly, say) — falls back to whatever's
-    /// in the global cache for this key, or an empty document if there's
-    /// nothing there yet; this is a documented convention, not something
-    /// enforced here.
+    /// `dumped_desired`/`dumped_versions` over a fresh read of the global
+    /// cache: a concurrent caller (a `bypass_cache` dump, or another sync)
+    /// could have changed the cached entry for this key in the time between
+    /// this instance's `dump` and this `sync` call, and reconstructing the
+    /// desired config against a baseline other than the one `events` were
+    /// diffed against would produce a wrong result. Without a pinned
+    /// snapshot — `events` built from something other than this instance's
+    /// own `dump` (a caller applying a known change directly, say) — falls
+    /// back to whatever's in the global cache for this key, or an empty
+    /// document if there's nothing there yet; this is a documented
+    /// convention, not something enforced here.
     async fn sync(
         &self,
         events: Vec<Event>,
@@ -265,30 +289,42 @@ impl adc_sdk::Backend for Backend {
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
         let mut entry = Cache::global().lock(&self.cache_key).await;
-        let old_raw_config = match self.dumped_raw_config.lock().unwrap().clone() {
-            Some(raw_config) => raw_config,
-            None => entry.raw_config.clone().unwrap_or_default(),
+        let prior_desired = match self.dumped_desired.lock().unwrap().clone() {
+            Some(desired) => desired,
+            None => entry.config.clone().unwrap_or_default(),
+        };
+        let old_versions = match self.dumped_versions.lock().unwrap().clone() {
+            Some(versions) => versions,
+            None => entry.versions.clone().unwrap_or_default(),
         };
         let latest_known_version = entry.latest_version;
 
-        match Operator::new(self.servers.clone(), old_raw_config, latest_known_version).sync(events, opts).await {
-            Ok(SyncOutcome { results, new_state: Some((timestamp, new_config)) }) => {
-                // Pinned before `new_config` is moved into `new_entry`
-                // below, so a later `sync`/`dump` on this same instance
-                // builds on what this call actually wrote, not the
+        match Operator::new(self.servers.clone(), prior_desired, old_versions, latest_known_version)
+            .sync(events, opts)
+            .await
+        {
+            Ok(SyncOutcome { results, new_state: Some(SyncedState { timestamp, desired, wire }) }) => {
+                // `wire` (the document actually PUT) is only needed
+                // transiently, to derive what gets cached — nothing here
+                // holds onto it past this point.
+                let versions = WireVersions::from_wire(&wire);
+                // Pinned before `desired`/`versions` are moved into
+                // `new_entry` below, so a later `sync`/`dump` on this same
+                // instance builds on what this call actually wrote, not the
                 // pre-sync snapshot it started from.
-                *self.dumped_raw_config.lock().unwrap() = Some(new_config.clone());
+                *self.dumped_desired.lock().unwrap() = Some(desired.clone());
+                *self.dumped_versions.lock().unwrap() = Some(versions.clone());
                 // Built in full before it touches `entry`, then swapped in
                 // as one assignment — a panic while computing the new state
-                // (e.g. inside `to_adc`) leaves the old entry untouched
-                // instead of a torn mix of old and new fields.
-                // `tokio::sync::Mutex` never poisons on a panicked guard
-                // holder, so nothing else would catch a partial write here.
+                // leaves the old entry untouched instead of a torn mix of
+                // old and new fields. `tokio::sync::Mutex` never poisons on
+                // a panicked guard holder, so nothing else would catch a
+                // partial write here.
                 let new_entry = CachedEntry {
                     version: entry.version.clone(),
                     latest_version: Some(entry.latest_version.map_or(timestamp, |current| current.max(timestamp))),
-                    config: Some(crate::transformer::to_adc(&new_config)),
-                    raw_config: Some(new_config),
+                    config: Some(desired),
+                    versions: Some(versions),
                     updated_at: Some(timestamp),
                 };
                 *entry = new_entry;
@@ -305,11 +341,12 @@ impl adc_sdk::Backend for Backend {
                 // pointing at data a live server may have moved past. The
                 // next dump() re-fetches and re-runs `find_latest` to
                 // discover the cluster's real state instead of trusting
-                // stale cache. This instance's own pinned snapshot is now
-                // equally untrustworthy, so it's cleared too — a retry on
-                // the same instance must go through a fresh `dump`.
+                // stale cache. This instance's own pinned snapshots are now
+                // equally untrustworthy, so they're cleared too — a retry
+                // on the same instance must go through a fresh `dump`.
                 *entry = CachedEntry::default();
-                *self.dumped_raw_config.lock().unwrap() = None;
+                *self.dumped_desired.lock().unwrap() = None;
+                *self.dumped_versions.lock().unwrap() = None;
                 Err(error)
             }
         }
@@ -321,26 +358,4 @@ impl adc_sdk::Backend for Backend {
             .validate(events)
             .await
     }
-}
-
-/// The version cache primes off whichever `*_conf_version` field is
-/// numerically highest across the whole document — there's no single
-/// document-wide version, just one counter per resource collection, and the
-/// highest one is what a subsequent `sync` must not regress below (see
-/// `crate::operator::Operator::sync`'s clock-rollback guard).
-fn highest_conf_version(raw_config: &ApisixStandalone) -> i64 {
-    [
-        raw_config.routes_conf_version,
-        raw_config.services_conf_version,
-        raw_config.consumers_conf_version,
-        raw_config.ssls_conf_version,
-        raw_config.global_rules_conf_version,
-        raw_config.plugin_metadata_conf_version,
-        raw_config.upstreams_conf_version,
-        raw_config.stream_routes_conf_version,
-    ]
-    .into_iter()
-    .flatten()
-    .max()
-    .unwrap_or(0)
 }

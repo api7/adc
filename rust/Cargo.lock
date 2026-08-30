@@ -52,6 +52,8 @@ dependencies = [
  "async-trait",
  "dashmap",
  "log",
+ "proptest",
+ "reqwest",
  "semver",
  "serde",
  "serde_json",

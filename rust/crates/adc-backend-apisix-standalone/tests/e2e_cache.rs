@@ -101,27 +101,25 @@ async fn single_instance_initializes_caches_and_syncs() {
     let backend = backend(cache_key);
 
     assert!(common::cache().config(cache_key).await.is_none());
-    assert!(common::cache().raw_config(cache_key).await.is_none());
+    assert!(common::cache().versions(cache_key).await.is_none());
 
     let initial = dump(&backend).await;
     assert!(common::cache().config(cache_key).await.is_some());
-    let raw = common::cache().raw_config(cache_key).await.expect("dump populates the raw config cache");
+    let raw = common::raw_config().await;
     assert_fresh_cache_shape(&initial);
-    // A never-configured instance reports every conf_version as a present 0,
-    // not absent — the document itself already exists, just empty.
-    assert_eq!(raw.routes_conf_version, Some(0));
-    assert_eq!(raw.services_conf_version, Some(0));
-    assert_eq!(raw.consumers_conf_version, Some(0));
-    assert_eq!(raw.ssls_conf_version, Some(0));
-    assert_eq!(raw.global_rules_conf_version, Some(0));
-    assert_eq!(raw.plugin_metadata_conf_version, Some(0));
-    assert_eq!(raw.upstreams_conf_version, Some(0));
-    // Not asserted like the others: stream routes are a newer standalone
-    // feature, absent from the document's schema entirely (not merely
-    // zeroed) on some of this suite's older supported versions — the same
-    // reason the TS suite's own equivalent check only walks whatever keys
-    // the raw document actually has, rather than a fixed list.
-    assert!(matches!(raw.stream_routes_conf_version, None | Some(0)));
+    // A never-configured instance reports every conf_version as 0 — the
+    // document itself already exists, just empty. `#[serde(default)]`
+    // normalizes an older APISIX's stream_routes_conf_version (absent from
+    // the document's schema entirely on some older supported versions) to
+    // the same 0, so it's asserted the same way as every other type here.
+    assert_eq!(raw.routes_conf_version, 0);
+    assert_eq!(raw.services_conf_version, 0);
+    assert_eq!(raw.consumers_conf_version, 0);
+    assert_eq!(raw.ssls_conf_version, 0);
+    assert_eq!(raw.global_rules_conf_version, 0);
+    assert_eq!(raw.plugin_metadata_conf_version, 0);
+    assert_eq!(raw.upstreams_conf_version, 0);
+    assert_eq!(raw.stream_routes_conf_version, 0);
 
     // A second dump is served from cache — same result, no new fetch.
     let again = dump(&backend).await;
@@ -147,18 +145,18 @@ async fn single_instance_initializes_caches_and_syncs() {
     // Every resource created in this one sync call shares the same
     // timestamp, on both its own `modifiedIndex` and its collection's
     // `conf_version` — and that's also what got cached as `latest_version`.
-    let raw = common::cache().raw_config(cache_key).await.unwrap();
-    let timestamp = raw.services.as_ref().unwrap()[0].modified_index;
-    assert_eq!(raw.services_conf_version, Some(timestamp));
-    assert_eq!(raw.routes.as_ref().unwrap()[0].modified_index, timestamp);
-    assert_eq!(raw.routes_conf_version, Some(timestamp));
-    assert_eq!(raw.upstreams.as_ref().unwrap()[0].modified_index, timestamp);
-    assert_eq!(raw.upstreams_conf_version, Some(timestamp));
-    for consumer in raw.consumers.as_ref().unwrap() {
+    let raw = common::raw_config().await;
+    let timestamp = raw.services[0].modified_index;
+    assert_eq!(raw.services_conf_version, timestamp);
+    assert_eq!(raw.routes[0].modified_index, timestamp);
+    assert_eq!(raw.routes_conf_version, timestamp);
+    assert_eq!(raw.upstreams[0].modified_index, timestamp);
+    assert_eq!(raw.upstreams_conf_version, timestamp);
+    for consumer in &raw.consumers {
         let consumer = consumer.as_consumer().expect("this fixture has no credentials, only plain consumers");
         assert_eq!(consumer.modified_index, timestamp);
     }
-    assert_eq!(raw.consumers_conf_version, Some(timestamp));
+    assert_eq!(raw.consumers_conf_version, timestamp);
     assert_eq!(common::cache().latest_version(cache_key).await, Some(timestamp));
 }
 
@@ -171,8 +169,8 @@ async fn multiple_fresh_instances_all_receive_the_sync() {
 
     let initial = dump(&backend).await;
     assert_fresh_cache_shape(&initial);
-    let raw = common::cache().raw_config(cache_key).await.unwrap();
-    assert_eq!(raw.services_conf_version, Some(0));
+    let raw = common::raw_config().await;
+    assert_eq!(raw.services_conf_version, 0);
 
     let before = dump(&backend).await;
     let events = diff(&fixture_config(9180), &before);
@@ -225,7 +223,7 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
         let port = services[0].upstream.as_ref().unwrap().nodes.as_ref().unwrap()[0].port;
         assert_eq!(port, 3306, "must pick server2's (the more recently written) document, not server1's");
     } else {
-        assert!(common::cache().raw_config(cache_key).await.is_some());
+        assert!(common::cache().versions(cache_key).await.is_some());
     }
 }
 
