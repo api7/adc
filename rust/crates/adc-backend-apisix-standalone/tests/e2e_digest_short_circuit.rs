@@ -1,4 +1,3 @@
-//! No TS reference spec to port from — this is a from-scratch addition.
 //! Every other test touching `X-Digest` (the header `operator.rs::sha1_hex`
 //! computes to let APISIX skip reprocessing an unchanged document) only
 //! checks its *effect*: that resyncing unchanged state doesn't move any

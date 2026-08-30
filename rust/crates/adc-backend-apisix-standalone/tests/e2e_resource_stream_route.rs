@@ -1,6 +1,4 @@
-//! No TS reference spec to port from (`libs/backend-apisix-standalone/e2e/
-//! resources/` has no `stream-route.e2e-spec.ts`) — this is a from-scratch
-//! addition. Mirrors `e2e_resource_service.rs`'s HTTP-route coverage for the
+//! Mirrors `e2e_resource_service.rs`'s HTTP-route coverage for the
 //! stream (TCP/UDP) side, plus the isolation checks that file doesn't make:
 //! adding a stream route must bump only `stream_routes`, never `services` —
 //! `DifferV4::handle_update` doesn't even emit a `Service` event when the

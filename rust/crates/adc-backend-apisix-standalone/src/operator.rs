@@ -171,7 +171,15 @@ impl Operator {
             async move {
                 match put_one(&server.client, body, digest).await {
                     Ok(()) => Ok(BackendSyncResult { success: true, event: None, error: None, server: Some(server.server) }),
-                    Err(error) => Err((server.server, error)),
+                    Err(error) => {
+                        if let Some(message) = conf_version_rejection_message(&error) {
+                            tracing::error!(
+                                "conf_version rejected by {}: (\"{message}\") — another writer is likely active on this cluster.",
+                                server.server
+                            );
+                        }
+                        Err((server.server, error))
+                    }
                 }
             }
         };
@@ -218,6 +226,23 @@ async fn put_one(client: &HttpClient, body: String, digest: String) -> Result<()
     let request = client.request(Method::PUT, CONFIG_ENDPOINT)?.header(HEADER_DIGEST, digest).body(body);
     client.send(request).await?;
     Ok(())
+}
+
+/// Whether `error` is APISIX rejecting a PUT for carrying a stale
+/// `*_conf_version` — observed verbatim from a real 3.17.0 instance:
+/// `{"error_msg":"services_conf_version must be greater than or equal to
+/// (<N>)"}`, i.e. a `400` whose message names one of the eight
+/// `*_conf_version` fields. Means someone else's write landed on this
+/// cluster after the baseline this sync computed its own versions from —
+/// this crate's own cache regressing (a bug) would look identical from
+/// here, since the two aren't distinguishable from the response alone.
+/// Returns the message, for the caller to log — not a bool, so the ERROR
+/// log below doesn't need its own second, separate extraction.
+fn conf_version_rejection_message(error: &BackendError) -> Option<&str> {
+    match error {
+        BackendError::Api { status: 400, message } if message.contains("conf_version") => Some(message),
+        _ => None,
+    }
 }
 
 fn sha1_hex(bytes: &[u8]) -> String {
@@ -436,6 +461,37 @@ mod tests {
 
     use super::*;
     use crate::typing::{self, ConsumerOrCredential};
+
+    #[test]
+    fn a_400_naming_a_conf_version_field_is_recognized() {
+        // Verbatim from a real 3.17.0 instance (seeded with an inflated
+        // `services_conf_version` via raw PUT, then PUT a normal one back).
+        let error = BackendError::Api {
+            status: 400,
+            message: "services_conf_version must be greater than or equal to (99999999999999)".to_string(),
+        };
+        assert_eq!(
+            conf_version_rejection_message(&error),
+            Some("services_conf_version must be greater than or equal to (99999999999999)")
+        );
+    }
+
+    #[test]
+    fn a_400_not_naming_a_conf_version_field_is_not_a_conf_version_rejection() {
+        let error = BackendError::Api { status: 400, message: "missing digest header".to_string() };
+        assert_eq!(conf_version_rejection_message(&error), None);
+    }
+
+    #[test]
+    fn a_non_400_status_is_never_a_conf_version_rejection_even_if_it_mentions_one() {
+        let error = BackendError::Api { status: 500, message: "services_conf_version must be greater than or equal to (1)".to_string() };
+        assert_eq!(conf_version_rejection_message(&error), None);
+    }
+
+    #[test]
+    fn a_non_api_error_is_never_a_conf_version_rejection() {
+        assert_eq!(conf_version_rejection_message(&BackendError::Transport("connection refused".to_string())), None);
+    }
 
     #[test]
     fn no_known_latest_version_uses_the_wall_clock_time_as_is() {

@@ -1,6 +1,4 @@
-//! No TS reference spec to port from (`libs/backend-apisix-standalone/e2e/
-//! resources/` has no `plugin-metadata.e2e-spec.ts`) — this is a
-//! from-scratch addition, structured like `e2e_resource_global_rule.rs`
+//! Structured like `e2e_resource_global_rule.rs`
 //! (same `Record`-kind wire shape) but going through the real differ
 //! (`common::diff`) instead of hand-built events, and adding the
 //! per-entry isolation checks that file doesn't make. Also the e2e
