@@ -66,19 +66,29 @@ pub struct Backend {
     /// fresh (possibly since-changed by a concurrent caller) read of the
     /// global cache. See `sync`'s doc comment. A caller can legitimately
     /// `dump`/`sync` more than once on the same instance, so every call
-    /// overwrites this with its own result. Always set together (same
-    /// moment, same lock) with `dumped_versions` below — both come from
-    /// the same `CachedEntry`.
-    dumped_desired: std::sync::Mutex<Option<Configuration>>,
+    /// overwrites this with its own result. Both fields always come from
+    /// the same `CachedEntry` and must be read/written together — one
+    /// `Mutex` around both, rather than one each, so there's no window
+    /// where a concurrent call on the same instance (this type has no
+    /// invariant preventing a caller from sharing it, e.g. via `Arc`,
+    /// across tasks) could observe one field updated and the other still
+    /// from a prior moment.
+    dumped: std::sync::Mutex<DumpedSnapshot>,
+}
+
+/// See `Backend::dumped`'s doc comment for why these two are paired instead
+/// of each getting their own `Mutex`.
+#[derive(Clone, Default)]
+struct DumpedSnapshot {
+    desired: Option<Configuration>,
     /// The `modifiedIndex`/`*_conf_version` values the wire document last
     /// actually written for this `cache_key` carried — what
     /// `crate::operator::stamp_versions` carries forward for a resource
-    /// `events` doesn't touch. Pinned for the same reason, and under the
-    /// same rules, as `dumped_desired`; derived from
-    /// `crate::cache::CachedEntry::versions` (or the freshly-written wire
-    /// document, after a `sync`) rather than held onto directly — nothing
-    /// here needs the wire document itself, only what it carried.
-    dumped_versions: std::sync::Mutex<Option<WireVersions>>,
+    /// `events` doesn't touch. Derived from `crate::cache::CachedEntry::
+    /// versions` (or the freshly-written wire document, after a `sync`)
+    /// rather than held onto directly — nothing here needs the wire
+    /// document itself, only what it carried.
+    versions: Option<WireVersions>,
 }
 
 impl Backend {
@@ -117,8 +127,7 @@ impl Backend {
             cache_key: opts.cache_key,
             bypass_cache: opts.bypass_cache,
             version: OnceCell::new(),
-            dumped_desired: std::sync::Mutex::new(None),
-            dumped_versions: std::sync::Mutex::new(None),
+            dumped: std::sync::Mutex::new(DumpedSnapshot::default()),
         })
     }
 
@@ -192,10 +201,9 @@ impl adc_sdk::Backend for Backend {
     /// cache at the end, so a `dump` right before it always sees fresh data
     /// without needing to hit the servers again.
     ///
-    /// Also pins `config`/derived versions onto this instance
-    /// (`dumped_desired`/`dumped_versions`) — see `sync`'s doc comment for
-    /// why a later `sync` on this same instance prefers those pinned copies
-    /// over a fresh cache read.
+    /// Also pins `config`/derived versions onto this instance (`dumped`)
+    /// — see `sync`'s doc comment for why a later `sync` on this same
+    /// instance prefers that pinned snapshot over a fresh cache read.
     async fn dump(&self) -> Result<Configuration, BackendError> {
         if self.bypass_cache {
             Cache::global().invalidate(&self.cache_key).await;
@@ -207,8 +215,7 @@ impl adc_sdk::Backend for Backend {
         if let Some(entry) = Cache::global().get_live(&self.cache_key).await
             && let Some(config) = entry.config
         {
-            *self.dumped_desired.lock().unwrap() = Some(config.clone());
-            *self.dumped_versions.lock().unwrap() = entry.versions;
+            *self.dumped.lock().unwrap() = DumpedSnapshot { desired: Some(config.clone()), versions: entry.versions };
             return Ok(config);
         }
 
@@ -226,8 +233,7 @@ impl adc_sdk::Backend for Backend {
         if Cache::global().is_fresh(&entry) && let Some(config) = entry.config.clone() {
             // Someone else populated the cache while this call resolved
             // the version or waited for this lock.
-            *self.dumped_desired.lock().unwrap() = Some(config.clone());
-            *self.dumped_versions.lock().unwrap() = entry.versions.clone();
+            *self.dumped.lock().unwrap() = DumpedSnapshot { desired: Some(config.clone()), versions: entry.versions.clone() };
             return Ok(config);
         }
 
@@ -257,16 +263,15 @@ impl adc_sdk::Backend for Backend {
         };
         *entry = new_entry;
         drop(entry);
-        *self.dumped_desired.lock().unwrap() = Some(config.clone());
-        *self.dumped_versions.lock().unwrap() = Some(versions);
+        *self.dumped.lock().unwrap() = DumpedSnapshot { desired: Some(config.clone()), versions: Some(versions) };
         Ok(config)
     }
 
     /// When this instance ran its own `dump` first — the normal case: a
     /// caller diffs `events` against whatever `dump` just returned, then
     /// syncs them on the same instance — prefers that `dump`'s pinned
-    /// `dumped_desired`/`dumped_versions` over a fresh read of the global
-    /// cache: a concurrent caller (a `bypass_cache` dump, or another sync)
+    /// `dumped` snapshot over a fresh read of the global cache: a
+    /// concurrent caller (a `bypass_cache` dump, or another sync)
     /// could have changed the cached entry for this key in the time between
     /// this instance's `dump` and this `sync` call, and reconstructing the
     /// desired config against a baseline other than the one `events` were
@@ -285,11 +290,14 @@ impl adc_sdk::Backend for Backend {
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
         let mut entry = Cache::global().lock(&self.cache_key).await;
-        let prior_desired = match self.dumped_desired.lock().unwrap().clone() {
+        // One clone of the whole pinned pair, not two separate lock
+        // acquisitions — see `Backend::dumped`'s doc comment for why.
+        let snapshot = self.dumped.lock().unwrap().clone();
+        let prior_desired = match snapshot.desired {
             Some(desired) => desired,
             None => entry.config.clone().unwrap_or_default(),
         };
-        let old_versions = match self.dumped_versions.lock().unwrap().clone() {
+        let old_versions = match snapshot.versions {
             Some(versions) => versions,
             None => entry.versions.clone().unwrap_or_default(),
         };
@@ -308,8 +316,7 @@ impl adc_sdk::Backend for Backend {
                 // `new_entry` below, so a later `sync`/`dump` on this same
                 // instance builds on what this call actually wrote, not the
                 // pre-sync snapshot it started from.
-                *self.dumped_desired.lock().unwrap() = Some(desired.clone());
-                *self.dumped_versions.lock().unwrap() = Some(versions.clone());
+                *self.dumped.lock().unwrap() = DumpedSnapshot { desired: Some(desired.clone()), versions: Some(versions.clone()) };
                 // Built in full before it touches `entry`, then swapped in
                 // as one assignment — a panic while computing the new state
                 // leaves the old entry untouched instead of a torn mix of
@@ -341,8 +348,7 @@ impl adc_sdk::Backend for Backend {
                 // equally untrustworthy, so they're cleared too — a retry
                 // on the same instance must go through a fresh `dump`.
                 *entry = CachedEntry::default();
-                *self.dumped_desired.lock().unwrap() = None;
-                *self.dumped_versions.lock().unwrap() = None;
+                *self.dumped.lock().unwrap() = DumpedSnapshot::default();
                 Err(error)
             }
         }
