@@ -143,23 +143,44 @@ impl Backend {
         let version = self
             .version
             .get_or_try_init(|| async {
-                let primary = &self.servers[0];
-                // HEAD support on the config document endpoint is itself
-                // version-gated (see `Fetcher::find_latest`'s
-                // `version_supports_head`), so the version probe uses the
-                // admin root instead, which has none of that ambiguity.
-                let request = primary.client.request(Method::HEAD, "/apisix/admin")?;
-                let response = primary.client.send(request).await?;
-
-                let header = response
-                    .headers()
-                    .get("server")
-                    .and_then(|value| value.to_str().ok())
-                    .and_then(|value| value.strip_prefix("APISIX/"));
-                Ok::<_, BackendError>(match header.map(Version::parse) {
-                    Some(Ok(version)) => version,
-                    _ => UNKNOWN_VERSION,
-                })
+                // Tries every configured server in turn, not just the
+                // first — one unreachable instance (a rolling restart, a
+                // network blip) shouldn't block version resolution as
+                // long as some server in the cluster still answers.
+                let mut last_error = None;
+                for server in &self.servers {
+                    // HEAD support on the config document endpoint is
+                    // itself version-gated (see `Fetcher::probe_reachable`'s
+                    // `version_supports_head`), so the version probe uses
+                    // the admin root instead, which has none of that
+                    // ambiguity.
+                    let outcome = async {
+                        let request = server.client.request(Method::HEAD, "/apisix/admin")?;
+                        server.client.send(request).await
+                    }
+                    .await;
+                    let response = match outcome {
+                        Ok(response) => response,
+                        Err(error) => {
+                            tracing::warn!("apisix-standalone: server unreachable while probing for the cluster version: {error}");
+                            last_error = Some(error);
+                            continue;
+                        }
+                    };
+                    let header = response
+                        .headers()
+                        .get("server")
+                        .and_then(|value| value.to_str().ok())
+                        .and_then(|value| value.strip_prefix("APISIX/"));
+                    return Ok::<_, BackendError>(match header.map(Version::parse) {
+                        Some(Ok(version)) => version,
+                        _ => UNKNOWN_VERSION,
+                    });
+                }
+                // `self.servers` is never empty (enforced in `Backend::new`),
+                // so the loop above ran at least once — every iteration that
+                // doesn't early-return sets `last_error`.
+                Err(last_error.expect("self.servers is non-empty, so at least one iteration ran and failed"))
             })
             .await?;
         // Only cache a genuinely observed version, not the "couldn't tell"
@@ -342,7 +363,7 @@ impl adc_sdk::Backend for Backend {
                 // (same effect as `Cache::invalidate`, just through the
                 // guard instead of a second lookup) rather than leaving it
                 // pointing at data a live server may have moved past. The
-                // next dump() re-fetches and re-runs `find_latest` to
+                // next dump() re-fetches and re-runs the probe to
                 // discover the cluster's real state instead of trusting
                 // stale cache. This instance's own pinned snapshots are now
                 // equally untrustworthy, so they're cleared too — a retry

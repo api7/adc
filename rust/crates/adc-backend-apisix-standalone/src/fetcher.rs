@@ -1,6 +1,6 @@
 //! Fetching a standalone cluster's current config: which server has the
-//! most recently accepted write (`find_latest`), then pulling that server's
-//! full config document (`dump`).
+//! most recently accepted write (`probe_reachable`), then pulling that
+//! server's full config document (`dump`).
 
 use adc_backend_core::{Method, concurrent_map};
 use adc_sdk::BackendError;
@@ -16,8 +16,8 @@ const HEADER_LAST_MODIFIED: &str = "x-last-modified";
 
 /// APISIX standalone versions above 3.13.0 accept `HEAD` on the config
 /// endpoint (a cheaper way to read just the `X-Last-Modified` header);
-/// older ones don't implement `HEAD` for it at all, so `find_latest` falls
-/// back to a full `GET` there.
+/// older ones don't implement `HEAD` for it at all, so `probe_reachable`
+/// falls back to a full `GET` there.
 const HEAD_SUPPORTED_SINCE: (u64, u64, u64) = (3, 13, 0);
 
 pub struct Fetcher {
@@ -30,25 +30,22 @@ impl Fetcher {
         Self { servers, version }
     }
 
-    /// Pulls the full config document from whichever server
-    /// [`Self::find_latest`] picks (or the first configured server, if none
-    /// of them has ever accepted a write yet), and converts it into ADC's
-    /// model.
+    /// Pulls the full config document from whichever server holds the
+    /// most recently accepted write, going by each one's `X-Last-Modified`
+    /// response header (a timestamp the server stamps on every config it
+    /// stores) — or an arbitrary reachable server, if every reachable one
+    /// reports timestamp `0` (a fresh cluster no server has ever accepted
+    /// a write on) — and converts it into ADC's model.
     pub async fn dump(&self) -> Result<(Configuration, ApisixStandalone), BackendError> {
-        let target = match self.find_latest().await? {
-            Some(server) => server,
-            None => self
-                .servers
-                .first()
-                .ok_or_else(no_servers_configured)?
-                .server
-                .clone(),
-        };
+        let reachable = self.probe_reachable().await?;
+        // `reachable` is never empty here — `probe_reachable` already
+        // turned that case into the `Err` propagated above.
+        let target = pick_latest(reachable.clone()).unwrap_or_else(|| reachable[0].0.clone());
         let client = &self
             .servers
             .iter()
             .find(|s| s.server == target)
-            .expect("find_latest only ever returns a server from self.servers")
+            .expect("target came from probing self.servers, so it's one of them")
             .client;
 
         let request = client.request(Method::GET, ENDPOINT_CONFIG)?;
@@ -57,13 +54,18 @@ impl Fetcher {
         Ok((config, raw_config))
     }
 
-    /// Finds which server holds the most recently accepted write, going by
-    /// each one's `X-Last-Modified` response header (a timestamp the server
-    /// stamps on every config it stores). `None` means no server has ever
-    /// accepted a write (every one reports timestamp `0` — a fresh
-    /// cluster), not that a request failed — a request failure is still
-    /// propagated as `Err`.
-    async fn find_latest(&self) -> Result<Option<String>, BackendError> {
+    /// Probes every configured server for its `X-Last-Modified` header,
+    /// tolerating some being unreachable: a real cluster can have a subset
+    /// of instances down (a rolling restart, a network blip) without that
+    /// blocking `dump()` entirely, as long as at least one instance
+    /// answers. An unreachable server is logged and simply excluded from
+    /// the returned set — not retried here, nor recorded anywhere past
+    /// this one call; the next `dump()` probes every server again from
+    /// scratch, including ones excluded this time. Fails only when *none*
+    /// of them could be reached (propagating whichever probe's error
+    /// happened to be seen last — with every server down, which one's
+    /// error surfaces isn't meaningful).
+    async fn probe_reachable(&self) -> Result<Vec<(String, i64)>, BackendError> {
         let method = if version_supports_head(&self.version) { Method::HEAD } else { Method::GET };
 
         let probe = |server: StandaloneServer| {
@@ -81,14 +83,22 @@ impl Fetcher {
             }
         };
         let results = concurrent_map(self.servers.clone(), None, probe).await;
-        let mut resolved = Vec::with_capacity(results.len());
-        for result in results {
-            // Any single probe failure fails the whole lookup, even if every
-            // other server is healthy — not attempted-and-recovered-from.
-            resolved.push(result?);
-        }
 
-        Ok(pick_latest(resolved))
+        let mut reachable = Vec::with_capacity(results.len());
+        let mut last_error = None;
+        for result in results {
+            match result {
+                Ok(pair) => reachable.push(pair),
+                Err(error) => {
+                    tracing::warn!("apisix-standalone: server unreachable while probing for the latest config: {error}");
+                    last_error = Some(error);
+                }
+            }
+        }
+        if reachable.is_empty() {
+            return Err(last_error.unwrap_or_else(no_servers_configured));
+        }
+        Ok(reachable)
     }
 }
 
@@ -168,11 +178,13 @@ mod tests {
         StandaloneServer { server: "http://127.0.0.1:1".to_string(), client }
     }
 
-    /// Documents current behavior rather than asserting it's the only
-    /// sensible one: a single unreachable server fails the whole `dump()`,
-    /// even with zero other servers configured to fall back on. If this
-    /// crate ever grows tolerance for a subset of unreachable servers, this
-    /// test is the one that should change alongside it.
+    /// The tolerant case (some servers unreachable, at least one isn't) is
+    /// `e2e_cache.rs`'s `a_dump_tolerates_one_unreachable_server_among_
+    /// several`, which needs a real cluster to have something to succeed
+    /// against; this one needs no live cluster at all, since with only one
+    /// server configured and it unreachable, zero servers are reachable —
+    /// still a hard failure, by design (see `probe_reachable`'s doc
+    /// comment).
     #[tokio::test]
     async fn a_single_unreachable_server_fails_the_whole_dump() {
         let fetcher = Fetcher::new(vec![unreachable_server()], Version::new(999, 999, 999));
