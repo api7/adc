@@ -71,11 +71,20 @@ fn stream_route(name: &str, server_port: u16) -> adc::StreamRoute {
     }
 }
 
+/// Stream routes are a newer standalone feature — absent from the
+/// document's schema entirely (not merely zeroed) on some of this suite's
+/// older supported versions, the same cutoff `e2e_cache.rs` already checks
+/// against (see its own `single_instance_initializes_caches_and_syncs`).
+fn stream_routes_supported() -> bool {
+    common::apisix_version() > semver::Version::new(3, 13, 0)
+}
+
 /// One resource of every wire collection `WireVersions`/`stamp_versions`
-/// track: `services` (x2: one http, one stream), `routes`, `stream_routes`,
-/// `upstreams` (x3: two inline defaults + one named), `consumers` +
-/// (folded into the same collection) `consumer_credentials`, `ssls`,
-/// `global_rules`, `plugin_metadata`.
+/// track: `services` (one http, plus one stream if this APISIX version
+/// supports stream routes at all), `routes`, `stream_routes`, `upstreams`
+/// (x3: two inline defaults + one named), `consumers` + (folded into the
+/// same collection) `consumer_credentials`, `ssls`, `global_rules`,
+/// `plugin_metadata`.
 fn full_configuration() -> Configuration {
     let http_service = adc::Service {
         name: "svc-http".to_string(),
@@ -84,12 +93,15 @@ fn full_configuration() -> Configuration {
         routes: Some(adc::ServiceRoutes::Http { routes: vec![route("route-a")] }),
         ..base_service()
     };
-    let stream_service = adc::Service {
-        name: "svc-stream".to_string(),
-        upstream: Some(adc::Upstream { nodes: Some(vec![node(9280)]), ..base_upstream() }),
-        routes: Some(adc::ServiceRoutes::Stream { stream_routes: vec![stream_route("stream-a", 9300)] }),
-        ..base_service()
-    };
+    let mut services = vec![http_service];
+    if stream_routes_supported() {
+        services.push(adc::Service {
+            name: "svc-stream".to_string(),
+            upstream: Some(adc::Upstream { nodes: Some(vec![node(9280)]), ..base_upstream() }),
+            routes: Some(adc::ServiceRoutes::Stream { stream_routes: vec![stream_route("stream-a", 9300)] }),
+            ..base_service()
+        });
+    }
 
     let mut credential_config = adc::Plugin::new();
     credential_config.insert("key".to_string(), json!("alice-key"));
@@ -125,7 +137,7 @@ fn full_configuration() -> Configuration {
     plugin_metadata.insert("http-logger".to_string(), json!({ "log_format": { "host": "$host" } }));
 
     Configuration {
-        services: Some(vec![http_service, stream_service]),
+        services: Some(services),
         ssls: Some(vec![ssl]),
         consumers: Some(vec![consumer]),
         consumer_groups: None,
@@ -150,10 +162,10 @@ async fn changing_one_resource_type_leaves_every_other_type_byte_identical() {
     let snapshot1: ApisixStandalone = common::raw_config().await;
     // Sanity: every collection this test cares about actually got seeded —
     // an empty one would make the "untouched" assertion below vacuous.
-    assert_eq!(snapshot1.services.len(), 2);
+    assert_eq!(snapshot1.services.len(), if stream_routes_supported() { 2 } else { 1 });
     assert_eq!(snapshot1.routes.len(), 1);
-    assert_eq!(snapshot1.stream_routes.len(), 1);
-    assert_eq!(snapshot1.upstreams.len(), 3, "2 inline defaults + 1 named");
+    assert_eq!(snapshot1.stream_routes.len(), if stream_routes_supported() { 1 } else { 0 });
+    assert_eq!(snapshot1.upstreams.len(), if stream_routes_supported() { 3 } else { 2 }, "inline default(s) + 1 named");
     assert_eq!(snapshot1.consumers.len(), 2, "1 consumer + 1 credential");
     assert_eq!(snapshot1.ssls.len(), 1);
     assert_eq!(snapshot1.global_rules.len(), 1);
@@ -253,7 +265,6 @@ async fn deleting_everything_at_once_clears_every_collection_with_one_shared_tim
     for (field, version) in [
         ("services_conf_version", raw.services_conf_version),
         ("routes_conf_version", raw.routes_conf_version),
-        ("stream_routes_conf_version", raw.stream_routes_conf_version),
         ("upstreams_conf_version", raw.upstreams_conf_version),
         ("consumers_conf_version", raw.consumers_conf_version),
         ("ssls_conf_version", raw.ssls_conf_version),
@@ -261,5 +272,12 @@ async fn deleting_everything_at_once_clears_every_collection_with_one_shared_tim
         ("plugin_metadata_conf_version", raw.plugin_metadata_conf_version),
     ] {
         assert_eq!(version, timestamp, "{field} must share the one timestamp this delete-everything sync stamped");
+    }
+    // `full_configuration` never seeded a stream route at all on a version
+    // that doesn't support them — nothing ever bumped this collection, so
+    // it's excluded from the shared-timestamp check above, not expected to
+    // equal it.
+    if stream_routes_supported() {
+        assert_eq!(raw.stream_routes_conf_version, timestamp, "stream_routes_conf_version must share the one timestamp this delete-everything sync stamped");
     }
 }
