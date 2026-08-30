@@ -123,6 +123,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
     assert_original_layout().await;
 
     let raw_before = common::raw_config().await;
+    let nd1_index_before = raw_before.upstreams.iter().find(|u| u.name == "nd-upstream1").unwrap().modified_index;
     let nd2_index_before = raw_before.upstreams.iter().find(|u| u.name == "nd-upstream2").unwrap().modified_index;
     let default_index_before = raw_before.upstreams.iter().find(|u| u.name == "test").unwrap().modified_index;
     let services_conf_version_before = raw_before.services_conf_version;
@@ -143,7 +144,7 @@ async fn syncs_and_dumps_a_service_with_multiple_named_upstreams() {
         Some(&generate_id("test"))
     );
     assert_eq!(nd1.nodes.as_ref().unwrap()[0].host, "8.8.8.8");
-    assert!(nd1.modified_index > nd2_index_before, "nd-upstream1's own modifiedIndex must bump");
+    assert!(nd1.modified_index > nd1_index_before, "nd-upstream1's own modifiedIndex must bump");
 
     let nd2_index_after = upstreams.iter().find(|u| u.name == "nd-upstream2").unwrap().modified_index;
     let default_index_after = upstreams.iter().find(|u| u.name == "test").unwrap().modified_index;

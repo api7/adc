@@ -229,12 +229,16 @@ async fn repeated_noop_syncs_leave_the_whole_document_byte_identical() {
     }
 }
 
-/// Deleting every seeded resource type in one sync: every collection must
-/// come back an explicit `[]` on the wire (not merely absent — `#[serde(
-/// default)]` on `ApisixStandalone`'s non-`Option` fields can't tell those
-/// apart, so this checks the untyped JSON directly), and every collection
-/// that actually held something bumps its `conf_version` to the *same*
-/// shared timestamp — one sync, one moment, not staggered per type.
+/// Deleting every seeded resource type in one sync: every collection comes
+/// back empty (`#[serde(default)]` on `ApisixStandalone`'s non-`Option`
+/// fields can't distinguish an explicit `[]` from an absent key — that
+/// distinction is checked at the serialization boundary instead, in
+/// `transformer.rs`'s `transform_to_wire_always_emits_every_collection_and_
+/// conf_version_explicitly`, since a real round trip can't observe it:
+/// APISIX's own GET response drops empty collections from the JSON
+/// entirely regardless of what was PUT), and every collection that
+/// actually held something bumps its `conf_version` to the *same* shared
+/// timestamp — one sync, one moment, not staggered per type.
 #[tokio::test]
 #[ignore]
 async fn deleting_everything_at_once_clears_every_collection_with_one_shared_timestamp() {

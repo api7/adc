@@ -460,3 +460,36 @@ fn boolean_defaults_merged_correctly() {
 
     assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![expected]);
 }
+
+// A configured `core` default must still get merged in even when local and
+// remote are raw-identical: both omitting the same defaulted field means
+// the equality fast path in `handle_update` can't just check raw equality,
+// or it'd wrongly treat this as unchanged (`merge_default` only ever
+// touches `local_item`, so a real diff exists once it's applied — the
+// remote side never gets the default injected to match).
+#[test]
+fn adapts_to_default_core_values_even_when_both_sides_omit_the_field() {
+    let name = "alice";
+    let local = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
+    let remote = config(json!({ "consumers": [{ "username": name, "plugins": {} }] }));
+    let default_value = DefaultValue {
+        core: HashMap::from([(ResourceType::Consumer, json!({ "description": "default-desc" }))]),
+        plugins: HashMap::new(),
+    };
+
+    let expected = ev(
+        ResourceType::Consumer,
+        EventKind::Update {
+            old_value: json!({ "username": name, "plugins": {} }),
+            new_value: json!({ "username": name, "plugins": {}, "description": "default-desc" }),
+            diff: Some(vec![adc_sdk::ValueDiff::New {
+                path: vec![adc_sdk::PathSegment::Key("description".into())],
+                rhs: json!("default-desc"),
+            }]),
+        },
+        name,
+        name,
+    );
+
+    assert_eq!(DifferV4::diff(&local, &remote, Some(&default_value)), vec![expected]);
+}

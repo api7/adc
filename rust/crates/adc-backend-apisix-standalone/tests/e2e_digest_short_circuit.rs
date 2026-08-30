@@ -115,4 +115,10 @@ async fn a_resync_with_the_correct_digest_short_circuits_a_wrong_one_does_not() 
         // about the short-circuit specifically.
         return;
     }
+
+    // This version *does* distinguish by digest (already confirmed above,
+    // via the `!=`) — the mismatched digest must still be processed as a
+    // normal write rather than rejected outright, just not via the
+    // short-circuit `correct_status` got.
+    assert!(wrong_status.is_success(), "a PUT with a mismatched digest must still be processed as a normal write, not rejected: got {wrong_status}");
 }

@@ -208,9 +208,7 @@ impl adc_sdk::Backend for Backend {
             && let Some(config) = entry.config
         {
             *self.dumped_desired.lock().unwrap() = Some(config.clone());
-            if let Some(versions) = entry.versions {
-                *self.dumped_versions.lock().unwrap() = Some(versions);
-            }
+            *self.dumped_versions.lock().unwrap() = entry.versions;
             return Ok(config);
         }
 
@@ -229,9 +227,7 @@ impl adc_sdk::Backend for Backend {
             // Someone else populated the cache while this call resolved
             // the version or waited for this lock.
             *self.dumped_desired.lock().unwrap() = Some(config.clone());
-            if let Some(versions) = entry.versions.clone() {
-                *self.dumped_versions.lock().unwrap() = Some(versions);
-            }
+            *self.dumped_versions.lock().unwrap() = entry.versions.clone();
             return Ok(config);
         }
 
