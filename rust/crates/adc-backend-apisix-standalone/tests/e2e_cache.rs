@@ -198,12 +198,12 @@ async fn a_multi_server_dump_picks_up_whichever_server_was_updated_most_recently
 
     // ... then a moment later, independently to server2 (newer). A real
     // sleep, not a mocked clock: server2's write must land at a genuinely
-    // later wall-clock timestamp than server1's for `find_latest` to be
+    // later wall-clock timestamp than server1's for the freshness probe to be
     // able to tell them apart by `X-Last-Modified` — which is APISIX's own
     // second-granularity header, not our millisecond `stable_timestamp`, so
     // the gap has to clear a full second (matches the TS reference's own
     // `wait(1000)` in this same scenario) or the two can tie and
-    // `find_latest`'s tie-break (whichever probe's response completes
+    // the tie-break (whichever probe's response completes
     // last, not whichever was actually written last) picks arbitrarily.
     tokio::time::sleep(Duration::from_millis(1100)).await;
 
@@ -267,4 +267,34 @@ async fn bypass_cache_discards_stale_state_and_refetches() {
     // ... and a subsequent non-bypassing dump serves that repopulated cache.
     let result = dump(&backend).await;
     assert_eq!(result.services.unwrap()[0].name, "service1");
+}
+
+/// One real, live server plus one that will never answer — `dump()` must
+/// still succeed off the reachable one, not fail the whole cluster over a
+/// single dead instance (the pure-logic half of this — an all-unreachable
+/// probe still fails outright — is covered without a live cluster, in
+/// `fetcher.rs`'s own `a_single_unreachable_server_fails_the_whole_dump`).
+/// The dead server is listed *first*: `Backend::resolved_version` tries
+/// `self.servers` in that order and returns on the first success, so
+/// listing the live one first would let this test pass without ever
+/// exercising `resolved_version`'s own skip-and-continue fallback — only
+/// `probe_reachable`'s (which probes every server concurrently regardless
+/// of list order).
+#[tokio::test]
+#[ignore]
+async fn a_dump_tolerates_one_unreachable_server_among_several() {
+    common::restart_apisix().await;
+    let cache_key = "cache-e2e-fault-tolerant";
+    common::cache().invalidate(cache_key).await;
+
+    let synced = fixture_config(9180);
+    sync_ok(&backend_for(common::SERVER1, cache_key), diff(&synced, &empty_configuration())).await;
+    common::cache().invalidate(cache_key).await;
+
+    let opts = common::backend_options(vec!["http://127.0.0.1:1".to_string(), common::SERVER1.to_string()], cache_key);
+    let backend = Backend::new(opts).unwrap();
+
+    let config = dump(&backend).await;
+    let services = config.services.expect("the reachable server's data, despite the other server being dead");
+    assert_eq!(services[0].name, "service1");
 }

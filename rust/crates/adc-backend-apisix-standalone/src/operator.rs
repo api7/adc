@@ -188,7 +188,7 @@ impl Operator {
                     // the caller resets its held entry rather than leaving
                     // it pointing at data a live server may have already
                     // moved past. The next dump() re-fetches and re-runs
-                    // `find_latest` to discover the cluster's real state
+                    // the probe to discover the cluster's real state
                     // instead of trusting stale cache.
                     return Err(error);
                 }
