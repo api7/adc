@@ -227,9 +227,9 @@ async fn output_for_apisix_standalone(gateway: &dyn Backend, events: &[Event], r
 
     let body = json!({
         "status": status,
-        "total_resources": 0,
-        "success_count": successes.len(),
-        "failed_count": failures.len(),
+        "total_resources": success.len() + failed.len(),
+        "success_count": success.len(),
+        "failed_count": failed.len(),
         "success": success,
         "failed": failed,
         "endpoint_status": results.iter().map(|r| EndpointStatusEntry {
