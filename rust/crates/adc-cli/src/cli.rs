@@ -82,8 +82,6 @@ pub enum BackendKind {
     Apisix,
     #[value(name = "api7ee")]
     Api7Ee,
-    #[value(name = "apisix-standalone")]
-    ApisixStandalone,
 }
 
 impl BackendKind {
@@ -91,7 +89,6 @@ impl BackendKind {
         match self {
             BackendKind::Apisix => "apisix",
             BackendKind::Api7Ee => "api7ee",
-            BackendKind::ApisixStandalone => "apisix-standalone",
         }
     }
 }

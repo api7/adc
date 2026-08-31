@@ -1,4 +1,3 @@
-//! No TS reference spec to port from — this is a from-scratch addition.
 //! `backend.rs`'s `sync` has explicit, commented recovery logic for a
 //! multi-server write where only some servers accept the PUT ("a server
 //! earlier in the batch may have already accepted the new document before a

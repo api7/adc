@@ -1,6 +1,4 @@
-//! No TS reference spec to port from (`libs/backend-apisix-standalone/e2e/
-//! resources/` has no `ssl.e2e-spec.ts`) — this is a from-scratch addition,
-//! covering SSL the same way the ported suites cover every other resource
+//! Covers SSL the same way the ported suites cover every other resource
 //! type: basic correctness (create/dump round-trips), extension correctness
 //! (modifiedIndex/conf_version bump on a real change), and that a create
 //! then an update each produce exactly one event through the real differ.

@@ -1,4 +1,3 @@
-//! No TS reference spec to port from — this is a from-scratch addition.
 //! `operator.rs`'s own unit tests already prove `ChangeSet::from_events`
 //! surfaces a clear error for a malformed *input* (a missing `parent_id`);
 //! this instead provokes a real rejection from a live server (wrong admin

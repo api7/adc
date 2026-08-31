@@ -1,4 +1,3 @@
-//! No TS reference spec to port from — this is a from-scratch addition.
 //! `Cache`'s own unit tests (in `src/cache.rs`) prove the raw per-key mutex
 //! is race-safe in isolation; this proves the *composed* guarantee actually
 //! holds when real, independent `Backend` instances (mirroring independent

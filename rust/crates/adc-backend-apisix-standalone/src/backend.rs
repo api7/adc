@@ -307,6 +307,12 @@ impl adc_sdk::Backend for Backend {
         events: Vec<Event>,
         opts: BackendSyncOptions,
     ) -> Result<Vec<BackendSyncResult>, BackendError> {
+        // Resolved before the lock below, same reason as `dump`'s own
+        // pre-lock resolve: may itself read or write this cache_key's
+        // cached `version` field, which would deadlock against a lock this
+        // call is about to hold.
+        let version = self.resolved_version().await?;
+
         // Held for the whole read-modify-write span, not just the read
         // below — see `Cache::lock`'s doc comment for why two concurrent
         // syncs on the same key can't just read-then-write independently.
@@ -324,7 +330,7 @@ impl adc_sdk::Backend for Backend {
         };
         let latest_known_version = entry.latest_version;
 
-        match Operator::new(self.servers.clone(), prior_desired, old_versions, latest_known_version)
+        match Operator::new(self.servers.clone(), prior_desired, old_versions, latest_known_version, version)
             .sync(events, opts)
             .await
         {

@@ -31,6 +31,7 @@ use adc_sdk::{
     BackendError, BackendSyncOptions, BackendSyncResult, DEFAULT_EXIT_ON_FAILURE, Event, EventType, PathSegment,
     ResourceType, ValueDiff,
 };
+use semver::Version;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 
@@ -118,6 +119,7 @@ pub struct Operator {
     prior_desired: Configuration,
     old_versions: WireVersions,
     latest_known_version: Option<i64>,
+    version: Version,
 }
 
 impl Operator {
@@ -133,8 +135,9 @@ impl Operator {
         prior_desired: Configuration,
         old_versions: WireVersions,
         latest_known_version: Option<i64>,
+        version: Version,
     ) -> Self {
-        Self { servers, prior_desired, old_versions, latest_known_version }
+        Self { servers, prior_desired, old_versions, latest_known_version, version }
     }
 
     pub async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<SyncOutcome, BackendError> {
@@ -165,19 +168,33 @@ impl Operator {
             .map_err(|e| BackendError::Serialization(format!("encoding sync config: {e}")))?;
         let digest = sha1_hex(body.as_bytes());
 
+        let wait_ms = env_sync_wait_ms();
+        let version = self.version.clone();
         let put = |server: StandaloneServer| {
             let body = body.clone();
             let digest = digest.clone();
+            let version = version.clone();
             async move {
-                match put_one(&server.client, body, digest).await {
-                    Ok(()) => Ok(BackendSyncResult { success: true, event: None, error: None, server: Some(server.server) }),
-                    Err(error) => Err((server.server, error)),
+                match put_one(&server.client, body, digest, wait_ms).await {
+                    Ok(status) => {
+                        let confirmed = is_confirmed(&version, status);
+                        Ok(BackendSyncResult { success: true, event: None, error: None, server: Some(server.server), confirmed: Some(confirmed) })
+                    }
+                    Err(error) => {
+                        if let Some(message) = conf_version_rejection_message(&error) {
+                            tracing::error!(
+                                "conf_version rejected by {}: (\"{message}\") — another writer is likely active on this cluster.",
+                                server.server
+                            );
+                        }
+                        Err((server.server, error))
+                    }
                 }
             }
         };
 
         let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
-        let results = if exit_on_failure {
+        let results: Vec<BackendSyncResult> = if exit_on_failure {
             match concurrent_map_until_err(self.servers.clone(), None, put).await {
                 Ok(results) => results,
                 Err((_, error)) => {
@@ -199,25 +216,92 @@ impl Operator {
                 .into_iter()
                 .map(|outcome| match outcome {
                     Ok(result) => result,
-                    Err((server, error)) => BackendSyncResult { success: false, event: None, error: Some(error), server: Some(server) },
+                    Err((server, error)) => {
+                        BackendSyncResult { success: false, event: None, error: Some(error), server: Some(server), confirmed: None }
+                    }
                 })
                 .collect()
         };
 
-        // Keyed on "at least one server accepted the write", not on
-        // per-server completion order — with concurrent writers, "cache
+        // Keyed on "at least one server *confirmed* the write" — not on
+        // per-server completion order (with concurrent writers, "cache
         // whatever the most recently completed request happened to see"
-        // has no coherent meaning.
-        let new_state = results.iter().any(|result| result.success).then(|| SyncedState { timestamp, desired, wire });
+        // has no coherent meaning), and not on plain `success` either: a
+        // `202` means APISIX only accepted the document, without waiting
+        // to confirm the data plane actually picked it up — trusting that
+        // as much as a confirmed `200` would let this crate's cache get
+        // ahead of what's really live. `is_confirmed` already collapses to
+        // "any success counts" on a cluster too old to ever tell the
+        // difference, so this never regresses to "cache never refreshes"
+        // there.
+        let new_state = results.iter().any(|r| r.confirmed == Some(true)).then(|| SyncedState { timestamp, desired, wire });
 
         Ok(SyncOutcome { results, new_state })
     }
 }
 
-async fn put_one(client: &HttpClient, body: String, digest: String) -> Result<(), BackendError> {
-    let request = client.request(Method::PUT, CONFIG_ENDPOINT)?.header(HEADER_DIGEST, digest).body(body);
-    client.send(request).await?;
-    Ok(())
+/// Whether a PUT that got `status` back is confirmed applied, not just
+/// accepted — on a cluster that can actually tell the difference (see
+/// `is_confirmed`'s own version gate), only `200` means APISIX waited and
+/// saw its own data plane pick the document up; `202` means it gave up
+/// waiting (or never started — see `env_sync_wait_ms`) without that
+/// confirmation. A cluster below that version has no such distinction to
+/// make in the first place — every one of its 2xx responses collapses to
+/// "confirmed" here, the same as this crate treated any successful PUT
+/// before this gate existed, since otherwise its cache would never be
+/// trusted enough to refresh at all.
+const WAIT_CONFIRMATION_SUPPORTED_SINCE: (u64, u64, u64) = (3, 19, 0);
+fn is_confirmed(version: &Version, status: u16) -> bool {
+    let (major, minor, patch) = WAIT_CONFIRMATION_SUPPORTED_SINCE;
+    if *version < Version::new(major, minor, patch) {
+        return true;
+    }
+    status == 200
+}
+
+/// How long a PUT's `?wait=` asks APISIX to hold the response open for,
+/// polling its own data plane for confirmation before giving up and
+/// answering `202` instead of `200` — milliseconds, matching the query
+/// parameter's own unit. `u32` rather than `u64`: comfortably enough range
+/// (up to ~49 days) that nothing reasonable ever gets clamped, while an
+/// absurd config value fails to parse outright instead of being silently
+/// accepted; also keeps this nowhere near the point (2^53) where a Lua
+/// number — a double, same as everywhere else this crate's values cross
+/// into APISIX's own Lua-side handling — would start losing precision.
+/// Configurable because how long "the data plane hasn't picked this up
+/// yet" stays worth waiting on is a deployment-size question, not
+/// something this crate can pick a universally right answer for.
+const DEFAULT_SYNC_WAIT_MS: u32 = 3_000;
+fn env_sync_wait_ms() -> u32 {
+    std::env::var("ADC_APISIX_STANDALONE_SYNC_WAIT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|v: &u32| *v >= 1)
+        .unwrap_or(DEFAULT_SYNC_WAIT_MS)
+}
+
+async fn put_one(client: &HttpClient, body: String, digest: String, wait_ms: u32) -> Result<u16, BackendError> {
+    let endpoint = format!("{CONFIG_ENDPOINT}?wait={wait_ms}");
+    let request = client.request(Method::PUT, &endpoint)?.header(HEADER_DIGEST, digest).body(body);
+    let response = client.send(request).await?;
+    Ok(response.status().as_u16())
+}
+
+/// Whether `error` is APISIX rejecting a PUT for carrying a stale
+/// `*_conf_version` — observed verbatim from a real 3.17.0 instance:
+/// `{"error_msg":"services_conf_version must be greater than or equal to
+/// (<N>)"}`, i.e. a `400` whose message names one of the eight
+/// `*_conf_version` fields. Means someone else's write landed on this
+/// cluster after the baseline this sync computed its own versions from —
+/// this crate's own cache regressing (a bug) would look identical from
+/// here, since the two aren't distinguishable from the response alone.
+/// Returns the message, for the caller to log — not a bool, so the ERROR
+/// log below doesn't need its own second, separate extraction.
+fn conf_version_rejection_message(error: &BackendError) -> Option<&str> {
+    match error {
+        BackendError::Api { status: 400, message } if message.contains("conf_version") => Some(message),
+        _ => None,
+    }
 }
 
 fn sha1_hex(bytes: &[u8]) -> String {
@@ -436,6 +520,56 @@ mod tests {
 
     use super::*;
     use crate::typing::{self, ConsumerOrCredential};
+
+    #[test]
+    fn an_old_cluster_treats_any_status_as_confirmed() {
+        assert!(is_confirmed(&Version::new(3, 18, 0), 202));
+        assert!(is_confirmed(&Version::new(3, 18, 0), 200));
+    }
+
+    #[test]
+    fn a_cluster_new_enough_to_wait_only_confirms_on_200() {
+        assert!(is_confirmed(&Version::new(3, 19, 0), 200));
+        assert!(!is_confirmed(&Version::new(3, 19, 0), 202));
+    }
+
+    #[test]
+    fn the_cutoff_itself_already_counts_as_new_enough() {
+        // `>= 3.19.0`, not `> 3.19.0` — 3.19.0 exactly must already gate on
+        // the status, not fall back to the pre-gate "any status confirms".
+        assert!(!is_confirmed(&Version::new(3, 19, 0), 202));
+    }
+
+    #[test]
+    fn a_400_naming_a_conf_version_field_is_recognized() {
+        // Verbatim from a real 3.17.0 instance (seeded with an inflated
+        // `services_conf_version` via raw PUT, then PUT a normal one back).
+        let error = BackendError::Api {
+            status: 400,
+            message: "services_conf_version must be greater than or equal to (99999999999999)".to_string(),
+        };
+        assert_eq!(
+            conf_version_rejection_message(&error),
+            Some("services_conf_version must be greater than or equal to (99999999999999)")
+        );
+    }
+
+    #[test]
+    fn a_400_not_naming_a_conf_version_field_is_not_a_conf_version_rejection() {
+        let error = BackendError::Api { status: 400, message: "missing digest header".to_string() };
+        assert_eq!(conf_version_rejection_message(&error), None);
+    }
+
+    #[test]
+    fn a_non_400_status_is_never_a_conf_version_rejection_even_if_it_mentions_one() {
+        let error = BackendError::Api { status: 500, message: "services_conf_version must be greater than or equal to (1)".to_string() };
+        assert_eq!(conf_version_rejection_message(&error), None);
+    }
+
+    #[test]
+    fn a_non_api_error_is_never_a_conf_version_rejection() {
+        assert_eq!(conf_version_rejection_message(&BackendError::Transport("connection refused".to_string())), None);
+    }
 
     #[test]
     fn no_known_latest_version_uses_the_wall_clock_time_as_is() {

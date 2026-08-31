@@ -90,6 +90,7 @@ impl Operator {
                             event: Some(event),
                             error: Some(error),
                             server: None,
+                            confirmed: None,
                         }),
                     }
                 }
@@ -158,6 +159,7 @@ impl Operator {
                 event: Some(event),
                 error: Some(error),
                 server: None,
+                confirmed: None,
             });
         }
 
@@ -167,6 +169,7 @@ impl Operator {
                 event: Some(event),
                 error: None,
                 server: None,
+                confirmed: None,
             }),
             Err(error) => Err((event, error)),
         }
