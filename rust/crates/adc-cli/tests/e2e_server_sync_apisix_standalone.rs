@@ -136,15 +136,23 @@ async fn put_sync(server: &Server, body: &Value) -> (u16, Value) {
     (status, json)
 }
 
-/// `SERVER1`'s raw config document, bypassing this whole crate — used to
+/// `server`'s raw config document, bypassing this whole crate — used to
 /// prove a rejected write actually left the real server untouched, not
-/// just that the response said so.
-async fn raw_consumers() -> Vec<Value> {
+/// just that the response said so. `error_for_status` first, so a failed
+/// request surfaces as a panic instead of silently reading as "no
+/// consumers". A genuinely successful response with no `consumers` field
+/// at all is a real, different case — a fresh instance that has never had
+/// anything written to it omits the key entirely rather than returning
+/// `[]` (see `typing.rs`'s own tolerant deserialization for this) — and is
+/// correctly treated as "no consumers".
+async fn raw_consumers(server: &str) -> Vec<Value> {
     let response = reqwest::Client::new()
-        .get(format!("{SERVER1}/apisix/admin/configs"))
+        .get(format!("{server}/apisix/admin/configs"))
         .header("X-API-KEY", TOKEN)
         .send()
         .await
+        .unwrap()
+        .error_for_status()
         .unwrap();
     let body: Value = response.json().await.unwrap();
     body["consumers"].as_array().cloned().unwrap_or_default()
@@ -227,8 +235,10 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     }
 
     // Rejected outright by every server — neither consumer, not even the
-    // innocent one, actually landed anywhere.
-    assert!(raw_consumers().await.is_empty(), "an all-failed write must leave the real servers untouched");
+    // innocent one, actually landed anywhere on any of the three.
+    for target in [SERVER1, SERVER2, SERVER3] {
+        assert!(raw_consumers(target).await.is_empty(), "an all-failed write must leave {target} untouched");
+    }
 
     // The cluster isn't left poisoned by the rejected write — a follow-up
     // sync with just the valid resource still succeeds normally.
@@ -236,7 +246,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     let (status, json) = put_sync(&server, &recovery_body).await;
     assert_eq!(status, 202, "{json}");
     assert_eq!(json["status"], "success", "{json}");
-    assert_eq!(raw_consumers().await.len(), 1, "{json}");
+    assert_eq!(raw_consumers(SERVER1).await.len(), 1, "{json}");
 }
 
 #[tokio::test]
