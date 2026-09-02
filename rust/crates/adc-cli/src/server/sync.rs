@@ -176,12 +176,17 @@ fn output(results: &[BackendSyncResult]) -> Value {
 ///
 /// `events` is never split between `success`/`failed` — apisix-standalone
 /// writes one document in one request, so `events` as a whole landed or
-/// it didn't: every server failing is always `400`, and puts every event
-/// in `failed`; anything else (including a partial failure — some server
-/// rejecting the exact same document some other server just accepted
-/// isn't about the document being bad) puts every event in `success`.
+/// it didn't: every server failing is always `422` (the request itself was
+/// fine, the data plane rejected its content — `400` stays reserved for a
+/// malformed request, which never reaches this function at all), and puts
+/// every event in `failed`; anything else (including a partial failure —
+/// some server rejecting the exact same document some other server just
+/// accepted isn't about the document being bad) puts every event in
+/// `success`, with the status code telling those two apart: `200` once
+/// every server also confirmed the write, `202` for a partial failure or a
+/// write still only accepted.
 ///
-/// On an all-failed `400`, re-validates `events` against the gateway (the
+/// On an all-failed `422`, re-validates `events` against the gateway (the
 /// same call `/validate` itself makes) for a `reason` more specific than
 /// the sync failure's own — a resource named in the re-validate's result
 /// gets its own error; everything else falls back to the first server's
@@ -214,13 +219,24 @@ async fn output_for_apisix_standalone(gateway: &dyn Backend, events: &[Event], r
                     reason: reason_for(event, &reason_by_resource, &shared_reason),
                 })
                 .collect::<Vec<_>>();
-            (StatusCode::BAD_REQUEST, Vec::new(), failed)
+            (StatusCode::UNPROCESSABLE_ENTITY, Vec::new(), failed)
         }
-        SyncStatus::Success | SyncStatus::PartialFailure => {
+        SyncStatus::Success => {
             let success = events
                 .iter()
                 .map(|event| SuccessEntry { server: None, event: Some(simplify_event(event)), synced_at: now.clone() })
                 .collect::<Vec<_>>();
+            let status_code = if all_confirmed(results) { StatusCode::OK } else { StatusCode::ACCEPTED };
+            (status_code, success, Vec::new())
+        }
+        SyncStatus::PartialFailure => {
+            let success = events
+                .iter()
+                .map(|event| SuccessEntry { server: None, event: Some(simplify_event(event)), synced_at: now.clone() })
+                .collect::<Vec<_>>();
+            // A server outright failing isn't "done" even if the rest confirmed -- the
+            // cluster is left inconsistent, `endpoint_status` names which one, and `202`
+            // says as much.
             (StatusCode::ACCEPTED, success, Vec::new())
         }
     };
@@ -269,6 +285,15 @@ struct EndpointStatusEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
     requested_at: String,
+}
+
+/// Whether every server's write was confirmed picked up by the data plane —
+/// the bar a `Success` sync clears to answer `200` rather than `202`.
+/// `confirmed: Some(false)` is the only thing that fails it; `Some(true)`
+/// and `None` (a cluster too old to report the distinction, collapsed to
+/// "confirmed" the same as `is_confirmed` collapses a single PUT) both pass.
+fn all_confirmed(results: &[BackendSyncResult]) -> bool {
+    results.iter().all(|r| r.confirmed != Some(false))
 }
 
 /// `null` for a failed write (nothing was confirmed *or* accepted) or a
@@ -353,6 +378,29 @@ mod tests {
     #[test]
     fn a_backend_that_never_reports_the_distinction_has_no_confirmation() {
         assert!(confirmation_of(&result(true, None)).is_none());
+    }
+
+    #[test]
+    fn all_confirmed_requires_every_result_to_have_confirmed() {
+        assert!(all_confirmed(&[result(true, Some(true)), result(true, Some(true))]));
+    }
+
+    #[test]
+    fn all_confirmed_fails_on_a_single_merely_accepted_result() {
+        assert!(!all_confirmed(&[result(true, Some(true)), result(true, Some(false))]));
+    }
+
+    #[test]
+    fn all_confirmed_treats_an_unreported_distinction_as_confirmed() {
+        // A cluster too old to tell 200 from 202 apart never sets `confirmed` at all --
+        // collapsing that to "confirmed" is what keeps such a cluster's successful syncs at
+        // 200, not permanently stuck at 202.
+        assert!(all_confirmed(&[result(true, None)]));
+    }
+
+    #[test]
+    fn all_confirmed_of_an_empty_slice_is_vacuously_true() {
+        assert!(all_confirmed(&[]));
     }
 
     #[test]
