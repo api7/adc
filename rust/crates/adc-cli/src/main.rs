@@ -8,6 +8,7 @@ mod server;
 
 use std::collections::{HashMap, HashSet};
 
+use adc_sdk::resources::Configuration;
 use adc_sdk::{BackendSyncOptions, Event, EventType, ResourceType};
 use clap::Parser;
 
@@ -280,14 +281,9 @@ async fn cmd_validate(args: ValidateArgs) -> Result<(), CliError> {
         ),
     )
     .await?;
-    let remote = progress::stage(
-        "Fetching remote configuration...",
-        pipeline::load_remote(backend.as_ref(), &include, &exclude, &label_selector),
-    )
-    .await?;
     let events = progress::stage(
         "Computing diff...",
-        pipeline::diff(backend.as_ref(), &local, &remote),
+        pipeline::diff(backend.as_ref(), &local, &Configuration::default()),
     )
     .await?;
 

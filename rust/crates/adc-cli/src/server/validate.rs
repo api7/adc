@@ -14,17 +14,6 @@ use super::{backend, bad_request, internal_error};
 use crate::config;
 use crate::pipeline;
 
-fn empty_configuration() -> Configuration {
-    Configuration {
-        services: None,
-        ssls: None,
-        consumers: None,
-        consumer_groups: None,
-        global_rules: None,
-        plugin_metadata: None,
-    }
-}
-
 pub async fn validate_handler(body: Bytes) -> Response {
     let input: ValidateInput = match serde_json::from_slice(&body) {
         Ok(input) => input,
@@ -79,7 +68,7 @@ pub async fn validate_handler(body: Bytes) -> Response {
         Err(error) => return internal_error(json!({"success": false, "message": error.to_string(), "errors": []})),
     };
 
-    let events = match pipeline::diff(gateway.as_ref(), &configuration, &empty_configuration()).await {
+    let events = match pipeline::diff(gateway.as_ref(), &configuration, &Configuration::default()).await {
         Ok(events) => events,
         Err(error) => return internal_error(json!({"success": false, "message": error.to_string(), "errors": []})),
     };
