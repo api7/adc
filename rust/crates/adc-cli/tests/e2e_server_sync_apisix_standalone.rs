@@ -164,7 +164,7 @@ fn consumer(username: &str) -> Value {
 
 /// `limit-count` requires `count`/`time_window`; both are missing — the
 /// same shape `e2e_validate.rs` uses, confirmed against a real standalone
-/// admin API to 400 the whole config write, not just `/validate`.
+/// admin API to 422 the whole config write, not just `/validate`.
 fn consumer_with_bad_plugin(username: &str) -> Value {
     json!({"username": username, "plugins": {"limit-count": {}}})
 }
@@ -177,7 +177,8 @@ async fn a_successful_sync_confirms_every_server() {
     let body = sync_body(&[SERVER1, SERVER2, SERVER3], "sync-e2e-success", json!({"consumers": [consumer("sync-ok")]}));
 
     let (status, json) = put_sync(&server, &body).await;
-    assert_eq!(status, 202, "{json}");
+    // Every server confirmed the write (see the loop below) -- 200, not 202.
+    assert_eq!(status, 200, "{json}");
     assert_eq!(json["status"], "success", "{json}");
     assert_eq!(json["total_resources"], 1, "{json}");
     assert_eq!(json["success_count"], 1, "{json}");
@@ -206,7 +207,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     let body = sync_body(&[SERVER1, SERVER2, SERVER3], "sync-e2e-all-failed", config);
 
     let (status, json) = put_sync(&server, &body).await;
-    assert_eq!(status, 400, "{json}");
+    assert_eq!(status, 422, "{json}");
     assert_eq!(json["status"], "all_failed", "{json}");
     assert_eq!(json["total_resources"], 2, "{json}");
     assert_eq!(json["success_count"], 0, "{json}");
@@ -244,7 +245,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     // sync with just the valid resource still succeeds normally.
     let recovery_body = sync_body(&[SERVER1, SERVER2, SERVER3], "sync-e2e-all-failed", json!({"consumers": [consumer("innocent-bystander")]}));
     let (status, json) = put_sync(&server, &recovery_body).await;
-    assert_eq!(status, 202, "{json}");
+    assert_eq!(status, 200, "{json}");
     assert_eq!(json["status"], "success", "{json}");
     assert_eq!(raw_consumers(SERVER1).await.len(), 1, "{json}");
 }
@@ -274,4 +275,18 @@ async fn a_partial_server_failure_still_reports_the_event_as_synced() {
     let failed_entry = endpoint_status.iter().find(|e| e["success"] == false).unwrap();
     assert!(failed_entry["confirmation"].is_null(), "{json}");
     assert!(failed_entry["reason"].as_str().is_some_and(|r| !r.is_empty()), "{json}");
+}
+
+/// Every configured server unreachable fails before a document is ever
+/// evaluated -- 500, not the 422 a genuine content rejection gets. No real
+/// APISIX cluster is involved at all, so this doesn't call `restart_apisix`.
+#[tokio::test]
+#[ignore]
+async fn every_server_unreachable_returns_500_not_422() {
+    let server = spawn_server().await;
+    let body = sync_body(&[UNREACHABLE, UNREACHABLE, UNREACHABLE], "sync-e2e-unreachable", json!({"consumers": [consumer("sync-unreachable")]}));
+
+    let (status, json) = put_sync(&server, &body).await;
+    assert_eq!(status, 500, "{json}");
+    assert!(json["message"].as_str().is_some_and(|m| !m.is_empty()), "{json}");
 }
