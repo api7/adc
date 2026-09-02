@@ -276,3 +276,17 @@ async fn a_partial_server_failure_still_reports_the_event_as_synced() {
     assert!(failed_entry["confirmation"].is_null(), "{json}");
     assert!(failed_entry["reason"].as_str().is_some_and(|r| !r.is_empty()), "{json}");
 }
+
+/// Every configured server unreachable fails before a document is ever
+/// evaluated -- 500, not the 422 a genuine content rejection gets. No real
+/// APISIX cluster is involved at all, so this doesn't call `restart_apisix`.
+#[tokio::test]
+#[ignore]
+async fn every_server_unreachable_returns_500_not_422() {
+    let server = spawn_server().await;
+    let body = sync_body(&[UNREACHABLE, UNREACHABLE, UNREACHABLE], "sync-e2e-unreachable", json!({"consumers": [consumer("sync-unreachable")]}));
+
+    let (status, json) = put_sync(&server, &body).await;
+    assert_eq!(status, 500, "{json}");
+    assert!(json["message"].as_str().is_some_and(|m| !m.is_empty()), "{json}");
+}

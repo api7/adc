@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use adc_sdk::resources::Configuration;
-use adc_sdk::{Backend, BackendSyncOptions, BackendSyncResult, BackendValidateResult, Event, ResourceType};
+use adc_sdk::{Backend, BackendError, BackendSyncOptions, BackendSyncResult, BackendValidateResult, Event, ResourceType};
 use axum::Json;
 use axum::body::Bytes;
 use axum::http::StatusCode;
@@ -176,15 +176,18 @@ fn output(results: &[BackendSyncResult]) -> Value {
 ///
 /// `events` is never split between `success`/`failed` — apisix-standalone
 /// writes one document in one request, so `events` as a whole landed or
-/// it didn't: every server failing is always `422` (the request itself was
-/// fine, the data plane rejected its content — `400` stays reserved for a
-/// malformed request, which never reaches this function at all), and puts
-/// every event in `failed`; anything else (including a partial failure —
-/// some server rejecting the exact same document some other server just
-/// accepted isn't about the document being bad) puts every event in
-/// `success`, with the status code telling those two apart: `200` once
-/// every server also confirmed the write, `202` for a partial failure or a
-/// write still only accepted.
+/// it didn't: every server failing puts every event in `failed`, answered
+/// `422` when at least one server actually evaluated the document and
+/// rejected it (the request itself was fine, the data plane rejected its
+/// content — `400` stays reserved for a malformed request, which never
+/// reaches this function at all) or `500` when every failure was transient
+/// (every server unreachable, or every server's own admin API erroring) —
+/// nobody looked at the content, so it isn't `422`'s to blame. Anything
+/// else (including a partial failure — some server rejecting the exact
+/// same document some other server just accepted isn't about the document
+/// being bad) puts every event in `success`, with the status code telling
+/// those two apart: `200` once every server also confirmed the write,
+/// `202` for a partial failure or a write still only accepted.
 ///
 /// On an all-failed `422`, re-validates `events` against the gateway (the
 /// same call `/validate` itself makes) for a `reason` more specific than
@@ -219,7 +222,8 @@ async fn output_for_apisix_standalone(gateway: &dyn Backend, events: &[Event], r
                     reason: reason_for(event, &reason_by_resource, &shared_reason),
                 })
                 .collect::<Vec<_>>();
-            (StatusCode::UNPROCESSABLE_ENTITY, Vec::new(), failed)
+            let status_code = if content_was_rejected(&failures) { StatusCode::UNPROCESSABLE_ENTITY } else { StatusCode::INTERNAL_SERVER_ERROR };
+            (status_code, Vec::new(), failed)
         }
         SyncStatus::Success => {
             let success = events
@@ -285,6 +289,17 @@ struct EndpointStatusEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
     requested_at: String,
+}
+
+/// Whether at least one server actually looked at the document and rejected
+/// it, as opposed to every failure being transient (unreachable, or the
+/// server's own admin API erroring on its end) — reuses `is_retriable`'s
+/// existing split, since a retriable failure is by definition one where the
+/// backend never gave a verdict on the content itself. All-transient means
+/// `422` would blame the document for something that was never evaluated;
+/// `500` says so instead.
+fn content_was_rejected(failures: &[&BackendSyncResult]) -> bool {
+    failures.iter().any(|r| !r.error.as_ref().is_some_and(BackendError::is_retriable))
 }
 
 /// Whether every server's write was confirmed picked up by the data plane —
@@ -401,6 +416,40 @@ mod tests {
     #[test]
     fn all_confirmed_of_an_empty_slice_is_vacuously_true() {
         assert!(all_confirmed(&[]));
+    }
+
+    fn failed_result(error: BackendError) -> BackendSyncResult {
+        BackendSyncResult { success: false, event: None, error: Some(error), server: Some("s1".to_string()), confirmed: None }
+    }
+
+    #[test]
+    fn content_was_rejected_is_false_when_every_server_was_unreachable() {
+        let failures = [failed_result(BackendError::Transport("connection refused".into())), failed_result(BackendError::Transport("timed out".into()))];
+        assert!(!content_was_rejected(&failures.iter().collect::<Vec<_>>()));
+    }
+
+    #[test]
+    fn content_was_rejected_is_false_when_every_server_erred_on_its_own_end() {
+        let failures = [failed_result(BackendError::Api { status: 502, message: "bad gateway".into() })];
+        assert!(!content_was_rejected(&failures.iter().collect::<Vec<_>>()));
+    }
+
+    #[test]
+    fn content_was_rejected_is_true_when_a_server_actually_rejected_it() {
+        let failures = [failed_result(BackendError::Api { status: 400, message: "unknown plugin".into() })];
+        assert!(content_was_rejected(&failures.iter().collect::<Vec<_>>()));
+    }
+
+    #[test]
+    fn content_was_rejected_is_true_if_even_one_of_several_servers_rejected_it() {
+        // Two servers unreachable, one genuinely rejected the document -- that one rejection
+        // is a real, actionable signal about the content and takes priority.
+        let failures = [
+            failed_result(BackendError::Transport("connection refused".into())),
+            failed_result(BackendError::Api { status: 400, message: "unknown plugin".into() }),
+            failed_result(BackendError::Transport("connection refused".into())),
+        ];
+        assert!(content_was_rejected(&failures.iter().collect::<Vec<_>>()));
     }
 
     #[test]
