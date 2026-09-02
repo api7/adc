@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adc-backend-api7"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-backend-api7",
  "adc-backend-core",
@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "adc-backend-apisix"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-backend-apisix",
  "adc-backend-core",
@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "adc-backend-apisix-standalone"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-backend-apisix",
  "adc-backend-apisix-standalone",
@@ -64,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "adc-backend-core"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-sdk",
  "axum",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "adc-cli"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-backend-api7",
  "adc-backend-apisix",
@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "adc-converter-openapi"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-sdk",
  "log",
@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "adc-differ"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "adc-sdk",
  "criterion",
@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "adc-sdk"
-version = "0.30.0"
+version = "0.30.1"
 dependencies = [
  "async-trait",
  "jsonschema",
