@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig};
+use adc_backend_core::{HttpClient, HttpClientConfig, Method, TlsConfig, concurrent_map_until_ok};
 use adc_sdk::resources::Configuration;
 use adc_sdk::{
     BackendError, BackendMetadata, BackendSyncOptions, BackendSyncResult, BackendValidateResult,
@@ -383,8 +383,20 @@ impl adc_sdk::Backend for Backend {
 
     async fn validate(&self, events: &[Event]) -> Result<BackendValidateResult, BackendError> {
         let version = self.resolved_version().await?;
-        adc_backend_apisix::Validator::new(self.servers[0].client.clone(), version)
-            .validate(events)
-            .await
+        // Tries every configured server concurrently -- one unreachable instance (or one
+        // too old to support `/validate` at all) shouldn't blank out attribution as long as
+        // some other server in the cluster can answer. Whichever answers first (with a real
+        // result, not just whichever settles first) wins; the rest are dropped mid-flight.
+        concurrent_map_until_ok(self.servers.clone(), None, |server| {
+            let version = version.clone();
+            async move {
+                let result = adc_backend_apisix::Validator::new(server.client, version).validate(events).await;
+                if let Err(error) = &result {
+                    tracing::warn!("apisix-standalone: {} failed to validate: {error}", server.server);
+                }
+                result
+            }
+        })
+        .await
     }
 }

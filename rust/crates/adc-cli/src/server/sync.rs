@@ -98,7 +98,7 @@ async fn run(
     let events_for_output = is_apisix_standalone.then(|| events.clone());
     let results = gateway.sync(events, sync_opts).await?;
     match events_for_output {
-        Some(events) => Ok(output_for_apisix_standalone(gateway.as_ref(), &events, &results).await),
+        Some(events) => Ok(output_for_apisix_standalone(gateway.as_ref(), &local, &events, &results).await),
         None => Ok((StatusCode::ACCEPTED, output(&results))),
     }
 }
@@ -168,62 +168,69 @@ fn output(results: &[BackendSyncResult]) -> Value {
     })
 }
 
-/// One `BackendSyncResult` per *server* here, not per event — `success`/
-/// `failed` describe `events` directly (same shape as `output`'s, so the
-/// caller doesn't need a standalone-specific parser for them), and
-/// `endpoint_status` carries the per-server detail `output` has no
-/// equivalent for.
+/// One `BackendSyncResult` per *server*, not per event — it's whether the whole document
+/// landed on that server, not whether any one resource in it was valid. Status codes:
+/// `422` when every server failed (content rejected, unreachable, or a mix — `400` is only
+/// for a malformed request, handled before this function); `200`/`202` when every server
+/// took the write, split on whether every one also confirmed it; `202` for a partial
+/// failure (some server rejecting what others accepted isn't about the document).
 ///
-/// `events` is never split between `success`/`failed` — apisix-standalone
-/// writes one document in one request, so `events` as a whole landed or
-/// it didn't: every server failing puts every event in `failed`, answered
-/// `422` when at least one server actually evaluated the document and
-/// rejected it (the request itself was fine, the data plane rejected its
-/// content — `400` stays reserved for a malformed request, which never
-/// reaches this function at all) or `500` when every failure was transient
-/// (every server unreachable, or every server's own admin API erroring) —
-/// nobody looked at the content, so it isn't `422`'s to blame. Anything
-/// else (including a partial failure — some server rejecting the exact
-/// same document some other server just accepted isn't about the document
-/// being bad) puts every event in `success`, with the status code telling
-/// those two apart: `200` once every server also confirmed the write,
-/// `202` for a partial failure or a write still only accepted.
-///
-/// On an all-failed `422`, re-validates `events` against the gateway (the
-/// same call `/validate` itself makes) for a `reason` more specific than
-/// the sync failure's own — a resource named in the re-validate's result
-/// gets its own error; everything else falls back to the first server's
-/// rejection reason (still useful — a conf_version conflict, say, rejects
-/// the whole document for a reason that has nothing to do with any one
-/// resource, and re-validating finds nothing to report there). Best-effort
-/// — a re-validate that itself errors just means every event falls back
-/// to that same shared reason.
-async fn output_for_apisix_standalone(gateway: &dyn Backend, events: &[Event], results: &[BackendSyncResult]) -> (StatusCode, Value) {
+/// On `422`, re-validates *every resource this cacheKey holds* — not just this sync's own
+/// diff — since a resource the diff never touched can still be the one rejected. `failed[]`
+/// only ever holds what the re-validate actually named: an innocent resource swept up in the
+/// same rejection is left out entirely, never guessed at, so bad-resource exclusion can't
+/// blacklist it for something it never did.
+async fn output_for_apisix_standalone(
+    gateway: &dyn Backend,
+    local: &Configuration,
+    events: &[Event],
+    results: &[BackendSyncResult],
+) -> (StatusCode, Value) {
     let now = chrono::Utc::now().to_rfc3339();
     let (successes, failures): (Vec<_>, Vec<_>) = results.iter().partition(|r| r.success);
     let status = status_of(results.len(), successes.len(), failures.len());
 
     let (http_status, success, failed) = match status {
         SyncStatus::AllFailed => {
-            let errors = match gateway.validate(events).await {
+            // Every resource as a fresh Create event, same as `/validate`'s empty-remote
+            // diff. Falls back to this sync's own `events` on error, though standalone's
+            // `default_value` makes no network call and shouldn't ever fail here.
+            let all_events = pipeline::diff(gateway, local, &Configuration::default()).await.unwrap_or_else(|_| events.to_vec());
+
+            let errors = match gateway.validate(&all_events).await {
                 Ok(BackendValidateResult { errors, .. }) => errors,
+                // This gateway version has no `/validate` endpoint at all -- `failed` comes
+                // back empty not because nothing was found, but because nothing could be
+                // looked for. Worth its own log line, not silently identical to any other
+                // validate failure.
+                Err(BackendError::Unsupported(_)) => {
+                    tracing::warn!(
+                        "apisix-standalone: gateway doesn't support /validate, all-failed rejection can't be attributed to a resource"
+                    );
+                    vec![]
+                }
                 Err(_) => vec![],
             };
             let reason_by_resource: HashMap<&str, &str> =
                 errors.iter().filter_map(|e| e.resource_id.as_deref().map(|id| (id, e.error.as_str()))).collect();
-            let shared_reason = failures.first().and_then(|r| r.error.as_ref()).map(|e| e.to_string()).unwrap_or_default();
 
-            let failed = events
+            // Only resources the re-validate actually named -- an innocent one swept up in
+            // the same rejected document must never land here, or bad-resource exclusion
+            // would blacklist it for something it never did. A rejection with no per-resource
+            // cause at all (a conf_version race, say) leaves `failed` empty on purpose;
+            // `endpoint_status` already carries that document-level reason.
+            let failed = all_events
                 .iter()
-                .map(|event| FailedEntry {
-                    server: None,
-                    event: Some(simplify_event(event)),
-                    failed_at: now.clone(),
-                    reason: reason_for(event, &reason_by_resource, &shared_reason),
+                .filter_map(|event| {
+                    reason_by_resource.get(event.resource_id.as_str()).map(|reason| FailedEntry {
+                        server: None,
+                        event: Some(simplify_event(event)),
+                        failed_at: now.clone(),
+                        reason: reason.to_string(),
+                    })
                 })
                 .collect::<Vec<_>>();
-            let status_code = if content_was_rejected(&failures) { StatusCode::UNPROCESSABLE_ENTITY } else { StatusCode::INTERNAL_SERVER_ERROR };
-            (status_code, Vec::new(), failed)
+            (StatusCode::UNPROCESSABLE_ENTITY, Vec::new(), failed)
         }
         SyncStatus::Success => {
             let success = events
@@ -263,16 +270,6 @@ async fn output_for_apisix_standalone(gateway: &dyn Backend, events: &[Event], r
     (http_status, body)
 }
 
-/// The specific reason a re-validate found for `event` (matched by
-/// `resource_id`), or `shared_reason` when it didn't — either because the
-/// re-validate ran but didn't report anything for this particular event
-/// (a resource swept up in the same failed batch without being
-/// individually invalid), or because it found nothing at all (the whole
-/// document was rejected for a reason that isn't about any one resource).
-fn reason_for(event: &Event, reason_by_resource: &HashMap<&str, &str>, shared_reason: &str) -> String {
-    reason_by_resource.get(event.resource_id.as_str()).map(|r| r.to_string()).unwrap_or_else(|| shared_reason.to_string())
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Confirmation {
@@ -289,17 +286,6 @@ struct EndpointStatusEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
     requested_at: String,
-}
-
-/// Whether at least one server actually looked at the document and rejected
-/// it, as opposed to every failure being transient (unreachable, or the
-/// server's own admin API erroring on its end) — reuses `is_retriable`'s
-/// existing split, since a retriable failure is by definition one where the
-/// backend never gave a verdict on the content itself. All-transient means
-/// `422` would blame the document for something that was never evaluated;
-/// `500` says so instead.
-fn content_was_rejected(failures: &[&BackendSyncResult]) -> bool {
-    failures.iter().any(|r| !r.error.as_ref().is_some_and(BackendError::is_retriable))
 }
 
 /// Whether every server's write was confirmed picked up by the data plane —
@@ -418,40 +404,6 @@ mod tests {
         assert!(all_confirmed(&[]));
     }
 
-    fn failed_result(error: BackendError) -> BackendSyncResult {
-        BackendSyncResult { success: false, event: None, error: Some(error), server: Some("s1".to_string()), confirmed: None }
-    }
-
-    #[test]
-    fn content_was_rejected_is_false_when_every_server_was_unreachable() {
-        let failures = [failed_result(BackendError::Transport("connection refused".into())), failed_result(BackendError::Transport("timed out".into()))];
-        assert!(!content_was_rejected(&failures.iter().collect::<Vec<_>>()));
-    }
-
-    #[test]
-    fn content_was_rejected_is_false_when_every_server_erred_on_its_own_end() {
-        let failures = [failed_result(BackendError::Api { status: 502, message: "bad gateway".into() })];
-        assert!(!content_was_rejected(&failures.iter().collect::<Vec<_>>()));
-    }
-
-    #[test]
-    fn content_was_rejected_is_true_when_a_server_actually_rejected_it() {
-        let failures = [failed_result(BackendError::Api { status: 400, message: "unknown plugin".into() })];
-        assert!(content_was_rejected(&failures.iter().collect::<Vec<_>>()));
-    }
-
-    #[test]
-    fn content_was_rejected_is_true_if_even_one_of_several_servers_rejected_it() {
-        // Two servers unreachable, one genuinely rejected the document -- that one rejection
-        // is a real, actionable signal about the content and takes priority.
-        let failures = [
-            failed_result(BackendError::Transport("connection refused".into())),
-            failed_result(BackendError::Api { status: 400, message: "unknown plugin".into() }),
-            failed_result(BackendError::Transport("connection refused".into())),
-        ];
-        assert!(content_was_rejected(&failures.iter().collect::<Vec<_>>()));
-    }
-
     #[test]
     fn a_confirmed_write_serializes_to_applied() {
         let confirmation = confirmation_of(&result(true, Some(true))).unwrap();
@@ -471,27 +423,4 @@ mod tests {
         assert_eq!(serde_json::to_value(status_of(2, 1, 1)).unwrap(), json!("partial_failure"));
     }
 
-    fn event_with_id(resource_id: &str) -> Event {
-        Event::new(ResourceType::Service, adc_sdk::EventKind::Create { new_value: json!({"name": "svc"}) }, resource_id, "svc")
-    }
-
-    #[test]
-    fn reason_for_prefers_the_re_validate_error_matched_by_resource_id() {
-        let event = event_with_id("bad-one");
-        let reason_by_resource = HashMap::from([("bad-one", "unknown plugin")]);
-        assert_eq!(reason_for(&event, &reason_by_resource, "shared reason"), "unknown plugin");
-    }
-
-    #[test]
-    fn reason_for_falls_back_to_the_shared_reason_when_this_event_has_no_specific_match() {
-        let event = event_with_id("innocent-bystander");
-        let reason_by_resource = HashMap::from([("bad-one", "unknown plugin")]);
-        assert_eq!(reason_for(&event, &reason_by_resource, "shared reason"), "shared reason");
-    }
-
-    #[test]
-    fn reason_for_falls_back_to_the_shared_reason_when_nothing_matched_at_all() {
-        let event = event_with_id("any-id");
-        assert_eq!(reason_for(&event, &HashMap::new(), "shared reason"), "shared reason");
-    }
 }
