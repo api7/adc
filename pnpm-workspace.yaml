@@ -62,3 +62,6 @@ allowBuilds:
   esbuild: true
   less: false
   nx: true
+minimumReleaseAgeExclude:
+  # Renovate security update: qs@6.16.0
+  - qs@6.16.0
