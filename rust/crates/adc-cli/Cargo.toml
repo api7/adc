@@ -47,3 +47,4 @@ http-body-util = "0.1"
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 libc = "0.2"
+semver = { workspace = true }

@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use adc_sdk::resources::Configuration;
-use adc_sdk::{Backend, BackendSyncOptions, BackendSyncResult, BackendValidateResult, Event, ResourceType};
+use adc_sdk::{Backend, BackendError, BackendSyncOptions, BackendSyncResult, BackendValidateResult, Event, ResourceType};
 use axum::Json;
 use axum::body::Bytes;
 use axum::http::StatusCode;
@@ -199,6 +199,16 @@ async fn output_for_apisix_standalone(
 
             let errors = match gateway.validate(&all_events).await {
                 Ok(BackendValidateResult { errors, .. }) => errors,
+                // This gateway version has no `/validate` endpoint at all -- `failed` comes
+                // back empty not because nothing was found, but because nothing could be
+                // looked for. Worth its own log line, not silently identical to any other
+                // validate failure.
+                Err(BackendError::Unsupported(_)) => {
+                    tracing::warn!(
+                        "apisix-standalone: gateway doesn't support /validate, all-failed rejection can't be attributed to a resource"
+                    );
+                    vec![]
+                }
                 Err(_) => vec![],
             };
             let reason_by_resource: HashMap<&str, &str> =

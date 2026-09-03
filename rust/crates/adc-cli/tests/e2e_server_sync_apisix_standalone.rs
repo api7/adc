@@ -8,12 +8,14 @@
 //! end through a real HTTP request to a real spawned `adc` process — the
 //! same black-box pattern `ingress_server_sigint.rs` uses.
 //!
-//! The real cluster here reports APISIX/3.17.0, below the 3.19.0
-//! `?wait`-confirmation gate — every successful write is therefore always
-//! `confirmed` regardless of the raw status APISIX itself returns for that
-//! request. The `>= 3.19 and 202 → accepted, not applied` branch has no
-//! real gateway to test against yet; `operator.rs`'s own unit tests are the
-//! only coverage for it (see D10 in `impl/standalone/changes-by-project.md`).
+//! CI runs this against a version matrix (`BACKEND_APISIX_VERSION`, same env var the TS
+//! suite reads), all still below the 3.19.0 `?wait`-confirmation gate — every successful
+//! write is therefore always `confirmed` regardless of the raw status APISIX itself returns.
+//! The `>= 3.19 and 202 → accepted, not applied` branch has no real gateway to test against
+//! yet; `operator.rs`'s own unit tests are the only coverage for it (see D10 in
+//! `impl/standalone/changes-by-project.md`). Below 3.17.0, APISIX has no `/validate` endpoint
+//! at all (`apisix_version_supports_validate`) — `failed[]` attribution needs it, so an
+//! all-failed rejection there reports `failed: []` even for an obviously bad resource.
 
 use std::process::Stdio;
 use std::time::Duration;
@@ -30,6 +32,22 @@ const UNREACHABLE: &str = "http://127.0.0.1:1";
 
 fn free_port() -> u16 {
     std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
+}
+
+/// Same pattern as `adc-backend-apisix-standalone`'s own `common::apisix_version` --
+/// falls back to a version high enough to exercise every version-gated path when unset.
+fn apisix_version() -> semver::Version {
+    match std::env::var("BACKEND_APISIX_VERSION") {
+        Ok(v) => semver::Version::parse(&v).unwrap_or_else(|e| panic!("BACKEND_APISIX_VERSION={v:?} is not a valid semver: {e}")),
+        Err(_) => semver::Version::new(999, 999, 999),
+    }
+}
+
+/// APISIX added `/apisix/admin/configs/validate` in 3.17.0 -- below that, `Validator::validate`
+/// gets a 404 (`BackendError::Unsupported`), so an all-failed rejection's `failed[]` can never
+/// be attributed there, no matter how obviously bad the resource actually is.
+fn apisix_version_supports_validate() -> bool {
+    apisix_version() >= semver::Version::new(3, 17, 0)
 }
 
 /// Same cluster, same wipe-and-recheck strategy as
@@ -209,24 +227,29 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     let (status, json) = put_sync(&server, &body).await;
     assert_eq!(status, 422, "{json}");
     assert_eq!(json["status"], "all_failed", "{json}");
-    assert_eq!(json["total_resources"], 1, "{json}");
-    assert_eq!(json["success_count"], 0, "{json}");
-    assert_eq!(json["failed_count"], 1, "{json}");
     assert_eq!(json["success"].as_array().unwrap().len(), 0, "{json}");
 
     // Only the resource the re-validate actually named -- the innocent one swept up in the
     // same rejected document must not appear, or bad-resource exclusion would blacklist it
-    // for something it never did.
+    // for something it never did. Below 3.17.0 there's no `/validate` endpoint to name
+    // anything with at all, so `failed[]` is empty even though the rejection is just as real
+    // (see `endpoint_status` below).
     let failed = json["failed"].as_array().unwrap();
-    assert_eq!(failed.len(), 1, "{json}");
-    let bad = failed.iter().find(|e| e["event"]["resource_name"] == "the-bad-one").expect("the bad resource must be in `failed`");
+    if apisix_version_supports_validate() {
+        assert_eq!(json["total_resources"], 1, "{json}");
+        assert_eq!(json["failed_count"], 1, "{json}");
+        assert_eq!(failed.len(), 1, "{json}");
+        let bad = failed.iter().find(|e| e["event"]["resource_name"] == "the-bad-one").expect("the bad resource must be in `failed`");
+        assert!(bad["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
+    } else {
+        assert_eq!(json["total_resources"], 0, "{json}");
+        assert_eq!(json["failed_count"], 0, "{json}");
+        assert_eq!(failed.len(), 0, "{json}");
+    }
     assert!(
         failed.iter().all(|e| e["event"]["resource_name"] != "innocent-bystander"),
         "an unattributed resource must never appear in failed[]: {json}"
     );
-
-    let bad_reason = bad["reason"].as_str().unwrap();
-    assert!(bad_reason.to_lowercase().contains("limit-count"), "{bad_reason}");
 
     let endpoint_status = json["endpoint_status"].as_array().unwrap();
     assert_eq!(endpoint_status.len(), 3, "{json}");
@@ -265,9 +288,14 @@ async fn an_all_failed_rejection_mixed_with_an_unreachable_server_is_still_422()
     assert_eq!(status, 422, "{json}");
     assert_eq!(json["status"], "all_failed", "{json}");
 
+    // Below 3.17.0 there's no `/validate` endpoint to attribute anything with at all.
     let failed = json["failed"].as_array().unwrap();
-    assert_eq!(failed.len(), 1, "{json}");
-    assert!(failed[0]["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
+    if apisix_version_supports_validate() {
+        assert_eq!(failed.len(), 1, "{json}");
+        assert!(failed[0]["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
+    } else {
+        assert_eq!(failed.len(), 0, "{json}");
+    }
 
     let endpoint_status = json["endpoint_status"].as_array().unwrap();
     assert_eq!(endpoint_status.len(), 3, "{json}");
