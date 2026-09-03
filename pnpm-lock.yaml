@@ -23,7 +23,7 @@ catalogs:
       version: 1.0.4
     immer:
       specifier: ^11.1.8
-      version: 11.1.8
+      version: 11.1.18
     js-yaml:
       specifier: ^5.2.2
       version: 5.2.2
@@ -272,7 +272,7 @@ importers:
         version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       immer:
         specifier: 'catalog:'
-        version: 11.1.8
+        version: 11.1.18
       lodash-es:
         specifier: '>=4.17.24'
         version: 4.18.1
@@ -309,7 +309,7 @@ importers:
         version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       immer:
         specifier: 'catalog:'
-        version: 11.1.8
+        version: 11.1.18
       lodash-es:
         specifier: '>=4.17.24'
         version: 4.18.1
@@ -2750,8 +2750,8 @@ packages:
     resolution: {integrity: sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg==}
     engines: {node: '>= 4'}
 
-  immer@11.1.8:
-    resolution: {integrity: sha512-/tbkHMW7y10Lx6i1crLjD4/OhNkRG+Fo7byZHtah0547nIeXYcpIXaUh0IAQY6gO5459qpGGYapcEOHtFXkIuA==}
+  immer@11.1.18:
+    resolution: {integrity: sha512-EQyQtLiYW029lyoczMl/Hh4Xu7cDecSc58JRYpHyL4tIAu3eqd1yJzQX04d2BZHDkzFFvm6qJEJWOtfDSWAXbQ==}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -6254,7 +6254,7 @@ snapshots:
 
   ignore@7.0.5: {}
 
-  immer@11.1.8: {}
+  immer@11.1.18: {}
 
   import-fresh@3.3.1:
     dependencies:
