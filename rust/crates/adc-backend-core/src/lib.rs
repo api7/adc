@@ -14,7 +14,7 @@ mod retry;
 mod tls;
 
 pub use client::{HTTP_REQUEST_SPAN_NAME, HttpClient, HttpClientConfig, encode_path_segment};
-pub use concurrency::{concurrent_map, concurrent_map_until_err};
+pub use concurrency::{concurrent_map, concurrent_map_until_err, concurrent_map_until_ok};
 pub use event::{deserialize_event_value, missing_parent, to_request_body};
 pub use resource_filter::{ResourceFilter, filter_configuration_by_labels};
 pub use resource_path::resource_type_collection_name;

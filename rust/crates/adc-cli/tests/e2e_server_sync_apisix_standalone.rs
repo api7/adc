@@ -310,6 +310,30 @@ async fn an_all_failed_rejection_mixed_with_an_unreachable_server_is_still_422()
     }
 }
 
+/// Same as above with the unreachable server listed *first* -- `Backend::validate` must not
+/// depend on the first configured server specifically; it should move on and re-validate
+/// against another one instead of losing attribution just because of server order.
+#[tokio::test]
+#[ignore]
+async fn an_all_failed_rejection_is_still_attributed_when_the_first_server_is_unreachable() {
+    restart_apisix().await;
+    let server = spawn_server().await;
+    let config = json!({"consumers": [consumer_with_bad_plugin("the-bad-one")]});
+    let body = sync_body(&[UNREACHABLE, SERVER1, SERVER2], "sync-e2e-mixed-all-failed-reversed", config);
+
+    let (status, json) = put_sync(&server, &body).await;
+    assert_eq!(status, 422, "{json}");
+    assert_eq!(json["status"], "all_failed", "{json}");
+
+    let failed = json["failed"].as_array().unwrap();
+    if apisix_version_supports_validate() {
+        assert_eq!(failed.len(), 1, "{json}");
+        assert!(failed[0]["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
+    } else {
+        assert_eq!(failed.len(), 0, "{json}");
+    }
+}
+
 /// A first sync against real servers caches this cacheKey's baseline; a second sync
 /// against unreachable ones reuses that cache instead of re-probing, so it reaches the
 /// write itself -- which then fails on every server. No content was ever evaluated (the

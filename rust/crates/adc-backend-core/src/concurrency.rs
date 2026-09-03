@@ -58,3 +58,34 @@ where
         None => Ok(results),
     }
 }
+
+/// The mirror of `concurrent_map_until_err`: stops as soon as one item's future resolves to
+/// `Ok`, dropping every other future still in flight (and anything not yet dispatched)
+/// without waiting for them — dropping is the only way Rust has to cancel a future that's
+/// already running. Only fails once every item has: `Err` from whichever one settles last.
+///
+/// `items` must be non-empty — there's no `E` to report on zero attempts.
+pub async fn concurrent_map_until_ok<T, U, E, F, Fut>(items: Vec<T>, concurrency: Option<usize>, mut f: F) -> Result<U, E>
+where
+    F: FnMut(T) -> Fut,
+    Fut: Future<Output = Result<U, E>>,
+{
+    let concurrency = concurrency.unwrap_or(items.len()).max(1);
+    let mut items = items.into_iter();
+    let mut in_flight = FuturesUnordered::new();
+    for item in items.by_ref().take(concurrency) {
+        in_flight.push(f(item));
+    }
+
+    let mut last_error = None;
+    while let Some(outcome) = in_flight.next().await {
+        match outcome {
+            Ok(value) => return Ok(value),
+            Err(error) => last_error = Some(error),
+        }
+        if let Some(item) = items.next() {
+            in_flight.push(f(item));
+        }
+    }
+    Err(last_error.expect("items must be non-empty"))
+}
