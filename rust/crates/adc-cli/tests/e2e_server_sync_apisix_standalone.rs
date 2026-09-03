@@ -209,23 +209,24 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     let (status, json) = put_sync(&server, &body).await;
     assert_eq!(status, 422, "{json}");
     assert_eq!(json["status"], "all_failed", "{json}");
-    assert_eq!(json["total_resources"], 2, "{json}");
+    assert_eq!(json["total_resources"], 1, "{json}");
     assert_eq!(json["success_count"], 0, "{json}");
-    assert_eq!(json["failed_count"], 2, "{json}");
+    assert_eq!(json["failed_count"], 1, "{json}");
     assert_eq!(json["success"].as_array().unwrap().len(), 0, "{json}");
 
+    // Only the resource the re-validate actually named -- the innocent one swept up in the
+    // same rejected document must not appear, or bad-resource exclusion would blacklist it
+    // for something it never did.
     let failed = json["failed"].as_array().unwrap();
-    assert_eq!(failed.len(), 2, "{json}");
+    assert_eq!(failed.len(), 1, "{json}");
     let bad = failed.iter().find(|e| e["event"]["resource_name"] == "the-bad-one").expect("the bad resource must be in `failed`");
-    let good = failed
-        .iter()
-        .find(|e| e["event"]["resource_name"] == "innocent-bystander")
-        .expect("the whole document was rejected — the innocent resource must be in `failed` too");
+    assert!(
+        failed.iter().all(|e| e["event"]["resource_name"] != "innocent-bystander"),
+        "an unattributed resource must never appear in failed[]: {json}"
+    );
 
     let bad_reason = bad["reason"].as_str().unwrap();
     assert!(bad_reason.to_lowercase().contains("limit-count"), "{bad_reason}");
-    let good_reason = good["reason"].as_str().unwrap();
-    assert!(!good_reason.is_empty(), "{json}");
 
     let endpoint_status = json["endpoint_status"].as_array().unwrap();
     assert_eq!(endpoint_status.len(), 3, "{json}");
@@ -248,6 +249,62 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
     assert_eq!(status, 200, "{json}");
     assert_eq!(json["status"], "success", "{json}");
     assert_eq!(raw_consumers(SERVER1).await.len(), 1, "{json}");
+}
+
+/// A rejecting server and an unreachable one can land in the same response -- all three end
+/// up success:false either way, and it's still all_failed, still 422.
+#[tokio::test]
+#[ignore]
+async fn an_all_failed_rejection_mixed_with_an_unreachable_server_is_still_422() {
+    restart_apisix().await;
+    let server = spawn_server().await;
+    let config = json!({"consumers": [consumer_with_bad_plugin("the-bad-one")]});
+    let body = sync_body(&[SERVER1, SERVER2, UNREACHABLE], "sync-e2e-mixed-all-failed", config);
+
+    let (status, json) = put_sync(&server, &body).await;
+    assert_eq!(status, 422, "{json}");
+    assert_eq!(json["status"], "all_failed", "{json}");
+
+    let failed = json["failed"].as_array().unwrap();
+    assert_eq!(failed.len(), 1, "{json}");
+    assert!(failed[0]["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
+
+    let endpoint_status = json["endpoint_status"].as_array().unwrap();
+    assert_eq!(endpoint_status.len(), 3, "{json}");
+    assert!(endpoint_status.iter().all(|e| e["success"] == false), "{json}");
+    assert!(
+        endpoint_status.iter().any(|e| e["server"] == UNREACHABLE),
+        "the unreachable server must still be reported, not silently dropped: {json}"
+    );
+
+    for target in [SERVER1, SERVER2] {
+        assert!(raw_consumers(target).await.is_empty(), "an all-failed write must leave {target} untouched");
+    }
+}
+
+/// A first sync against real servers caches this cacheKey's baseline; a second sync
+/// against unreachable ones reuses that cache instead of re-probing, so it reaches the
+/// write itself -- which then fails on every server. No content was ever evaluated (the
+/// re-validate can't reach anyone either), so `failed[]` stays empty; still 422, not 500.
+#[tokio::test]
+#[ignore]
+async fn an_all_failed_write_with_nothing_reachable_reports_no_attribution() {
+    restart_apisix().await;
+    let server = spawn_server().await;
+
+    let baseline = sync_body(&[SERVER1, SERVER2, SERVER3], "sync-e2e-unreachable-write", json!({"consumers": [consumer("stable-one")]}));
+    let (status, json) = put_sync(&server, &baseline).await;
+    assert_eq!(status, 200, "{json}");
+
+    let body = sync_body(&[UNREACHABLE, UNREACHABLE, UNREACHABLE], "sync-e2e-unreachable-write", json!({"consumers": [consumer("stable-two")]}));
+    let (status, json) = put_sync(&server, &body).await;
+    assert_eq!(status, 422, "{json}");
+    assert_eq!(json["status"], "all_failed", "{json}");
+    assert_eq!(json["failed"].as_array().unwrap().len(), 0, "{json}");
+
+    let endpoint_status = json["endpoint_status"].as_array().unwrap();
+    assert_eq!(endpoint_status.len(), 3, "{json}");
+    assert!(endpoint_status.iter().all(|e| e["success"] == false), "{json}");
 }
 
 #[tokio::test]
@@ -277,12 +334,12 @@ async fn a_partial_server_failure_still_reports_the_event_as_synced() {
     assert!(failed_entry["reason"].as_str().is_some_and(|r| !r.is_empty()), "{json}");
 }
 
-/// Every configured server unreachable fails before a document is ever
-/// evaluated -- 500, not the 422 a genuine content rejection gets. No real
-/// APISIX cluster is involved at all, so this doesn't call `restart_apisix`.
+/// Fails during the pre-write dump (needs at least one reachable server), not during the
+/// write itself -- a system-level 500, unrelated to the 422 an all-server write failure
+/// gets. No real cluster involved, so no `restart_apisix`.
 #[tokio::test]
 #[ignore]
-async fn every_server_unreachable_returns_500_not_422() {
+async fn every_server_unreachable_before_the_write_is_attempted_returns_500() {
     let server = spawn_server().await;
     let body = sync_body(&[UNREACHABLE, UNREACHABLE, UNREACHABLE], "sync-e2e-unreachable", json!({"consumers": [consumer("sync-unreachable")]}));
 
