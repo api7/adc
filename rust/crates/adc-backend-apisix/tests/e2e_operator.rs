@@ -81,7 +81,7 @@ async fn sync_ok(backend: &ApisixBackend, events: Vec<Event>) {
 
 #[tokio::test]
 #[ignore]
-async fn update_touching_only_upstream_does_not_rewrite_the_service_record() {
+async fn update_touching_only_upstream_still_rewrites_the_service_record() {
     let backend = backend();
     let service_id = "e2e-op-svc1";
     sync_ok(
@@ -110,7 +110,7 @@ async fn update_touching_only_upstream_does_not_rewrite_the_service_record() {
     sync_ok(&backend, vec![event]).await;
 
     let after = update_time(&service_path).await.unwrap();
-    assert_eq!(before, after, "the service record itself must not be re-written when only its upstream changed");
+    assert!(after > before, "the service record must still be re-written even when only its upstream changed, to convert a remote inline upstream to the split form");
 
     sync_ok(&backend, vec![delete(ResourceType::Service, service_id)]).await;
 }
@@ -157,7 +157,7 @@ async fn update_touching_both_writes_both_records() {
 
 #[tokio::test]
 #[ignore]
-async fn update_not_touching_upstream_does_not_rewrite_the_upstream_record() {
+async fn update_not_touching_upstream_still_rewrites_the_upstream_record() {
     let backend = backend();
     let service_id = "e2e-op-svc3";
     sync_ok(
@@ -186,7 +186,7 @@ async fn update_not_touching_upstream_does_not_rewrite_the_upstream_record() {
     sync_ok(&backend, vec![event]).await;
 
     let after = update_time(&upstream_path).await.unwrap();
-    assert_eq!(before, after, "the upstream record must not be re-written when only non-upstream fields changed");
+    assert!(after > before, "the upstream record must still be re-written even when the diff doesn't mention it, since the diff can't tell an already-split upstream from a remote inline one");
 
     sync_ok(&backend, vec![delete(ResourceType::Service, service_id)]).await;
 }
