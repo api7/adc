@@ -55,6 +55,31 @@ async fn update_time(path: &str) -> Option<i64> {
     body["value"]["update_time"].as_i64()
 }
 
+/// The resource's own body (the `value` envelope's contents), or `None` if
+/// it doesn't currently exist. Same panic-vs-`None` split as `update_time`.
+async fn get_value(path: &str) -> Option<Value> {
+    let client = client();
+    let request = client.request(Method::GET, path).expect("building the get_value request should never fail for a well-formed path");
+    let response = client.execute(request).await.expect("transport failure while reading a resource");
+    if !response.status().is_success() {
+        return None;
+    }
+    let body: Value = response.json().await.ok()?;
+    Some(body["value"].clone())
+}
+
+/// PUTs a body straight to the admin API, bypassing the operator (and
+/// therefore `transform_service`) entirely — used to seed a service the way
+/// an APISIX instance predating adc's upstream/service split would have it:
+/// the upstream inlined into the service's own body, with no separate
+/// `/upstreams/{id}` resource at all.
+async fn put_raw(path: &str, body: Value) {
+    let client = client();
+    let request = client.request(Method::PUT, path).expect("building the put_raw request should never fail for a well-formed path").json(&body);
+    let response = client.execute(request).await.expect("transport failure while seeding legacy state");
+    assert!(response.status().is_success(), "seeding legacy state at {path} failed: {}", response.status());
+}
+
 fn create(rt: ResourceType, id: &str, new_value: Value) -> Event {
     Event::new(rt, EventKind::Create { new_value }, id, id)
 }
@@ -111,6 +136,89 @@ async fn update_touching_only_upstream_still_rewrites_the_service_record() {
 
     let after = update_time(&service_path).await.unwrap();
     assert!(after > before, "the service record must still be re-written even when only its upstream changed, to convert a remote inline upstream to the split form");
+
+    sync_ok(&backend, vec![delete(ResourceType::Service, service_id)]).await;
+}
+
+/// The actual bug this whole file exists to guard against: a service left
+/// over from before adc split upstreams out of services still has its
+/// upstream inlined, with no `/upstreams/{id}` resource at all. An update
+/// that only touches the upstream's content must still split it out —
+/// `update_touching_only_upstream_still_rewrites_the_service_record` above
+/// only proves a PUT happens, not that it actually produces the split form.
+#[tokio::test]
+#[ignore]
+async fn update_touching_only_upstream_migrates_a_legacy_inline_upstream_to_the_split_form() {
+    let service_id = "e2e-op-svc-legacy1";
+    let service_path = format!("/apisix/admin/services/{service_id}");
+    let upstream_path = format!("/apisix/admin/upstreams/{service_id}");
+
+    put_raw(
+        &service_path,
+        json!({ "name": service_id, "upstream": { "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] } }),
+    )
+    .await;
+    assert!(get_value(&upstream_path).await.is_none(), "test setup: no separate upstream resource should exist yet");
+
+    let backend = backend();
+    let event = Event::new(
+        ResourceType::Service,
+        EventKind::Update {
+            old_value: json!({ "name": service_id, "upstream": { "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] } }),
+            new_value: json!({ "name": service_id, "upstream": { "nodes": [{ "host": "2.2.2.2", "port": 80, "weight": 1 }] } }),
+            diff: Some(vec![upstream_diff()]),
+        },
+        service_id,
+        service_id,
+    );
+    sync_ok(&backend, vec![event]).await;
+
+    let service = get_value(&service_path).await.expect("service should still exist");
+    assert_eq!(service["upstream_id"], service_id, "service must now reference the split-out upstream by id");
+    assert!(service["upstream"].is_null(), "the upstream must no longer be inlined into the service");
+    let upstream = get_value(&upstream_path).await.expect("the legacy inline upstream must have been split into its own resource");
+    assert_eq!(upstream["nodes"][0]["host"], "2.2.2.2", "the split-out upstream must carry the updated content");
+
+    sync_ok(&backend, vec![delete(ResourceType::Service, service_id)]).await;
+}
+
+/// The mirror case: the diff doesn't mention `upstream` at all (only an
+/// unrelated field changed), yet a legacy inlined upstream must still be
+/// split out — the diff can't tell "already split" apart from "still
+/// inline", so writing the upstream can't be conditioned on the diff
+/// mentioning it.
+#[tokio::test]
+#[ignore]
+async fn update_touching_only_another_field_migrates_a_legacy_inline_upstream_to_the_split_form() {
+    let service_id = "e2e-op-svc-legacy2";
+    let service_path = format!("/apisix/admin/services/{service_id}");
+    let upstream_path = format!("/apisix/admin/upstreams/{service_id}");
+
+    put_raw(
+        &service_path,
+        json!({ "name": service_id, "upstream": { "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] } }),
+    )
+    .await;
+    assert!(get_value(&upstream_path).await.is_none(), "test setup: no separate upstream resource should exist yet");
+
+    let backend = backend();
+    let event = Event::new(
+        ResourceType::Service,
+        EventKind::Update {
+            old_value: json!({ "name": service_id, "upstream": { "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] } }),
+            new_value: json!({ "name": service_id, "upstream": { "nodes": [{ "host": "1.1.1.1", "port": 80, "weight": 1 }] }, "plugins": { "key-auth": {} } }),
+            diff: Some(vec![plugins_diff()]),
+        },
+        service_id,
+        service_id,
+    );
+    sync_ok(&backend, vec![event]).await;
+
+    let service = get_value(&service_path).await.expect("service should still exist");
+    assert_eq!(service["upstream_id"], service_id, "service must now reference the split-out upstream by id");
+    assert!(service["upstream"].is_null(), "the upstream must no longer be inlined into the service");
+    let upstream = get_value(&upstream_path).await.expect("the legacy inline upstream must have been split into its own resource, even though the diff never mentioned it");
+    assert_eq!(upstream["nodes"][0]["host"], "1.1.1.1", "the split-out upstream must carry the (unchanged) node content");
 
     sync_ok(&backend, vec![delete(ResourceType::Service, service_id)]).await;
 }

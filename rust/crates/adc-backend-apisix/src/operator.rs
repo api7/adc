@@ -711,8 +711,8 @@ mod tests {
     }
 
     /// A service update that both changes another field *and* removes its
-    /// upstream still orders the upstream DELETE *before* the service
-    /// request that detaches it.
+    /// upstream still puts the service request that detaches `upstream_id`
+    /// *before* the upstream DELETE.
     #[test]
     fn service_update_changing_another_field_and_removing_its_upstream_still_detaches_before_deleting()
      {
