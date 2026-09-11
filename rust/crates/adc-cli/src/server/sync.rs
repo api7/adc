@@ -422,8 +422,9 @@ mod tests {
         assert_eq!(failed_event["resourceType"], json!("route"));
         assert_eq!(failed_event["resourceId"], json!("r1"));
         for event in [success_event, failed_event] {
-            assert!(event["resource_type"].is_null(), "{body}");
-            assert!(event["resource_id"].is_null(), "{body}");
+            let object = event.as_object().unwrap();
+            assert!(!object.contains_key("resource_type"), "{body}");
+            assert!(!object.contains_key("resource_id"), "{body}");
         }
     }
 
