@@ -124,7 +124,11 @@ pub trait Backend: Send + Sync {
     /// whole document at once (apisix-standalone) reports one result per
     /// *server* instead, with `BackendSyncResult::event` left `None` since
     /// no single event owns that write.
-    async fn sync(&self, events: Vec<Event>, opts: BackendSyncOptions) -> Result<Vec<BackendSyncResult>, BackendError>;
+    async fn sync(
+        &self,
+        events: Vec<Event>,
+        opts: BackendSyncOptions,
+    ) -> Result<Vec<BackendSyncResult>, BackendError>;
 
     /// Not every backend can pre-validate events against the remote server
     /// before applying them, so this defaults to rejecting with

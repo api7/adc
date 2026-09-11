@@ -61,7 +61,11 @@ pub enum ValueDiff {
     Deleted { path: DiffPath, lhs: Value },
     /// Edit: present (with a different value or type) on both sides.
     #[serde(rename = "E")]
-    Edit { path: DiffPath, lhs: Value, rhs: Value },
+    Edit {
+        path: DiffPath,
+        lhs: Value,
+        rhs: Value,
+    },
     /// Array: a tail element was added/removed relative to the other side's length.
     #[serde(rename = "A")]
     Array {
@@ -87,13 +91,28 @@ fn real_type_of(v: &Value) -> &'static str {
 pub fn diff_value(lhs: &Value, rhs: &Value) -> Option<Vec<ValueDiff>> {
     let mut changes = Vec::new();
     deep_diff(Some(lhs), Some(rhs), &[], &mut changes);
-    if changes.is_empty() { None } else { Some(changes) }
+    if changes.is_empty() {
+        None
+    } else {
+        Some(changes)
+    }
 }
 
-fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], changes: &mut Vec<ValueDiff>) {
+fn deep_diff(
+    lhs: Option<&Value>,
+    rhs: Option<&Value>,
+    path: &[PathSegment],
+    changes: &mut Vec<ValueDiff>,
+) {
     match (lhs, rhs) {
-        (None, Some(r)) => changes.push(ValueDiff::New { path: path.to_vec(), rhs: r.clone() }),
-        (Some(l), None) => changes.push(ValueDiff::Deleted { path: path.to_vec(), lhs: l.clone() }),
+        (None, Some(r)) => changes.push(ValueDiff::New {
+            path: path.to_vec(),
+            rhs: r.clone(),
+        }),
+        (Some(l), None) => changes.push(ValueDiff::Deleted {
+            path: path.to_vec(),
+            lhs: l.clone(),
+        }),
         (None, None) => {}
         (Some(l), Some(r)) => {
             // Equal subtrees can't contain a diff at any depth — skips the
@@ -107,7 +126,11 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
                 return;
             }
             if real_type_of(l) != real_type_of(r) {
-                changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
+                changes.push(ValueDiff::Edit {
+                    path: path.to_vec(),
+                    lhs: l.clone(),
+                    rhs: r.clone(),
+                });
                 return;
             }
             match (l, r) {
@@ -123,12 +146,20 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
                 // guarding against for gateway config values.
                 (Value::Number(ln), Value::Number(rn)) => {
                     if ln.as_f64() != rn.as_f64() {
-                        changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
+                        changes.push(ValueDiff::Edit {
+                            path: path.to_vec(),
+                            lhs: l.clone(),
+                            rhs: r.clone(),
+                        });
                     }
                 }
                 _ => {
                     if l != r {
-                        changes.push(ValueDiff::Edit { path: path.to_vec(), lhs: l.clone(), rhs: r.clone() });
+                        changes.push(ValueDiff::Edit {
+                            path: path.to_vec(),
+                            lhs: l.clone(),
+                            rhs: r.clone(),
+                        });
                     }
                 }
             }
@@ -136,7 +167,12 @@ fn deep_diff(lhs: Option<&Value>, rhs: Option<&Value>, path: &[PathSegment], cha
     }
 }
 
-fn diff_object(lo: &serde_json::Map<String, Value>, ro: &serde_json::Map<String, Value>, path: &[PathSegment], changes: &mut Vec<ValueDiff>) {
+fn diff_object(
+    lo: &serde_json::Map<String, Value>,
+    ro: &serde_json::Map<String, Value>,
+    path: &[PathSegment],
+    changes: &mut Vec<ValueDiff>,
+) {
     // lhs's own keys first, in insertion order (matches `Object.keys(lObj)`).
     for (key, lv) in lo {
         let mut sub_path = path.to_vec();
@@ -163,7 +199,10 @@ fn diff_array(la: &[Value], ra: &[Value], path: &[PathSegment], changes: &mut Ve
         changes.push(ValueDiff::Array {
             path: path.to_vec(),
             index: idx,
-            item: Box::new(ValueDiff::New { path: vec![], rhs: ra[idx].clone() }),
+            item: Box::new(ValueDiff::New {
+                path: vec![],
+                rhs: ra[idx].clone(),
+            }),
         });
         i -= 1;
     }
@@ -172,7 +211,10 @@ fn diff_array(la: &[Value], ra: &[Value], path: &[PathSegment], changes: &mut Ve
         changes.push(ValueDiff::Array {
             path: path.to_vec(),
             index: idx,
-            item: Box::new(ValueDiff::Deleted { path: vec![], lhs: la[idx].clone() }),
+            item: Box::new(ValueDiff::Deleted {
+                path: vec![],
+                lhs: la[idx].clone(),
+            }),
         });
         j -= 1;
     }
@@ -202,7 +244,10 @@ mod tests {
     fn new_key() {
         assert_eq!(
             diff_value(&json!({}), &json!({"a": 1})),
-            Some(vec![ValueDiff::New { path: vec![PathSegment::Key("a".into())], rhs: json!(1) }])
+            Some(vec![ValueDiff::New {
+                path: vec![PathSegment::Key("a".into())],
+                rhs: json!(1)
+            }])
         );
     }
 
@@ -210,7 +255,10 @@ mod tests {
     fn deleted_key() {
         assert_eq!(
             diff_value(&json!({"a": 1}), &json!({})),
-            Some(vec![ValueDiff::Deleted { path: vec![PathSegment::Key("a".into())], lhs: json!(1) }])
+            Some(vec![ValueDiff::Deleted {
+                path: vec![PathSegment::Key("a".into())],
+                lhs: json!(1)
+            }])
         );
     }
 
@@ -218,7 +266,11 @@ mod tests {
     fn edited_scalar() {
         assert_eq!(
             diff_value(&json!({"a": 1}), &json!({"a": 2})),
-            Some(vec![ValueDiff::Edit { path: vec![PathSegment::Key("a".into())], lhs: json!(1), rhs: json!(2) }])
+            Some(vec![ValueDiff::Edit {
+                path: vec![PathSegment::Key("a".into())],
+                lhs: json!(1),
+                rhs: json!(2)
+            }])
         );
     }
 
@@ -241,7 +293,10 @@ mod tests {
             Some(vec![ValueDiff::Array {
                 path: vec![],
                 index: 2,
-                item: Box::new(ValueDiff::New { path: vec![], rhs: json!(3) })
+                item: Box::new(ValueDiff::New {
+                    path: vec![],
+                    rhs: json!(3)
+                })
             }])
         );
     }
@@ -253,7 +308,10 @@ mod tests {
             Some(vec![ValueDiff::Array {
                 path: vec![],
                 index: 2,
-                item: Box::new(ValueDiff::Deleted { path: vec![], lhs: json!(3) })
+                item: Box::new(ValueDiff::Deleted {
+                    path: vec![],
+                    lhs: json!(3)
+                })
             }])
         );
     }
@@ -267,7 +325,11 @@ mod tests {
     fn array_element_edit() {
         assert_eq!(
             diff_value(&json!([1, 2]), &json!([1, 5])),
-            Some(vec![ValueDiff::Edit { path: vec![PathSegment::Index(1)], lhs: json!(2), rhs: json!(5) }])
+            Some(vec![ValueDiff::Edit {
+                path: vec![PathSegment::Index(1)],
+                lhs: json!(2),
+                rhs: json!(5)
+            }])
         );
     }
 
@@ -287,7 +349,11 @@ mod tests {
     fn a_type_change_from_null_to_object_is_one_edit() {
         assert_eq!(
             diff_value(&json!({"a": null}), &json!({"a": {"b": 1}})),
-            Some(vec![ValueDiff::Edit { path: vec![PathSegment::Key("a".into())], lhs: json!(null), rhs: json!({"b": 1}) }])
+            Some(vec![ValueDiff::Edit {
+                path: vec![PathSegment::Key("a".into())],
+                lhs: json!(null),
+                rhs: json!({"b": 1})
+            }])
         );
     }
 

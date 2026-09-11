@@ -6,11 +6,15 @@
 
 use std::path::PathBuf;
 
-use adc_sdk::resources::{Consumer, FlatConfiguration, Route, Service, ServiceRoutes, UpstreamHealthCheck, SSL};
+use adc_sdk::resources::{
+    Consumer, FlatConfiguration, Route, SSL, Service, ServiceRoutes, UpstreamHealthCheck,
+};
 use serde_json::Value;
 
 fn fixture(name: &str) -> Value {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/differ").join(name);
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../fixtures/differ")
+        .join(name);
     let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
 }
@@ -24,7 +28,14 @@ fn deserializes_service_with_nested_routes_and_upstream() {
 
     let service = &services[0];
     assert_eq!(service.name, "test");
-    assert_eq!(service.routes.as_ref().and_then(ServiceRoutes::http).map(<[_]>::len), Some(0));
+    assert_eq!(
+        service
+            .routes
+            .as_ref()
+            .and_then(ServiceRoutes::http)
+            .map(<[_]>::len),
+        Some(0)
+    );
     assert!(service.upstream.is_some());
     let upstreams = service.upstreams.as_ref().expect("upstreams");
     assert_eq!(upstreams.len(), 1);
@@ -34,7 +45,8 @@ fn deserializes_service_with_nested_routes_and_upstream() {
 #[test]
 fn deserializes_ssl_with_certificates() {
     let f = fixture("upstream.creates_and_updates_ssl_before_upstream.json");
-    let ssls: Vec<SSL> = serde_json::from_value(f["local"]["ssls"].clone()).expect("deserialize ssls");
+    let ssls: Vec<SSL> =
+        serde_json::from_value(f["local"]["ssls"].clone()).expect("deserialize ssls");
     assert_eq!(ssls.len(), 2);
     assert_eq!(ssls[0].snis, vec!["test1.com", "test2.com"]);
     assert_eq!(ssls[0].certificates.len(), 1);
@@ -73,7 +85,8 @@ fn deserializes_route_with_plugins_and_methods() {
 fn deserializes_full_health_check_block() {
     let f = fixture("usecase.selectively_merges_objects_in_default_values_on_a_service.json");
     let checks_patch = f["defaultValue"]["core"]["service"]["upstream"]["checks"].clone();
-    let checks: UpstreamHealthCheck = serde_json::from_value(checks_patch).expect("deserialize checks");
+    let checks: UpstreamHealthCheck =
+        serde_json::from_value(checks_patch).expect("deserialize checks");
 
     assert_eq!(checks.active.concurrency, 10);
     let active_healthy = checks.active.healthy.expect("active.healthy");
@@ -86,11 +99,13 @@ fn deserializes_full_health_check_block() {
 #[test]
 fn deserializes_whole_flat_configuration() {
     let f = fixture("upstream.creates_and_updates_ssl_before_upstream.json");
-    let local: FlatConfiguration = serde_json::from_value(f["local"].clone()).expect("deserialize local");
+    let local: FlatConfiguration =
+        serde_json::from_value(f["local"].clone()).expect("deserialize local");
     assert_eq!(local.services.map(|s| s.len()), Some(1));
     assert_eq!(local.ssls.map(|s| s.len()), Some(2));
 
-    let remote: FlatConfiguration = serde_json::from_value(f["remote"].clone()).expect("deserialize remote");
+    let remote: FlatConfiguration =
+        serde_json::from_value(f["remote"].clone()).expect("deserialize remote");
     assert_eq!(remote.services.map(|s| s.len()), Some(1));
     assert_eq!(remote.ssls.map(|s| s.len()), Some(1));
 }

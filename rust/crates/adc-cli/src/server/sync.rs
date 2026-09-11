@@ -321,8 +321,8 @@ fn simplify_event(event: &Event) -> Value {
         Err(error) => return json!({"error": format!("failed to serialize event: {error}")}),
     };
     if let Value::Object(map) = &mut value {
-        map.remove("old_value");
-        map.remove("new_value");
+        map.remove("oldValue");
+        map.remove("newValue");
         map.remove("diff");
     }
     value
@@ -337,10 +337,95 @@ fn lint_issue_json(issue: &adc_sdk::lint::LintIssue) -> Value {
 
 #[cfg(test)]
 mod tests {
+    use adc_sdk::EventKind;
+
     use super::*;
 
     fn result(success: bool, confirmed: Option<bool>) -> BackendSyncResult {
         BackendSyncResult { success, event: None, error: None, server: Some("s1".to_string()), confirmed }
+    }
+
+    /// `resourceType`/`resourceId`/`resourceName`/`parentId`: the TS `Event`'s own field
+    /// names (`libs/sdk/src/core/differ.ts`), the wire format every `/sync` consumer (AIC
+    /// included) expects. `Event`/`EventKind` carry `#[serde(rename_all = ...)]` for this;
+    /// asserting on the actual serialized keys here, rather than just trusting the
+    /// attribute is still there, is what catches it if that attribute is ever lost.
+    #[test]
+    fn simplify_event_serializes_the_envelope_in_camel_case() {
+        let mut event = Event::new(
+            ResourceType::Route,
+            EventKind::Update { old_value: json!({"id": "r1"}), new_value: json!({"id": "r1", "uri": "/foo"}), diff: None },
+            "r1",
+            "test-route",
+        );
+        event.parent_id = Some("svc1".to_string());
+
+        let value = simplify_event(&event);
+        let object = value.as_object().expect("event serializes to an object");
+
+        for key in ["resourceType", "type", "resourceId", "resourceName", "parentId"] {
+            assert!(object.contains_key(key), "missing {key:?} in {value}");
+        }
+        for key in ["resource_type", "resource_id", "resource_name", "parent_id"] {
+            assert!(!object.contains_key(key), "unexpected snake_case key {key:?} in {value}");
+        }
+        assert_eq!(object["resourceType"], json!("route"));
+        assert_eq!(object["type"], json!("update"));
+        assert_eq!(object["resourceId"], json!("r1"));
+        assert_eq!(object["resourceName"], json!("test-route"));
+        assert_eq!(object["parentId"], json!("svc1"));
+
+        // old_value/new_value are stripped by simplify_event, under either casing.
+        for key in ["oldValue", "newValue", "old_value", "new_value"] {
+            assert!(!object.contains_key(key), "unexpected {key:?} in {value}");
+        }
+    }
+
+    /// A `Create` event has no `parentId` at all, and its casing shouldn't depend on
+    /// which `EventKind` variant produced it.
+    #[test]
+    fn simplify_event_omits_parent_id_rather_than_nulling_it_when_absent() {
+        let event = Event::new(ResourceType::Service, EventKind::Create { new_value: json!({}) }, "svc1", "test-service");
+
+        let value = simplify_event(&event);
+        let object = value.as_object().unwrap();
+        assert!(!object.contains_key("parentId"), "{value}");
+        assert!(!object.contains_key("parent_id"), "{value}");
+        assert_eq!(object["type"], json!("create"));
+    }
+
+    /// The full `/sync` response body embeds the same camelCase envelope in both
+    /// `success[]` and `failed[]` entries: this is the actual shape a caller like AIC
+    /// parses `event.resourceType`/`event.resourceId` out of.
+    #[test]
+    fn output_embeds_the_camel_case_event_envelope_in_success_and_failed_entries() {
+        let success_event = Event::new(ResourceType::Service, EventKind::Create { new_value: json!({}) }, "svc1", "test-service");
+        let failed_event = Event::new(ResourceType::Route, EventKind::Create { new_value: json!({}) }, "r1", "test-route");
+
+        let results = vec![
+            BackendSyncResult { success: true, event: Some(success_event), error: None, server: Some("s1".into()), confirmed: Some(true) },
+            BackendSyncResult {
+                success: false,
+                event: Some(failed_event),
+                error: Some(BackendError::Api { status: 400, message: "bad config".into() }),
+                server: Some("s1".into()),
+                confirmed: None,
+            },
+        ];
+
+        let body = output(&results);
+        let success_event = &body["success"][0]["event"];
+        let failed_event = &body["failed"][0]["event"];
+
+        assert_eq!(success_event["resourceType"], json!("service"));
+        assert_eq!(success_event["resourceId"], json!("svc1"));
+        assert_eq!(failed_event["resourceType"], json!("route"));
+        assert_eq!(failed_event["resourceId"], json!("r1"));
+        for event in [success_event, failed_event] {
+            let object = event.as_object().unwrap();
+            assert!(!object.contains_key("resource_type"), "{body}");
+            assert!(!object.contains_key("resource_id"), "{body}");
+        }
     }
 
     #[test]

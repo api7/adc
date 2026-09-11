@@ -492,9 +492,9 @@ fn resource_type_from_fixture_str(value: &str) -> ResourceType {
 
 /// Loads a `testdata/*.json` fixture — a plain JSON array of events in the
 /// TS suite's own camelCase field names (`resourceType`/`resourceId`/...),
-/// not `Event`'s own (deliberately snake_case, `Serialize`-only) wire
-/// shape — so this reads the raw JSON structurally instead of deriving
-/// `Deserialize` on `Event` just for this one fixture-loading path.
+/// which is also `Event`'s own wire shape (`Serialize`-only, no `Deserialize`
+/// impl exists) — so this reads the raw JSON structurally instead of adding
+/// one just for this fixture-loading path.
 pub fn load_events_fixture(name: &str) -> Vec<Event> {
     let raw: Value = serde_json::from_str(&read_asset(&format!("testdata/{name}")))
         .unwrap_or_else(|e| panic!("parsing fixture {name}: {e}"));

@@ -151,7 +151,9 @@ export const syncHandler: RequestHandler<
   }
 };
 
-const simplifyEvent = (event: ADCSDK.Event) =>
+export const simplifyEvent = (
+  event: ADCSDK.Event,
+): Omit<ADCSDK.Event, 'diff' | 'oldValue' | 'newValue' | 'subEvents'> =>
   omit(event, ['diff', 'oldValue', 'newValue', 'subEvents']);
 
 const formatAxiosResponse = (axiosResponse: AxiosResponse) => ({
@@ -170,7 +172,7 @@ const formatAxiosResponse = (axiosResponse: AxiosResponse) => ({
   },
 });
 
-const generateOutput = ([results, successes, faileds]: [
+export const generateOutput = ([results, successes, faileds]: [
   Array<ADCSDK.BackendSyncResult>,
   Array<ADCSDK.BackendSyncResult>,
   Array<ADCSDK.BackendSyncResult>,
@@ -218,7 +220,7 @@ const generateOutput = ([results, successes, faileds]: [
  * @param results
  * @returns
  */
-const generateOutputForAPISIXStandalone = (
+export const generateOutputForAPISIXStandalone = (
   events: Array<ADCSDK.Event>,
   [results, successes, faileds]: [
     Array<ADCSDK.BackendSyncResult>,
