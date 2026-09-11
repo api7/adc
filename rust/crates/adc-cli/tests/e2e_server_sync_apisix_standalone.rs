@@ -239,7 +239,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
         assert_eq!(json["total_resources"], 1, "{json}");
         assert_eq!(json["failed_count"], 1, "{json}");
         assert_eq!(failed.len(), 1, "{json}");
-        let bad = failed.iter().find(|e| e["event"]["resource_name"] == "the-bad-one").expect("the bad resource must be in `failed`");
+        let bad = failed.iter().find(|e| e["event"]["resourceName"] == "the-bad-one").expect("the bad resource must be in `failed`");
         assert!(bad["reason"].as_str().unwrap().to_lowercase().contains("limit-count"), "{json}");
     } else {
         assert_eq!(json["total_resources"], 0, "{json}");
@@ -247,7 +247,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
         assert_eq!(failed.len(), 0, "{json}");
     }
     assert!(
-        failed.iter().all(|e| e["event"]["resource_name"] != "innocent-bystander"),
+        failed.iter().all(|e| e["event"]["resourceName"] != "innocent-bystander"),
         "an unattributed resource must never appear in failed[]: {json}"
     );
 
