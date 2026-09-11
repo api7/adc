@@ -114,12 +114,20 @@ fn check_cross_field_rules(config: &Configuration, issues: &mut Vec<LintIssue>) 
         check_service(service, &push_index(&push_key(&[], "services"), i), issues);
     }
     for (i, consumer) in config.consumers.iter().flatten().enumerate() {
-        check_consumer_credentials(consumer, &push_index(&push_key(&[], "consumers"), i), issues);
+        check_consumer_credentials(
+            consumer,
+            &push_index(&push_key(&[], "consumers"), i),
+            issues,
+        );
     }
     for (i, group) in config.consumer_groups.iter().flatten().enumerate() {
         let group_path = push_index(&push_key(&[], "consumer_groups"), i);
         for (j, consumer) in group.consumers.iter().flatten().enumerate() {
-            check_consumer_credentials(consumer, &push_index(&push_key(&group_path, "consumers"), j), issues);
+            check_consumer_credentials(
+                consumer,
+                &push_index(&push_key(&group_path, "consumers"), j),
+                issues,
+            );
         }
     }
 }
@@ -147,7 +155,11 @@ fn check_service(service: &Service, path: &[PathSegment], issues: &mut Vec<LintI
         check_upstream_discovery(upstream, &push_key(path, "upstream"), issues);
     }
     for (i, upstream) in service.upstreams.iter().flatten().enumerate() {
-        check_upstream_discovery(upstream, &push_index(&push_key(path, "upstreams"), i), issues);
+        check_upstream_discovery(
+            upstream,
+            &push_index(&push_key(path, "upstreams"), i),
+            issues,
+        );
     }
 }
 
@@ -155,10 +167,17 @@ fn check_service(service: &Service, path: &[PathSegment], issues: &mut Vec<LintI
 /// mutually exclusive, and exactly one must be set:
 /// `(nodes && !discovery_type && !service_name) || (discovery_type &&
 /// service_name && !nodes)`.
-fn check_upstream_discovery(upstream: &Upstream, path: &[PathSegment], issues: &mut Vec<LintIssue>) {
-    let nodes_only = upstream.nodes.is_some() && upstream.discovery_type.is_none() && upstream.service_name.is_none();
-    let discovery_only =
-        upstream.discovery_type.is_some() && upstream.service_name.is_some() && upstream.nodes.is_none();
+fn check_upstream_discovery(
+    upstream: &Upstream,
+    path: &[PathSegment],
+    issues: &mut Vec<LintIssue>,
+) {
+    let nodes_only = upstream.nodes.is_some()
+        && upstream.discovery_type.is_none()
+        && upstream.service_name.is_none();
+    let discovery_only = upstream.discovery_type.is_some()
+        && upstream.service_name.is_some()
+        && upstream.nodes.is_none();
     if !(nodes_only || discovery_only) {
         issues.push(LintIssue {
             path: path.to_vec(),
@@ -170,7 +189,11 @@ fn check_upstream_discovery(upstream: &Upstream, path: &[PathSegment], issues: &
 
 const ALLOWED_CREDENTIAL_TYPES: [&str; 4] = ["key-auth", "basic-auth", "jwt-auth", "hmac-auth"];
 
-fn check_consumer_credentials(consumer: &Consumer, path: &[PathSegment], issues: &mut Vec<LintIssue>) {
+fn check_consumer_credentials(
+    consumer: &Consumer,
+    path: &[PathSegment],
+    issues: &mut Vec<LintIssue>,
+) {
     for (i, credential) in consumer.credentials.iter().flatten().enumerate() {
         if !ALLOWED_CREDENTIAL_TYPES.contains(&credential.r#type.as_str()) {
             issues.push(LintIssue {
@@ -196,7 +219,13 @@ mod tests {
             hash_on: None,
             key: None,
             checks: None,
-            nodes: Some(vec![UpstreamNode { host: "127.0.0.1".into(), port: 80, weight: 1, priority: 0, metadata: None }]),
+            nodes: Some(vec![UpstreamNode {
+                host: "127.0.0.1".into(),
+                port: 80,
+                weight: 1,
+                priority: 0,
+                metadata: None,
+            }]),
             scheme: Default::default(),
             retries: None,
             retry_timeout: None,
@@ -228,12 +257,22 @@ mod tests {
     }
 
     fn empty_config() -> Configuration {
-        Configuration { services: None, ssls: None, consumers: None, consumer_groups: None, global_rules: None, plugin_metadata: None }
+        Configuration {
+            services: None,
+            ssls: None,
+            consumers: None,
+            consumer_groups: None,
+            global_rules: None,
+            plugin_metadata: None,
+        }
     }
 
     #[test]
     fn a_valid_configuration_lints_clean() {
-        let config = Configuration { services: Some(vec![minimal_service()]), ..empty_config() };
+        let config = Configuration {
+            services: Some(vec![minimal_service()]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
@@ -242,8 +281,14 @@ mod tests {
         let mut upstream = minimal_upstream_with_nodes();
         upstream.discovery_type = Some("dns".into());
         upstream.service_name = Some("svc.local".into());
-        let service = Service { upstream: Some(upstream), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstream: Some(upstream),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
         assert_eq!(format_path(&issues[0].path), "services[0].upstream");
@@ -253,8 +298,14 @@ mod tests {
     fn upstream_with_neither_nodes_nor_discovery_is_rejected() {
         let mut upstream = minimal_upstream_with_nodes();
         upstream.nodes = None;
-        let service = Service { upstream: Some(upstream), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstream: Some(upstream),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config).len(), 1);
     }
 
@@ -264,15 +315,27 @@ mod tests {
         upstream.nodes = None;
         upstream.discovery_type = Some("dns".into());
         upstream.service_name = Some("svc.local".into());
-        let service = Service { upstream: Some(upstream), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstream: Some(upstream),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
     #[test]
     fn path_prefix_without_a_leading_slash_is_rejected() {
-        let service = Service { path_prefix: Some("no-slash".into()), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            path_prefix: Some("no-slash".into()),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
         assert_eq!(format_path(&issues[0].path), "services[0].path_prefix");
@@ -280,8 +343,14 @@ mod tests {
 
     #[test]
     fn path_prefix_with_a_leading_slash_is_accepted() {
-        let service = Service { path_prefix: Some("/api".into()), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            path_prefix: Some("/api".into()),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
@@ -289,8 +358,15 @@ mod tests {
     fn upstreams_without_a_default_upstream_is_rejected() {
         let mut named = minimal_upstream_with_nodes();
         named.name = Some("u1".into());
-        let service = Service { upstream: None, upstreams: Some(vec![named]), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstream: None,
+            upstreams: Some(vec![named]),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config).len(), 1);
     }
 
@@ -298,16 +374,28 @@ mod tests {
     fn upstreams_with_a_default_upstream_is_accepted() {
         let mut named = minimal_upstream_with_nodes();
         named.name = Some("u1".into());
-        let service = Service { upstreams: Some(vec![named]), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstreams: Some(vec![named]),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
     #[test]
     fn an_unnamed_entry_in_upstreams_is_rejected_by_the_schema() {
         let unnamed = minimal_upstream_with_nodes();
-        let service = Service { upstreams: Some(vec![unnamed]), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstreams: Some(vec![unnamed]),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert!(!lint(&config).is_empty());
     }
 
@@ -317,8 +405,14 @@ mod tests {
     fn an_id_on_the_default_upstream_is_rejected_by_the_schema() {
         let mut upstream = minimal_upstream_with_nodes();
         upstream.id = Some("u1".into());
-        let service = Service { upstream: Some(upstream), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstream: Some(upstream),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert!(!lint(&config).is_empty());
     }
 
@@ -327,23 +421,42 @@ mod tests {
         let mut named = minimal_upstream_with_nodes();
         named.id = Some("u1".into());
         named.name = Some("u1".into());
-        let service = Service { upstreams: Some(vec![named]), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            upstreams: Some(vec![named]),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
     #[test]
     fn a_name_or_description_at_exactly_the_64kb_limit_lints_clean() {
-        let service = Service { name: "0".repeat(64 * 1024), description: Some("0".repeat(64 * 1024)), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            name: "0".repeat(64 * 1024),
+            description: Some("0".repeat(64 * 1024)),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
     #[test]
     fn a_name_or_description_one_character_past_the_64kb_limit_is_rejected() {
-        let service =
-            Service { name: "0".repeat(64 * 1024 + 1), description: Some("0".repeat(64 * 1024 + 1)), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            name: "0".repeat(64 * 1024 + 1),
+            description: Some("0".repeat(64 * 1024 + 1)),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 2);
         assert_eq!(format_path(&issues[0].path), "services[0].name");
@@ -352,15 +465,27 @@ mod tests {
 
     #[test]
     fn an_id_at_exactly_the_256_character_limit_lints_clean() {
-        let service = Service { id: Some("0".repeat(256)), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            id: Some("0".repeat(256)),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
     #[test]
     fn an_id_one_character_past_the_256_character_limit_is_rejected_by_the_schema() {
-        let service = Service { id: Some("0".repeat(257)), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            id: Some("0".repeat(257)),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
         assert_eq!(format_path(&issues[0].path), "services[0].id");
@@ -368,8 +493,14 @@ mod tests {
 
     #[test]
     fn an_id_with_disallowed_characters_is_rejected_by_the_schema() {
-        let service = Service { id: Some("not valid!".into()), ..minimal_service() };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let service = Service {
+            id: Some("not valid!".into()),
+            ..minimal_service()
+        };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
         assert_eq!(format_path(&issues[0].path), "services[0].id");
@@ -383,11 +514,17 @@ mod tests {
             labels: None,
             r#type: Default::default(),
             snis: vec!["example.com".into()],
-            certificates: vec![SSLCertificate { certificate: "short".into(), key: "x".repeat(32) }],
+            certificates: vec![SSLCertificate {
+                certificate: "short".into(),
+                key: "x".repeat(32),
+            }],
             client: None,
             ssl_protocols: None,
         };
-        let config = Configuration { ssls: Some(vec![ssl]), ..empty_config() };
+        let config = Configuration {
+            ssls: Some(vec![ssl]),
+            ..empty_config()
+        };
         assert!(!lint(&config).is_empty());
     }
 
@@ -399,11 +536,17 @@ mod tests {
             labels: None,
             r#type: Default::default(),
             snis: vec!["example.com".into()],
-            certificates: vec![SSLCertificate { certificate: "$secret://vault/cert".into(), key: "$env://TLS_KEY".into() }],
+            certificates: vec![SSLCertificate {
+                certificate: "$secret://vault/cert".into(),
+                key: "$env://TLS_KEY".into(),
+            }],
             client: None,
             ssl_protocols: None,
         };
-        let config = Configuration { ssls: Some(vec![ssl]), ..empty_config() };
+        let config = Configuration {
+            ssls: Some(vec![ssl]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
@@ -423,11 +566,17 @@ mod tests {
             labels: None,
             r#type: Default::default(),
             snis: vec!["example.com".into()],
-            certificates: vec![SSLCertificate { certificate: "x".repeat(128), key: secret_value.into() }],
+            certificates: vec![SSLCertificate {
+                certificate: "x".repeat(128),
+                key: secret_value.into(),
+            }],
             client: None,
             ssl_protocols: None,
         };
-        let config = Configuration { ssls: Some(vec![ssl]), ..empty_config() };
+        let config = Configuration {
+            ssls: Some(vec![ssl]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
         assert!(
@@ -453,10 +602,16 @@ mod tests {
                 config: Default::default(),
             }]),
         };
-        let config = Configuration { consumers: Some(vec![consumer]), ..empty_config() };
+        let config = Configuration {
+            consumers: Some(vec![consumer]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
-        assert_eq!(format_path(&issues[0].path), "consumers[0].credentials[0].type");
+        assert_eq!(
+            format_path(&issues[0].path),
+            "consumers[0].credentials[0].type"
+        );
     }
 
     #[test]
@@ -475,7 +630,10 @@ mod tests {
                 config: Default::default(),
             }]),
         };
-        let config = Configuration { consumers: Some(vec![consumer]), ..empty_config() };
+        let config = Configuration {
+            consumers: Some(vec![consumer]),
+            ..empty_config()
+        };
         assert_eq!(lint(&config), Vec::new());
     }
 
@@ -495,11 +653,24 @@ mod tests {
                 config: Default::default(),
             }]),
         };
-        let group = ConsumerGroup { id: None, name: "g".into(), description: None, labels: None, plugins: None, consumers: Some(vec![consumer]) };
-        let config = Configuration { consumer_groups: Some(vec![group]), ..empty_config() };
+        let group = ConsumerGroup {
+            id: None,
+            name: "g".into(),
+            description: None,
+            labels: None,
+            plugins: None,
+            consumers: Some(vec![consumer]),
+        };
+        let config = Configuration {
+            consumer_groups: Some(vec![group]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         assert_eq!(issues.len(), 1);
-        assert_eq!(format_path(&issues[0].path), "consumer_groups[0].consumers[0].credentials[0].type");
+        assert_eq!(
+            format_path(&issues[0].path),
+            "consumer_groups[0].consumers[0].credentials[0].type"
+        );
     }
 
     #[test]
@@ -513,7 +684,10 @@ mod tests {
             upstream: Some(upstream),
             ..minimal_service()
         };
-        let config = Configuration { services: Some(vec![service]), ..empty_config() };
+        let config = Configuration {
+            services: Some(vec![service]),
+            ..empty_config()
+        };
         let issues = lint(&config);
         // id charset (schema), path_prefix leading slash, nodes/discovery
         // conflict — three independent violations, all reported together.

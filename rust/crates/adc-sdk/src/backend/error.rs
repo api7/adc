@@ -61,13 +61,19 @@ mod tests {
 
     #[test]
     fn a_5xx_api_error_is_retriable() {
-        let err = BackendError::Api { status: 502, message: "bad gateway".into() };
+        let err = BackendError::Api {
+            status: 502,
+            message: "bad gateway".into(),
+        };
         assert!(err.is_retriable());
     }
 
     #[test]
     fn a_plain_4xx_api_error_is_not_retriable() {
-        let err = BackendError::Api { status: 400, message: "bad config".into() };
+        let err = BackendError::Api {
+            status: 400,
+            message: "bad config".into(),
+        };
         assert!(!err.is_retriable());
     }
 

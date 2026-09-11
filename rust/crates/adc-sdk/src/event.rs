@@ -23,8 +23,15 @@ pub enum EventType {
 ///
 /// `#[serde(tag = "type")]` keeps the wire format identical to a flat struct with
 /// a `type` discriminant field: `{"type": "create", "newValue": ...}`.
+///
+/// `rename_all_fields` matches the TS `Event`'s own camelCase (`oldValue`/`newValue`):
+/// `rename_all` alone only renames the variant names, not the fields inside them.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
 pub enum EventKind {
     Create {
         new_value: Value,
@@ -51,14 +58,18 @@ impl EventKind {
 
     pub fn old_value(&self) -> Option<&Value> {
         match self {
-            EventKind::Delete { old_value } | EventKind::Update { old_value, .. } => Some(old_value),
+            EventKind::Delete { old_value } | EventKind::Update { old_value, .. } => {
+                Some(old_value)
+            }
             EventKind::Create { .. } => None,
         }
     }
 
     pub fn new_value(&self) -> Option<&Value> {
         match self {
-            EventKind::Create { new_value } | EventKind::Update { new_value, .. } => Some(new_value),
+            EventKind::Create { new_value } | EventKind::Update { new_value, .. } => {
+                Some(new_value)
+            }
             EventKind::Delete { .. } => None,
         }
     }
@@ -72,7 +83,13 @@ impl EventKind {
 }
 
 /// A single detected change between local and remote configuration for one resource.
+///
+/// `rename_all = "camelCase"` matches the TS `Event`'s own field names
+/// (`resourceType`/`resourceId`/`resourceName`/`parentId`): the wire format this was
+/// ported from, and what every consumer of the `/sync` and `/validate` responses (AIC
+/// included) still expects.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Event {
     pub resource_type: ResourceType,
     #[serde(flatten)]

@@ -23,16 +23,17 @@ pub mod service;
 pub mod ssl;
 pub mod upstream;
 
-pub use common::{Expr, Labels, LabelValue, Plugin, Plugins, Timeout};
+pub use common::{Expr, LabelValue, Labels, Plugin, Plugins, Timeout};
 pub use consumer::{Consumer, ConsumerCredential, ConsumerGroup};
 pub use route::{HttpMethod, Route, StreamRoute};
 pub use service::{Service, ServiceRoutes};
 pub use ssl::{SSL, SSLCertificate, SslClient, SslProtocol, SslType};
 pub use upstream::{
     Upstream, UpstreamBalancer, UpstreamHealthCheck, UpstreamHealthCheckActive,
-    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy, UpstreamHealthCheckPassive,
-    UpstreamHealthCheckPassiveHealthy, UpstreamHealthCheckPassiveUnhealthy, UpstreamHealthCheckType,
-    UpstreamKeepalivePool, UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
+    UpstreamHealthCheckActiveHealthy, UpstreamHealthCheckActiveUnhealthy,
+    UpstreamHealthCheckPassive, UpstreamHealthCheckPassiveHealthy,
+    UpstreamHealthCheckPassiveUnhealthy, UpstreamHealthCheckType, UpstreamKeepalivePool,
+    UpstreamNode, UpstreamPassHost, UpstreamScheme, UpstreamTls,
 };
 
 use schemars::JsonSchema;

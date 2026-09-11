@@ -9,10 +9,13 @@
 #[test]
 fn schema_json_is_consistent_with_the_current_resource_model() {
     let current = schemars::schema_for!(adc_sdk::resources::Configuration);
-    let current_json = serde_json::to_string_pretty(&current).expect("schema serializes to JSON") + "\n";
+    let current_json =
+        serde_json::to_string_pretty(&current).expect("schema serializes to JSON") + "\n";
 
-    let committed = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schema.json"))
-        .expect("rust/schema.json should exist — run `cargo run -p adc-sdk --bin export-schema`");
+    let committed =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schema.json")).expect(
+            "rust/schema.json should exist — run `cargo run -p adc-sdk --bin export-schema`",
+        );
 
     // Normalize CRLF -> LF on both sides: `current_json` is always built
     // with bare `\n`, but a CRLF checkout (e.g. git's `core.autocrlf` on
