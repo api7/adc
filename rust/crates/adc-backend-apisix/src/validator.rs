@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use adc_backend_core::{HttpClient, Method, deserialize_event_value, missing_parent};
+use adc_backend_core::{HttpClient, Method, deserialize_event_value, missing_parent, to_request_body};
 use adc_sdk::resources::{self as adc};
 use adc_sdk::{
     BackendError, BackendValidateResult, BackendValidationError, Event, EventType, ResourceType,
@@ -25,13 +25,19 @@ pub struct Validator {
 /// One entry per group APISIX's validate endpoint recognizes
 /// (`routes`/`services`/`consumers`/`ssls`/`global_rules`/`stream_routes`/
 /// `plugin_metadata`/`upstreams`) — deliberately not every `ResourceType`:
-/// consumer credentials, consumer groups, plugin configs and standalone
-/// upstream events never appear in this payload; nothing is pushed for them.
+/// consumer groups and standalone stream services never appear in this
+/// payload; nothing is pushed for them. A consumer credential has no
+/// top-level group of its own on the wire — APISIX validates it as an item
+/// of `consumers` whose `id` embeds its parent (`"<username>/credentials/
+/// <id>"`, see `check_conf` in `apisix/admin/config_validate.lua`), so it
+/// shares this group with real consumers; `consumers` is `Vec<Value>`
+/// rather than `Vec<typing::Consumer>` for exactly this reason, mirroring
+/// `plugin_metadata` below.
 #[derive(Debug, Default, Serialize)]
 struct ValidateRequestBody {
     routes: Vec<typing::Route>,
     services: Vec<typing::Service>,
-    consumers: Vec<typing::Consumer>,
+    consumers: Vec<Value>,
     ssls: Vec<typing::Ssl>,
     global_rules: Vec<typing::GlobalRule>,
     stream_routes: Vec<typing::StreamRoute>,
@@ -165,7 +171,8 @@ fn build_request(
             }
             ResourceType::Consumer => {
                 let consumer: adc::Consumer = deserialize_event_value(new_value)?;
-                body.consumers.push(typing::Consumer::from(consumer));
+                body.consumers
+                    .push(to_request_body(typing::Consumer::from(consumer))?);
                 track(&mut index, "consumers");
             }
             ResourceType::Ssl => {
@@ -191,10 +198,25 @@ fn build_request(
                 body.plugin_metadata.push(value);
                 track(&mut index, "plugin_metadata");
             }
-            ResourceType::ConsumerCredential
-            | ResourceType::ConsumerGroup
-            | ResourceType::Upstream
-            | ResourceType::InternalStreamService => {
+            ResourceType::Upstream => {
+                let upstream: adc::Upstream = deserialize_event_value(new_value)?;
+                let mut wire = typing::Upstream::from(upstream);
+                wire.id = Some(event.resource_id.clone());
+                body.upstreams.push(wire);
+                track(&mut index, "upstreams");
+            }
+            ResourceType::ConsumerCredential => {
+                let credential: adc::ConsumerCredential = deserialize_event_value(new_value)?;
+                let parent_id = event
+                    .parent_id
+                    .clone()
+                    .ok_or_else(|| missing_parent(event))?;
+                let mut wire = typing::ConsumerCredential::from(credential);
+                wire.id = Some(format!("{parent_id}/credentials/{}", event.resource_id));
+                body.consumers.push(to_request_body(wire)?);
+                track(&mut index, "consumers");
+            }
+            ResourceType::ConsumerGroup | ResourceType::InternalStreamService => {
                 // Not part of APISIX's validate payload.
             }
         }
@@ -247,6 +269,63 @@ mod tests {
             build_request(&[stream_route_create("sr1")], &Version::new(3, 13, 0)).unwrap();
         assert_eq!(body.stream_routes[0].name.as_deref(), Some("sr1"));
         assert!(body.stream_routes[0].labels.is_none());
+    }
+
+    #[test]
+    fn build_request_puts_a_named_upstream_in_the_upstreams_group() {
+        let event = Event::new(
+            ResourceType::Upstream,
+            EventKind::Create {
+                new_value: json!({ "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }] }),
+            },
+            "ups1",
+            "ups1",
+        );
+        let (body, index) =
+            build_request(std::slice::from_ref(&event), &Version::new(3, 17, 0)).unwrap();
+
+        assert_eq!(body.upstreams.len(), 1);
+        assert_eq!(body.upstreams[0].id.as_deref(), Some("ups1"));
+        let (name, indexed_event) = &index["upstreams"][0];
+        assert_eq!(name, "ups1");
+        assert_eq!(indexed_event, &event);
+    }
+
+    #[test]
+    fn build_request_embeds_a_credential_in_the_consumers_group_with_its_parent_encoded_in_the_id() {
+        let mut event = Event::new(
+            ResourceType::ConsumerCredential,
+            EventKind::Create {
+                new_value: json!({ "name": "cred1", "type": "key-auth", "config": { "key": "secret" } }),
+            },
+            "cred1",
+            "cred1",
+        );
+        event.parent_id = Some("alice".to_string());
+
+        let (body, index) =
+            build_request(std::slice::from_ref(&event), &Version::new(3, 17, 0)).unwrap();
+
+        assert_eq!(body.consumers.len(), 1);
+        assert_eq!(body.consumers[0]["id"], json!("alice/credentials/cred1"));
+        let (name, indexed_event) = &index["consumers"][0];
+        assert_eq!(name, "cred1");
+        assert_eq!(indexed_event, &event);
+    }
+
+    #[test]
+    fn build_request_rejects_a_credential_with_no_parent() {
+        let event = Event::new(
+            ResourceType::ConsumerCredential,
+            EventKind::Create {
+                new_value: json!({ "name": "cred1", "type": "key-auth", "config": { "key": "secret" } }),
+            },
+            "cred1",
+            "cred1",
+        );
+
+        let err = build_request(&[event], &Version::new(3, 17, 0)).unwrap_err();
+        assert!(err.to_string().contains("cred1"), "{err}");
     }
 
     #[test]
