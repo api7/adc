@@ -254,8 +254,11 @@ async fn fails_with_an_invalid_named_upstream() {
     let events = vec![create(
         ResourceType::Upstream,
         upstream_id,
-        // `retries` must be >= 0.
-        json!({ "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }], "retries": -1 }),
+        // A node's weight must be >= 0. `UpstreamNode.weight` is a signed
+        // `i64` on our side (unlike e.g. `retries`, which is `u32` and
+        // would reject a negative value locally before this ever reaches
+        // APISIX), so this is a rejection the server itself has to catch.
+        json!({ "nodes": [{ "host": "httpbin.org", "port": 80, "weight": -1 }] }),
     )];
 
     let result = validator().validate(&events).await.unwrap();
