@@ -220,3 +220,118 @@ async fn is_a_dry_run_with_no_side_effects_on_the_server() {
         "validate must not have created anything on the server"
     );
 }
+
+#[tokio::test]
+#[ignore]
+async fn succeeds_with_a_valid_named_upstream() {
+    skip_below_3_17_0!();
+
+    let upstream_id = "e2e-validate-ups1";
+    let events = vec![create(
+        ResourceType::Upstream,
+        upstream_id,
+        json!({ "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }] }),
+    )];
+
+    let result = validator().validate(&events).await.unwrap();
+    assert!(result.success, "{:?}", result.errors);
+    assert!(result.errors.is_empty());
+}
+
+/// A named (traffic-split) upstream is a genuinely independent resource on
+/// the wire, diffed and synced separately from the service that references
+/// it (see `differ_meta.rs`'s `"upstreams"` field entry and `operator.rs`'s
+/// own `ResourceType::Upstream` case). Before this crate's `validator.rs`
+/// started including it in the payload, this event was silently skipped,
+/// so this would have come back `success: true` even though the content is
+/// invalid — that regression is exactly what this test guards against.
+#[tokio::test]
+#[ignore]
+async fn fails_with_an_invalid_named_upstream() {
+    skip_below_3_17_0!();
+
+    let upstream_id = "e2e-validate-bad-ups1";
+    let events = vec![create(
+        ResourceType::Upstream,
+        upstream_id,
+        // `retries` must be >= 0.
+        json!({ "nodes": [{ "host": "httpbin.org", "port": 80, "weight": 100 }], "retries": -1 }),
+    )];
+
+    let result = validator().validate(&events).await.unwrap();
+    assert!(!result.success);
+    assert!(!result.errors.is_empty());
+    assert_eq!(result.errors[0].resource_type, "upstreams");
+    assert_eq!(result.errors[0].resource_name.as_deref(), Some(upstream_id));
+    let matched_event = result.errors[0]
+        .event
+        .as_ref()
+        .expect("event should have been matched from the request index");
+    assert_eq!(matched_event.resource_type, ResourceType::Upstream);
+    assert_eq!(matched_event.resource_id, upstream_id);
+}
+
+fn credential(id: &str, username: &str, config: serde_json::Value) -> Event {
+    let mut event = create(
+        ResourceType::ConsumerCredential,
+        id,
+        json!({ "name": id, "type": "key-auth", "config": config }),
+    );
+    // APISIX embeds a credential's parent consumer's username into the id
+    // it validates it under (`"<username>/credentials/<id>"`), not a
+    // separate field — matches `main_path`'s real sync path for the same
+    // resource type.
+    event.parent_id = Some(username.to_string());
+    event
+}
+
+#[tokio::test]
+#[ignore]
+async fn succeeds_with_a_valid_consumer_credential() {
+    skip_below_3_17_0!();
+
+    let username = "e2e_validate_cred_consumer1";
+    let events = vec![
+        create(
+            ResourceType::Consumer,
+            username,
+            json!({ "username": username }),
+        ),
+        credential("e2e-validate-cred1", username, json!({ "key": "validate-test-key" })),
+    ];
+
+    let result = validator().validate(&events).await.unwrap();
+    assert!(result.success, "{:?}", result.errors);
+    assert!(result.errors.is_empty());
+}
+
+/// Mirrors `fails_with_an_invalid_named_upstream`'s regression coverage,
+/// for the other resource type this crate's `validator.rs` used to skip.
+#[tokio::test]
+#[ignore]
+async fn fails_with_an_invalid_consumer_credential() {
+    skip_below_3_17_0!();
+
+    let username = "e2e_validate_bad_cred_consumer1";
+    let credential_id = "e2e-validate-bad-cred1";
+    let events = vec![
+        create(
+            ResourceType::Consumer,
+            username,
+            json!({ "username": username }),
+        ),
+        // key-auth's `key` is required; an empty config leaves it out.
+        credential(credential_id, username, json!({})),
+    ];
+
+    let result = validator().validate(&events).await.unwrap();
+    assert!(!result.success);
+    assert!(!result.errors.is_empty());
+    let matched_event = result
+        .errors
+        .iter()
+        .find_map(|e| e.event.as_ref())
+        .expect("at least one error should have matched an event");
+    assert_eq!(matched_event.resource_type, ResourceType::ConsumerCredential);
+    assert_eq!(matched_event.resource_id, credential_id);
+}
