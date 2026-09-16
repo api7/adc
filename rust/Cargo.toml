@@ -41,7 +41,7 @@ reqwest = { version = "0.13", default-features = false, features = [
 ] }
 serde_yaml_ng = "0.10"
 dashmap = "6"
-rstest = "0.26.1"
+rstest = "0.27.0"
 proptest = "1"
 
 [profile.release]
