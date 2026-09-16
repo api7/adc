@@ -1,5 +1,4 @@
-//! Reproduces the actual multi-writer conflict (see `impl/standalone/
-//! p01-multi-writer.md`): another writer already advanced a collection's
+//! Reproduces the actual multi-writer conflict: another writer already advanced a collection's
 //! `*_conf_version` past what this crate's next `sync()` computes, and
 //! APISIX rejects the PUT with `400`. The exact message this asserts on
 //! was captured verbatim from a real 3.17.0 instance (seed an inflated
