@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use adc_sdk::resources::Configuration;
-use adc_sdk::{Backend, BackendError, BackendSyncOptions, BackendSyncResult, BackendValidateResult, Event, ResourceType};
+use adc_sdk::{Backend, BackendError, BackendSyncOptions, BackendSyncResult, BackendValidateResult, BackendValidationError, Event, ResourceType};
 use axum::Json;
 use axum::body::Bytes;
 use axum::http::StatusCode;
@@ -211,26 +211,7 @@ async fn output_for_apisix_standalone(
                 }
                 Err(_) => vec![],
             };
-            let reason_by_resource: HashMap<&str, &str> =
-                errors.iter().filter_map(|e| e.resource_id.as_deref().map(|id| (id, e.error.as_str()))).collect();
-
-            // Only resources the re-validate actually named -- an innocent one swept up in
-            // the same rejected document must never land here, or bad-resource exclusion
-            // would blacklist it for something it never did. A rejection with no per-resource
-            // cause at all (a conf_version race, say) leaves `failed` empty on purpose;
-            // `endpoint_status` already carries that document-level reason.
-            let failed = all_events
-                .iter()
-                .filter_map(|event| {
-                    reason_by_resource.get(event.resource_id.as_str()).map(|reason| FailedEntry {
-                        server: None,
-                        event: Some(simplify_event(event)),
-                        failed_at: now.clone(),
-                        reason: reason.to_string(),
-                    })
-                })
-                .collect::<Vec<_>>();
-            (StatusCode::UNPROCESSABLE_ENTITY, Vec::new(), failed)
+            (StatusCode::UNPROCESSABLE_ENTITY, Vec::new(), failed_entries(&errors, &now))
         }
         SyncStatus::Success => {
             let success = events
@@ -293,6 +274,33 @@ struct EndpointStatusEntry {
 /// `confirmed: Some(false)` is the only thing that fails it; `Some(true)`
 /// and `None` (a cluster too old to report the distinction, collapsed to
 /// "confirmed" the same as `is_confirmed` collapses a single PUT) both pass.
+/// The `failed[]` of an all-failed standalone sync: only the resources the re-validate
+/// actually named. An innocent resource swept up in the same rejected document must never
+/// land here, or bad-resource exclusion would blacklist it for something it never did, and
+/// a rejection with no per-resource cause at all (a conf_version race, say) leaves this
+/// empty on purpose, since `endpoint_status` already carries that document-level reason.
+///
+/// Each error is attributed through the event it carries, which the backend matched by
+/// where the resource sits in the request body it validated. The id the gateway reports
+/// back cannot do that job: a credential travels among the consumers under an id that
+/// embeds its own consumer (`<username>/credentials/<id>`, which is how the gateway tells
+/// a credential from a consumer in the first place), so it never equals the credential's
+/// own `resourceId`, and two resource types that happen to share an id would be confused
+/// for each other.
+fn failed_entries(errors: &[BackendValidationError], now: &str) -> Vec<FailedEntry> {
+    errors
+        .iter()
+        .filter_map(|error| {
+            error.event.as_ref().map(|event| FailedEntry {
+                server: None,
+                event: Some(simplify_event(event)),
+                failed_at: now.to_string(),
+                reason: error.error.clone(),
+            })
+        })
+        .collect()
+}
+
 fn all_confirmed(results: &[BackendSyncResult]) -> bool {
     results.iter().all(|r| r.confirmed != Some(false))
 }
@@ -343,6 +351,43 @@ mod tests {
 
     fn result(success: bool, confirmed: Option<bool>) -> BackendSyncResult {
         BackendSyncResult { success, event: None, error: None, server: Some("s1".to_string()), confirmed }
+    }
+
+    fn validation_error(reported_id: &str, error: &str, event: Option<Event>) -> BackendValidationError {
+        BackendValidationError {
+            resource_type: "consumers".to_string(),
+            resource_id: Some(reported_id.to_string()),
+            resource_name: None,
+            index: 0,
+            error: error.to_string(),
+            event,
+        }
+    }
+
+    /// A credential is validated among the consumers under an id that embeds its own
+    /// consumer, so the id the gateway reports back never equals the credential's own
+    /// `resourceId`. What the error is attributed to has to come from the event the
+    /// backend matched it to.
+    #[test]
+    fn a_rejected_credential_is_attributed_to_its_own_event() {
+        let mut event = Event::new(ResourceType::ConsumerCredential, EventKind::Create { new_value: json!({}) }, "cred1", "key-auth");
+        event.parent_id = Some("alice".to_string());
+
+        let entries = failed_entries(&[validation_error("alice/credentials/cred1", "wrong type", Some(event))], "now");
+
+        assert_eq!(entries.len(), 1);
+        let reported = entries[0].event.as_ref().expect("the entry carries its event");
+        assert_eq!(reported["resourceId"], json!("cred1"));
+        assert_eq!(reported["resourceType"], json!("consumer_credential"));
+        assert_eq!(reported["parentId"], json!("alice"));
+        assert_eq!(entries[0].reason, "wrong type");
+    }
+
+    /// A rejection the backend could not match to a resource (a document-level error, say)
+    /// is left out rather than guessed at.
+    #[test]
+    fn an_unattributed_error_is_left_out() {
+        assert!(failed_entries(&[validation_error("", "invalid request body", None)], "now").is_empty());
     }
 
     /// `resourceType`/`resourceId`/`resourceName`/`parentId`: the TS `Event`'s own field
