@@ -52,7 +52,7 @@ jobs:
           zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip ./adc.exe && rm -rf ./adc.exe
 
       - name: Upload ADC to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -100,7 +100,7 @@ jobs:
           tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz ./adc && rm -rf ./adc
 
       - name: Upload ADC to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -159,7 +159,7 @@ jobs:
           tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.debug
 
       - name: Upload adc to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -224,7 +224,7 @@ jobs:
           Compress-Archive -Path "$binDir/adc.pdb" -DestinationPath "release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip"
 
       - name: Upload adc to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -292,7 +292,7 @@ jobs:
           tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.dSYM
 
       - name: Upload adc to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
