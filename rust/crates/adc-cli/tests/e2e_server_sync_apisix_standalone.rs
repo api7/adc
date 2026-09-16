@@ -12,9 +12,10 @@
 //! suite reads), all still below the 3.19.0 `?wait`-confirmation gate — every successful
 //! write is therefore always `confirmed` regardless of the raw status APISIX itself returns.
 //! The `>= 3.19 and 202 → accepted, not applied` branch has no real gateway to test against
-//! yet; `operator.rs`'s own unit tests are the only coverage for it. Below 3.16.0, APISIX has no `/validate` endpoint
-//! at all (`apisix_version_supports_validate`) — `failed[]` attribution needs it, so an
-//! all-failed rejection there reports `failed: []` even for an obviously bad resource.
+//! yet; `operator.rs`'s own unit tests are the only coverage for it. Below 3.15.0, APISIX has
+//! no `/validate` endpoint at all (`apisix_version_supports_validate`) — `failed[]`
+//! attribution needs it, so an all-failed rejection there reports `failed: []` even for an
+//! obviously bad resource.
 
 use std::process::Stdio;
 use std::time::Duration;
@@ -42,16 +43,16 @@ fn apisix_version() -> semver::Version {
     }
 }
 
-/// APISIX serves `/apisix/admin/configs/validate` in standalone mode from 3.16.0
+/// APISIX serves `/apisix/admin/configs/validate` in standalone mode from 3.15.0
 /// (`apisix/admin/standalone.lua`), and in every mode from 3.17.0
-/// (`apisix/admin/config_validate.lua`). Below 3.16.0 `Validator::validate` gets a 404
+/// (`apisix/admin/config_validate.lua`). Below 3.15.0 `Validator::validate` gets a 404
 /// (`BackendError::Unsupported`), so an all-failed rejection's `failed[]` can never be
 /// attributed there, no matter how obviously bad the resource actually is.
 ///
-/// 3.16.0 reports each error with the resource's position in the validated body but not
-/// with its id, which is enough: attribution follows the position, not the id.
+/// Before 3.17.0 an error carries the resource's position in the validated body but not
+/// its id, which is enough: attribution follows the position, not the id.
 fn apisix_version_supports_validate() -> bool {
-    apisix_version() >= semver::Version::new(3, 16, 0)
+    apisix_version() >= semver::Version::new(3, 15, 0)
 }
 
 /// Same cluster, same wipe-and-recheck strategy as
@@ -235,7 +236,7 @@ async fn an_all_server_rejection_reports_structured_per_resource_failures() {
 
     // Only the resource the re-validate actually named -- the innocent one swept up in the
     // same rejected document must not appear, or bad-resource exclusion would blacklist it
-    // for something it never did. Below 3.16.0 there's no `/validate` endpoint to name
+    // for something it never did. Below 3.15.0 there's no `/validate` endpoint to name
     // anything with at all, so `failed[]` is empty even though the rejection is just as real
     // (see `endpoint_status` below).
     let failed = json["failed"].as_array().unwrap();
@@ -292,7 +293,7 @@ async fn an_all_failed_rejection_mixed_with_an_unreachable_server_is_still_422()
     assert_eq!(status, 422, "{json}");
     assert_eq!(json["status"], "all_failed", "{json}");
 
-    // Below 3.16.0 there's no `/validate` endpoint to attribute anything with at all.
+    // Below 3.15.0 there's no `/validate` endpoint to attribute anything with at all.
     let failed = json["failed"].as_array().unwrap();
     if apisix_version_supports_validate() {
         assert_eq!(failed.len(), 1, "{json}");
