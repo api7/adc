@@ -615,6 +615,36 @@ mod tests {
         assert_eq!(back.tls_passthrough, route.tls_passthrough);
     }
 
+    /// The singular form gets its own case rather than being added to the
+    /// fixture above: it is the exact value the read direction used to
+    /// hardcode to `None`, and the gateway rejects a stream route that
+    /// carries `sni` and `snis` at once, so the two cannot share a fixture.
+    #[test]
+    fn stream_route_round_trips_its_singular_sni() {
+        let route = adc::StreamRoute {
+            id: Some("sr1".to_string()),
+            name: "sr1".to_string(),
+            description: None,
+            labels: None,
+            plugins: None,
+            remote_addr: None,
+            server_addr: None,
+            server_port: None,
+            sni: Some("a.example.com".to_string()),
+            snis: None,
+            tls_passthrough: None,
+        };
+
+        let wire = transform_stream_route(route.clone(), "svc1".to_string());
+        assert_eq!(wire.sni, Some("a.example.com".to_string()));
+
+        let back = adc::StreamRoute::from(typing::StreamRoute {
+            id: wire.stream_route_id.clone(),
+            ..wire
+        });
+        assert_eq!(back.sni, route.sni);
+    }
+
     /// `server_port` is `u16` at the wire level too (not a wider int
     /// narrowed later): a port outside 0-65535 is never a real port, so a
     /// server response containing one is rejected right at deserialization

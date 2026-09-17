@@ -75,6 +75,27 @@ describe('Transformer', () => {
       expect(out.snis).toEqual(snis);
       expect(out.tls_passthrough).toBe(true);
     });
+
+    // The singular form gets its own case rather than being added to the two
+    // above: it is the value ToADC used to drop, and the gateway rejects a
+    // stream route carrying `sni` and `snis` at once.
+    it('carries the singular sni in both directions', () => {
+      const wire = new FromADC().transformStreamRoute(
+        {
+          id: 'sr1',
+          name: 'sr1',
+          sni: 'a.example.com',
+        } as ADCSDK.StreamRoute,
+        'svc1',
+      );
+      expect(wire.sni).toEqual('a.example.com');
+
+      const out = new ToADC().transformStreamRoute({
+        ...wire,
+        id: 'sr1',
+      } as typing.StreamRoute);
+      expect(out.sni).toEqual('a.example.com');
+    });
   });
 
   describe('active health check req_headers round-trip', () => {
