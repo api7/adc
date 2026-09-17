@@ -1037,11 +1037,28 @@
           "maximum": 65535
         },
         "sni": {
+          "description": "`sni` and `snis` are singular/plural forms of the same match, and the\ngateway rejects a stream route carrying both.",
           "type": [
             "string",
             "null"
           ],
           "minLength": 1
+        },
+        "snis": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "tls_passthrough": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false,

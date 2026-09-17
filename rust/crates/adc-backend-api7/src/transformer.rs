@@ -340,7 +340,9 @@ impl From<typing::StreamRoute> for adc::StreamRoute {
             remote_addr: route.remote_addr,
             server_addr: route.server_addr,
             server_port: route.server_port,
-            sni: None,
+            sni: route.sni,
+            snis: route.snis,
+            tls_passthrough: route.tls_passthrough,
         }
     }
 }
@@ -384,6 +386,9 @@ pub fn transform_stream_route(route: adc::StreamRoute, parent_id: String) -> typ
         server_addr: route.server_addr,
         server_port: route.server_port,
         remote_addr: route.remote_addr,
+        sni: route.sni,
+        snis: route.snis,
+        tls_passthrough: route.tls_passthrough,
     }
 }
 
@@ -541,6 +546,8 @@ mod tests {
             server_addr: None,
             server_port: None,
             sni: None,
+            snis: None,
+            tls_passthrough: None,
         };
 
         let wire = transform_stream_route(route, "svc1".to_string());
@@ -565,11 +572,47 @@ mod tests {
             server_addr: Some("1.1.1.1".to_string()),
             server_port: Some(80),
             remote_addr: None,
+            sni: None,
+            snis: None,
+            tls_passthrough: None,
         };
 
         let route = adc::StreamRoute::from(wire);
 
         assert_eq!(route.plugins, Some(ip_restriction_plugins()));
+    }
+
+    /// Regression: both stream route conversions used to drop the SNI
+    /// match outright (the read direction hardcoded `sni: None`), because
+    /// the control plane had no field to carry it. It does now, together
+    /// with `snis` and `tls_passthrough`, so a TLS passthrough stream route
+    /// survives a dump/sync round trip instead of losing what it matches on.
+    #[test]
+    fn stream_route_round_trips_its_sni_match_and_tls_passthrough() {
+        let route = adc::StreamRoute {
+            id: Some("sr1".to_string()),
+            name: "sr1".to_string(),
+            description: None,
+            labels: None,
+            plugins: None,
+            remote_addr: None,
+            server_addr: None,
+            server_port: None,
+            sni: None,
+            snis: Some(vec!["a.example.com".to_string()]),
+            tls_passthrough: Some(true),
+        };
+
+        let wire = transform_stream_route(route.clone(), "svc1".to_string());
+        assert_eq!(wire.snis, Some(vec!["a.example.com".to_string()]));
+        assert_eq!(wire.tls_passthrough, Some(true));
+
+        let back = adc::StreamRoute::from(typing::StreamRoute {
+            id: wire.stream_route_id.clone(),
+            ..wire
+        });
+        assert_eq!(back.snis, route.snis);
+        assert_eq!(back.tls_passthrough, route.tls_passthrough);
     }
 
     /// `server_port` is `u16` at the wire level too (not a wider int

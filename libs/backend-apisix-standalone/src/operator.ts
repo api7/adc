@@ -439,6 +439,8 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
           server_addr: res.server_addr,
           server_port: res.server_port,
           sni: res.sni,
+          snis: res.snis,
+          tls_passthrough: res.tls_passthrough,
           service_id: event.parentId!,
         } satisfies typing.StreamRoute as typing.StreamRoute;
       }

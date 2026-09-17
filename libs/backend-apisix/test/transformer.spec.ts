@@ -76,6 +76,34 @@ describe('Transformer', () => {
     });
   });
 
+  // snis (the plural SNI match) and tls_passthrough are newer gateway stream
+  // route fields; both directions have to carry them, or a TLS passthrough
+  // route silently degrades into a terminating one that matches nothing.
+  describe('stream route snis and tls_passthrough', () => {
+    const snis = ['a.example.com', 'b.example.com'];
+
+    it('should write snis and tls_passthrough to the wire', () => {
+      const wire = new FromADC().transformStreamRoute(
+        { name: 'my-stream-route', snis, tls_passthrough: true },
+        'svc1',
+        'native',
+      );
+      expect(wire.snis).toEqual(snis);
+      expect(wire.tls_passthrough).toBe(true);
+    });
+
+    it('should read snis and tls_passthrough back on dump', () => {
+      expect(
+        new ToADC().transformStreamRoute({
+          id: 'sr1',
+          name: 'sr1',
+          snis,
+          tls_passthrough: true,
+        } as typing.StreamRoute),
+      ).toMatchObject({ snis, tls_passthrough: true });
+    });
+  });
+
   describe('stream route name persistence', () => {
     const streamRoute = { name: 'my-stream-route' } as ADCSDK.StreamRoute;
 

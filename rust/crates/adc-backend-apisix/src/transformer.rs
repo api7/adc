@@ -394,6 +394,8 @@ impl From<typing::StreamRoute> for adc::StreamRoute {
             server_addr: route.server_addr,
             server_port: route.server_port,
             sni: route.sni,
+            snis: route.snis,
+            tls_passthrough: route.tls_passthrough,
         }
     }
 }
@@ -679,6 +681,8 @@ pub fn transform_stream_route(
         server_addr: route.server_addr,
         server_port: route.server_port,
         sni: route.sni,
+        snis: route.snis,
+        tls_passthrough: route.tls_passthrough,
         upstream: None,
         upstream_id: None,
         service_id: Some(parent_id),

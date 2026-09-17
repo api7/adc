@@ -146,6 +146,8 @@ export interface StreamRoute {
   server_addr?: string;
   server_port?: number;
   sni?: string;
+  snis?: Array<string>;
+  tls_passthrough?: boolean;
   upstream?: InlineUpstream;
   upstream_id?: string;
   service_id?: string;
