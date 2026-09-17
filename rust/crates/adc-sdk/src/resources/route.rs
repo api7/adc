@@ -155,7 +155,7 @@ pub struct StreamRoute {
     #[schemars(length(min = 1))]
     pub sni: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(length(min = 1))]
+    #[schemars(length(min = 1), inner(length(min = 1)))]
     pub snis: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls_passthrough: Option<bool>,
