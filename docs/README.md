@@ -9,6 +9,7 @@ Start with the workflow guide if you are setting up ADC for the first time. Use 
 - [Use ADC for Declarative Configuration](./guides/workflow.md): configure a backend, write an `adc.yaml` file, lint it, preview changes, sync it, and export backups.
 - [Resource IDs](./guides/resource-ids.md): understand how ADC matches local resources to remote resources, especially before adopting resources that were created outside ADC.
 - [Label Selector](./guides/label-selector.md): split ownership by labels so multiple teams or pipelines can manage one backend safely.
+- [Manage Gateway Configuration in CI/CD](./guides/ci-cd.md): check pull requests, review deployment plans, protect credentials, detect drift, and roll back configuration.
 
 ## Reference
 
