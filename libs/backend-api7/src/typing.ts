@@ -69,6 +69,9 @@ export interface StreamRoute {
   server_addr?: string;
   server_port?: number;
   remote_addr?: string;
+  sni?: string;
+  snis?: Array<string>;
+  tls_passthrough?: boolean;
 }
 export interface Service {
   id?: string;

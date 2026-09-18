@@ -249,7 +249,11 @@ const streamRouteSchema = z.strictObject({
   remote_addr: z.string().optional(),
   server_addr: z.string().optional(),
   server_port: portSchema.optional(),
+  // `sni` and `snis` are singular/plural forms of the same match, and the
+  // gateway rejects a stream route carrying both.
   sni: hostSchema.optional(),
+  snis: z.array(hostSchema).min(1).optional(),
+  tls_passthrough: z.boolean().optional(),
 });
 export type StreamRoute = z.infer<typeof streamRouteSchema>;
 export { streamRouteSchema };

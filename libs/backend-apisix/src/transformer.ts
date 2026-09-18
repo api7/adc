@@ -199,6 +199,8 @@ export class ToADC {
       server_addr: streamRoute.server_addr,
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
+      snis: streamRoute.snis,
+      tls_passthrough: streamRoute.tls_passthrough,
     } as ADCSDK.StreamRoute);
   }
 
@@ -463,6 +465,8 @@ export class FromADC {
       server_addr: streamRoute.server_addr,
       server_port: streamRoute.server_port,
       sni: streamRoute.sni,
+      snis: streamRoute.snis,
+      tls_passthrough: streamRoute.tls_passthrough,
       service_id: parentId,
     } as unknown as typing.StreamRoute);
   }

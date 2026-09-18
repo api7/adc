@@ -41,6 +41,63 @@ describe('Transformer', () => {
     });
   });
 
+  // Regression: both directions used to drop the SNI match outright (ToADC
+  // never read it, FromADC never wrote it), because the control plane had no
+  // field to carry it. It does now, together with snis and tls_passthrough, so
+  // a TLS passthrough stream route survives a dump/sync round trip instead of
+  // losing what it matches on.
+  describe('stream route SNI match and tls_passthrough round-trip', () => {
+    const snis = ['a.example.com', 'b.example.com'];
+
+    it('FromADC.transformStreamRoute writes snis and tls_passthrough', () => {
+      const out = new FromADC().transformStreamRoute(
+        {
+          id: 'sr1',
+          name: 'sr1',
+          snis,
+          tls_passthrough: true,
+        } as ADCSDK.StreamRoute,
+        'svc1',
+      );
+      expect(out.snis).toEqual(snis);
+      expect(out.tls_passthrough).toBe(true);
+    });
+
+    it('ToADC.transformStreamRoute preserves snis and tls_passthrough on dump', () => {
+      const out = new ToADC().transformStreamRoute({
+        id: 'sr1',
+        name: 'sr1',
+        service_id: 'svc1',
+        stream_route_id: 'sr1',
+        snis,
+        tls_passthrough: true,
+      } as typing.StreamRoute);
+      expect(out.snis).toEqual(snis);
+      expect(out.tls_passthrough).toBe(true);
+    });
+
+    // The singular form gets its own case rather than being added to the two
+    // above: it is the value ToADC used to drop, and the gateway rejects a
+    // stream route carrying `sni` and `snis` at once.
+    it('carries the singular sni in both directions', () => {
+      const wire = new FromADC().transformStreamRoute(
+        {
+          id: 'sr1',
+          name: 'sr1',
+          sni: 'a.example.com',
+        } as ADCSDK.StreamRoute,
+        'svc1',
+      );
+      expect(wire.sni).toEqual('a.example.com');
+
+      const out = new ToADC().transformStreamRoute({
+        ...wire,
+        id: 'sr1',
+      } as typing.StreamRoute);
+      expect(out.sni).toEqual('a.example.com');
+    });
+  });
+
   describe('active health check req_headers round-trip', () => {
     it('ToADC.transformUpstream maps req_headers to ADC http_req_headers', () => {
       const out = new ToADC().transformUpstream({

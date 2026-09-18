@@ -41,6 +41,9 @@ export class ToADC {
       server_addr: route.server_addr,
       server_port: route.server_port,
       remote_addr: route.remote_addr,
+      sni: route.sni,
+      snis: route.snis,
+      tls_passthrough: route.tls_passthrough,
     });
   }
 
@@ -224,6 +227,9 @@ export class FromADC {
       server_addr: route.server_addr,
       server_port: route.server_port,
       remote_addr: route.remote_addr,
+      sni: route.sni,
+      snis: route.snis,
+      tls_passthrough: route.tls_passthrough,
     });
   }
 

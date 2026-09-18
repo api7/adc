@@ -253,6 +253,8 @@ const StreamRouteSchema = z.strictObject({
   server_addr: z.string().optional(),
   server_port: Port.optional(),
   sni: z.string().optional(),
+  snis: z.array(z.string()).min(1).optional(),
+  tls_passthrough: z.boolean().optional(),
   service_id: Metadata.id,
   plugins: Plugins.optional(),
   protocol: z

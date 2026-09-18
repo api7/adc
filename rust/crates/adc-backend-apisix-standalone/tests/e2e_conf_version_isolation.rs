@@ -68,6 +68,8 @@ fn stream_route(name: &str, server_port: u16) -> adc::StreamRoute {
         server_addr: None,
         server_port: Some(server_port),
         sni: None,
+        snis: None,
+        tls_passthrough: None,
     }
 }
 

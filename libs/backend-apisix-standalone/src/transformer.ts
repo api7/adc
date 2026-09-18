@@ -112,6 +112,8 @@ export const toADC = (input: typing.APISIXStandalone) => {
               server_addr: route.server_addr,
               server_port: route.server_port,
               sni: route.sni,
+              snis: route.snis,
+              tls_passthrough: route.tls_passthrough,
               plugins: route.plugins,
             }))
             .map(ADCSDK.utils.recursiveOmitUndefined),

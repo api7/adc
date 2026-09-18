@@ -254,6 +254,10 @@ pub struct StreamRoute {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sni: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snis: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_passthrough: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream: Option<Upstream>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream_id: Option<String>,

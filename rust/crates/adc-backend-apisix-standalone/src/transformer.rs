@@ -141,6 +141,8 @@ fn stream_route_to_adc(route: &typing::StreamRoute) -> adc::StreamRoute {
         server_addr: route.server_addr.clone(),
         server_port: route.server_port,
         sni: route.sni.clone(),
+        snis: route.snis.clone(),
+        tls_passthrough: route.tls_passthrough,
     }
 }
 
@@ -464,6 +466,8 @@ fn stream_route_to_wire(route: &adc::StreamRoute, service_id: &str) -> typing::S
         server_addr: route.server_addr.clone(),
         server_port: route.server_port,
         sni: route.sni.clone(),
+        snis: route.snis.clone(),
+        tls_passthrough: route.tls_passthrough,
         service_id: service_id.to_string(),
 
         protocol: None,
@@ -850,6 +854,8 @@ mod tests {
                             server_addr: None,
                             server_port: Some(3000 + index as u16 * 10 + k as u16),
                             sni: None,
+                            snis: None,
+                            tls_passthrough: None,
                         })
                         .collect(),
                 }),

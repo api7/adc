@@ -102,6 +102,8 @@ fn adc_stream_route(name: &str) -> adc::StreamRoute {
         server_addr: None,
         server_port: None,
         sni: None,
+        snis: None,
+        tls_passthrough: None,
     }
 }
 
@@ -453,6 +455,8 @@ fn stream_route_recovers_its_name_from_the_magic_label_and_strips_it() {
         server_addr: None,
         server_port: Some(9000),
         sni: None,
+        snis: None,
+        tls_passthrough: None,
         upstream: None,
         upstream_id: None,
         service_id: None,
@@ -467,6 +471,45 @@ fn stream_route_recovers_its_name_from_the_magic_label_and_strips_it() {
     assert_eq!(labels.get("env"), Some(&LabelValue::Single("prod".into())));
 }
 
+/// `snis` (the plural SNI match) and `tls_passthrough` are newer gateway
+/// stream route fields; both conversions have to carry them, or a TLS
+/// passthrough route silently degrades into a terminating one that matches
+/// nothing.
+#[test]
+fn stream_route_carries_snis_and_tls_passthrough_both_ways() {
+    let wire = typing::StreamRoute {
+        id: Some("sr1".into()),
+        name: Some("sr1".into()),
+        desc: None,
+        labels: None,
+        remote_addr: None,
+        server_addr: None,
+        server_port: Some(9110),
+        sni: None,
+        snis: Some(vec!["a.example.com".into(), "b.example.com".into()]),
+        tls_passthrough: Some(true),
+        upstream: None,
+        upstream_id: None,
+        service_id: None,
+        plugins: None,
+        protocol: None,
+    };
+
+    let adc_route: adc::StreamRoute = wire.into();
+    assert_eq!(
+        adc_route.snis,
+        Some(vec!["a.example.com".into(), "b.example.com".into()])
+    );
+    assert_eq!(adc_route.tls_passthrough, Some(true));
+
+    let back = transform_stream_route(adc_route, "svc1".into(), StreamRouteNameMode::Native);
+    assert_eq!(
+        back.snis,
+        Some(vec!["a.example.com".into(), "b.example.com".into()])
+    );
+    assert_eq!(back.tls_passthrough, Some(true));
+}
+
 #[test]
 fn stream_route_without_the_magic_label_falls_back_to_id() {
     let route = typing::StreamRoute {
@@ -478,6 +521,8 @@ fn stream_route_without_the_magic_label_falls_back_to_id() {
         server_addr: None,
         server_port: None,
         sni: None,
+        snis: None,
+        tls_passthrough: None,
         upstream: None,
         upstream_id: None,
         service_id: None,
@@ -502,6 +547,8 @@ fn stream_route_prefers_the_native_name_over_the_magic_label() {
         server_addr: None,
         server_port: None,
         sni: None,
+        snis: None,
+        tls_passthrough: None,
         upstream: None,
         upstream_id: None,
         service_id: None,

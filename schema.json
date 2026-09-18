@@ -1199,6 +1199,17 @@
                 "sni": {
                   "type": "string",
                   "minLength": 1
+                },
+                "snis": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "tls_passthrough": {
+                  "type": "boolean"
                 }
               },
               "required": [

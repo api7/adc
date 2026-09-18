@@ -149,7 +149,14 @@ pub struct StreamRoute {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(range(min = 1))]
     pub server_port: Option<u16>,
+    /// `sni` and `snis` are singular/plural forms of the same match, and the
+    /// gateway rejects a stream route carrying both.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(length(min = 1))]
     pub sni: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1), inner(length(min = 1)))]
+    pub snis: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_passthrough: Option<bool>,
 }
