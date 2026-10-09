@@ -31,6 +31,42 @@ describe('Route Linter', () => {
       expect: true,
       errors: [],
     },
+    ...[
+      {
+        name: 'should accept a stream route with only sni',
+        route: { name: 'test', sni: 'a.example.com' },
+        expect: true,
+      },
+      {
+        name: 'should accept a stream route with only snis',
+        route: { name: 'test', snis: ['a.example.com'] },
+        expect: true,
+      },
+      {
+        name: 'should reject a stream route with both sni and snis',
+        route: {
+          name: 'test',
+          sni: 'a.example.com',
+          snis: ['b.example.com'],
+        },
+        expect: false,
+      },
+    ].map((c) => ({
+      name: c.name,
+      input: {
+        services: [{ name: 'test', stream_routes: [c.route] }],
+      } as ADCSDK.Configuration,
+      expect: c.expect,
+      errors: c.expect
+        ? []
+        : [
+            {
+              code: 'custom',
+              message: 'Stream route must not specify both sni and snis',
+              path: ['services', 0, 'stream_routes', 0],
+            },
+          ],
+    })),
   ];
 
   // test cases runner
