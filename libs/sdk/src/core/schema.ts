@@ -236,25 +236,29 @@ const routeSchema = z.strictObject({
 export type Route = z.infer<typeof routeSchema>;
 export { routeSchema };
 
-const streamRouteSchema = z.strictObject({
-  id: idSchema.optional(),
-  name: nameSchema,
-  description: descriptionSchema.optional(),
-  labels: labelsSchema.optional(),
+const streamRouteSchema = z
+  .strictObject({
+    id: idSchema.optional(),
+    name: nameSchema,
+    description: descriptionSchema.optional(),
+    labels: labelsSchema.optional(),
 
-  plugins: withDifferMeta(pluginsSchema.optional(), {
-    listType: FieldListType.OBJECT_MAP,
-  }),
+    plugins: withDifferMeta(pluginsSchema.optional(), {
+      listType: FieldListType.OBJECT_MAP,
+    }),
 
-  remote_addr: z.string().optional(),
-  server_addr: z.string().optional(),
-  server_port: portSchema.optional(),
-  // `sni` and `snis` are singular/plural forms of the same match, and the
-  // gateway rejects a stream route carrying both.
-  sni: hostSchema.optional(),
-  snis: z.array(hostSchema).min(1).optional(),
-  tls_passthrough: z.boolean().optional(),
-});
+    remote_addr: z.string().optional(),
+    server_addr: z.string().optional(),
+    server_port: portSchema.optional(),
+    // `sni` and `snis` are singular/plural forms of the same match, and the
+    // gateway rejects a stream route carrying both.
+    sni: hostSchema.optional(),
+    snis: z.array(hostSchema).min(1).optional(),
+    tls_passthrough: z.boolean().optional(),
+  })
+  .refine((val) => isNil(val.sni) || isNil(val.snis), {
+    error: 'Stream route must not specify both sni and snis',
+  });
 export type StreamRoute = z.infer<typeof streamRouteSchema>;
 export { streamRouteSchema };
 

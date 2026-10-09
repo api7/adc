@@ -22,7 +22,7 @@
 
 use std::sync::LazyLock;
 
-use crate::resources::{Configuration, Consumer, Service, Upstream};
+use crate::resources::{Configuration, Consumer, Service, StreamRoute, Upstream};
 use crate::value_diff::{DiffPath, PathSegment, format_path};
 
 static SCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
@@ -160,6 +160,30 @@ fn check_service(service: &Service, path: &[PathSegment], issues: &mut Vec<LintI
             &push_index(&push_key(path, "upstreams"), i),
             issues,
         );
+    }
+    for (i, route) in service
+        .routes
+        .as_ref()
+        .and_then(|r| r.stream())
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        check_stream_route_sni(
+            route,
+            &push_index(&push_key(path, "stream_routes"), i),
+            issues,
+        );
+    }
+}
+
+/// `sni` and `snis` are mutually exclusive on a stream route.
+fn check_stream_route_sni(route: &StreamRoute, path: &[PathSegment], issues: &mut Vec<LintIssue>) {
+    if route.sni.is_some() && route.snis.is_some() {
+        issues.push(LintIssue {
+            path: path.to_vec(),
+            message: "stream route must not specify both \"sni\" and \"snis\"".to_string(),
+        });
     }
 }
 
@@ -321,6 +345,62 @@ mod tests {
         };
         let config = Configuration {
             services: Some(vec![service]),
+            ..empty_config()
+        };
+        assert_eq!(lint(&config), Vec::new());
+    }
+
+    fn service_with_stream_route(sni: Option<&str>, snis: Option<&[&str]>) -> Service {
+        Service {
+            routes: Some(ServiceRoutes::Stream {
+                stream_routes: vec![StreamRoute {
+                    id: None,
+                    name: "sr".into(),
+                    description: None,
+                    labels: None,
+                    plugins: None,
+                    remote_addr: None,
+                    server_addr: None,
+                    server_port: None,
+                    sni: sni.map(Into::into),
+                    snis: snis.map(|s| s.iter().map(|h| h.to_string()).collect()),
+                    tls_passthrough: None,
+                }],
+            }),
+            ..minimal_service()
+        }
+    }
+
+    #[test]
+    fn stream_route_with_both_sni_and_snis_is_rejected() {
+        let config = Configuration {
+            services: Some(vec![service_with_stream_route(
+                Some("a.example.com"),
+                Some(&["b.example.com"]),
+            )]),
+            ..empty_config()
+        };
+        let issues = lint(&config);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(format_path(&issues[0].path), "services[0].stream_routes[0]");
+    }
+
+    #[test]
+    fn stream_route_with_only_sni_is_accepted() {
+        let config = Configuration {
+            services: Some(vec![service_with_stream_route(Some("a.example.com"), None)]),
+            ..empty_config()
+        };
+        assert_eq!(lint(&config), Vec::new());
+    }
+
+    #[test]
+    fn stream_route_with_only_snis_is_accepted() {
+        let config = Configuration {
+            services: Some(vec![service_with_stream_route(
+                None,
+                Some(&["a.example.com"]),
+            )]),
             ..empty_config()
         };
         assert_eq!(lint(&config), Vec::new());
