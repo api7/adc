@@ -14,7 +14,7 @@ import { SyncCommand } from './sync.command';
 import { configurePluralize } from './utils';
 import { ValidateCommand } from './validate.command';
 
-const versionCode = '0.30.5';
+const versionCode = '0.31.0';
 
 function setupInternal() {
   // initialize dotenv
