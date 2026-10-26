@@ -108,7 +108,19 @@ See the [`docs/`](docs/README.md) folder for the CLI command reference, configur
 
 ## Development
 
-To build ADC from source, [install Nx](https://nx.dev/getting-started/installation) and run:
+### Rust CLI
+
+The default `adc` binary is built with Cargo:
+
+```bash
+cd rust
+cargo build --release -p adc-cli
+./target/release/adc -h
+```
+
+### JavaScript CLI
+
+To build the JavaScript implementation, [install Nx](https://nx.dev/getting-started/installation) and run:
 
 ```bash
 pnpm install

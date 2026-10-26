@@ -58,6 +58,7 @@ jobs:
       meta-tags: |
         type=semver,pattern={{version}}-js
         type=raw,value=dev-js,enable={{is_default_branch}}
+      meta-flavor: latest=false
     secrets:
       registry-auths: |
         - registry: docker.io
