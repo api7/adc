@@ -161,11 +161,20 @@ mod tests {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 counter.fetch_add(1, Ordering::SeqCst);
                 tokio::spawn(async move {
+                    let response = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+                    let mut pending = Vec::new();
                     let mut buf = [0u8; 1024];
-                    while stream.read(&mut buf).await.is_ok_and(|n| n > 0) {
-                        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-                        if stream.write_all(response).await.is_err() {
-                            break;
+                    while stream.read(&mut buf).await.is_ok_and(|n| {
+                        pending.extend_from_slice(&buf[..n]);
+                        n > 0
+                    }) {
+                        // One response per complete request head, however the
+                        // bytes were split across reads.
+                        while let Some(end) = pending.windows(4).position(|w| w == b"\r\n\r\n") {
+                            pending.drain(..end + 4);
+                            if stream.write_all(response).await.is_err() {
+                                return;
+                            }
                         }
                     }
                 });
