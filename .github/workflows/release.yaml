@@ -10,7 +10,7 @@ on:
 env:
   NODE_VERSION: "24.16.0"
 jobs:
-  adc:
+  adc-js:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
@@ -43,25 +43,25 @@ jobs:
         run: |
           mkdir -p release
           mv ./node-binary/linux-amd64 ./adc
-          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz ./adc && rm -rf ./adc
+          tar -czf release/adc_js_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz ./adc && rm -rf ./adc
           mv ./node-binary/linux-arm64 ./adc
-          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz ./adc && rm -rf ./adc
+          tar -czf release/adc_js_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz ./adc && rm -rf ./adc
           mv ./node-binary/win-x64.exe ./adc.exe
-          zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_amd64.zip ./adc.exe && rm -rf ./adc.exe
+          zip -r release/adc_js_${{ env.RELEASE_VERSION }}_windows_amd64.zip ./adc.exe && rm -rf ./adc.exe
           mv ./node-binary/win-arm64.exe ./adc.exe
-          zip -r release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip ./adc.exe && rm -rf ./adc.exe
+          zip -r release/adc_js_${{ env.RELEASE_VERSION }}_windows_arm64.zip ./adc.exe && rm -rf ./adc.exe
 
       - name: Upload ADC to GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/adc_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz
-            release/adc_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz
-            release/adc_${{ env.RELEASE_VERSION }}_windows_amd64.zip
-            release/adc_${{ env.RELEASE_VERSION }}_windows_arm64.zip
+            release/adc_js_${{ env.RELEASE_VERSION }}_linux_amd64.tar.gz
+            release/adc_js_${{ env.RELEASE_VERSION }}_linux_arm64.tar.gz
+            release/adc_js_${{ env.RELEASE_VERSION }}_windows_amd64.zip
+            release/adc_js_${{ env.RELEASE_VERSION }}_windows_arm64.zip
 
-  adc-macos:
+  adc-js-macos:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: macos-26
     permissions:
@@ -95,19 +95,19 @@ jobs:
         run: |
           mkdir release
           mv ./node-binary/darwin-arm64 ./adc
-          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz ./adc && rm -rf ./adc
+          tar -czf release/adc_js_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz ./adc && rm -rf ./adc
           mv ./node-binary/darwin-x64 ./adc
-          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz ./adc && rm -rf ./adc
+          tar -czf release/adc_js_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz ./adc && rm -rf ./adc
 
       - name: Upload ADC to GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/adc_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
-            release/adc_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
+            release/adc_js_${{ env.RELEASE_VERSION }}_darwin_arm64.tar.gz
+            release/adc_js_${{ env.RELEASE_VERSION }}_darwin_amd64.tar.gz
 
-  adc-rust-linux:
+  adc-linux:
     if: startsWith(github.ref, 'refs/tags/') || contains(github.event.pull_request.labels.*.name, 'test/build')
     strategy:
       fail-fast: false
@@ -118,9 +118,15 @@ jobs:
           - os: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.os }}
+    # Built on EL8 so the binary only needs glibc 2.28 or newer at runtime.
+    container: almalinux:8
     permissions:
       contents: write
     steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-binutils make cmake perl git tar gzip curl
+          echo "/opt/rh/gcc-toolset-12/root/usr/bin" >> $GITHUB_PATH
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -132,10 +138,19 @@ jobs:
             echo "RELEASE_VERSION=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           fi
 
+      - name: Verify tag matches Cargo version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          CARGO_VERSION=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' rust/Cargo.toml)
+          if [ "$CARGO_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "Tag version $RELEASE_VERSION does not match rust/Cargo.toml version $CARGO_VERSION"
+            exit 1
+          fi
+
       - name: Setup Rust toolchain
         run: |
-          rustup update stable
-          rustup default stable
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: rust -> target
@@ -143,6 +158,15 @@ jobs:
       - name: Build adc-cli
         working-directory: ./rust
         run: cargo build --release -p adc-cli
+
+      - name: Check glibc floor
+        run: |
+          MAX=$(objdump -T rust/target/release/adc | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+          echo "Highest required glibc symbol version: $MAX"
+          if [ "$(printf '%s\n' "$MAX" GLIBC_2.28 | sort -V | tail -1)" != "GLIBC_2.28" ]; then
+            echo "Binary requires $MAX, which is newer than the supported GLIBC_2.28"
+            exit 1
+          fi
 
       - name: Split debug info
         run: |
@@ -155,28 +179,53 @@ jobs:
         run: |
           mkdir -p release
           BIN_DIR=rust/target/release
-          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
-          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.debug
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.debug
 
       - name: Upload adc to GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz
-            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
 
       - name: Upload adc artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: github.event_name == 'pull_request'
         with:
-          name: adc_rust_linux_${{ matrix.arch }}
+          name: adc_linux_${{ matrix.arch }}
           path: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz
-            release/adc_rust_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
           if-no-files-found: error
 
-  adc-rust-windows:
+  adc-linux-smoke:
+    needs: adc-linux
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+        image: ["debian:11", "debian:12", "ubuntu:22.04", "ubuntu:24.04"]
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Download adc artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: adc_linux_${{ matrix.arch }}
+      - name: Run adc in ${{ matrix.image }}
+        run: |
+          mkdir bin
+          tar -xzf adc_*_linux_${{ matrix.arch }}.tar.gz -C bin
+          docker run --rm -v "$PWD/bin:/opt/adc:ro" ${{ matrix.image }} sh -c '/opt/adc/adc --version && /opt/adc/adc --help > /dev/null'
+
+  adc-windows:
     if: startsWith(github.ref, 'refs/tags/') || contains(github.event.pull_request.labels.*.name, 'test/build')
     strategy:
       fail-fast: false
@@ -220,28 +269,28 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           $binDir = "rust/target/release"
-          Compress-Archive -Path "$binDir/adc.exe" -DestinationPath "release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip"
-          Compress-Archive -Path "$binDir/adc.pdb" -DestinationPath "release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip"
+          Compress-Archive -Path "$binDir/adc.exe" -DestinationPath "release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip"
+          Compress-Archive -Path "$binDir/adc.pdb" -DestinationPath "release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip"
 
       - name: Upload adc to GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip
-            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
+            release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip
+            release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
 
       - name: Upload adc artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'pull_request'
         with:
-          name: adc_rust_windows_${{ matrix.arch }}
+          name: adc_windows_${{ matrix.arch }}
           path: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip
-            release/adc_rust_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
+            release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}.zip
+            release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
           if-no-files-found: error
 
-  adc-rust-macos:
+  adc-macos:
     if: startsWith(github.ref, 'refs/tags/') || contains(github.event.pull_request.labels.*.name, 'test/build')
     strategy:
       fail-fast: false
@@ -288,23 +337,23 @@ jobs:
         run: |
           mkdir -p release
           BIN_DIR=rust/target/${{ matrix.target }}/release
-          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
-          tar -czf release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.dSYM
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz -C "$BIN_DIR" adc
+          tar -czf release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz -C "$BIN_DIR" adc.dSYM
 
       - name: Upload adc to GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz
-            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
 
       - name: Upload adc artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'pull_request'
         with:
-          name: adc_rust_darwin_${{ matrix.arch }}
+          name: adc_darwin_${{ matrix.arch }}
           path: |
-            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz
-            release/adc_rust_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}.tar.gz
+            release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
           if-no-files-found: error

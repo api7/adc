@@ -1,20 +1,13 @@
-FROM node:lts-bookworm-slim AS builder
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME/bin:$PATH"
-ENV NX_DAEMON="false"
-RUN corepack enable
+FROM rust:1-trixie AS builder
 
 WORKDIR /build
 
-COPY . .
+COPY rust ./rust
 
-RUN pnpm install nx -g \
-  && pnpm install \
-  && NODE_ENV=production nx build cli
+RUN cd rust && cargo build --release --locked -p adc-cli
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 
-COPY --from=builder /build/dist/apps/cli/main.cjs .
+COPY --from=builder /build/rust/target/release/adc /adc
 
-ENTRYPOINT [ "/nodejs/bin/node", "main.cjs" ]
+ENTRYPOINT [ "/adc" ]

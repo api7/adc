@@ -27,6 +27,8 @@ Or, you can download the appropriate binary from the [releases page](https://git
 
 Pre-built binaries for `amd64` and `arm64` on Linux, Windows, and macOS are available now.
 
+The binaries and the Docker images (`api7/adc:<version>`, also published to `ghcr.io/api7/adc`) are the Rust implementation. The JavaScript implementation is published as `adc_js_<version>_<os>_<arch>` archives and `api7/adc:<version>-js` images. The Linux binaries require glibc 2.28 or newer. See [Workflows](.github/workflows/README.md) and [tools](libs/tools/README.md) for the release details.
+
 ## Configure ADC
 
 You can configure ADC through environment variables or command line flags. Run `adc help [command]` to see the available configuration options for a command.
@@ -106,7 +108,19 @@ See the [`docs/`](docs/README.md) folder for the CLI command reference, configur
 
 ## Development
 
-To build ADC from source, [install Nx](https://nx.dev/getting-started/installation) and run:
+### Rust CLI
+
+The default `adc` binary is built with Cargo:
+
+```bash
+cd rust
+cargo build --release -p adc-cli
+./target/release/adc -h
+```
+
+### JavaScript CLI
+
+To build the JavaScript implementation, [install Nx](https://nx.dev/getting-started/installation) and run:
 
 ```bash
 pnpm install
