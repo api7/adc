@@ -21,4 +21,4 @@ pub use resource_path::resource_type_collection_name;
 pub use retry::RetryPolicy;
 pub use tls::TlsConfig;
 
-pub use reqwest::{Method, RequestBuilder, Response};
+pub use reqwest::{Client, Method, RequestBuilder, Response};

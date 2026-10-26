@@ -49,6 +49,9 @@ pub struct BackendOptions {
     pub bypass_cache: bool,
     pub timeout: Option<Duration>,
     pub tls: TlsConfig,
+    /// A caller-owned, pooled client shared by every server. `None` builds
+    /// one client per server from `tls`.
+    pub shared_client: Option<adc_backend_core::Client>,
 }
 
 /// Stands in for a version that couldn't be determined (missing/unparseable
@@ -111,12 +114,17 @@ impl Backend {
                 let token = if paired_tokens { opts.tokens.get(index) } else { opts.tokens.first() }
                     .cloned()
                     .ok_or_else(|| BackendError::Other("apisix-standalone backend requires at least one token".into()))?;
-                let client = HttpClient::new(HttpClientConfig {
-                    server: server.clone(),
-                    token,
-                    timeout: opts.timeout,
-                    tls: opts.tls.clone(),
-                })?
+                let client = match &opts.shared_client {
+                    Some(shared) => {
+                        HttpClient::with_shared_client(shared.clone(), server.clone(), token, opts.timeout)?
+                    }
+                    None => HttpClient::new(HttpClientConfig {
+                        server: server.clone(),
+                        token,
+                        timeout: opts.timeout,
+                        tls: opts.tls.clone(),
+                    })?,
+                }
                 .with_log_scope(vec!["APISIX".to_string()]);
                 Ok(StandaloneServer { server, client })
             })

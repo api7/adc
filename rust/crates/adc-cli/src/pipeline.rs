@@ -74,8 +74,7 @@ impl TryFrom<&BackendArgs> for BackendSpec {
 
 /// `shared_client`: `None` builds a fresh `HttpClient` from `spec.tls` (the
 /// one-shot CLI); `Some` reuses an already-built, pooled `reqwest::Client`
-/// (the ingress-server daemon). Only `apisix`/`api7ee` look at it —
-/// `apisix-standalone` always builds its own clients from `spec.tls`.
+/// (the ingress-server daemon), shared by every server of the backend.
 pub fn init_backend(
     spec: BackendSpec,
     shared_client: Option<reqwest::Client>,
@@ -103,6 +102,7 @@ pub fn init_backend(
                 bypass_cache: spec.bypass_cache,
                 timeout: spec.timeout,
                 tls: spec.tls,
+                shared_client,
             },
         )?)),
         "" | "apisix" => {
