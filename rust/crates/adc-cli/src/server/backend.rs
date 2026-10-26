@@ -146,6 +146,47 @@ mod tests {
         task.abort();
     }
 
+    /// A plain HTTP stub that answers every request with an empty `200` and
+    /// counts accepted TCP connections.
+    async fn spawn_counting_http_stub() -> (std::net::SocketAddr, Arc<std::sync::atomic::AtomicUsize>) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let counter = accepted.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                counter.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    while stream.read(&mut buf).await.is_ok_and(|n| n > 0) {
+                        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+                        if stream.write_all(response).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        (addr, accepted)
+    }
+
+    #[tokio::test]
+    async fn apisix_standalone_backends_reuse_one_connection_across_builds() {
+        let (addr, accepted) = spawn_counting_http_stub().await;
+        let mut o = opts(&format!("http://{addr}"), None);
+        o.backend = "apisix-standalone".to_string();
+        o.cache_key = "test-standalone-reuse".to_string();
+
+        for _ in 0..3 {
+            build_backend(&o).unwrap().ping().await.unwrap();
+        }
+        assert_eq!(accepted.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
     #[test]
     fn build_backend_constructs_an_api7ee_backend() {
         let mut o = opts("http://127.0.0.1:9180", None);

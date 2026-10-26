@@ -34,6 +34,7 @@ pub fn backend_options(servers: Vec<String>, cache_key: &str) -> adc_backend_api
         bypass_cache: false,
         timeout: Some(Duration::from_secs(10)),
         tls: tls(),
+        shared_client: None,
     }
 }
 
