@@ -406,7 +406,7 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
             multi_id,
             json!({ "request-id": {}, "file-logger": { "path": "logs/file.log" } }),
         ),
-        (renamed_id, json!({ "request-id": {} })),
+        (renamed_id, json!({ "gzip": {} })),
     ] {
         let request = client
             .request(Method::PUT, &format!("/apisix/admin/global_rules/{id}"))
@@ -423,7 +423,7 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
         rules[multi_id]["plugins"]["file-logger"]["path"],
         json!("logs/file.log")
     );
-    assert!(rules[renamed_id]["plugins"]["request-id"].is_object());
+    assert!(rules[renamed_id]["plugins"]["gzip"].is_object());
 
     // An empty local config must delete both through the real differ.
     let events = common::diff(&adc_sdk::resources::Configuration::default(), &remote, None);

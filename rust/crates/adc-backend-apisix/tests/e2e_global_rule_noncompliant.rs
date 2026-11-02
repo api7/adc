@@ -35,7 +35,7 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
         json!({ "plugins": { "request-id": {}, "file-logger": { "path": "logs/file.log" } } }),
     )
     .await;
-    put_raw_global_rule(renamed_id, json!({ "plugins": { "request-id": {} } })).await;
+    put_raw_global_rule(renamed_id, json!({ "plugins": { "gzip": {} } })).await;
 
     let rules = dump(&backend).await.global_rules.expect("rules were just created");
     assert_eq!(rules.len(), 2);
@@ -44,7 +44,7 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
         json!("logs/file.log")
     );
     assert!(rules[multi_id]["plugins"]["request-id"].is_object());
-    assert!(rules[renamed_id]["plugins"]["request-id"].is_object());
+    assert!(rules[renamed_id]["plugins"]["gzip"].is_object());
 
     // The delete the differ emits for a placeholder key the local config lacks.
     let events: Vec<Event> = [multi_id, renamed_id]
