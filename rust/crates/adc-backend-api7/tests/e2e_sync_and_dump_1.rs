@@ -399,14 +399,13 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
     let backend = common::backend().await;
     let client = common::client().await;
     let group = common::gateway_group();
-    let multi_id = "legacy-rules";
-    let renamed_id = "renamed-rule";
+    // API7 only accepts one plugin per rule, so non-compliant means an id that
+    // differs from the plugin name.
+    let logger_id = "legacy-logger-rule";
+    let gzip_id = "renamed-rule";
     for (id, plugins) in [
-        (
-            multi_id,
-            json!({ "request-id": {}, "file-logger": { "path": "logs/file.log" } }),
-        ),
-        (renamed_id, json!({ "gzip": {} })),
+        (logger_id, json!({ "file-logger": { "path": "logs/file.log" } })),
+        (gzip_id, json!({ "gzip": {} })),
     ] {
         let request = client
             .request(Method::PUT, &format!("/apisix/admin/global_rules/{id}"))
@@ -420,10 +419,10 @@ async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
     let rules = remote.global_rules.clone().expect("rules were just created");
     assert_eq!(rules.len(), 2);
     assert_eq!(
-        rules[multi_id]["plugins"]["file-logger"]["path"],
+        rules[logger_id]["plugins"]["file-logger"]["path"],
         json!("logs/file.log")
     );
-    assert!(rules[renamed_id]["plugins"]["gzip"].is_object());
+    assert!(rules[gzip_id]["plugins"]["gzip"].is_object());
 
     // An empty local config must delete both through the real differ.
     let events = common::diff(&adc_sdk::resources::Configuration::default(), &remote, None);

@@ -256,6 +256,8 @@ global_rules:
         path: logs/file.log
 ```
 
+API7 accepts only one plugin per global rule, so there a placeholder is always a single-plugin rule whose ID differs from its plugin name, and its `plugins` object holds just that plugin.
+
 `adc diff` and `adc sync` delete every placeholder from the backend, whether or not the local file declares any global rules, and create or update the compliant rules declared locally. Do not copy a placeholder entry into a configuration file, since its key is a rule ID rather than a plugin name.
 
 ### Plugin Metadata
