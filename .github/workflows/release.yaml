@@ -191,7 +191,7 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_linux_${{ matrix.arch }}_debuginfo.tar.gz
 
       - name: Upload adc artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: adc_linux_${{ matrix.arch }}
           path: |
@@ -281,7 +281,7 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_windows_${{ matrix.arch }}_debuginfo.zip
 
       - name: Upload adc artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name == 'pull_request'
         with:
           name: adc_windows_${{ matrix.arch }}
@@ -349,7 +349,7 @@ jobs:
             release/adc_${{ env.RELEASE_VERSION }}_darwin_${{ matrix.arch }}_debuginfo.tar.gz
 
       - name: Upload adc artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name == 'pull_request'
         with:
           name: adc_darwin_${{ matrix.arch }}
