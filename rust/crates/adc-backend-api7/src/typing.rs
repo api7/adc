@@ -248,13 +248,11 @@ pub struct Ssl {
     pub status: Option<i64>,
 }
 
-/// `id` is the rule's key on the admin API. It is read back only to tell a
-/// compliant rule (one plugin, id equal to the plugin's name) from any other
-/// rule, and is never sent on write: the URL path alone addresses it.
+/// No id field: unlike every other resource, a global rule's identity is
+/// its single plugin's name within `plugins`, not a separate field — the
+/// URL path alone addresses it on write.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GlobalRule {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
     #[serde(default)]
     pub plugins: Plugins,
 }
