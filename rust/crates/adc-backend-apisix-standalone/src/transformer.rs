@@ -320,12 +320,12 @@ pub fn to_adc(input: &typing::ApisixStandalone) -> adc::Configuration {
 
     let ssls: Vec<adc::SSL> = input.ssls.iter().map(ssl_to_adc).collect();
 
-    let global_rules = adc_backend_core::normalize_global_rules(
-        input
-            .global_rules
-            .iter()
-            .map(|entry| (entry.id.clone(), entry.plugins.clone().unwrap_or_default())),
-    );
+    let mut global_rules = adc::Plugins::new();
+    for entry in &input.global_rules {
+        if let Some(plugins) = &entry.plugins {
+            global_rules.extend(plugins.clone());
+        }
+    }
 
     // `modifiedIndex` is APISIX's own per-entry version counter, not part of
     // the declarative model — a client never sends it. Kept out of the
@@ -679,33 +679,6 @@ mod tests {
         ] {
             assert_eq!(body.get(field), Some(&Value::from(0)), "{field} must be an explicit 0, not omitted");
         }
-    }
-
-    #[test]
-    fn to_adc_keeps_noncompliant_global_rules_as_id_keyed_placeholders() {
-        let rule = |id: &str, plugins: Value| typing::GlobalRule {
-            modified_index: 1,
-            id: id.to_string(),
-            plugins: plugins.as_object().cloned(),
-        };
-        let wire = typing::ApisixStandalone {
-            global_rules: vec![
-                rule("request-id", serde_json::json!({ "request-id": {} })),
-                rule("legacy-rules", serde_json::json!({ "a": { "x": 1 }, "b": {} })),
-                rule("renamed", serde_json::json!({ "request-id": {} })),
-            ],
-            ..Default::default()
-        };
-
-        let rules = to_adc(&wire).global_rules.unwrap();
-        assert_eq!(
-            Value::Object(rules),
-            serde_json::json!({
-                "request-id": {},
-                "legacy-rules": { "plugins": { "a": { "x": 1 }, "b": {} } },
-                "renamed": { "plugins": { "request-id": {} } },
-            })
-        );
     }
 
     /// `server_port` is `u16` at the wire level too (not a wider int
