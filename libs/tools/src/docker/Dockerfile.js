@@ -1,4 +1,4 @@
-FROM node:lts-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME/bin:$PATH"
@@ -15,6 +15,8 @@ RUN pnpm install nx -g \
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot
 
-COPY --from=builder /build/dist/apps/cli/main.cjs .
+WORKDIR /app
 
-ENTRYPOINT [ "/nodejs/bin/node", "main.cjs" ]
+COPY --from=builder /build/dist/apps/cli/main.cjs /app/main.cjs
+
+ENTRYPOINT [ "/nodejs/bin/node", "/app/main.cjs" ]

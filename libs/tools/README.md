@@ -13,6 +13,7 @@ Both images are published to `docker.io/api7/adc` and `ghcr.io/api7/adc` by `.gi
 
 - The Rust image builds `adc-cli` in `rust:1-trixie` and runs it on `gcr.io/distroless/cc-debian13:nonroot`. The runtime image provides glibc, libgcc and CA certificates, so the binary must stay glibc based. Moving to a static musl binary would require changing the base image as well.
 - The Docker build context is the repository root. `.dockerignore` excludes `rust/target` and `node_modules`, keep them excluded or the context becomes very large.
+- The JavaScript image builds in `node:24-bookworm-slim` (Node.js 26 and later no longer bundle Corepack, so do not move the builder to `node:lts`) and runs on `gcr.io/distroless/nodejs24-debian13:nonroot`. The bundle lives in `/app`, not in the base image's `/home/nonroot`, which is mode 0700 and owned by uid 65532: any other `runAsUser` could not traverse it and Node would report `MODULE_NOT_FOUND`.
 - The entrypoint of each image is the CLI binary itself, so arguments are passed straight to `adc`.
 
 ## Install script
