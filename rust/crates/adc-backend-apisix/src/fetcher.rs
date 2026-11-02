@@ -100,12 +100,11 @@ impl Fetcher {
         Ok(body.list.into_iter().map(|item| item.value).collect())
     }
 
-    /// A backend may define several `global_rules` entries; their `plugins`
-    /// maps are merged into one (later entries win on key collision),
-    /// matching how they're consumed — as a single flat set of gateway-wide
-    /// plugins, not as separate rules. Not `list()`: a global rule has no
-    /// `labels` field of its own, so there's nothing for `--label-selector`
-    /// to match against.
+    /// Rules are keyed by plugin name when compliant (one plugin, id equal to
+    /// its name) and by rule id with a nested `plugins` object otherwise, see
+    /// `adc_backend_core::normalize_global_rules`. Not `list()`: a global rule
+    /// has no `labels` field of its own, so there's nothing for
+    /// `--label-selector` to match against.
     pub async fn list_global_rules(&self) -> Result<Plugins, BackendError> {
         if self.filter.is_skip(ResourceType::GlobalRule) {
             return Ok(Plugins::new());
@@ -113,11 +112,9 @@ impl Fetcher {
         let path = Self::collection_path(ResourceType::GlobalRule)?;
         let builder = self.request(Method::GET, &path)?;
         let body: typing::ListResponse<typing::GlobalRule> = self.client.send_json(builder).await?;
-        let mut merged = Plugins::new();
-        for item in body.list {
-            merged.extend(item.value.plugins);
-        }
-        Ok(merged)
+        Ok(adc_backend_core::normalize_global_rules(
+            body.list.into_iter().map(|item| (item.value.id, item.value.plugins)),
+        ))
     }
 
     /// Plugin metadata isn't returned as a `name` field on each item — the

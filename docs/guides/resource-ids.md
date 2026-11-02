@@ -22,7 +22,7 @@ When no explicit `id` is set, ADC derives IDs deterministically.
 | Resource type       | Generated ID                                    |
 | ------------------- | ----------------------------------------------- |
 | Consumer            | `username`                                      |
-| Global rule         | Plugin name                                     |
+| Global rule         | Plugin name (see [Global Rules](../reference/configuration.md#global-rules) for backend rules that break this convention) |
 | Plugin metadata     | Plugin name                                     |
 | Service             | `sha1(name)`                                    |
 | SSL                 | `sha1(snis.join(','))`                          |

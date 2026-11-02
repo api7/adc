@@ -390,3 +390,53 @@ async fn syncs_and_dumps_plugin_metadata() {
     let dump = dump_configuration(&backend).await.unwrap();
     assert!(dump.plugin_metadata.is_none_or(|p| p.is_empty()));
 }
+
+#[tokio::test]
+#[ignore]
+async fn dumps_noncompliant_global_rules_as_placeholders_and_deletes_them() {
+    use adc_backend_core::Method;
+
+    let backend = common::backend().await;
+    let client = common::client().await;
+    let group = common::gateway_group();
+    let multi_id = "legacy-rules";
+    let renamed_id = "renamed-rule";
+    for (id, plugins) in [
+        (
+            multi_id,
+            json!({ "request-id": {}, "file-logger": { "path": "logs/file.log" } }),
+        ),
+        (renamed_id, json!({ "request-id": {} })),
+    ] {
+        let request = client
+            .request(Method::PUT, &format!("/apisix/admin/global_rules/{id}"))
+            .unwrap()
+            .query(&[("gateway_group_id", group.as_str())])
+            .json(&json!({ "plugins": plugins }));
+        client.send(request).await.unwrap();
+    }
+
+    let remote = dump_configuration(&backend).await.unwrap();
+    let rules = remote.global_rules.clone().expect("rules were just created");
+    assert_eq!(rules.len(), 2);
+    assert_eq!(
+        rules[multi_id]["plugins"]["file-logger"]["path"],
+        json!("logs/file.log")
+    );
+    assert!(rules[renamed_id]["plugins"]["request-id"].is_object());
+
+    // An empty local config must delete both through the real differ.
+    let events = common::diff(&adc_sdk::resources::Configuration::default(), &remote, None);
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| e.resource_type == ResourceType::GlobalRule)
+            .count(),
+        2
+    );
+    let results = sync_events(&backend, events).await.unwrap();
+    assert!(results.iter().all(|r| r.success), "{results:?}");
+
+    let after = dump_configuration(&backend).await.unwrap().global_rules;
+    assert!(after.is_none_or(|r| r.is_empty()), "non-compliant rules must be gone");
+}

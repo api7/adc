@@ -207,7 +207,7 @@ fn build_request(events: &[Event]) -> Result<(ValidateRequestBody, ValidateIndex
             ResourceType::GlobalRule => {
                 let mut plugins = adc::Plugins::new();
                 plugins.insert(event.resource_id.clone(), new_value.clone());
-                body.global_rules.push(typing::GlobalRule { plugins });
+                body.global_rules.push(typing::GlobalRule { id: None, plugins });
                 track(&mut index, "global_rules");
             }
             ResourceType::PluginMetadata => {

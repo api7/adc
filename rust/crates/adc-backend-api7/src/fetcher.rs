@@ -231,10 +231,9 @@ impl Fetcher {
             })
             .collect::<Result<Vec<_>, BackendError>>()?;
 
-        let mut merged_global_rules = adc::Plugins::new();
-        for rule in global_rules {
-            merged_global_rules.extend(rule.plugins);
-        }
+        let merged_global_rules = adc_backend_core::normalize_global_rules(
+            global_rules.into_iter().map(|rule| (rule.id.unwrap_or_default(), rule.plugins)),
+        );
 
         Ok(Configuration {
             services: (!services.is_empty()).then_some(services),

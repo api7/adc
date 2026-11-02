@@ -243,6 +243,21 @@ global_rules:
     # plugin-specific configuration
 ```
 
+ADC manages exactly one plugin per global rule, and the rule's ID is the plugin name. A global rule on the backend that does not follow this convention (it holds several plugins, no plugin, or its ID differs from its plugin name) cannot be expressed in this map. `adc dump` shows such a rule as a placeholder keyed by the rule's real ID, with the whole rule nested under `plugins`:
+
+```yaml
+global_rules:
+  limit-count: # compliant rule, shown as the plugin configuration
+    count: 10
+  legacy-rules: # non-compliant rule, shown as a placeholder
+    plugins:
+      request-id: {}
+      file-logger:
+        path: logs/file.log
+```
+
+`adc diff` and `adc sync` delete every placeholder from the backend, whether or not the local file declares any global rules, and create or update the compliant rules declared locally. Do not copy a placeholder entry into a configuration file, since its key is a rule ID rather than a plugin name.
+
 ### Plugin Metadata
 
 Plugin metadata configures shared, plugin-wide settings (as opposed to per-route/per-service plugin configuration), defined as a map of plugin name to metadata:
