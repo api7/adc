@@ -65,3 +65,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # Renovate security update: glob@14.0.2
   - glob@14.0.2
+  # Renovate security update: nx@23.2.1
+  - nx@23.2.1
