@@ -120,8 +120,8 @@ catalogs:
       specifier: ^4.1.9
       version: 4.1.10
     datum-diff:
-      specifier: 1.0.4
-      version: 1.0.4
+      specifier: 1.0.5
+      version: 1.0.5
     immer:
       specifier: ^11.1.8
       version: 11.1.8
@@ -530,7 +530,7 @@ importers:
         version: link:../sdk
       datum-diff:
         specifier: 'catalog:'
-        version: 1.0.4
+        version: 1.0.5
       lodash-es:
         specifier: '>=4.17.24'
         version: 4.18.1
@@ -549,7 +549,7 @@ importers:
         version: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       datum-diff:
         specifier: 'catalog:'
-        version: 1.0.4
+        version: 1.0.5
       lodash-es:
         specifier: '>=4.17.24'
         version: 4.18.1
@@ -2453,8 +2453,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  datum-diff@1.0.4:
-    resolution: {integrity: sha512-kjspjQR4d7+A/I4EVkYEysnKNQi+omcPm5mAC8T1LEQ2fjVClxOgKMgzsg4hB3u3QWXMXqM/LIUT8DTK/cZVbg==}
+  datum-diff@1.0.5:
+    resolution: {integrity: sha512-5/+kw5QPnVMinYcz5cHJVO0saRDxVYSd5kdHKLAtXW/Q8rTuMzarkJ3s0nD6TS94MaqIGWZVH6e95aTDJspEfA==}
     engines: {node: '>=16', npm: '>=10'}
 
   debug@4.4.3:
@@ -5943,7 +5943,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  datum-diff@1.0.4: {}
+  datum-diff@1.0.5: {}
 
   debug@4.4.3(supports-color@7.2.0):
     dependencies:
