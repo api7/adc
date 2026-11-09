@@ -27,6 +27,8 @@
 //!   while still letting e.g. all SSL creates happen before any upstream
 //!   creates, matching the differ's own topological ordering.
 
+use std::collections::HashSet;
+
 use adc_backend_core::{
     HttpClient, Method, RetryPolicy, concurrent_map, concurrent_map_until_err,
     deserialize_event_value, encode_path_segment, missing_parent, to_request_body,
@@ -77,7 +79,7 @@ impl Operator {
         let exit_on_failure = opts.exit_on_failure.unwrap_or(DEFAULT_EXIT_ON_FAILURE);
 
         let mut results = Vec::new();
-        for group in group_events(events) {
+        for group in group_events(drop_cascaded_credential_deletes(events)) {
             if exit_on_failure {
                 let group_results =
                     concurrent_map_until_err(group, opts.concurrent, |event| self.apply(event))
@@ -287,6 +289,30 @@ mod retry_tests {
         };
         assert!(!is_retriable(&err));
     }
+}
+
+/// Drops a credential `DELETE` whose parent consumer is also deleted in this
+/// batch. APISIX deletes a consumer's credentials together with the consumer,
+/// so a separate delete would return 404 once the consumer is gone.
+fn drop_cascaded_credential_deletes(events: Vec<Event>) -> Vec<Event> {
+    let deleted_consumer_ids: HashSet<String> = events
+        .iter()
+        .filter(|e| {
+            e.resource_type == ResourceType::Consumer && e.event_type() == EventType::Delete
+        })
+        .map(|e| e.resource_id.clone())
+        .collect();
+
+    events
+        .into_iter()
+        .filter(|e| {
+            !(e.resource_type == ResourceType::ConsumerCredential
+                && e.event_type() == EventType::Delete
+                && e.parent_id
+                    .as_deref()
+                    .is_some_and(|id| deleted_consumer_ids.contains(id)))
+        })
+        .collect()
 }
 
 /// Buckets events by `(resource_type, event_type)`, preserving each
@@ -618,6 +644,42 @@ mod tests {
     #[test]
     fn empty_input_produces_no_groups() {
         assert!(group_events(vec![]).is_empty());
+    }
+
+    fn delete(rt: ResourceType, id: &str, parent: Option<&str>) -> Event {
+        let mut e = event(
+            rt,
+            EventKind::Delete {
+                old_value: json!({}),
+            },
+            id,
+        );
+        e.parent_id = parent.map(str::to_string);
+        e
+    }
+
+    #[test]
+    fn drops_credential_deletes_cascaded_by_a_deleted_consumer() {
+        let events = drop_cascaded_credential_deletes(vec![
+            delete(ResourceType::Consumer, "consumer-1", None),
+            delete(
+                ResourceType::ConsumerCredential,
+                "credential-1",
+                Some("consumer-1"),
+            ),
+            delete(
+                ResourceType::ConsumerCredential,
+                "credential-2",
+                Some("consumer-2"),
+            ),
+            create(ResourceType::ConsumerCredential, "credential-3"),
+        ]);
+
+        let ids: Vec<&str> = events.iter().map(|e| e.resource_id.as_str()).collect();
+        // consumer-1's credential is deleted with consumer-1. consumer-2 is
+        // kept, so its credential delete must still be sent, as must
+        // unrelated non-delete events.
+        assert_eq!(ids, ["consumer-1", "credential-2", "credential-3"]);
     }
 
     #[test]

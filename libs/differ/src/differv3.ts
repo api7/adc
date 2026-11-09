@@ -268,8 +268,8 @@ export class DifferV3 {
           oldValue: remoteItem,
 
           // Special handling of resources containing nested resources
-          // When a consumer is deleted, its credentials are not taken into
-          // consideration.
+          // A deleted consumer also emits deletes for its credentials; the
+          // standalone backend needs them, while the Admin API cascades them.
           subEvents: DifferV3.diff(
             {},
             resourceType === ADCSDK.ResourceType.SERVICE

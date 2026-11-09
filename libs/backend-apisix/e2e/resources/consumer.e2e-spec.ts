@@ -1,3 +1,4 @@
+import { Differ } from '@api7/adc-differ';
 import * as ADCSDK from '@api7/adc-sdk';
 import { gte } from 'semver';
 
@@ -101,6 +102,68 @@ describe('Consumer E2E', () => {
         ]));
 
       it('Dump again (consumer should not exist)', async () => {
+        const result = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        expect(result.consumers).toHaveLength(0);
+      });
+    },
+  );
+
+  conditionalDescribe(semverCondition(gte, '3.11.0'))(
+    'Sync consumer credential deletes produced by the differ',
+    () => {
+      const credential = (name: string) => ({
+        name,
+        type: 'key-auth',
+        config: { key: name },
+      });
+      const syncDiff = async (local: ADCSDK.Configuration) =>
+        syncEvents(
+          backend,
+          Differ.diff(local, await dumpConfiguration(backend)),
+        );
+
+      it('Create consumers with credentials', async () =>
+        syncDiff({
+          consumers: [
+            {
+              username: 'cascade-gone',
+              credentials: [credential('gone-1'), credential('gone-2')],
+            },
+            {
+              username: 'cascade-kept',
+              credentials: [credential('kept-1'), credential('kept-2')],
+            },
+          ],
+        }));
+
+      // The differ emits a deleted consumer's credential deletes after the
+      // consumer delete; APISIX already removed them with the consumer.
+      it('Delete a consumer and rename a kept consumer credential', async () =>
+        syncDiff({
+          consumers: [
+            {
+              username: 'cascade-kept',
+              credentials: [credential('kept-1'), credential('kept-3')],
+            },
+          ],
+        }));
+
+      it('Dump (deleted consumer gone, kept consumer updated)', async () => {
+        const result = (await dumpConfiguration(
+          backend,
+        )) as ADCSDK.Configuration;
+        expect(result.consumers).toHaveLength(1);
+        expect(result.consumers?.[0]?.username).toEqual('cascade-kept');
+        expect(
+          result.consumers?.[0]?.credentials?.map(({ name }) => name).sort(),
+        ).toEqual(['kept-1', 'kept-3']);
+      });
+
+      it('Delete all consumers', async () => syncDiff({ consumers: [] }));
+
+      it('Dump again (no consumers)', async () => {
         const result = (await dumpConfiguration(
           backend,
         )) as ADCSDK.Configuration;

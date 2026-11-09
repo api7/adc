@@ -190,9 +190,31 @@ export class Operator extends ADCSDK.backend.BackendEventSource {
   }
 
   // Preprocess events for sync:
-  // 1. Divide events into groups by resource type and operation type.
+  // 1. Drop credential deletes whose consumer is also being deleted.
+  //    APISIX deletes a consumer's credentials together with the consumer,
+  //    so a separate delete would return 404 once the consumer is gone.
+  // 2. Divide events into groups by resource type and operation type.
   private syncPreprocessEvents(events: Array<ADCSDK.Event>) {
-    return from(events).pipe(
+    const deletedConsumerIds = new Set(
+      events
+        .filter(
+          (event) =>
+            event.resourceType === ADCSDK.ResourceType.CONSUMER &&
+            event.type === ADCSDK.EventType.DELETE,
+        )
+        .map((event) => event.resourceId),
+    );
+    return from(
+      events.filter(
+        (event) =>
+          !(
+            event.resourceType === ADCSDK.ResourceType.CONSUMER_CREDENTIAL &&
+            event.type === ADCSDK.EventType.DELETE &&
+            event.parentId &&
+            deletedConsumerIds.has(event.parentId)
+          ),
+      ),
+    ).pipe(
       // Grouping events by resource type and operation type.
       // The sequence of events should not be broken in this process,
       // and the correct behavior of the API will depend on the order
