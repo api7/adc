@@ -211,3 +211,93 @@ async fn consumer_credentials_are_never_fetched_below_apisix_3_11_0() {
         assert!(result.success, "{:?}", result.error);
     }
 }
+
+#[tokio::test]
+#[ignore]
+async fn deleting_a_consumer_with_credentials_in_differ_order_succeeds() {
+    if apisix_version() < semver::Version::new(3, 11, 0) {
+        eprintln!("skipping: consumer credentials require apisix >= 3.11.0");
+        return;
+    }
+
+    let backend = backend();
+    let credential = |consumer: &str, id: &str| {
+        let mut event = create(
+            ResourceType::ConsumerCredential,
+            id,
+            json!({ "name": id, "type": "key-auth", "config": { "key": id } }),
+        );
+        event.parent_id = Some(consumer.to_string());
+        event
+    };
+    let delete_credential = |consumer: &str, id: &str| {
+        let mut event = delete(ResourceType::ConsumerCredential, id);
+        event.parent_id = Some(consumer.to_string());
+        event
+    };
+
+    let results = backend
+        .sync(
+            vec![
+                create(
+                    ResourceType::Consumer,
+                    "cascade_gone",
+                    json!({ "username": "cascade_gone" }),
+                ),
+                create(
+                    ResourceType::Consumer,
+                    "cascade_kept",
+                    json!({ "username": "cascade_kept" }),
+                ),
+                credential("cascade_gone", "cascade-gone-1"),
+                credential("cascade_gone", "cascade-gone-2"),
+                credential("cascade_kept", "cascade-kept-1"),
+                credential("cascade_kept", "cascade-kept-2"),
+            ],
+            BackendSyncOptions::default(),
+        )
+        .await
+        .unwrap();
+    for result in &results {
+        assert!(result.success, "{:?}", result.error);
+    }
+
+    // The differ emits a deleted consumer's credential deletes after the
+    // consumer delete. APISIX removes them together with the consumer, so
+    // sending them would fail with 404; the kept consumer's credential
+    // delete must still be sent.
+    let results = backend
+        .sync(
+            vec![
+                delete(ResourceType::Consumer, "cascade_gone"),
+                delete_credential("cascade_gone", "cascade-gone-1"),
+                delete_credential("cascade_gone", "cascade-gone-2"),
+                delete_credential("cascade_kept", "cascade-kept-2"),
+            ],
+            BackendSyncOptions::default(),
+        )
+        .await
+        .unwrap();
+    for result in &results {
+        assert!(result.success, "{:?}", result.error);
+    }
+
+    let consumers = backend.dump().await.unwrap().consumers.unwrap_or_default();
+    assert!(consumers.iter().all(|c| c.username != "cascade_gone"));
+    let kept = consumers
+        .iter()
+        .find(|c| c.username == "cascade_kept")
+        .expect("kept consumer should still exist");
+    let kept_credentials = kept.credentials.clone().unwrap_or_default();
+    assert_eq!(kept_credentials.len(), 1);
+    assert_eq!(kept_credentials[0].name, "cascade-kept-1");
+
+    let results = backend
+        .sync(
+            vec![delete(ResourceType::Consumer, "cascade_kept")],
+            BackendSyncOptions::default(),
+        )
+        .await
+        .unwrap();
+    assert!(results[0].success, "{:?}", results[0].error);
+}
