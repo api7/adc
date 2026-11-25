@@ -112,7 +112,7 @@ impl DashboardSession {
                 return;
             }
             if tokio::time::Instant::now() >= deadline {
-                panic!("dashboard at {} was not ready within 120s", self.base);
+                panic!("dashboard was not ready within 120s");
             }
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
@@ -121,7 +121,7 @@ impl DashboardSession {
     async fn login(&self, username: &str, password: &str) {
         assert!(
             self.try_login(username, password).await,
-            "login as {username:?} failed"
+            "POST /api/login failed"
         );
     }
 
@@ -135,43 +135,47 @@ impl DashboardSession {
             .json(&json!({ "username": username, "password": password }))
             .send()
             .await
-            .unwrap_or_else(|e| panic!("POST /api/login: {e}"));
+            .unwrap_or_else(|_| panic!("sending POST /api/login failed"));
         response.status().is_success()
     }
 
-    async fn put(&self, path: &str, body: Value) {
+    async fn put(&self, operation: &'static str, path: &str, body: Value) {
         let response = self
             .client
             .put(format!("{}{path}", self.base))
             .json(&body)
             .send()
             .await
-            .unwrap_or_else(|e| panic!("PUT {path}: {e}"));
+            .unwrap_or_else(|_| panic!("{operation} request failed"));
         let status = response.status();
-        assert!(status.is_success(), "PUT {path} failed: {status}");
+        assert!(status.is_success(), "{operation} failed: {status}");
     }
 
-    async fn post(&self, path: &str, body: Value) -> Value {
+    async fn post(&self, path: &'static str, body: Value) -> Value {
         let response = self
             .client
             .post(format!("{}{path}", self.base))
             .json(&body)
             .send()
             .await
-            .unwrap_or_else(|e| panic!("POST {path}: {e}"));
+            .unwrap_or_else(|_| panic!("sending POST {path} failed"));
         let status = response.status();
         assert!(status.is_success(), "POST {path} failed: {status}");
         response
             .json()
             .await
-            .unwrap_or_else(|e| panic!("decoding response from POST {path}: {e}"))
+            .unwrap_or_else(|_| panic!("decoding response from POST {path} failed"))
     }
 }
 
 async fn activate_license(session: &DashboardSession, license: &Option<String>) {
     if let Some(license) = license {
         session
-            .put("/api/license", json!({ "data": license }))
+            .put(
+                "Activate license",
+                "/api/license",
+                json!({ "data": license }),
+            )
             .await;
     }
 }
@@ -211,6 +215,7 @@ async fn init_user(
     }
     session
         .put(
+            "Change password",
             "/api/password",
             json!({ "old_password": password, "new_password": new_password }),
         )
@@ -264,6 +269,7 @@ async fn bootstrap_token() -> String {
         .to_string();
     session
         .put(
+            "Assign test user role",
             &format!("/api/users/{user_id}/assigned_roles"),
             json!({ "roles": ["super_admin_id"] }),
         )

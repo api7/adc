@@ -192,12 +192,9 @@ export async function setup() {
     await generateToken();
   } catch (err) {
     if (axios.isAxiosError(err)) {
-      const { method, url } = err.config ?? {};
       const status = err.response?.status ?? err.code ?? 'request failed';
       // eslint-disable-next-line preserve-caught-error -- Axios errors include request credentials.
-      throw new Error(
-        `API7 bootstrap failed on ${method?.toUpperCase()} ${url}: ${status}`,
-      );
+      throw new Error(`API7 bootstrap request failed: ${status}`);
     }
     throw err;
   }
