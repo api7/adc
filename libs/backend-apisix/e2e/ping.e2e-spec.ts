@@ -8,7 +8,7 @@ import {
 import { join } from 'path';
 
 import { BackendAPISIX } from '../src';
-import { server, token } from './support/constants';
+import { mtlsServer, server, token } from './support/constants';
 
 describe('Ping', () => {
   it('should success (http)', async () => {
@@ -24,7 +24,7 @@ describe('Ping', () => {
 
   it('should success (mTLS)', async () => {
     const backend = new BackendAPISIX({
-      server: 'https://localhost:29180',
+      server: mtlsServer,
       token,
       cacheKey: 'default',
       httpAgent: httpGlobalAgent,
@@ -59,7 +59,7 @@ describe('Ping', () => {
 
   it('should failed (self-signed certificate)', async () => {
     const backend = new BackendAPISIX({
-      server: 'https://localhost:29180',
+      server: mtlsServer,
       token,
       cacheKey: 'default',
       httpAgent: httpGlobalAgent,
@@ -72,7 +72,7 @@ describe('Ping', () => {
 
   it('should failed (miss client certificates)', async () => {
     const backend = new BackendAPISIX({
-      server: 'https://localhost:29180',
+      server: mtlsServer,
       token,
       cacheKey: 'default',
       httpAgent: httpGlobalAgent,

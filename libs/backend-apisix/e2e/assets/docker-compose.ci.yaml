@@ -1,0 +1,9 @@
+services:
+  apisix_http:
+    ports: !override ["127.0.0.1::9180"]
+  apisix_mtls:
+    ports: !override ["127.0.0.1::9180"]
+  apisix_no_stream:
+    ports: !override ["127.0.0.1::9180"]
+  etcd:
+    ports: !reset []

@@ -38,7 +38,7 @@ fn backend(server: &str, tls: TlsConfig) -> ApisixBackend {
 #[tokio::test]
 #[ignore]
 async fn succeeds_over_plain_http() {
-    let backend = backend("http://localhost:19180", TlsConfig::default());
+    let backend = backend(&common::server(), TlsConfig::default());
     backend.ping().await.unwrap();
 }
 
@@ -51,7 +51,7 @@ async fn succeeds_over_mtls() {
         client_key_pem: Some(read_asset("client.key")),
         skip_verify: false,
     };
-    let backend = backend("https://localhost:29180", tls);
+    let backend = backend(&common::mtls_server(), tls);
     backend.ping().await.unwrap();
 }
 
@@ -71,7 +71,7 @@ async fn fails_against_an_unreachable_server() {
 async fn fails_when_the_server_certificate_is_not_trusted() {
     // mTLS endpoint's cert is self-signed for this test fixture; not
     // supplying the CA to trust it must fail the TLS handshake.
-    let backend = backend("https://localhost:29180", TlsConfig::default());
+    let backend = backend(&common::mtls_server(), TlsConfig::default());
     let err = backend.ping().await.unwrap_err();
     assert!(
         matches!(err, adc_sdk::BackendError::Transport(_)),
@@ -88,7 +88,7 @@ async fn fails_when_the_client_certificate_is_missing() {
         client_key_pem: None,
         skip_verify: false,
     };
-    let backend = backend("https://localhost:29180", tls);
+    let backend = backend(&common::mtls_server(), tls);
     // APISIX's mTLS listener requires a client cert; without one the TLS
     // handshake itself is refused before any HTTP response comes back.
     assert!(backend.ping().await.is_err());
