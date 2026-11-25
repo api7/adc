@@ -12,6 +12,7 @@ dependencies = [
  "adc-sdk",
  "async-trait",
  "axum",
+ "getrandom 0.4.3",
  "reqwest",
  "semver",
  "serde",

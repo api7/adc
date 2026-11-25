@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 use std::env;
+use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -23,8 +24,22 @@ use adc_sdk::{
 use serde_json::{Value, json};
 use tokio::sync::OnceCell;
 
-const BOOTSTRAP_PASSWORD: &str = "Admin12345!@#$%";
-const INVITE_PASSWORD: &str = "AdcInvite1234!";
+fn required_password(name: &str) -> String {
+    env::var(name)
+        .ok()
+        .filter(|password| !password.is_empty())
+        .unwrap_or_else(|| panic!("set {name} before running API7 E2E"))
+}
+
+fn generate_password() -> String {
+    let mut random = [0_u8; 24];
+    getrandom::fill(&mut random).expect("generating random API7 E2E credentials");
+    let mut entropy = String::with_capacity(random.len() * 2);
+    for byte in random {
+        write!(entropy, "{byte:02x}").unwrap();
+    }
+    format!("Aa1!{entropy}")
+}
 
 pub fn server() -> String {
     env::var("SERVER").unwrap_or_else(|_| "https://localhost:7443".to_string())
@@ -133,8 +148,7 @@ impl DashboardSession {
             .await
             .unwrap_or_else(|e| panic!("PUT {path}: {e}"));
         let status = response.status();
-        let text = response.text().await.unwrap_or_default();
-        assert!(status.is_success(), "PUT {path} failed: {status}: {text}");
+        assert!(status.is_success(), "PUT {path} failed: {status}");
     }
 
     async fn post(&self, path: &str, body: Value) -> Value {
@@ -146,10 +160,11 @@ impl DashboardSession {
             .await
             .unwrap_or_else(|e| panic!("POST {path}: {e}"));
         let status = response.status();
-        let text = response.text().await.unwrap_or_default();
-        assert!(status.is_success(), "POST {path} failed: {status}: {text}");
-        serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("decoding response from POST {path}: {e}: {text}"))
+        assert!(status.is_success(), "POST {path} failed: {status}");
+        response
+            .json()
+            .await
+            .unwrap_or_else(|e| panic!("decoding response from POST {path}: {e}"))
     }
 }
 
@@ -171,6 +186,7 @@ async fn init_user(
     session: &DashboardSession,
     username: &str,
     password: &str,
+    new_password: &str,
     first_time: bool,
     version: &semver::Version,
     license: &Option<String>,
@@ -185,7 +201,7 @@ async fn init_user(
     // password (and skip re-activating the license) instead of repeating
     // the dance a previous binary already completed.
     if !session.try_login(username, password).await {
-        session.login(username, BOOTSTRAP_PASSWORD).await;
+        session.login(username, new_password).await;
         return;
     }
     // Mirrors the TS suite: on dashboards older than 3.2.15 the license
@@ -196,10 +212,10 @@ async fn init_user(
     session
         .put(
             "/api/password",
-            json!({ "old_password": password, "new_password": BOOTSTRAP_PASSWORD }),
+            json!({ "old_password": password, "new_password": new_password }),
         )
         .await;
-    session.login(username, BOOTSTRAP_PASSWORD).await;
+    session.login(username, new_password).await;
     if first_time && *version >= semver::Version::new(3, 2, 15) {
         activate_license(session, license).await;
     }
@@ -221,14 +237,13 @@ async fn bootstrap_token() -> String {
         .ok()
         .filter(|v| !v.is_empty());
 
-    let initial_password = env::var("API7_ADMIN_INITIAL_PASSWORD")
-        .ok()
-        .filter(|password| !password.is_empty())
-        .unwrap_or_else(|| "admin".to_string());
+    let initial_password = required_password("API7_ADMIN_INITIAL_PASSWORD");
+    let rotated_password = required_password("BACKEND_API7_ROTATED_ADMIN_PASSWORD");
     init_user(
         &session,
         "admin",
         &initial_password,
+        &rotated_password,
         true,
         &version,
         &license,
@@ -236,10 +251,11 @@ async fn bootstrap_token() -> String {
     .await;
 
     let username = unique_name("adc-rust-e2e");
+    let invite_password = generate_password();
     let invite = session
         .post(
             "/api/invites",
-            json!({ "username": username, "password": INVITE_PASSWORD }),
+            json!({ "username": username, "password": invite_password }),
         )
         .await;
     let user_id = invite["value"]["id"]
@@ -256,7 +272,8 @@ async fn bootstrap_token() -> String {
     init_user(
         &session,
         &username,
-        INVITE_PASSWORD,
+        &invite_password,
+        &generate_password(),
         false,
         &version,
         &license,

@@ -92,7 +92,7 @@ const setupAPI7 = async () => {
   await waitForDashboard();
 };
 
-const newPassword = 'Admin12345!@#$%';
+const generatePassword = () => `Aa1!${randomUUID()}`;
 const initUser = async (
   username: string,
   password: string,
@@ -114,6 +114,7 @@ const initUser = async (
   )
     await activateAPI7();
 
+  const newPassword = generatePassword();
   console.log('Modify password');
   await httpClient.put(`/api/password`, {
     old_password: password,
@@ -150,7 +151,7 @@ const activateAPI7 = async () => {
 
 const generateToken = async () => {
   console.log('Create test user');
-  const invitePassword = `Aa1!${randomUUID()}`;
+  const invitePassword = generatePassword();
   const user = await httpClient.post(`/api/invites`, {
     username: 'test',
     password: invitePassword,
@@ -181,14 +182,18 @@ const generateToken = async () => {
 };
 
 export async function setup() {
+  const initialPassword = process.env.API7_ADMIN_INITIAL_PASSWORD;
+  if (!initialPassword)
+    throw new Error('Set API7_ADMIN_INITIAL_PASSWORD before running API7 E2E');
+
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
   try {
-    await initUser('admin', process.env.API7_ADMIN_INITIAL_PASSWORD || 'admin');
+    await initUser('admin', initialPassword);
     await generateToken();
   } catch (err) {
     if (axios.isAxiosError(err)) {
       const { method, url } = err.config ?? {};
-      const status = err.response?.status ?? err.code;
+      const status = err.response?.status ?? err.code ?? 'request failed';
       // eslint-disable-next-line preserve-caught-error -- Axios errors include request credentials.
       throw new Error(
         `API7 bootstrap failed on ${method?.toUpperCase()} ${url}: ${status}`,
