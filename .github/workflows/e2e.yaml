@@ -177,6 +177,9 @@ jobs:
             echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
+            initial_password="Aa1!$(openssl rand -hex 24)"
+            printf '::add-mask::%s\n' "$initial_password"
+            printf 'API7_ADMIN_INITIAL_PASSWORD=%s\n' "$initial_password" >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"
@@ -231,6 +234,9 @@ jobs:
             echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
+            initial_password="Aa1!$(openssl rand -hex 24)"
+            printf '::add-mask::%s\n' "$initial_password"
+            printf 'API7_ADMIN_INITIAL_PASSWORD=%s\n' "$initial_password" >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"

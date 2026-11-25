@@ -5,9 +5,10 @@
 //! `common::token()` handle the login/password-rotation/license-activation
 //! /token-minting dance a fresh dashboard needs themselves (see
 //! `common`'s module doc), so nothing beyond the running dashboard is
-//! required; set `SERVER`/`GATEWAY_GROUP`/`TOKEN`/`BACKEND_API7_LICENSE`/
-//! `BACKEND_API7_VERSION` to override the defaults the TS e2e suite's own
-//! `global-setup.ts` uses.
+//! required. For images that require an initial admin password, export
+//! `API7_ADMIN_INITIAL_PASSWORD` before starting Compose and running the
+//! tests. Set `SERVER`, `GATEWAY_GROUP`, `TOKEN`, `BACKEND_API7_LICENSE` or
+//! `BACKEND_API7_VERSION` to override the other defaults in the TS suite.
 //!
 //! Ignored by default (`cargo test` never touches the network); run with
 //! `cargo test -p adc-backend-api7 --test e2e_gateway_group -- --ignored --test-threads=1`.

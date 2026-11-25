@@ -94,9 +94,9 @@ const setupAPI7 = async () => {
 
 const newPassword = 'Admin12345!@#$%';
 const initUser = async (
-  username = 'admin',
-  password = 'admin',
-  fisrtTime = true,
+  username: string,
+  password: string,
+  firstTime = true,
 ) => {
   console.log('Log in');
   await httpClient.post(`/api/login`, {
@@ -110,7 +110,7 @@ const initUser = async (
       semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
       '3.2.15',
     ) &&
-    fisrtTime
+    firstTime
   )
     await activateAPI7();
 
@@ -136,7 +136,7 @@ const initUser = async (
       semver.coerce(process.env.BACKEND_API7_VERSION) ?? '0.0.0',
       '3.2.15',
     ) &&
-    fisrtTime
+    firstTime
   )
     await activateAPI7();
 };
@@ -150,9 +150,10 @@ const activateAPI7 = async () => {
 
 const generateToken = async () => {
   console.log('Create test user');
+  const invitePassword = `Aa1!${randomUUID()}`;
   const user = await httpClient.post(`/api/invites`, {
     username: 'test',
-    password: 'test',
+    password: invitePassword,
   });
   const userId: string = user.data.value.id;
 
@@ -165,7 +166,7 @@ const generateToken = async () => {
   httpClient.sessionToken = '';
 
   console.log('Log in to test user');
-  await initUser('test', 'test', false);
+  await initUser('test', invitePassword, false);
 
   console.log('Generate token');
   const resp = await httpClient.post<{ value: { token: string } }>(
@@ -182,10 +183,17 @@ const generateToken = async () => {
 export async function setup() {
   if (process.env['SKIP_API7_SETUP'] !== 'true') await setupAPI7();
   try {
-    await initUser();
+    await initUser('admin', process.env.API7_ADMIN_INITIAL_PASSWORD || 'admin');
     await generateToken();
   } catch (err) {
-    console.log(err);
+    if (axios.isAxiosError(err)) {
+      const { method, url } = err.config ?? {};
+      const status = err.response?.status ?? err.code;
+      // eslint-disable-next-line preserve-caught-error -- Axios errors include request credentials.
+      throw new Error(
+        `API7 bootstrap failed on ${method?.toUpperCase()} ${url}: ${status}`,
+      );
+    }
     throw err;
   }
 

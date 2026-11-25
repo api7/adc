@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use tokio::sync::OnceCell;
 
 const BOOTSTRAP_PASSWORD: &str = "Admin12345!@#$%";
+const INVITE_PASSWORD: &str = "AdcInvite1234!";
 
 pub fn server() -> String {
     env::var("SERVER").unwrap_or_else(|_| "https://localhost:7443".to_string())
@@ -165,7 +166,7 @@ async fn activate_license(session: &DashboardSession, license: &Option<String>) 
 /// minting an API token) until this happens, *even* for the throwaway
 /// invited user `bootstrap_token` creates below, not just the built-in
 /// `admin` account. `first_time` gates license activation only (TS's
-/// `fisrtTime` param); the password rotation itself always runs.
+/// `firstTime` param); the password rotation itself always runs.
 async fn init_user(
     session: &DashboardSession,
     username: &str,
@@ -220,13 +221,25 @@ async fn bootstrap_token() -> String {
         .ok()
         .filter(|v| !v.is_empty());
 
-    init_user(&session, "admin", "admin", true, &version, &license).await;
+    let initial_password = env::var("API7_ADMIN_INITIAL_PASSWORD")
+        .ok()
+        .filter(|password| !password.is_empty())
+        .unwrap_or_else(|| "admin".to_string());
+    init_user(
+        &session,
+        "admin",
+        &initial_password,
+        true,
+        &version,
+        &license,
+    )
+    .await;
 
     let username = unique_name("adc-rust-e2e");
     let invite = session
         .post(
             "/api/invites",
-            json!({ "username": username, "password": "test" }),
+            json!({ "username": username, "password": INVITE_PASSWORD }),
         )
         .await;
     let user_id = invite["value"]["id"]
@@ -240,7 +253,15 @@ async fn bootstrap_token() -> String {
         )
         .await;
 
-    init_user(&session, &username, "test", false, &version, &license).await;
+    init_user(
+        &session,
+        &username,
+        INVITE_PASSWORD,
+        false,
+        &version,
+        &license,
+    )
+    .await;
 
     let token = session
         .post(

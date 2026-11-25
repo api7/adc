@@ -14,6 +14,8 @@ services:
 
   dashboard:
     image: ${API7_DASHBOARD_IMAGE:-api7/api7-ee-3-integrated}:${API7_IMAGE_TAG:-dev}
+    environment:
+      - API7_ADMIN_INITIAL_PASSWORD
     depends_on:
       postgresql:
         condition: service_healthy
