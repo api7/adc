@@ -1,4 +1,5 @@
 import * as ADCSDK from '@api7/adc-sdk';
+import path from 'node:path';
 
 import {
   MANAGED_BY_LABEL_KEY,
@@ -488,7 +489,7 @@ describe('CLI utils', () => {
       );
 
       expect(warning).toContain('MISSING_SECRET');
-      expect(warning).toContain('configs/adc.yaml');
+      expect(warning).toContain(path.resolve('configs/adc.yaml'));
       expect(warning).toContain('substituted an empty string');
       expect(warning).toContain('\\${NAME}');
       expect(warning).not.toContain('secret-value');
