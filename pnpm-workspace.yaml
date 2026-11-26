@@ -50,7 +50,7 @@ overrides:
   # @trivago/prettier-plugin-sort-imports pins minimatch@^9, which drags in the
   # unpatched brace-expansion@2.x line (GHSA-mh99-v99m-4gvg). Force it onto minimatch@10
   # instead, which already resolves to the patched brace-expansion@5.0.9.
-  '@trivago/prettier-plugin-sort-imports>minimatch': '^10.0.0'
+  '@trivago/prettier-plugin-sort-imports>minimatch': '^11.0.0'
 
 strictPeerDependencies: false
 onlyBuiltDependencies:
@@ -65,3 +65,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # Renovate security update: glob@14.0.2
   - glob@14.0.2
+  # Renovate security update: minimatch@11.0.9
+  - minimatch@11.0.9

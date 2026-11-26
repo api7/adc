@@ -166,7 +166,7 @@ overrides:
   nanoid: '>=3.3.18'
   minimatch@10>brace-expansion: 5.0.12
   nx>brace-expansion: 5.0.9
-  '@trivago/prettier-plugin-sort-imports>minimatch': ^10.0.0
+  '@trivago/prettier-plugin-sort-imports>minimatch': ^11.0.0
 
 importers:
 
@@ -5337,7 +5337,7 @@ snapshots:
       '@babel/types': 7.29.0
       javascript-natural-sort: 0.7.1
       lodash-es: 4.18.1
-      minimatch: 10.2.5
+      minimatch: 11.0.3
       parse-imports-exports: 0.2.4
       prettier: 3.9.4
     transitivePeerDependencies:
