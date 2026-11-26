@@ -1,5 +1,5 @@
 //! Shared scaffolding for this crate's real-e2e test files: a live APISIX
-//! admin API at `SERVER`, reachable with `TOKEN`. See `e2e_apisix.rs`'s
+//! admin API reachable with `TOKEN`. See `e2e_apisix.rs`'s
 //! module doc for how to bring one up and run these tests. Not every test
 //! file uses every item here, so dead-code warnings are suppressed at the
 //! module level rather than per item.
@@ -8,23 +8,30 @@
 use adc_backend_apisix::Backend as ApisixBackend;
 use adc_backend_core::{HttpClient, HttpClientConfig, TlsConfig};
 
-pub const SERVER: &str = "http://localhost:19180";
-/// The `apisix_no_stream` compose instance — same admin key, started
-/// without stream proxy enabled.
-pub const SERVER_NO_STREAM: &str = "http://localhost:39180";
 pub const TOKEN: &str = "edd1c9f034335f136f87ad84b625c8f1";
 
+pub fn server() -> String {
+    std::env::var("BACKEND_APISIX_SERVER").unwrap_or_else(|_| "http://localhost:19180".to_string())
+}
+
+pub fn mtls_server() -> String {
+    std::env::var("BACKEND_APISIX_MTLS_SERVER")
+        .unwrap_or_else(|_| "https://localhost:29180".to_string())
+}
+
 pub fn client() -> HttpClient {
-    client_for(SERVER)
+    client_for(server())
 }
 
 pub fn client_no_stream() -> HttpClient {
-    client_for(SERVER_NO_STREAM)
+    let server = std::env::var("BACKEND_APISIX_NO_STREAM_SERVER")
+        .unwrap_or_else(|_| "http://localhost:39180".to_string());
+    client_for(server)
 }
 
-fn client_for(server: &str) -> HttpClient {
+fn client_for(server: String) -> HttpClient {
     HttpClient::new(HttpClientConfig {
-        server: server.to_string(),
+        server,
         token: TOKEN.to_string(),
         timeout: None,
         tls: TlsConfig::default(),

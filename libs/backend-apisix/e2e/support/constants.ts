@@ -2,7 +2,10 @@ import * as ADCSDK from '@api7/adc-sdk';
 import { globalAgent as httpGlobalAgent } from 'node:http';
 import { globalAgent as httpsGlobalAgent } from 'node:https';
 
-export const server = 'http://localhost:19180';
+export const server =
+  process.env.BACKEND_APISIX_SERVER ?? 'http://localhost:19180';
+export const mtlsServer =
+  process.env.BACKEND_APISIX_MTLS_SERVER ?? 'https://localhost:29180';
 export const token = 'edd1c9f034335f136f87ad84b625c8f1';
 
 export const defaultBackendOptions: ADCSDK.BackendOptions = {
