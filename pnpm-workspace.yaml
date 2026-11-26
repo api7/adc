@@ -6,7 +6,7 @@ autoInstallPeers: false
 catalog:
   '@types/lodash-es': ^4.17.12
   '@types/semver': ^7.7.1
-  axios: 1.18.1
+  axios: 1.20.0
   datum-diff: 1.0.4
   esbuild: ^0.28.1
   immer: ^11.1.8
@@ -65,3 +65,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # Renovate security update: glob@14.0.2
   - glob@14.0.2
+  # Renovate security update: axios@1.20.0
+  - axios@1.20.0
