@@ -12,11 +12,16 @@ import {
   MANAGED_BY_LABEL_VALUE,
   fillLabels,
   filterResourceType,
+  formatUndefinedEnvVarWarning,
   mergeKVConfigurations,
   recursiveReplaceEnvVars,
   toConfiguration,
   toKVConfiguration,
 } from '../command/utils';
+import {
+  SignaleRendererOutputType,
+  type SignaleRendererOutput,
+} from '../utils/listr';
 
 export const LoadLocalConfigurationTask = (
   files: Array<string>,
@@ -82,7 +87,17 @@ export const LoadLocalConfigurationTask = (
         },
         {
           title: 'Resolve value variables',
-          task: async () => {
+          task: async (_subCtx, task) => {
+            for (const [filePath, configuration] of Object.entries(
+              subCtx.configurations,
+            )) {
+              recursiveReplaceEnvVars(configuration, process.env, (name) => {
+                task.output = JSON.stringify({
+                  type: SignaleRendererOutputType.WARNING,
+                  messages: [formatUndefinedEnvVarWarning(name, filePath)],
+                } satisfies SignaleRendererOutput);
+              });
+            }
             ctx.local = recursiveReplaceEnvVars(ctx.local!);
           },
         },

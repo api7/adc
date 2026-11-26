@@ -4,6 +4,7 @@ import {
   MANAGED_BY_LABEL_KEY,
   MANAGED_BY_LABEL_VALUE,
   fillLabels,
+  formatUndefinedEnvVarWarning,
   recursiveRemoveIdField,
   recursiveReplaceEnvVars,
 } from './utils';
@@ -452,6 +453,45 @@ describe('CLI utils', () => {
           },
         ],
       });
+    });
+
+    it('reports only undefined unescaped variables', () => {
+      const undefinedVariables: Array<string> = [];
+      const config = {
+        services: [
+          {
+            name: '${MISSING}-${MISSING}-${EMPTY}',
+            description: '\\${ESCAPED}-${external_user.preferred_username}',
+          },
+        ],
+      } as ADCSDK.Configuration;
+
+      expect(
+        recursiveReplaceEnvVars(config, { EMPTY: '' }, (name) =>
+          undefinedVariables.push(name),
+        ),
+      ).toEqual({
+        services: [
+          {
+            name: '--',
+            description: '${ESCAPED}-${external_user.preferred_username}',
+          },
+        ],
+      });
+      expect(undefinedVariables).toEqual(['MISSING']);
+    });
+
+    it('formats an actionable undefined-variable warning without a value', () => {
+      const warning = formatUndefinedEnvVarWarning(
+        'MISSING_SECRET',
+        'configs/adc.yaml',
+      );
+
+      expect(warning).toContain('MISSING_SECRET');
+      expect(warning).toContain('configs/adc.yaml');
+      expect(warning).toContain('substituted an empty string');
+      expect(warning).toContain('\\${NAME}');
+      expect(warning).not.toContain('secret-value');
     });
   });
 });

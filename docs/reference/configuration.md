@@ -143,6 +143,8 @@ export API_KEY="<api-key>"
 adc sync -f adc.yaml
 ```
 
+If a referenced variable is not defined, ADC identifies the variable and configuration file in a warning, then substitutes an empty string. A variable that is explicitly set to an empty value is substituted without a warning.
+
 Use `\${VAR_NAME}` to escape a literal `${VAR_NAME}` and prevent ADC from interpolating it.
 
 ### Built-in Variables (`${...}`)

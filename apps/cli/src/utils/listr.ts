@@ -21,6 +21,7 @@ export interface SignaleRendererOptions {
 
 export const SignaleRendererOutputType = {
   DEBUG: 'DEBUG',
+  WARNING: 'WARNING',
   LISTR_TASK_START: 'LISTR_TASK_START',
   LISTR_TASK_COMPLETE: 'LISTR_TASK_COMPLETE',
 } as const;
@@ -134,6 +135,13 @@ export class SignaleRenderer implements ListrRenderer {
                 scope: output.scope ?? rendererOptions.scope,
               }).debug(output.messages.join(''));
             }
+            break;
+          }
+          case SignaleRendererOutputType.WARNING: {
+            this.getScopedLogger({
+              ...rendererOptions,
+              scope: output.scope ?? rendererOptions.scope,
+            }).warn(output.messages.join(''));
             break;
           }
         }

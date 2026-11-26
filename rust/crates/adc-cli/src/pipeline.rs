@@ -242,8 +242,8 @@ pub async fn load_local(
     lint: bool,
 ) -> Result<Configuration, CliError> {
     let mut files = config::read_files(files).await?;
-    for (_, value) in &mut files {
-        config::replace_env_vars(value);
+    for (path, value) in &mut files {
+        config::replace_env_vars(value, path);
     }
     let mut merged = config::merge_files(files)?;
     config::fill_labels(&mut merged, label_selector);

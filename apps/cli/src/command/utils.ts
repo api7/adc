@@ -252,10 +252,12 @@ export const recursiveRemoveIdField = (c: ADCSDK.Configuration) => {
 export const recursiveReplaceEnvVars = (
   c: ADCSDK.Configuration,
   dataSource = process.env,
+  onUndefined?: (name: string) => void,
 ): ADCSDK.Configuration => {
   const envVarRegex = /\$\{(\w+)\}/g;
   const escapedVarRegex = /\\\$\{(\w+)\}/g;
   const placeholder = '__ESCAPED_ENV_VAR_PLACEHOLDER__';
+  const reportedUndefined = new Set<string>();
   const replaceValue = (value: unknown): unknown => {
     if (typeof value !== 'string') return value;
 
@@ -263,7 +265,13 @@ export const recursiveReplaceEnvVars = (
       return `${placeholder}${envVar}${placeholder}`;
     });
     const replaced = escaped.replace(envVarRegex, (_, envVar) => {
-      return dataSource?.[envVar] || '';
+      const value = dataSource?.[envVar];
+      if (value !== undefined) return value;
+      if (!reportedUndefined.has(envVar)) {
+        reportedUndefined.add(envVar);
+        onUndefined?.(envVar);
+      }
+      return '';
     });
     return replaced.replace(
       new RegExp(`${placeholder}(\\w+)${placeholder}`, 'g'),
@@ -280,6 +288,13 @@ export const recursiveReplaceEnvVars = (
 
   return mapValues(c, recurseReplace) as ADCSDK.Configuration;
 };
+
+export const formatUndefinedEnvVarWarning = (
+  name: string,
+  filePath: string,
+) =>
+  `Environment variable "${name}" is not defined; ADC substituted an empty string while loading "${path.resolve(filePath)}".` +
+  ' Set the variable, or escape a literal placeholder as \\${NAME}.';
 
 // Re-sort the configuration to make it in a deterministic order
 export const resortConfiguration = (

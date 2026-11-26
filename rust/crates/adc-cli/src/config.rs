@@ -6,7 +6,7 @@
 //! set of nested arrays" — is generic across resource types; a typed walk
 //! would just be this same table hand-duplicated per struct.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -172,18 +172,35 @@ pub fn merge_files(files: Vec<(PathBuf, Value)>) -> Result<Value, CliError> {
 /// Expands `${VAR}` placeholders in every string value throughout `config`
 /// (recursing into arrays and object values, but never object *keys* — a
 /// key like `"${GLOBAL_PLUGIN}"` stays literal) using the process
-/// environment. A variable that's unset or empty expands to `""`. `\${VAR}`
-/// is a literal escape: the backslash is dropped and `${VAR}` is left in
-/// place, never substituted.
-pub fn replace_env_vars(config: &mut Value) {
-    replace_env_vars_with(config, &|name| std::env::var(name).ok());
+/// environment. A variable that's unset or empty expands to `""`; only an
+/// unset variable emits a warning. `\${VAR}` is a literal escape: the
+/// backslash is dropped and `${VAR}` is left in place, never substituted.
+pub fn replace_env_vars(config: &mut Value, path: &Path) {
+    let missing = replace_env_vars_with(config, &|name| std::env::var(name).ok());
+    warn_on_missing_env_vars(path, &missing);
 }
 
-fn replace_env_vars_with(config: &mut Value, lookup: &dyn Fn(&str) -> Option<String>) {
+fn warn_on_missing_env_vars(path: &Path, missing: &BTreeSet<String>) {
+    for name in missing {
+        tracing::warn!(
+            configuration_file = %path.display(),
+            environment_variable = %name,
+            "environment variable is not defined; ADC substituted an empty string. Set the variable, or escape a literal placeholder as \\${{NAME}}"
+        );
+    }
+}
+
+fn replace_env_vars_with(config: &mut Value, lookup: &dyn Fn(&str) -> Option<String>) -> BTreeSet<String> {
+    let mut missing = BTreeSet::new();
+    replace_env_vars_recursive(config, lookup, &mut missing);
+    missing
+}
+
+fn replace_env_vars_recursive(config: &mut Value, lookup: &dyn Fn(&str) -> Option<String>, missing: &mut BTreeSet<String>) {
     match config {
-        Value::String(s) => *s = expand_env_vars(s, lookup),
-        Value::Array(items) => items.iter_mut().for_each(|item| replace_env_vars_with(item, lookup)),
-        Value::Object(map) => map.values_mut().for_each(|item| replace_env_vars_with(item, lookup)),
+        Value::String(s) => *s = expand_env_vars(s, lookup, missing),
+        Value::Array(items) => items.iter_mut().for_each(|item| replace_env_vars_recursive(item, lookup, missing)),
+        Value::Object(map) => map.values_mut().for_each(|item| replace_env_vars_recursive(item, lookup, missing)),
         _ => {}
     }
 }
@@ -197,14 +214,22 @@ static RESTORE_ESCAPED_ENV_VAR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!("{ESCAPED_ENV_VAR_PLACEHOLDER}([0-9A-Za-z_]+){ESCAPED_ENV_VAR_PLACEHOLDER}")).expect("valid regex")
 });
 
-fn expand_env_vars(value: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+fn expand_env_vars(value: &str, lookup: &dyn Fn(&str) -> Option<String>, missing: &mut BTreeSet<String>) -> String {
     // `\${VAR}` occurrences are swapped out for a placeholder first so the
     // unescaped-substitution pass below can't touch them, then restored
     // (backslash dropped) at the end.
     let protected = ESCAPED_ENV_VAR
         .replace_all(value, |caps: &regex::Captures| format!("{ESCAPED_ENV_VAR_PLACEHOLDER}{}{ESCAPED_ENV_VAR_PLACEHOLDER}", &caps[1]));
-    let substituted =
-        ENV_VAR.replace_all(&protected, |caps: &regex::Captures| lookup(&caps[1]).unwrap_or_default());
+    let substituted = ENV_VAR.replace_all(&protected, |caps: &regex::Captures| {
+        let name = &caps[1];
+        match lookup(name) {
+            Some(value) => value,
+            None => {
+                missing.insert(name.to_string());
+                String::new()
+            }
+        }
+    });
     RESTORE_ESCAPED_ENV_VAR.replace_all(&substituted, |caps: &regex::Captures| format!("${{{}}}", &caps[1])).into_owned()
 }
 
@@ -472,7 +497,8 @@ mod tests {
             "plugin_metadata": { "file-logger": { "log_format": { "note": "${NOTE}" } } },
         });
 
-        replace_env_vars_with(&mut config, &lookup);
+        let missing = replace_env_vars_with(&mut config, &lookup);
+        assert!(missing.is_empty());
 
         assert_eq!(
             config,
@@ -492,9 +518,62 @@ mod tests {
 
     #[test]
     fn replace_env_vars_expands_an_unset_variable_to_an_empty_string() {
-        let mut config = json!({ "name": "prefix-${MISSING}-suffix" });
-        replace_env_vars_with(&mut config, &|_| None);
-        assert_eq!(config, json!({ "name": "prefix--suffix" }));
+        let mut config = json!({
+            "missing": "prefix-${MISSING}-suffix",
+            "empty": "${EMPTY}",
+            "escaped": "\\${ESCAPED}",
+            "dotted": "${external_user.preferred_username}",
+        });
+        let missing = replace_env_vars_with(&mut config, &|name| match name {
+            "EMPTY" => Some(String::new()),
+            _ => None,
+        });
+        assert_eq!(missing, BTreeSet::from(["MISSING".to_string()]));
+        assert_eq!(
+            config,
+            json!({
+                "missing": "prefix--suffix",
+                "empty": "",
+                "escaped": "${ESCAPED}",
+                "dotted": "${external_user.preferred_username}",
+            })
+        );
+    }
+
+    #[derive(Clone, Default)]
+    struct SharedBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl std::io::Write for SharedBuffer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn missing_variable_warning_names_the_file_and_variable_without_a_value() {
+        let buffer = SharedBuffer::default();
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .finish();
+
+        tracing::subscriber::with_default(subscriber, || {
+            warn_on_missing_env_vars(
+                Path::new("configs/adc.yaml"),
+                &BTreeSet::from(["MISSING_SECRET".to_string()]),
+            );
+        });
+
+        let output = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+        assert!(output.contains("configs/adc.yaml"), "{output}");
+        assert!(output.contains("MISSING_SECRET"), "{output}");
+        assert!(output.contains("substituted an empty string"), "{output}");
+        assert!(!output.contains("secret-value"), "{output}");
     }
 
     #[test]
@@ -836,7 +915,8 @@ mod tests {
                 (PathBuf::from("b.yaml"), json!({"services": [{"name": "${SVC_B}"}]})),
             ];
             for (_, value) in &mut files {
-                replace_env_vars_with(value, &lookup);
+                let missing = replace_env_vars_with(value, &lookup);
+                assert!(missing.is_empty());
             }
             let err = merge_files(files).unwrap_err();
             assert!(err.to_string().contains("duplicate"), "{err}");
