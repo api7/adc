@@ -65,3 +65,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # Renovate security update: glob@14.0.2
   - glob@14.0.2
+  # Renovate security update: js-yaml@5.4.1
+  - js-yaml@5.4.1
