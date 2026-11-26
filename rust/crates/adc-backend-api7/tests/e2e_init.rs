@@ -36,6 +36,7 @@ async fn bootstrap_shared_token() {
         // Not running in CI — nothing to share the token with.
         return;
     };
+    writeln!(std::io::stdout(), "::add-mask::{token}").unwrap();
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(&github_env)

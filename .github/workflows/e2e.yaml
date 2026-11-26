@@ -189,6 +189,9 @@ jobs:
             echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
+            initial_password="Aa1!$(openssl rand -hex 24)"
+            printf '::add-mask::%s\n' "$initial_password"
+            printf 'API7_ADMIN_INITIAL_PASSWORD=%s\n' "$initial_password" >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"
@@ -198,6 +201,8 @@ jobs:
             echo "BACKEND_API7_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=v${{ matrix.version }}" >> $GITHUB_ENV
+            # The pinned release images use their historical factory login.
+            printf 'API7_ADMIN_INITIAL_PASSWORD=admin\n' >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_LICENSE }}"
@@ -243,6 +248,9 @@ jobs:
             echo "BACKEND_API7_VERSION=999.999.999" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=ghcr.io/api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=dev" >> $GITHUB_ENV
+            initial_password="Aa1!$(openssl rand -hex 24)"
+            printf '::add-mask::%s\n' "$initial_password"
+            printf 'API7_ADMIN_INITIAL_PASSWORD=%s\n' "$initial_password" >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_DEV_LICENSE }}"
@@ -252,6 +260,8 @@ jobs:
             echo "BACKEND_API7_VERSION=${{ matrix.version }}" >> $GITHUB_ENV
             echo "API7_DASHBOARD_IMAGE=api7/api7-ee-3-integrated" >> $GITHUB_ENV
             echo "API7_IMAGE_TAG=v${{ matrix.version }}" >> $GITHUB_ENV
+            # The pinned release images use their historical factory login.
+            printf 'API7_ADMIN_INITIAL_PASSWORD=admin\n' >> "$GITHUB_ENV"
             {
               echo "BACKEND_API7_LICENSE<<EOLICENSE"
               echo "${{ secrets.BACKEND_API7_LICENSE }}"
@@ -295,6 +305,11 @@ jobs:
       # result is shared with every other test file as `TOKEN` (see
       # tests/e2e_init.rs), instead of each independently repeating it
       # against a dashboard the first one to run already mutated.
+      - name: Generate the Rust bootstrap password
+        run: |
+          rotated_password="Aa1!$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$rotated_password"
+          printf 'BACKEND_API7_ROTATED_ADMIN_PASSWORD=%s\n' "$rotated_password" >> "$GITHUB_ENV"
       - name: Bootstrap a shared API7 token
         working-directory: ./rust
         run: |
